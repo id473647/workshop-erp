@@ -1,81 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>My Care Service Center - Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Care Service Center - ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --green: #27ae60; --blue: #2980b9; --red: #e74c3c; --dark: #2c3e50; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; color: var(--dark); }
-        .header { background: var(--dark); color: white; padding: 1rem; text-align: center; }
-        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; }
-        .btn { padding: 20px; border: none; border-radius: 12px; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .btn-jc { background: var(--green); }
-        .btn-staff { background: var(--blue); }
-        .stats-container { padding: 15px; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .amt { font-size: 1.5rem; font-weight: bold; display: block; margin-top: 5px; }
-        .neg { color: var(--red); }
-        .pos { color: var(--green); }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --danger: #e74c3c; --light: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--light); }
+        .header { background: var(--primary); color: white; padding: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { padding: 15px; max-width: 800px; margin: auto; }
+        .nav-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .btn { padding: 18px; border: none; border-radius: 12px; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; transition: transform 0.2s; }
+        .btn:active { transform: scale(0.95); }
+        .btn-jc { background: var(--success); }
+        .btn-staff { background: var(--info); }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .mech-name { font-size: 1.2rem; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        .balance { font-size: 1.4rem; font-weight: bold; }
+        .pos { color: var(--success); }
+        .neg { color: var(--danger); }
+        .date-row { font-size: 0.9rem; color: #666; display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding: 5px 0; }
     </style>
 </head>
 <body>
 
 <div class="header">
     <h1>MY CARE SERVICE CENTER</h1>
-    <p>Workshop Management System</p>
+    <div id="connectionStatus" style="font-size: 0.8rem; opacity: 0.8;">Connecting to Supabase...</div>
 </div>
 
-<div class="nav-grid">
-    <button class="btn btn-jc" onclick="alert('Opening New Job Card Form...')">NEW JOB CARD</button>
-    <button class="btn btn-staff" onclick="loadStaffLedger()">STAFF LEDGER</button>
-</div>
+<div class="container">
+    <div class="nav-buttons">
+        <button class="btn btn-jc" onclick="alert('Form for 7-fields opening...')">NEW JOB CARD</button>
+        <button class="btn btn-staff" onclick="renderStaffLedger()">REFRESH LEDGER</button>
+    </div>
 
-<div class="stats-container">
-    <h3>Daily Live Summary</h3>
-    <div class="card">
-        Green Warehouse Sales
-        <span class="amt pos" id="dailyGreen">₹0</span>
-    </div>
-    <div class="card">
-        Moped Warehouse Sales
-        <span class="amt pos" id="dailyMoped">₹0</span>
-    </div>
-    
-    <h3>Staff Balances (Net Payable)</h3>
-    <div id="staffList">Loading staff balances...</div>
+    <h2 style="color: var(--primary);">Staff Net Payable (Live)</h2>
+    <div id="ledgerContainer">
+        </div>
 </div>
 
 <script>
-    const SUB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SUB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k"; // PASTE YOUR KEY HERE
-    const supabase = lib.supabase.createClient(SUB_URL, SUB_KEY);
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadStaffBalances() {
-        // Logic: Calculate (Earnings - Advances) for each mechanic
-        const { data: staff, error } = await supabase.from('mechanics').select('id, name');
+    async function renderStaffLedger() {
+        document.getElementById('connectionStatus').innerText = "Updating Balances...";
         
-        let html = '';
-        for (let mech of staff) {
-            const { data: ledger } = await supabase.from('staff_ledger').select('amount, entry_type').eq('mechanic_id', mech.id);
-            
-            let total = 0;
-            ledger.forEach(entry => {
-                if(entry.entry_type === 'EARNING') total += entry.amount;
-                else total -= entry.amount;
-            });
-
-            html += `
-                <div class="card">
-                    <strong>${mech.name}</strong>
-                    <span class="amt ${total < 0 ? 'neg' : 'pos'}">₹${total}</span>
-                </div>`;
+        // 1. Fetch all mechanics
+        const { data: mechanics, error: mError } = await supabase.from('mechanics').select('*').eq('is_active', true);
+        
+        if (mError) {
+            console.error(mError);
+            return;
         }
-        document.getElementById('staffList').innerHTML = html;
+
+        let containerHtml = '';
+
+        for (let mech of mechanics) {
+            // 2. Fetch ledger entries for this mechanic
+            const { data: entries } = await supabase.from('staff_ledger')
+                .select('*')
+                .eq('mechanic_id', mech.id)
+                .order('created_at', { ascending: false });
+
+            let netPayable = 0;
+            let dailyBreakdown = '';
+
+            if (entries) {
+                entries.forEach(e => {
+                    const amt = parseFloat(e.amount);
+                    if (e.entry_type === 'EARNING') {
+                        netPayable += amt;
+                        dailyBreakdown += `<div class="date-row"><span>${new Date(e.created_at).toLocaleDateString()}: Earning</span><span class="pos">+₹${amt}</span></div>`;
+                    } else {
+                        netPayable -= amt;
+                        dailyBreakdown += `<div class="date-row"><span>${new Date(e.created_at).toLocaleDateString()}: Advance</span><span class="neg">-₹${amt}</span></div>`;
+                    }
+                });
+            }
+
+            containerHtml += `
+                <div class="card">
+                    <div class="mech-name">
+                        <span>${mech.name}</span>
+                        <span class="balance ${netPayable >= 0 ? 'pos' : 'neg'}">₹${netPayable}</span>
+                    </div>
+                    <div style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 5px;">
+                        ${dailyBreakdown || '<small>No transactions recorded yet</small>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('ledgerContainer').innerHTML = containerHtml;
+        document.getElementById('connectionStatus').innerText = "Connected & Synced";
     }
 
-    // Initialize
-    loadStaffBalances();
+    // Run on load
+    renderStaffLedger();
 </script>
 
 </body>
