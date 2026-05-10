@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Care Service Center - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --green: #27ae60; --blue: #2980b9; --red: #e74c3c; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; color: var(--dark); }
+        .header { background: var(--dark); color: white; padding: 1rem; text-align: center; }
+        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; }
+        .btn { padding: 20px; border: none; border-radius: 12px; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-jc { background: var(--green); }
+        .btn-staff { background: var(--blue); }
+        .stats-container { padding: 15px; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .amt { font-size: 1.5rem; font-weight: bold; display: block; margin-top: 5px; }
+        .neg { color: var(--red); }
+        .pos { color: var(--green); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MY CARE SERVICE CENTER</h1>
+    <p>Workshop Management System</p>
+</div>
+
+<div class="nav-grid">
+    <button class="btn btn-jc" onclick="alert('Opening New Job Card Form...')">NEW JOB CARD</button>
+    <button class="btn btn-staff" onclick="loadStaffLedger()">STAFF LEDGER</button>
+</div>
+
+<div class="stats-container">
+    <h3>Daily Live Summary</h3>
+    <div class="card">
+        Green Warehouse Sales
+        <span class="amt pos" id="dailyGreen">₹0</span>
+    </div>
+    <div class="card">
+        Moped Warehouse Sales
+        <span class="amt pos" id="dailyMoped">₹0</span>
+    </div>
+    
+    <h3>Staff Balances (Net Payable)</h3>
+    <div id="staffList">Loading staff balances...</div>
+</div>
+
+<script>
+    const SUB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SUB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k"; // PASTE YOUR KEY HERE
+    const supabase = lib.supabase.createClient(SUB_URL, SUB_KEY);
+
+    async function loadStaffBalances() {
+        // Logic: Calculate (Earnings - Advances) for each mechanic
+        const { data: staff, error } = await supabase.from('mechanics').select('id, name');
+        
+        let html = '';
+        for (let mech of staff) {
+            const { data: ledger } = await supabase.from('staff_ledger').select('amount, entry_type').eq('mechanic_id', mech.id);
+            
+            let total = 0;
+            ledger.forEach(entry => {
+                if(entry.entry_type === 'EARNING') total += entry.amount;
+                else total -= entry.amount;
+            });
+
+            html += `
+                <div class="card">
+                    <strong>${mech.name}</strong>
+                    <span class="amt ${total < 0 ? 'neg' : 'pos'}">₹${total}</span>
+                </div>`;
+        }
+        document.getElementById('staffList').innerHTML = html;
+    }
+
+    // Initialize
+    loadStaffBalances();
+</script>
+
+</body>
+</html>
