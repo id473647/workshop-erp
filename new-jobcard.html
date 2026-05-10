@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Job Card - My Care</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; margin: 0; }
+        .form-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h2 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #27ae60; padding-bottom: 10px; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #34495e; }
+        input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        .btn-save { background: #27ae60; color: white; border: none; width: 100%; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-top: 25px; cursor: pointer; }
+        .btn-back { background: #95a5a6; color: white; text-decoration: none; display: inline-block; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="form-card">
+    <a href="index.html" class="btn-back">← Back to Dashboard</a>
+    <h2>Create Job Card</h2>
+    
+    <form id="jcForm">
+        <label>Customer Mobile (Primary Key)</label>
+        <input type="tel" id="mobile" placeholder="Enter 10 digit number" required>
+
+        <label>Customer Name & Address</label>
+        <input type="text" id="custName" placeholder="Full Name">
+        <input type="text" id="custAddress" placeholder="Address/Area">
+
+        <label>Vehicle Brand & Name</label>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="brand" placeholder="Hero/Honda">
+            <input type="text" id="vehName" placeholder="Activa/Shine">
+        </div>
+
+        <label>Vehicle Number & Colour</label>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="vehNo" placeholder="MP-04-XX-0000">
+            <input type="text" id="vehColor" placeholder="Black/Red">
+        </div>
+
+        <label>Customer Complaint</label>
+        <textarea id="complaint" rows="3" placeholder="Symptoms, noise, service needed..."></textarea>
+
+        <label>Estimate Given (₹)</label>
+        <input type="number" id="estimate" placeholder="Approximate cost">
+
+        <label>Assign Mechanic</label>
+        <select id="mechanicSelect">
+            <option value="">Select Mechanic</option>
+            </select>
+
+        <button type="submit" class="btn-save">OPEN JOB CARD</button>
+    </form>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
+
+    // Load active mechanics into dropdown
+    async function loadMechs() {
+        const { data } = await supabase.from('mechanics').select('id, name').eq('is_active', true);
+        const select = document.getElementById('mechanicSelect');
+        data.forEach(m => {
+            let opt = document.createElement('option');
+            opt.value = m.id;
+            opt.innerHTML = m.name;
+            select.appendChild(opt);
+        });
+    }
+
+    // Handle Form Submission
+    document.getElementById('jcForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        alert("Connecting to database to save Job Card...");
+        // Logic for saving to Supabase will be implemented in the next step
+    });
+
+    loadMechs();
+</script>
+
+</body>
+</html>
