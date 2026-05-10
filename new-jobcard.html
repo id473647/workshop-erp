@@ -48,69 +48,49 @@
         <input type="number" id="estimate" placeholder="Approximate cost">
 
         <label>Assign Mechanic</label>
-        <select id="mechanicSelect">
+        <select id="mechanicSelect" required>
             <option value="">Select Mechanic</option>
-            </select>
+        </select>
 
         <button type="submit" class="btn-save">OPEN JOB CARD</button>
     </form>
 </div>
-    
+
+<script>
+    // These keys connect your app to your specific database
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
+    
+    // Create the connection
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // Load active mechanics into dropdown
-    async function loadMechs() {
-        const { data } = await supabase.from('mechanics').select('id, name').eq('is_active', true);
-        const select = document.getElementById('mechanicSelect');
-        data.forEach(m => {
-            let opt = document.createElement('option');
-            opt.value = m.id;
-            opt.innerHTML = m.name;
-            select.appendChild(opt);
-        });
-    }
-
-    // Handle Form Submission
-    document.getElementById('jcForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        alert("Connecting to database to save Job Card...");
-        // Logic for saving to Supabase will be implemented in the next step
-    });
-
-    loadMechs();
-const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
-
-    // 1. Auto-fetch Customer Details when Mobile Number is typed
+    // 1. Auto-fetch Customer Details when Mobile Number is entered
     document.getElementById('mobile').addEventListener('blur', async (e) => {
         const phone = e.target.value;
         if(phone.length < 10) return;
 
-        const { data, error } = await supabase.from('customers').select('*').eq('mobile_number', phone).single();
-        
+        const { data } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
         if (data) {
             document.getElementById('custName').value = data.name;
             document.getElementById('custAddress').value = data.address;
-            alert("Welcome back, " + data.name + "! Old details loaded.");
         }
     });
 
     // 2. Load Mechanics into Dropdown
     async function loadMechs() {
-        const { data } = await supabase.from('mechanics').select('id, name').eq('is_active', true);
+        const { data } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
         const select = document.getElementById('mechanicSelect');
-        data.forEach(m => {
-            let opt = document.createElement('option');
-            opt.value = m.id;
-            opt.innerHTML = m.name;
-            select.appendChild(opt);
-        });
+        if(data) {
+            data.forEach(m => {
+                let opt = document.createElement('option');
+                opt.value = m.id;
+                opt.innerHTML = m.name;
+                select.appendChild(opt);
+            });
+        }
     }
 
-    // 3. The "Save" Logic
+    // 3. Save the Job Card
     document.getElementById('jcForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -118,20 +98,18 @@ const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
         const name = document.getElementById('custName').value;
         const address = document.getElementById('custAddress').value;
 
-        // Step A: Ensure Customer exists
-        const { error: custError } = await supabase.from('customers').upsert({ 
-            mobile_number: mobile, name: name, address: address 
-        });
+        // Step A: Save/Update Customer
+        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, address: address });
 
-        // Step B: Ensure Vehicle is recorded
-        const { data: vehData, error: vehError } = await supabase.from('vehicles').upsert({
+        // Step B: Save/Update Vehicle
+        const { data: vehData } = await supabaseClient.from('vehicles').upsert({
             customer_mobile: mobile,
             reg_number: document.getElementById('vehNo').value,
             make_model: document.getElementById('brand').value + " " + document.getElementById('vehName').value
         }).select().single();
 
-        // Step C: Create the Job Card
-        const { error: jcError } = await supabase.from('job_cards').insert({
+        // Step C: Open the Job Card
+        const { error: jcError } = await supabaseClient.from('job_cards').insert({
             customer_mobile: mobile,
             vehicle_id: vehData.id,
             mech_id: document.getElementById('mechanicSelect').value,
@@ -139,14 +117,14 @@ const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
         });
 
         if(!jcError) {
-            alert("Job Card Created Successfully!");
-            window.location.href = 'index.html'; // Go back to dashboard
+            alert("Job Card " + document.getElementById('vehNo').value + " Opened!");
+            window.location.href = 'index.html';
         } else {
             alert("Error: " + jcError.message);
         }
     });
 
     loadMechs();
-
+</script>
 </body>
 </html>
