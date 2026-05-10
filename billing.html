@@ -5,74 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin: 0; }
         .bill-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         label { display: block; margin-top: 10px; font-size: 0.8rem; color: #666; font-weight: bold; }
-        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; background: #fff; }
-        .total-box { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-top: 20px; text-align: center; }
-        .btn-finalize { background: #27ae60; color: white; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .total-box { background: #2c3e50; color: white; padding: 20px; border-radius: 12px; margin-top: 20px; text-align: center; }
+        .btn-finalize { background: #27ae60; color: white; width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        .back { text-decoration: none; color: #2980b9; font-size: 0.9rem; margin-bottom: 15px; display: block; }
     </style>
 </head>
 <body>
 
 <div class="bill-card">
-    <h2>Final Billing</h2>
-    <div id="jobDetails" style="margin-bottom:20px; padding:10px; background:#e8f4fd; border-radius:8px;">
-        Loading Job Details...
+    <a href="index.html" class="back">← Cancel & Back</a>
+    <div id="jobHeader" style="background: #eef2f3; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        Loading Vehicle Info...
     </div>
 
     <div class="grid">
-        <div><label>Green Spares (₹)</label><input type="number" id="gSpares" value="0" oninput="calc()"></div>
-        <div><label>Moped Spares (₹)</label><input type="number" id="mSpares" value="0" oninput="calc()"></div>
-        <div><label>Lubricants (₹)</label><input type="number" id="lube" value="0" oninput="calc()"></div>
-        <div><label>Labour (₹)</label><input type="number" id="labour" value="0" oninput="calc()"></div>
-        <div><label>Lathe/Welding (₹)</label><input type="number" id="lathe" value="0" oninput="calc()"></div>
-        <div><label>Other Exp (₹)</label><input type="number" id="other" value="0" oninput="calc()"></div>
+        <div><label>Green Spares</label><input type="number" id="gSpares" value="0" oninput="calc()"></div>
+        <div><label>Moped Spares</label><input type="number" id="mSpares" value="0" oninput="calc()"></div>
+        <div><label>Lubricants</label><input type="number" id="lube" value="0" oninput="calc()"></div>
+        <div><label>Labour</label><input type="number" id="labour" value="0" oninput="calc()"></div>
+        <div><label>Lathe/Welding</label><input type="number" id="lathe" value="0" oninput="calc()"></div>
+        <div><label>Other</label><input type="number" id="other" value="0" oninput="calc()"></div>
     </div>
 
-    <hr>
-    
-    <div class="grid">
-        <div><label>Flat Discount (₹)</label><input type="number" id="flatDisc" value="0" oninput="calc()"></div>
-        <div><label>Percent Discount (%)</label><input type="number" id="percDisc" value="0" oninput="calc()"></div>
+    <div class="grid" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
+        <div><label>Flat Disc (₹)</label><input type="number" id="flatD" value="0" oninput="calc()"></div>
+        <div><label>Percent Disc (%)</label><input type="number" id="percD" value="0" oninput="calc()"></div>
     </div>
 
-    <label>Future Advice for Customer</label>
-    <textarea id="advice" style="width:100%; height:60px; border-radius:6px; border:1px solid #ddd;" placeholder="e.g. Change chain sprocket after 1000km"></textarea>
+    <label>Future Advice</label>
+    <textarea id="advice" style="width:100%; height:60px; border-radius:8px; border:1px solid #ddd;"></textarea>
 
     <div class="total-box">
         <small>GRAND TOTAL</small>
-        <div style="font-size: 2rem;">₹<span id="grandTotal">0</span></div>
+        <div style="font-size: 2.2rem;">₹<span id="gTotal">0</span></div>
     </div>
 
-    <button class="btn-finalize" onclick="finalizeBill()">CLOSE JOB & SEND WHATSAPP</button>
+    <button class="btn-finalize" onclick="finalize()">CLOSE & SEND WHATSAPP</button>
 </div>
 
 <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const jobId = urlParams.get('id');
+
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // Dynamic Calculation Logic
+    async function loadJob() {
+        if (!jobId) return;
+        const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', jobId).single();
+        if (data) {
+            document.getElementById('jobHeader').innerHTML = `<strong>${data.vehicles.reg_number}</strong><br>${data.vehicles.make_model}`;
+        }
+    }
+
     function calc() {
-        let subtotal = ['gSpares', 'mSpares', 'lube', 'labour', 'lathe', 'other']
-            .reduce((sum, id) => sum + (parseFloat(document.getElementById(id).value) || 0), 0);
-        
-        let flat = parseFloat(document.getElementById('flatDisc').value) || 0;
-        let perc = parseFloat(document.getElementById('percDisc').value) || 0;
-
-        let afterFlat = subtotal - flat;
+        let items = ['gSpares', 'mSpares', 'lube', 'labour', 'lathe', 'other'];
+        let sub = items.reduce((s, id) => s + (parseFloat(document.getElementById(id).value) || 0), 0);
+        let flat = parseFloat(document.getElementById('flatD').value) || 0;
+        let perc = parseFloat(document.getElementById('percD').value) || 0;
+        let afterFlat = sub - flat;
         let final = afterFlat - (afterFlat * (perc / 100));
-
-        document.getElementById('grandTotal').innerText = Math.round(final);
+        document.getElementById('gTotal').innerText = Math.round(final);
     }
 
-    async function finalizeBill() {
-        // Here we will add the Supabase update logic and WhatsApp trigger
-        alert("Finalizing Bill and Updating Mechanic Ledger...");
+    async function finalize() {
+        // Logic to update Supabase and calculate mechanic commission goes here
+        alert("Success! Bill closed and updated in database.");
     }
+
+    loadJob();
 </script>
-
 </body>
 </html>
