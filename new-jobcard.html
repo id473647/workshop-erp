@@ -6,69 +6,76 @@
     <title>New Job Card - My Care</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; margin: 0; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--light); padding: 15px; margin: 0; }
+        .header { background: white; padding: 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); margin-bottom: 20px; border-radius: 8px; }
+        .logo-main { height: 40px; }
         .form-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-        h2 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #27ae60; padding-bottom: 10px; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #34495e; }
+        h2 { color: var(--primary); margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid var(--success); padding-bottom: 5px; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #444; font-size: 0.9rem; }
         input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-        .btn-save { background: #27ae60; color: white; border: none; width: 100%; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-top: 25px; cursor: pointer; }
-        .btn-back { background: #95a5a6; color: white; text-decoration: none; display: inline-block; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 0.9rem; }
+        .grid { display: flex; gap: 10px; }
+        .btn-save { background: var(--success); color: white; border: none; width: 100%; padding: 16px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; margin-top: 25px; cursor: pointer; transition: 0.3s; }
+        .btn-save:disabled { background: #95a5a6; cursor: not-allowed; }
+        .btn-back { background: #95a5a6; color: white; text-decoration: none; display: inline-block; padding: 8px 12px; border-radius: 5px; margin-bottom: 15px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
+<div class="header">
+    <img src="logo-main.jpg" class="logo-main" onerror="this.style.display='none'">
+    <h1 style="font-size: 1rem; margin:0;">MY CARE</h1>
+    <img src="logo-green.png" style="height:30px;" onerror="this.style.display='none'">
+</div>
+
 <div class="form-card">
-    <a href="index.html" class="btn-back">← Back to Dashboard</a>
-    <h2>Create Job Card</h2>
+    <a href="index.html" class="btn-back">← Back</a>
+    <h2>Open Job Card</h2>
     
     <form id="jcForm">
-        <label>Customer Mobile (Primary Key)</label>
-        <input type="tel" id="mobile" placeholder="Enter 10 digit number" required>
+        <label>Customer Mobile</label>
+        <input type="tel" id="mobile" placeholder="10 Digit Number" required>
 
         <label>Customer Name & Address</label>
         <input type="text" id="custName" placeholder="Full Name">
         <input type="text" id="custAddress" placeholder="Address/Area">
 
         <label>Vehicle Brand & Name</label>
-        <div style="display:flex; gap:10px;">
+        <div class="grid">
             <input type="text" id="brand" placeholder="Hero/Honda">
             <input type="text" id="vehName" placeholder="Activa/Shine">
         </div>
 
-        <label>Vehicle Number & Colour</label>
-        <div style="display:flex; gap:10px;">
+        <label>Number & Colour</label>
+        <div class="grid">
             <input type="text" id="vehNo" placeholder="MP-04-XX-0000">
             <input type="text" id="vehColor" placeholder="Black/Red">
         </div>
 
         <label>Customer Complaint</label>
-        <textarea id="complaint" rows="3" placeholder="Symptoms, noise, service needed..."></textarea>
+        <textarea id="complaint" rows="2" placeholder="Symptoms..."></textarea>
 
-        <label>Estimate Given (₹)</label>
-        <input type="number" id="estimate" placeholder="Approximate cost">
+        <label>Mechanic Estimate (₹)</label>
+        <input type="number" id="estimate" placeholder="Approx cost">
 
         <label>Assign Mechanic</label>
         <select id="mechanicSelect" required>
             <option value="">Select Mechanic</option>
         </select>
 
-        <button type="submit" class="btn-save">OPEN JOB CARD</button>
+        <button type="submit" id="submitBtn" class="btn-save">OPEN JOB CARD</button>
     </form>
 </div>
 
 <script>
-    // These keys connect your app to your specific database
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    
-    // Create the connection
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    // 1. Auto-fetch Customer Details when Mobile Number is entered
+    // Auto-fetch Customer on Mobile Entry
     document.getElementById('mobile').addEventListener('blur', async (e) => {
         const phone = e.target.value;
         if(phone.length < 10) return;
-
         const { data } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
         if (data) {
             document.getElementById('custName').value = data.name;
@@ -76,51 +83,53 @@
         }
     });
 
-    // 2. Load Mechanics into Dropdown
+    // Load Mechanics
     async function loadMechs() {
         const { data } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
         const select = document.getElementById('mechanicSelect');
-        if(data) {
-            data.forEach(m => {
-                let opt = document.createElement('option');
-                opt.value = m.id;
-                opt.innerHTML = m.name;
-                select.appendChild(opt);
-            });
-        }
+        if(data) data.forEach(m => {
+            let opt = document.createElement('option');
+            opt.value = m.id;
+            opt.innerHTML = m.name;
+            select.appendChild(opt);
+        });
     }
 
-    // 3. Save the Job Card
+    // Submit Logic
     document.getElementById('jcForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const mobile = document.getElementById('mobile').value;
-        const name = document.getElementById('custName').value;
-        const address = document.getElementById('custAddress').value;
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "SAVING TO CLOUD...";
+        btn.disabled = true;
 
-        // Step A: Save/Update Customer
-        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, address: address });
+        try {
+            const mobile = document.getElementById('mobile').value;
+            // 1. Save Customer
+            await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: document.getElementById('custName').value, address: document.getElementById('custAddress').value });
 
-        // Step B: Save/Update Vehicle
-        const { data: vehData } = await supabaseClient.from('vehicles').upsert({
-            customer_mobile: mobile,
-            reg_number: document.getElementById('vehNo').value,
-            make_model: document.getElementById('brand').value + " " + document.getElementById('vehName').value
-        }).select().single();
+            // 2. Save Vehicle
+            const { data: vData } = await supabaseClient.from('vehicles').upsert({
+                customer_mobile: mobile,
+                reg_number: document.getElementById('vehNo').value,
+                make_model: document.getElementById('brand').value + " " + document.getElementById('vehName').value
+            }).select().single();
 
-        // Step C: Open the Job Card
-        const { error: jcError } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile,
-            vehicle_id: vehData.id,
-            mech_id: document.getElementById('mechanicSelect').value,
-            status: 'Open'
-        });
+            // 3. Create Job Card
+            const { error } = await supabaseClient.from('job_cards').insert({
+                customer_mobile: mobile,
+                vehicle_id: vData.id,
+                mech_id: document.getElementById('mechanicSelect').value,
+                status: 'Open'
+            });
 
-        if(!jcError) {
-            alert("Job Card " + document.getElementById('vehNo').value + " Opened!");
-            window.location.href = 'index.html';
-        } else {
-            alert("Error: " + jcError.message);
+            if (!error) {
+                alert("Success! Job Card Opened.");
+                window.location.href = 'index.html';
+            } else { throw error; }
+        } catch (err) {
+            alert("Error: " + err.message);
+            btn.innerText = "OPEN JOB CARD";
+            btn.disabled = false;
         }
     });
 
