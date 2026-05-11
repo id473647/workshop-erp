@@ -75,7 +75,43 @@
     }
 
     async function finalize() {
-        // Logic to update Supabase and calculate mechanic commission goes here
+        const labour = parseFloat(document.getElementById('labour').value) || 0;
+        const total = parseFloat(document.getElementById('gTotal').innerText);
+        const advice = document.getElementById('advice').value;
+
+        // 1. Update the Job Card to 'Closed'
+        const { data: job, error: jcError } = await supabaseClient.from('job_cards')
+            .update({
+                status: 'Closed',
+                green_total: document.getElementById('gSpares').value,
+                moped_total: document.getElementById('mSpares').value,
+                lubricant_total: document.getElementById('lube').value,
+                labour_charges: labour,
+                lathe_welding: document.getElementById('lathe').value,
+                future_advice: advice,
+                total_invoice_value: total
+            })
+            .eq('id', jobId)
+            .select('*, mechanics(name, commission_rate)').single();
+
+        if (jcError) return alert("Error closing job: " + jcError.message);
+
+        // 2. Add Earning to Mechanic Ledger
+        const commission = (labour * (job.mechanics.commission_rate / 100));
+        await supabaseClient.from('staff_ledger').insert({
+            mechanic_id: job.mech_id,
+            amount: commission,
+            entry_type: 'EARNING',
+            description: `Commission for Job ID: ${job.id}`
+        });
+
+        // 3. Trigger WhatsApp
+        const msg = `Hello! Your vehicle is ready. %0A%0ATotal: ₹${total}%0AAdvice: ${advice}%0A%0AThank you for choosing My Care!`;
+        window.open(`https://wa.me/91${job.customer_mobile}?text=${msg}`, '_blank');
+
+        alert("Job Closed! Mechanic Earned: ₹" + commission);
+        window.location.href = 'index.html';
+    }
         alert("Success! Bill closed and updated in database.");
     }
 
