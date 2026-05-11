@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Staff Ledger - My Care</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #2c3e50; color: white; }
+        .pos { color: #27ae60; font-weight: bold; }
+        .neg { color: #e74c3c; font-weight: bold; }
+        .back { display: inline-block; margin-bottom: 15px; text-decoration: none; color: #2980b9; }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back">← Back to Dashboard</a>
+    <h2>Mechanic Balances & Ledgers</h2>
+    <div id="ledgerTable">Loading...</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    async function loadTable() {
+        const { data: mechanics } = await supabaseClient.from('mechanics').select('*');
+        let html = '<table><tr><th>Mechanic</th><th>Earnings</th><th>Advances</th><th>Net Payable</th></tr>';
+        
+        for (let m of mechanics) {
+            const { data: ledger } = await supabaseClient.from('staff_ledger').select('*').eq('mechanic_id', m.id);
+            let earned = 0, advances = 0;
+            ledger?.forEach(e => {
+                if(e.entry_type === 'EARNING') earned += parseFloat(e.amount);
+                else advances += parseFloat(e.amount);
+            });
+            let net = earned - advances;
+            html += `<tr>
+                <td>${m.name}</td>
+                <td class="pos">₹${earned}</td>
+                <td class="neg">₹${advances}</td>
+                <td><strong>₹${net}</strong></td>
+            </tr>`;
+        }
+        html += '</table>';
+        document.getElementById('ledgerTable').innerHTML = html;
+    }
+    loadTable();
+</script>
+</body>
+</html>
