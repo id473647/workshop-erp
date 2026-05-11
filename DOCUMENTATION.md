@@ -1,37 +1,32 @@
-# Workshop ERP: Project Manifest & Progress Log
+# My Care Service Center - ERP Project Manifest
 
-## 1. Project Vision
-To transition "My Care Service Center" from manual paper records to a cloud-synced digital system that manages customer history, dual-warehouse inventory (Green & Moped), and staff financial ledgers.
+## 1. Project Objective
+To digitize the manual workflow of a multi-brand two-wheeler workshop. The system tracks customer history, dual-warehouse spares, mechanic commissions, and third-party lathe work.
 
-## 2. Technical Infrastructure
-* **Version Control:** GitHub (For logic and documentation).
-* **Database:** Supabase / PostgreSQL (For real-time data storage).
-* **Frontend:** HTML5/JavaScript (Cross-platform for PC and Android).
-* **Integrations:** WhatsApp Web for automated invoicing.
+## 2. Branding & Identity
+* **Main Brand:** My Care Service Center.
+* **Segment Branding:** Green Scooter / Moped Warehouse logic.
+* **Logo Assets:** `logo-main.jpg` (Header) and `logo-green.png` (Sub-branding).
 
-## 3. How It Works (The Logic Flow)
-1.  **Check-in:** Enter mobile number -> Check if customer exists -> Record vehicle & problem -> Assign Mechanic.
-2.  **Service:** Parts issued from Green/Moped warehouses.
-3.  **Billing:** Sum of all costs (Spares + Labour + Lathe) -> Apply Flat then % Discount -> Add Future Advice.
-4.  **Accounting:** Update Mechanic Ledger with commissions -> Record Payment (Cash/UPI/Credit).
+## 3. Core Database Architecture (Supabase)
+* **Customers:** Primary Key: `mobile_number`. Links all bikes and bills.
+* **Mechanics:** Tracks active staff and their specific `commission_rate`.
+* **Staff Ledger:** Tracks `EARNING` (from labour) and `ADVANCE` (cash withdrawals).
+* **Job Cards:** Stores daily totals for Green Spares, Moped Spares, Lubricants, Labour, and Lathe.
+* **Lathe Tracking:** Uses `lathe_status` (Pending/Paid) to manage third-party settlements.
 
-## 4. Current Achievements (Status)
-- [x] **Phase 1: Infrastructure.** GitHub and Supabase connected.
-- [x] **Phase 2: Database Design.** SQL Master Schema v1.5 implemented (Mechanics, Ledger, Job Cards).
-- [x] **Phase 3: The Dashboard.** `index.html` created to show live workshop status.
-- [x] **Phase 4: Data Entry.** `new-jobcard.html` created with "upsert" logic (handles new/old customers).
-- [ ] **Phase 5: Billing System.** `billing.html` skeleton created (Need to connect "Close Job" logic).
+## 4. Operational Workflow
+1. **Entry:** Search mobile -> Load customer -> Record Complaints -> Assign Mechanic.
+2. **Dashboard:** Monitor "Open" jobs in the workshop and live staff balances.
+3. **Billing:** Calculate totals with dual-discount logic (Flat amount then Percentage).
+4. **Closing:** - Post commission to Mechanic Ledger.
+   - Set Lathe payment status.
+   - Trigger WhatsApp message with bill summary and "Future Advice".
 
-## 5. Future Roadmap
-- [ ] Implement WhatsApp Invoice generation.
-- [ ] Create Daily Sales Analytics report.
-- [ ] Add Lathe/Welding specialized tracking.
-- [ ] Build the "Counter Sale" mode for retail.
-
-External Work (Lathe/Welding) Rules:
-
-Tracking: Every Lathe entry must have a payment_status (Pending/Paid).
-
-Settlement: Even if a Job Card is "Closed" (customer paid you), the Lathe work might still be "Pending" (you haven't paid the operator yet).
-
-Ledger View: A dedicated report will show all "Pending" external payments to ensure no third-party operator is forgotten.
+## 5. Achievements & Progress
+- [x] Cloud Database Setup (Supabase).
+- [x] Automated Mechanic Commission Engine.
+- [x] Dual-Warehouse Accounting.
+- [x] Third-party Lathe/Welding Debt Tracking.
+- [x] WhatsApp Integration.
+- [x] Branding & UI Customization.
