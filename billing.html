@@ -1,51 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Billing - My Care</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing - My Care Service Center</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin: 0; }
-        .bill-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        label { display: block; margin-top: 10px; font-size: 0.8rem; color: #666; font-weight: bold; }
-        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .total-box { background: #2c3e50; color: white; padding: 20px; border-radius: 12px; margin-top: 20px; text-align: center; }
-        .btn-finalize { background: #27ae60; color: white; width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
-        .back { text-decoration: none; color: #2980b9; font-size: 0.9rem; margin-bottom: 15px; display: block; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f39c12; --danger: #e74c3c; --light: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--light); padding: 15px; margin: 0; }
+        .bill-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
+        .job-header { background: #eef2f3; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid var(--info); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        label { display: block; margin-top: 8px; font-size: 0.85rem; color: #555; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        .lathe-section { background: #fff4e5; padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px dashed var(--warning); }
+        .total-box { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-top: 20px; text-align: center; }
+        .btn-finalize { background: var(--success); color: white; width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 1.2rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        .btn-back { text-decoration: none; color: var(--info); font-size: 0.9rem; display: inline-block; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <div class="bill-card">
-    <a href="index.html" class="back">← Cancel & Back</a>
-    <div id="jobHeader" style="background: #eef2f3; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-        Loading Vehicle Info...
+    <a href="index.html" class="btn-back">← Back to Dashboard</a>
+    <h2>Finalize Bill</h2>
+    
+    <div id="jobHeader" class="job-header">
+        Loading vehicle and customer info...
     </div>
 
     <div class="grid">
-        <div><label>Green Spares</label><input type="number" id="gSpares" value="0" oninput="calc()"></div>
-        <div><label>Moped Spares</label><input type="number" id="mSpares" value="0" oninput="calc()"></div>
-        <div><label>Lubricants</label><input type="number" id="lube" value="0" oninput="calc()"></div>
-        <div><label>Labour</label><input type="number" id="labour" value="0" oninput="calc()"></div>
-        <div><label>Lathe/Welding</label><input type="number" id="lathe" value="0" oninput="calc()"></div>
-        <div><label>Other</label><input type="number" id="other" value="0" oninput="calc()"></div>
+        <div><label>Green Spares (₹)</label><input type="number" id="gSpares" value="0" oninput="calc()"></div>
+        <div><label>Moped Spares (₹)</label><input type="number" id="mSpares" value="0" oninput="calc()"></div>
+        <div><label>Lubricants (₹)</label><input type="number" id="lube" value="0" oninput="calc()"></div>
+        <div><label>Labour Charges (₹)</label><input type="number" id="labour" value="0" oninput="calc()"></div>
     </div>
 
-    <div class="grid" style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-        <div><label>Flat Disc (₹)</label><input type="number" id="flatD" value="0" oninput="calc()"></div>
-        <div><label>Percent Disc (%)</label><input type="number" id="percD" value="0" oninput="calc()"></div>
+    <div class="lathe-section">
+        <div class="grid">
+            <div>
+                <label>Lathe/Welding (₹)</label>
+                <input type="number" id="lathe" value="0" oninput="calc()">
+            </div>
+            <div>
+                <label>Lathe Pmt Status</label>
+                <select id="latheStatus">
+                    <option value="Pending">Pending (Pay Later)</option>
+                    <option value="Paid">Paid (Cash Given)</option>
+                </select>
+            </div>
+        </div>
+        <small style="color: #a67c00;">*Tracking for third-party operator payment</small>
     </div>
 
-    <label>Future Advice</label>
-    <textarea id="advice" style="width:100%; height:60px; border-radius:8px; border:1px solid #ddd;"></textarea>
+    <div class="grid">
+        <div><label>Other Exp (₹)</label><input type="number" id="other" value="0" oninput="calc()"></div>
+        <div><label>Flat Discount (₹)</label><input type="number" id="flatD" value="0" oninput="calc()"></div>
+    </div>
+    
+    <label>Percentage Discount (%)</label>
+    <input type="number" id="percD" value="0" oninput="calc()">
+
+    <label>Future Advice for Customer</label>
+    <textarea id="advice" placeholder="e.g. Next oil change in 2000km, check brake pads..."></textarea>
 
     <div class="total-box">
-        <small>GRAND TOTAL</small>
-        <div style="font-size: 2.2rem;">₹<span id="gTotal">0</span></div>
+        <small>FINAL AMOUNT TO COLLECT</small>
+        <div style="font-size: 2.5rem;">₹<span id="gTotal">0</span></div>
     </div>
 
-    <button class="btn-finalize" onclick="finalize()">CLOSE & SEND WHATSAPP</button>
+    <button class="btn-finalize" onclick="finalize()">CLOSE JOB & SEND WHATSAPP</button>
 </div>
 
 <script>
@@ -56,66 +80,87 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    // 1. Fetch the data for the specific bike
     async function loadJob() {
-        if (!jobId) return;
-        const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', jobId).single();
+        if (!jobId) return alert("No Job ID found!");
+        
+        const { data, error } = await supabaseClient
+            .from('job_cards')
+            .select('*, vehicles(reg_number, make_model)')
+            .eq('id', jobId)
+            .single();
+        
         if (data) {
-            document.getElementById('jobHeader').innerHTML = `<strong>${data.vehicles.reg_number}</strong><br>${data.vehicles.make_model}`;
+            document.getElementById('jobHeader').innerHTML = `
+                <strong>${data.vehicles.reg_number}</strong> - ${data.vehicles.make_model}<br>
+                <small>Customer: ${data.customer_mobile}</small>
+            `;
         }
     }
 
+    // 2. Real-time Calculation Logic
     function calc() {
-        let items = ['gSpares', 'mSpares', 'lube', 'labour', 'lathe', 'other'];
-        let sub = items.reduce((s, id) => s + (parseFloat(document.getElementById(id).value) || 0), 0);
+        const fields = ['gSpares', 'mSpares', 'lube', 'labour', 'lathe', 'other'];
+        let subtotal = fields.reduce((sum, id) => sum + (parseFloat(document.getElementById(id).value) || 0), 0);
+        
         let flat = parseFloat(document.getElementById('flatD').value) || 0;
         let perc = parseFloat(document.getElementById('percD').value) || 0;
-        let afterFlat = sub - flat;
+
+        let afterFlat = subtotal - flat;
         let final = afterFlat - (afterFlat * (perc / 100));
+
         document.getElementById('gTotal').innerText = Math.round(final);
     }
 
+    // 3. Finalize, Pay Mechanic, and WhatsApp
     async function finalize() {
-        const labour = parseFloat(document.getElementById('labour').value) || 0;
-        const total = parseFloat(document.getElementById('gTotal').innerText);
-        const advice = document.getElementById('advice').value;
+        const labourAmt = parseFloat(document.getElementById('labour').value) || 0;
+        const totalAmt = document.getElementById('gTotal').innerText;
+        const adviceTxt = document.getElementById('advice').value;
 
-        // 1. Update the Job Card to 'Closed'
+        // A. Update Job Card status
         const { data: job, error: jcError } = await supabaseClient.from('job_cards')
             .update({
                 status: 'Closed',
                 green_total: document.getElementById('gSpares').value,
                 moped_total: document.getElementById('mSpares').value,
                 lubricant_total: document.getElementById('lube').value,
-                labour_charges: labour,
+                labour_charges: labourAmt,
                 lathe_welding: document.getElementById('lathe').value,
-                future_advice: advice,
-                total_invoice_value: total
+                lathe_status: document.getElementById('latheStatus').value,
+                other_exp: document.getElementById('other').value,
+                future_advice: adviceTxt,
+                total_invoice_value: totalAmt
             })
             .eq('id', jobId)
             .select('*, mechanics(name, commission_rate)').single();
 
-        if (jcError) return alert("Error closing job: " + jcError.message);
+        if (jcError) return alert("Update Error: " + jcError.message);
 
-        // 2. Add Earning to Mechanic Ledger
-        const commission = (labour * (job.mechanics.commission_rate / 100));
+        // B. Calculate & Post Mechanic Commission
+        const commEarned = (labourAmt * (job.mechanics.commission_rate / 100));
         await supabaseClient.from('staff_ledger').insert({
             mechanic_id: job.mech_id,
-            amount: commission,
+            amount: commEarned,
             entry_type: 'EARNING',
-            description: `Commission for Job ID: ${job.id}`
+            description: `Labour comm for ${job.id}`
         });
 
-        // 3. Trigger WhatsApp
-        const msg = `Hello! Your vehicle is ready. %0A%0ATotal: ₹${total}%0AAdvice: ${advice}%0A%0AThank you for choosing My Care!`;
+        // C. Open WhatsApp
+        const msg = `*MY CARE SERVICE CENTER*%0A` +
+                    `Reg No: ${job.vehicles.reg_number}%0A` +
+                    `Total Bill: ₹${totalAmt}%0A` +
+                    `Advice: ${adviceTxt}%0A%0A` +
+                    `Thank you! See you again.`;
+        
         window.open(`https://wa.me/91${job.customer_mobile}?text=${msg}`, '_blank');
 
-        alert("Job Closed! Mechanic Earned: ₹" + commission);
+        alert("Job Closed! Mechanic Commission Saved: ₹" + commEarned);
         window.location.href = 'index.html';
-    }
-        alert("Success! Bill closed and updated in database.");
     }
 
     loadJob();
 </script>
+
 </body>
 </html>
