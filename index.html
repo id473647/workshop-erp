@@ -3,52 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - Dashboard</title>
+    <title>My Care - Home</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --danger: #e74c3c; --light: #f4f7f6; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --light: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); }
-        .header { background: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid var(--primary); }
-        .logo-main { height: 50px; border-radius: 5px; }
-        .logo-sub { height: 35px; opacity: 0.8; }
+        .header { background: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid var(--primary); }
+        .logo-main { height: 40px; }
         .container { padding: 15px; max-width: 800px; margin: auto; }
-        .nav-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .btn { padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
         .btn-jc { background: var(--success); }
-        .btn-refresh { background: var(--info); }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; overflow: hidden; }
-        /* Background watermark for style */
-        .card::after { content: ''; position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; background: url('logo-green.png') no-repeat center; background-size: contain; opacity: 0.05; pointer-events: none; }
-        .job-card { border-left: 5px solid var(--warning); cursor: pointer; }
-        .staff-card { border-left: 5px solid var(--info); }
-        .amt { font-weight: bold; float: right; font-size: 1.2rem; }
-        .pos { color: var(--success); }
-        .neg { color: var(--danger); }
-        h3 { border-bottom: 2px solid #ddd; padding-bottom: 5px; margin-top: 25px; color: var(--primary); }
+        .btn-ledger { background: var(--info); }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-top: 4px solid var(--primary); }
+        .stat-val { display: block; font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: var(--primary); }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--warning); cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <img src="logo-main.jpg" alt="My Care Logo" class="logo-main" onerror="this.style.display='none'">
-    <div style="text-align: center;">
-        <h1 style="margin:0; font-size: 1.2rem; color: var(--primary);">MY CARE</h1>
-        <small style="color: #666;">Service Dashboard</small>
-    </div>
-    <img src="logo-green.png" alt="Green Scooter" class="logo-sub" onerror="this.style.display='none'">
+    <img src="logo-main.jpg" class="logo-main" onerror="this.style.display='none'">
+    <h1 style="font-size: 1rem; margin:0;">MY CARE ERP</h1>
+    <img src="logo-green.png" style="height:30px;" onerror="this.style.display='none'">
 </div>
 
 <div class="container">
-    <div class="nav-buttons">
+    <div class="nav-grid">
         <a href="new-jobcard.html" class="btn btn-jc">NEW JOB CARD</a>
-        <button class="btn btn-refresh" onclick="loadData()">REFRESH DATA</button>
+        <a href="staff-ledger.html" class="btn btn-ledger">STAFF LEDGER</a>
     </div>
 
-    <h3>Vehicles in Workshop</h3>
-    <div id="activeJobs">Syncing workshop floor...</div>
+    <div class="stats-grid">
+        <div class="stat-card">Green Net<span class="stat-val" id="netGreen">₹0</span></div>
+        <div class="stat-card">Moped Net<span class="stat-val" id="netMoped">₹0</span></div>
+        <div class="stat-card">Staff Pay<span class="stat-val" id="netStaff">₹0</span></div>
+    </div>
 
-    <h3>Staff Balances (Net Payable)</h3>
-    <div id="staffBalances">Calculating mechanic accounts...</div>
+    <h3>Active Workshop Floor</h3>
+    <div id="activeJobs">Syncing...</div>
 </div>
 
 <script>
@@ -56,32 +50,38 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadData() {
-        // 1. Load Open Jobs
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
-        let jobHtml = '';
-        if (jobs && jobs.length > 0) {
-            jobs.forEach(j => {
-                jobHtml += `<div class="card job-card" onclick="window.location.href='billing.html?id=${j.id}'">
-                    <strong>${j.vehicles.reg_number}</strong> - ${j.vehicles.make_model}
-                    <div style="font-size: 0.8rem; color: #666;">Mobile: ${j.customer_mobile}</div>
-                </div>`;
-            });
-        } else { jobHtml = '<p>No active jobs.</p>'; }
-        document.getElementById('activeJobs').innerHTML = jobHtml;
+    async function loadDashboard() {
+        // 1. Fetch Totals for Green & Moped (Jobs Closed Today)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('jc_date', today);
+        
+        let gSum = 0, mSum = 0;
+        sales?.forEach(s => {
+            gSum += (parseFloat(s.green_total) || 0) + (parseFloat(s.lubricant_total) || 0); // User logic: Lube included in Green/Moped
+            mSum += (parseFloat(s.moped_total) || 0);
+        });
+        document.getElementById('netGreen').innerText = "₹" + gSum;
+        document.getElementById('netMoped').innerText = "₹" + mSum;
 
-        // 2. Load Staff Balances
-        const { data: staff } = await supabaseClient.from('mechanics').select('*').eq('is_active', true);
-        let staffHtml = '';
-        for (let m of staff) {
-            const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type').eq('mechanic_id', m.id);
-            let bal = 0;
-            if(ledger) ledger.forEach(e => bal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
-            staffHtml += `<div class="card staff-card">${m.name} <span class="amt ${bal >= 0 ? 'pos' : 'neg'}">₹${bal}</span></div>`;
-        }
-        document.getElementById('staffBalances').innerHTML = staffHtml;
+        // 2. Fetch Net Staff Payable
+        const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
+        let staffTotal = 0;
+        ledger?.forEach(e => staffTotal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
+        document.getElementById('netStaff').innerText = "₹" + staffTotal;
+
+        // 3. Load Active Jobs
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
+        let html = '';
+        jobs?.forEach(j => {
+            html += `<div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
+                <strong>${j.vehicles.reg_number}</strong> - ${j.vehicles.make_model}<br>
+                <small>Customer: ${j.customer_mobile}</small>
+            </div>`;
+        });
+        document.getElementById('activeJobs').innerHTML = html || '<p>Workshop is empty.</p>';
     }
-    loadData();
+
+    loadDashboard();
 </script>
 </body>
 </html>
