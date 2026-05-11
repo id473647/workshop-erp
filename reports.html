@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reports - My Care</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+        .report-card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .pending-lathe { border-left: 5px solid #e74c3c; padding-left: 10px; }
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; color: white; }
+        .tag-red { background: #e74c3c; }
+        .tag-green { background: #27ae60; }
+    </style>
+</head>
+<body>
+
+    <h2>Daily Workshop Report</h2>
+    
+    <div class="report-card">
+        <h3>Sales Summary (Today)</h3>
+        <div id="salesSummary">Loading totals...</div>
+    </div>
+
+    <div class="report-card">
+        <h3>Pending Lathe Payments</h3>
+        <div id="latheLedger">Checking third-party debts...</div>
+    </div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    async function loadReports() {
+        const today = new Date().toISOString().split('T')[0];
+
+        // 1. Fetch Today's Closed Jobs
+        const { data: sales } = await supabaseClient.from('job_cards').select('*').eq('jc_date', today).eq('status', 'Closed');
+        
+        let green = 0, moped = 0, oil = 0, labour = 0;
+        sales?.forEach(s => {
+            green += parseFloat(s.green_total || 0);
+            moped += parseFloat(s.moped_total || 0);
+            oil += parseFloat(s.lubricant_total || 0);
+            labour += parseFloat(s.labour_charges || 0);
+        });
+
+        document.getElementById('salesSummary').innerHTML = `
+            <div class="stat-row"><span>Green Warehouse:</span> <strong>₹${green}</strong></div>
+            <div class="stat-row"><span>Moped Warehouse:</span> <strong>₹${moped}</strong></div>
+            <div class="stat-row"><span>Oil/Lubricants:</span> <strong>₹${oil}</strong></div>
+            <div class="stat-row"><span>Labour Total:</span> <strong>₹${labour}</strong></div>
+        `;
+
+        // 2. Fetch ALL Pending Lathe Work
+        const { data: lathePending } = await supabaseClient.from('job_cards').select('id, lathe_welding, customer_mobile').eq('lathe_status', 'Pending').gt('lathe_welding', 0);
+        
+        let latheHtml = '';
+        lathePending?.forEach(l => {
+            latheHtml += `
+                <div class="stat-row pending-lathe">
+                    <span>Mob: ${l.customer_mobile}</span>
+                    <strong>₹${l.lathe_welding} <span class="tag tag-red">UNPAID</span></strong>
+                </div>`;
+        });
+        document.getElementById('latheLedger').innerHTML = latheHtml || 'All lathe works settled!';
+    }
+
+    loadReports();
+</script>
+</body>
+</html>
