@@ -9,62 +9,66 @@
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--light); padding: 15px; margin: 0; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .step-box { display: none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
+        .step { display: none; }
         .active { display: block; }
-        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; }
+        label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.85rem; color: #555; }
         input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .veh-card { border: 2px solid var(--info); padding: 10px; border-radius: 8px; margin: 10px 0; cursor: pointer; background: #ebf5fb; font-size: 0.9rem; }
+        
+        /* Step 3 Icons */
+        .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .veh-rect { border: 2px solid var(--info); padding: 12px; border-radius: 8px; cursor: pointer; background: #f0f7ff; text-align: center; font-weight: bold; font-size: 0.9rem; }
+        .veh-rect:hover { background: #d0e7ff; }
+        
         .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .btn-primary { background: var(--info); color: white; }
+        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 10px 20px; }
         .btn-success { background: var(--success); color: white; }
-        .loading-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:1000; text-align:center; padding-top:200px; font-weight:bold; }
+        .btn-add { background: none; border: 1px dashed var(--info); color: var(--info); }
+        .loading { display:none; text-align: center; color: var(--info); font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div id="loading" class="loading-overlay">PROCESSING... PLEASE WAIT</div>
-
 <div class="container">
-    <a href="index.html" style="text-decoration:none;">← Dashboard</a>
-    <h2 style="margin:10px 0; color:var(--primary);">New Job Card</h2>
+    <a href="index.html" style="text-decoration:none; font-size: 0.8rem;">← Dashboard</a>
     
-    <div id="section1">
-        <label>Customer Mobile</label>
+    <div id="step1" class="step active">
+        <h2>Step 1: Customer Mobile</h2>
         <div style="display:flex; gap:10px;">
-            <input type="tel" id="mobile" placeholder="Enter 10 digits">
-            <button class="btn-primary" onclick="handleStep1()" style="width:auto; margin:0; padding:0 15px;">Search</button>
+            <input type="tel" id="mobile" placeholder="10 Digits">
+            <button class="btn btn-search" onclick="searchCustomer()">SEARCH</button>
+        </div>
+        
+        <div id="step2" style="display:none; margin-top:15px; background:#fff9db; padding:15px; border-radius:10px;">
+            <h3 style="margin:0 0 10px 0; font-size:1rem;">New Customer Details</h3>
+            <label>Name</label><input type="text" id="custName">
+            <label>Address</label><input type="text" id="custAddress">
+            <button class="btn btn-success" onclick="saveCustomer()">SAVE & NEXT</button>
         </div>
     </div>
 
-    <div id="section2" class="step-box">
-        <p style="color:var(--info); font-size:0.8rem;">New Customer? Please fill details:</p>
-        <label>Full Name</label><input type="text" id="custName">
-        <label>Address</label><input type="text" id="custAddress">
-        <button class="btn-primary" onclick="saveCustomer()">Next: Vehicle Selection</button>
-    </div>
-
-    <div id="section3" class="step-box">
-        <label>Select Existing Vehicle</label>
-        <div id="vehicleList"></div>
+    <div id="step3" class="step">
+        <h2>Step 3: Select Vehicle</h2>
+        <div id="vehicleIcons" class="veh-grid"></div>
+        <button class="btn btn-add" onclick="showNewVehForm()">+ Link New Vehicle</button>
         
-        <hr>
-        <button onclick="toggleNewVeh()" style="background:none; border:none; color:var(--info); cursor:pointer; font-weight:bold;">+ Add New Vehicle</button>
-        
-        <div id="newVehForm" style="display:none; margin-top:10px; background:#f9f9f9; padding:10px; border-radius:8px;">
-            <label>Brand</label><input type="text" id="vBrand" placeholder="Hero/Honda">
-            <label>Vehicle Name</label><input type="text" id="vName" placeholder="Activa/Shine">
+        <div id="newVehForm" style="display:none; margin-top:15px; background:#f0f0f0; padding:15px; border-radius:10px;">
+            <label>Brand</label><input type="text" id="vBrand">
+            <label>Vehicle Name</label><input type="text" id="vName">
             <label>Colour</label><input type="text" id="vColor">
-            <label>Reg Number</label><input type="text" id="vNumber" placeholder="MP-04-XX-0000">
-            <button class="btn-primary" onclick="saveNewVehicle()">Link & Select Vehicle</button>
+            <label>Number</label><input type="text" id="vNumber" placeholder="MP-04-XX-0000">
+            <button class="btn btn-success" onclick="linkNewVehicle()">LINK & SELECT</button>
         </div>
     </div>
 
-    <div id="section4" class="step-box">
-        <div id="selectedVeh" style="color:var(--success); font-weight:bold; margin-bottom:10px;"></div>
-        <label>Complaint / Work Mentioned</label><textarea id="complaint" rows="2"></textarea>
-        <label>Estimate Given (₹)</label><input type="number" id="estimate" value="0">
-        <label>Select Mechanic</label><select id="mechSelect"></select>
-        <button id="finalBtn" class="btn-success" onclick="finalSubmit()">OPEN JOB CARD</button>
+    <div id="step4" class="step">
+        <h2>Step 4: Finalize Job</h2>
+        <div id="vehLabel" style="background:#e8f5e9; padding:10px; border-radius:8px; font-weight:bold; color:#2e7d32; margin-bottom:15px;"></div>
+        <label>Complaint</label><textarea id="complaint" rows="3"></textarea>
+        <label>Estimate (₹)</label><input type="number" id="estimate" value="0">
+        <label>Mechanic</label><select id="mechSelect"></select>
+        
+        <div id="loader" class="loading">SAVING TO CLOUD...</div>
+        <button id="finalBtn" class="btn btn-success" onclick="createJobCard()">OPEN JOB CARD</button>
     </div>
 </div>
 
@@ -75,75 +79,70 @@
 
     let selectedVehicleId = null;
 
-    async function handleStep1() {
+    async function searchCustomer() {
         const phone = document.getElementById('mobile').value;
-        if(phone.length < 10) return alert("Enter valid mobile");
-        
         const { data: customer } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
         
         if (customer) {
             document.getElementById('custName').value = customer.name;
             document.getElementById('custAddress').value = customer.address;
-            showSection3(phone);
+            goToStep3(phone);
         } else {
-            document.getElementById('section2').classList.add('active');
+            document.getElementById('step2').style.display = 'block';
         }
     }
 
     async function saveCustomer() {
         const phone = document.getElementById('mobile').value;
         await supabaseClient.from('customers').upsert({
-            mobile_number: phone,
-            name: document.getElementById('custName').value,
-            address: document.getElementById('custAddress').value
+            mobile_number: phone, name: document.getElementById('custName').value, address: document.getElementById('custAddress').value
         });
-        showSection3(phone);
+        goToStep3(phone);
     }
 
-    async function showSection3(phone) {
+    async function goToStep3(phone) {
+        document.getElementById('step1').classList.remove('active');
+        document.getElementById('step3').classList.add('active');
+        
         const { data: vehicles } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', phone);
-        const list = document.getElementById('vehicleList');
-        list.innerHTML = '';
-        if(vehicles && vehicles.length > 0) {
-            vehicles.forEach(v => {
-                list.innerHTML += `<div class="veh-card" onclick="selectVeh('${v.id}', '${v.reg_number} - ${v.make_model}')">
-                    ${v.reg_number} | ${v.make_model} (${v.color})
-                </div>`;
-            });
-        } else { list.innerHTML = '<p style="font-size:0.8rem;">No vehicles linked to this number.</p>'; }
-        document.getElementById('section3').classList.add('active');
+        const grid = document.getElementById('vehicleIcons');
+        grid.innerHTML = '';
+        vehicles?.forEach(v => {
+            grid.innerHTML += `<div class="veh-rect" onclick="selectVeh('${v.id}', '${v.reg_number}')">${v.reg_number}<br><small>${v.make_model}</small></div>`;
+        });
     }
 
-    function toggleNewVeh() { document.getElementById('newVehForm').style.display = 'block'; }
+    function showNewVehForm() { document.getElementById('newVehForm').style.display = 'block'; }
 
-    async function saveNewVehicle() {
-        const phone = document.getElementById('mobile').value;
+    async function linkNewVehicle() {
         const { data, error } = await supabaseClient.from('vehicles').insert({
-            customer_mobile: phone,
+            customer_mobile: document.getElementById('mobile').value,
             brand: document.getElementById('vBrand').value,
             make_model: document.getElementById('vName').value,
             color: document.getElementById('vColor').value,
             reg_number: document.getElementById('vNumber').value
         }).select().single();
-        
-        if (data) selectVeh(data.id, data.reg_number);
-        else alert("Error saving vehicle: " + error.message);
+        if(data) selectVeh(data.id, data.reg_number);
+        else alert("Vehicle link failed: " + error.message);
     }
 
     async function selectVeh(id, label) {
         selectedVehicleId = id;
-        document.getElementById('selectedVeh').innerText = "Selected: " + label;
-        document.getElementById('section4').classList.add('active');
+        document.getElementById('vehLabel').innerText = "Vehicle: " + label;
+        document.getElementById('step3').classList.remove('active');
+        document.getElementById('step4').classList.add('active');
         
-        // Load Mechanics
-        const { data } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
-        const select = document.getElementById('mechSelect');
-        select.innerHTML = '<option value="">Select Mechanic</option>';
-        data?.forEach(m => { select.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
+        const { data: mechs } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
+        const sel = document.getElementById('mechSelect');
+        sel.innerHTML = '<option value="">Select Mechanic</option>';
+        mechs?.forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
     }
 
-    async function finalSubmit() {
-        document.getElementById('loading').style.display = 'block';
+    async function createJobCard() {
+        const btn = document.getElementById('finalBtn');
+        const loader = document.getElementById('loader');
+        btn.style.display = 'none'; loader.style.display = 'block';
+
         const { error } = await supabaseClient.from('job_cards').insert({
             customer_mobile: document.getElementById('mobile').value,
             vehicle_id: selectedVehicleId,
@@ -154,10 +153,7 @@
         });
 
         if (!error) window.location.href = 'index.html';
-        else {
-            alert("Error: " + error.message);
-            document.getElementById('loading').style.display = 'none';
-        }
+        else { alert("Error: " + error.message); btn.style.display = 'block'; loader.style.display = 'none'; }
     }
 </script>
 </body>
