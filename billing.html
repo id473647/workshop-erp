@@ -6,29 +6,21 @@
     <title>Bill - My Care</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --light: #f4f7f6; }
+        :root { --primary: #2c3e50; --success: #27ae60; --warning: #f1c40f; --light: #f4f7f6; }
         body { font-family: sans-serif; background: var(--light); padding: 15px; margin: 0; }
         .bill-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .logo-main { height: 40px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .job-info { background: #eef2f3; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid var(--warning); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         label { display: block; margin-top: 8px; font-size: 0.8rem; font-weight: bold; color: #555; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-        .advance-box { background: #e8f4fd; padding: 15px; border-radius: 10px; margin: 15px 0; border: 1px solid #3498db; }
-        .total-box { background: var(--primary); color: white; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: center; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        .total-box { background: var(--primary); color: white; padding: 20px; border-radius: 12px; margin-top: 20px; text-align: center; }
         .btn-close { background: var(--success); color: white; width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; margin-top: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
-
 <div class="bill-card">
-    <div class="header">
-        <img src="logo-main.jpg" class="logo-main" onerror="this.style.display='none'">
-        <h2 style="margin:0; font-size: 1rem;">FINAL BILL</h2>
-        <img src="logo-green.png" style="height:25px;" onerror="this.style.display='none'">
-    </div>
-
-    <div id="jobHeader" style="background:#f9f9f9; padding:10px; border-radius:8px; margin-bottom:15px;">Loading...</div>
+    <h2>Final Bill</h2>
+    <div id="jobHeader" class="job-info">Loading initial complaint...</div>
 
     <div class="grid">
         <div><label>Green Spares</label><input type="number" id="gSpares" value="0" oninput="calc()"></div>
@@ -36,27 +28,20 @@
         <div><label>Lubricants</label><input type="number" id="lube" value="0" oninput="calc()"></div>
         <div><label>Labour Charges</label><input type="number" id="labour" value="0" oninput="calc()"></div>
         <div><label>Lathe Work</label><input type="number" id="lathe" value="0" oninput="calc()"></div>
-        <div><label>Lathe Pmt</label><select id="latheStatus"><option value="Pending">Pending</option><option value="Paid">Paid</option></select></div>
-    </div>
-
-    <div class="advance-box">
-        <label>Amount Already Paid to Manager (Point D)</label>
-        <input type="number" id="prePaid" value="0" oninput="calc()">
+        <div><label>Spare Mgr Adv</label><input type="number" id="prePaid" value="0" oninput="calc()"></div>
     </div>
 
     <div class="grid">
-        <div><label>Flat Disc (₹)</label><input type="number" id="flatD" value="0" oninput="calc()"></div>
-        <div><label>Percent Disc (%)</label><input type="number" id="percD" value="0" oninput="calc()"></div>
+        <div><label>Flat Disc</label><input type="number" id="flatD" value="0" oninput="calc()"></div>
+        <div><label>Percent Disc</label><input type="number" id="percD" value="0" oninput="calc()"></div>
     </div>
 
     <div class="total-box">
-        <small>COLLECT FROM CUSTOMER</small>
+        <small>FINAL TO COLLECT</small>
         <div style="font-size: 2rem;">₹<span id="gTotal">0</span></div>
     </div>
-
     <button class="btn-close" onclick="finalize()">CLOSE JOB & WHATSAPP</button>
 </div>
-
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const jobId = urlParams.get('id');
@@ -66,7 +51,13 @@
 
     async function loadJob() {
         const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', jobId).single();
-        if (data) { document.getElementById('jobHeader').innerHTML = `<strong>${data.vehicles.reg_number}</strong> - ${data.vehicles.make_model}`; }
+        if (data) {
+            document.getElementById('jobHeader').innerHTML = `
+                <strong>Reg No:</strong> ${data.vehicles.reg_number}<br>
+                <strong>Complaint:</strong> ${data.problem_mentioned || 'None'}<br>
+                <strong>Initial Estimate:</strong> ₹${data.estimate_given || 0}
+            `;
+        }
     }
 
     function calc() {
@@ -83,13 +74,12 @@
         const { data: job } = await supabaseClient.from('job_cards').update({
             status: 'Closed', green_total: document.getElementById('gSpares').value, moped_total: document.getElementById('mSpares').value, 
             lubricant_total: document.getElementById('lube').value, labour_charges: labourAmt, lathe_welding: document.getElementById('lathe').value,
-            lathe_status: document.getElementById('latheStatus').value, advance_paid: document.getElementById('prePaid').value, total_invoice_value: totalAmt
+            advance_paid: document.getElementById('prePaid').value, total_invoice_value: totalAmt
         }).eq('id', jobId).select('*, mechanics(commission_rate)').single();
 
         if (job) {
             const comm = (labourAmt * (job.mechanics.commission_rate / 100));
             await supabaseClient.from('staff_ledger').insert({ mechanic_id: job.mech_id, amount: comm, entry_type: 'EARNING' });
-            window.open(`https://wa.me/91${job.customer_mobile}?text=Bill for ${job.vehicles.reg_number}: ₹${totalAmt}`, '_blank');
             window.location.href = 'index.html';
         }
     }
