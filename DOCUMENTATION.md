@@ -27,3 +27,11 @@ To transition "My Care Service Center" from manual paper records to a cloud-sync
 - [ ] Create Daily Sales Analytics report.
 - [ ] Add Lathe/Welding specialized tracking.
 - [ ] Build the "Counter Sale" mode for retail.
+
+External Work (Lathe/Welding) Rules:
+
+Tracking: Every Lathe entry must have a payment_status (Pending/Paid).
+
+Settlement: Even if a Job Card is "Closed" (customer paid you), the Lathe work might still be "Pending" (you haven't paid the operator yet).
+
+Ledger View: A dedicated report will show all "Pending" external payments to ensure no third-party operator is forgotten.
