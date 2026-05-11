@@ -15,9 +15,13 @@
         .btn { padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
         .btn-jc { background: var(--success); }
         .btn-ledger { background: var(--info); }
+        
+        /* The Three Summary Boxes */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-top: 4px solid var(--primary); }
-        .stat-val { display: block; font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: var(--primary); }
+        .stat-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+        .stat-val { display: block; font-size: 1rem; font-weight: bold; margin-top: 5px; color: var(--primary); }
+
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--warning); cursor: pointer; }
     </style>
 </head>
@@ -32,17 +36,17 @@
 <div class="container">
     <div class="nav-grid">
         <a href="new-jobcard.html" class="btn btn-jc">NEW JOB CARD</a>
-        <a href="staff-ledger.html" class="btn btn-ledger">STAFF LEDGER</a>
+        <a href="staff-ledger.html" class="btn btn-ledger">VIEW LEDGERS</a>
     </div>
 
     <div class="stats-grid">
-        <div class="stat-card">Green Net<span class="stat-val" id="netGreen">₹0</span></div>
-        <div class="stat-card">Moped Net<span class="stat-val" id="netMoped">₹0</span></div>
-        <div class="stat-card">Staff Pay<span class="stat-val" id="netStaff">₹0</span></div>
+        <div class="stat-card"><span class="stat-label">Green Net</span><span class="stat-val" id="netGreen">₹0</span></div>
+        <div class="stat-card"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
+        <div class="stat-card"><span class="stat-label">Staff Total</span><span class="stat-val" id="netStaff">₹0</span></div>
     </div>
 
-    <h3>Active Workshop Floor</h3>
-    <div id="activeJobs">Syncing...</div>
+    <h3>Vehicles on Floor</h3>
+    <div id="activeJobs">Syncing database...</div>
 </div>
 
 <script>
@@ -50,38 +54,35 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadDashboard() {
-        // 1. Fetch Totals for Green & Moped (Jobs Closed Today)
-        const today = new Date().toISOString().split('T')[0];
-        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('jc_date', today);
-        
-        let gSum = 0, mSum = 0;
-        sales?.forEach(s => {
-            gSum += (parseFloat(s.green_total) || 0) + (parseFloat(s.lubricant_total) || 0); // User logic: Lube included in Green/Moped
-            mSum += (parseFloat(s.moped_total) || 0);
+    async function loadData() {
+        // 1. Calculate Warehouse Totals (Sum of all closed jobs)
+        const { data: totals } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed');
+        let g = 0, m = 0;
+        totals?.forEach(row => {
+            g += (parseFloat(row.green_total) || 0) + (parseFloat(row.lubricant_total) || 0); // Lube added to Green
+            m += (parseFloat(row.moped_total) || 0);
         });
-        document.getElementById('netGreen').innerText = "₹" + gSum;
-        document.getElementById('netMoped').innerText = "₹" + mSum;
+        document.getElementById('netGreen').innerText = "₹" + g;
+        document.getElementById('netMoped').innerText = "₹" + m;
 
-        // 2. Fetch Net Staff Payable
+        // 2. Calculate Staff Total
         const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
-        let staffTotal = 0;
-        ledger?.forEach(e => staffTotal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
-        document.getElementById('netStaff').innerText = "₹" + staffTotal;
+        let staffBal = 0;
+        ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
+        document.getElementById('netStaff').innerText = "₹" + staffBal;
 
-        // 3. Load Active Jobs
+        // 3. Load Open Jobs
         const { data: jobs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
         let html = '';
         jobs?.forEach(j => {
             html += `<div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
                 <strong>${j.vehicles.reg_number}</strong> - ${j.vehicles.make_model}<br>
-                <small>Customer: ${j.customer_mobile}</small>
+                <small>Mobile: ${j.customer_mobile}</small>
             </div>`;
         });
-        document.getElementById('activeJobs').innerHTML = html || '<p>Workshop is empty.</p>';
+        document.getElementById('activeJobs').innerHTML = html || '<p>No open jobs.</p>';
     }
-
-    loadDashboard();
+    loadData();
 </script>
 </body>
 </html>
