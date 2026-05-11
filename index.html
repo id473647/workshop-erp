@@ -12,17 +12,15 @@
         .logo-main { height: 40px; }
         .container { padding: 15px; max-width: 800px; margin: auto; }
         .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .btn { padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; }
+        .btn { padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block; }
         .btn-jc { background: var(--success); }
         .btn-ledger { background: var(--info); }
-        
-        /* The Three Summary Boxes */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-top: 4px solid var(--primary); }
-        .stat-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
-        .stat-val { display: block; font-size: 1rem; font-weight: bold; margin-top: 5px; color: var(--primary); }
-
+        .stat-label { font-size: 0.65rem; color: #666; text-transform: uppercase; display: block; }
+        .stat-val { font-size: 0.95rem; font-weight: bold; color: var(--primary); }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--warning); cursor: pointer; }
+        h3 { color: var(--primary); font-size: 1.1rem; margin-top: 25px; }
     </style>
 </head>
 <body>
@@ -36,16 +34,16 @@
 <div class="container">
     <div class="nav-grid">
         <a href="new-jobcard.html" class="btn btn-jc">NEW JOB CARD</a>
-        <a href="staff-ledger.html" class="btn btn-ledger">VIEW LEDGERS</a>
+        <a href="staff-ledger.html" class="btn btn-ledger">STAFF BALANCES</a>
     </div>
 
     <div class="stats-grid">
-        <div class="stat-card"><span class="stat-label">Green Net</span><span class="stat-val" id="netGreen">₹0</span></div>
+        <div class="stat-card"><span class="stat-label">Green/Oil</span><span class="stat-val" id="netGreen">₹0</span></div>
         <div class="stat-card"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
-        <div class="stat-card"><span class="stat-label">Staff Total</span><span class="stat-val" id="netStaff">₹0</span></div>
+        <div class="stat-card"><span class="stat-label">Staff Pay</span><span class="stat-val" id="netStaff">₹0</span></div>
     </div>
 
-    <h3>Vehicles on Floor</h3>
+    <h3>Active Workshop Floor</h3>
     <div id="activeJobs">Syncing database...</div>
 </div>
 
@@ -54,18 +52,19 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadData() {
-        // 1. Calculate Warehouse Totals (Sum of all closed jobs)
-        const { data: totals } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed');
+    async function loadDashboard() {
+        // 1. Calc Warehouse Totals (Today)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed').eq('jc_date', today);
         let g = 0, m = 0;
-        totals?.forEach(row => {
-            g += (parseFloat(row.green_total) || 0) + (parseFloat(row.lubricant_total) || 0); // Lube added to Green
+        sales?.forEach(row => {
+            g += (parseFloat(row.green_total) || 0) + (parseFloat(row.lubricant_total) || 0);
             m += (parseFloat(row.moped_total) || 0);
         });
         document.getElementById('netGreen').innerText = "₹" + g;
         document.getElementById('netMoped').innerText = "₹" + m;
 
-        // 2. Calculate Staff Total
+        // 2. Calc Staff Total Payable
         const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
         let staffBal = 0;
         ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
@@ -77,12 +76,12 @@
         jobs?.forEach(j => {
             html += `<div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
                 <strong>${j.vehicles.reg_number}</strong> - ${j.vehicles.make_model}<br>
-                <small>Mobile: ${j.customer_mobile}</small>
+                <small>Customer: ${j.customer_mobile}</small>
             </div>`;
         });
-        document.getElementById('activeJobs').innerHTML = html || '<p>No open jobs.</p>';
+        document.getElementById('activeJobs').innerHTML = html || '<p>Workshop is empty.</p>';
     }
-    loadData();
+    loadDashboard();
 </script>
 </body>
 </html>
