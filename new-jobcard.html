@@ -26,20 +26,29 @@
 </div>
 
 <div class="form-card">
-    <a href="index.html" style="text-decoration:none; color:var(--primary);">← Back</a>
+    <a href="index.html" style="text-decoration:none; color:var(--primary);">← Back to Dashboard</a>
     <h2 style="margin-top:10px;">New Job Card</h2>
     
     <form id="jcForm">
         <label>Customer Mobile</label>
-        <input type="tel" id="mobile" required>
-        <label>Name</label>
-        <input type="text" id="custName">
+        <input type="tel" id="mobile" required placeholder="10 digits">
+        
+        <label>Customer Name</label>
+        <input type="text" id="custName" placeholder="Optional">
+        
         <label>Vehicle Number</label>
         <input type="text" id="vehNo" placeholder="MP-04-XX-0000" required>
+        
         <label>Make & Model</label>
-        <input type="text" id="vehName" placeholder="Hero Splendor / Activa">
+        <input type="text" id="vehName" placeholder="e.g. Hero Splendor">
+
+        <label>Customer Complaint</label>
+        <textarea id="complaint" rows="2" placeholder="Optional"></textarea>
+
         <label>Assign Mechanic</label>
-        <select id="mechanicSelect" required><option value="">Select Mechanic</option></select>
+        <select id="mechanicSelect" required>
+            <option value="">Select Mechanic...</option>
+        </select>
 
         <button type="submit" id="submitBtn" class="btn-save">OPEN JOB CARD</button>
     </form>
@@ -50,6 +59,7 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    // Load Mechanics
     async function loadMechs() {
         const { data } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
         const select = document.getElementById('mechanicSelect');
@@ -62,22 +72,51 @@
     document.getElementById('jcForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
-        btn.innerText = "SAVING TO CLOUD..."; btn.disabled = true;
+        btn.innerText = "SAVING TO CLOUD..."; 
+        btn.disabled = true;
 
-        const mobile = document.getElementById('mobile').value;
-        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: document.getElementById('custName').value });
+        try {
+            const mobile = document.getElementById('mobile').value;
+            
+            // 1. Save Customer
+            const { error: cErr } = await supabaseClient.from('customers').upsert({ 
+                mobile_number: mobile, 
+                name: document.getElementById('custName').value || 'Walk-in Customer'
+            });
+            if(cErr) throw new Error("Customer Save Failed: " + cErr.message);
 
-        const { data: vData } = await supabaseClient.from('vehicles').upsert({
-            customer_mobile: mobile, reg_number: document.getElementById('vehNo').value, make_model: document.getElementById('vehName').value
-        }).select().single();
+            // 2. Save Vehicle
+            const { data: vData, error: vErr } = await supabaseClient.from('vehicles').upsert({
+                customer_mobile: mobile, 
+                reg_number: document.getElementById('vehNo').value, 
+                make_model: document.getElementById('vehName').value || 'Unknown Bike'
+            }).select().single();
+            if(vErr) throw new Error("Vehicle Save Failed: " + vErr.message);
 
-        const { error } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile, vehicle_id: vData.id, mech_id: document.getElementById('mechanicSelect').value, status: 'Open'
-        });
+            // 3. Create Job Card
+            const { error: jErr } = await supabaseClient.from('job_cards').insert({
+                customer_mobile: mobile, 
+                vehicle_id: vData.id, 
+                mech_id: document.getElementById('mechanicSelect').value, 
+                status: 'Open',
+                problem_mentioned: document.getElementById('complaint').value || 'General Checkup'
+            });
 
-        if (!error) { window.location.href = 'index.html'; }
-        else { alert("Error: " + error.message); btn.innerText = "OPEN JOB CARD"; btn.disabled = false; }
+            if (!jErr) { 
+                console.log("Success!");
+                window.location.href = 'index.html'; 
+            } else { 
+                throw new Error("Job Card Insert Failed: " + jErr.message); 
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert("⚠️ SYSTEM ERROR:\n" + err.message + "\n\nTip: Ensure you ran the SQL to add 'advance_paid' and 'jc_date' columns!");
+            btn.innerText = "OPEN JOB CARD"; 
+            btn.disabled = false;
+        }
     });
+
     loadMechs();
 </script>
 </body>
