@@ -3,49 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - Home</title>
+    <title>My Care - Live Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --light: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); }
-        .header { background: white; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid var(--primary); }
-        .logo-main { height: 40px; }
-        .container { padding: 15px; max-width: 800px; margin: auto; }
-        .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .btn { padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; display: block; }
-        .btn-jc { background: var(--success); }
-        .btn-ledger { background: var(--info); }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--light); margin: 0; padding: 15px; }
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-top: 4px solid var(--primary); }
-        .stat-label { font-size: 0.65rem; color: #666; text-transform: uppercase; display: block; }
-        .stat-val { font-size: 0.95rem; font-weight: bold; color: var(--primary); }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--warning); cursor: pointer; }
-        h3 { color: var(--primary); font-size: 1.1rem; margin-top: 25px; }
+        .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; border-top: 4px solid var(--primary); }
+        .card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border-left: 6px solid var(--info); }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .reg-no { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
+        .amount { font-size: 1.2rem; font-weight: bold; color: var(--success); }
+        .mech-tag { background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-top: 5px; display: inline-block; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <img src="logo-main.jpg" class="logo-main" onerror="this.style.display='none'">
-    <h1 style="font-size: 1rem; margin:0;">MY CARE ERP</h1>
-    <img src="logo-green.png" style="height:30px;" onerror="this.style.display='none'">
-</div>
-
-<div class="container">
-    <div class="nav-grid">
-        <a href="new-jobcard.html" class="btn btn-jc">NEW JOB CARD</a>
-        <a href="staff-ledger.html" class="btn btn-ledger">STAFF BALANCES</a>
-    </div>
-
     <div class="stats-grid">
-        <div class="stat-card"><span class="stat-label">Green/Oil</span><span class="stat-val" id="netGreen">₹0</span></div>
-        <div class="stat-card"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
-        <div class="stat-card"><span class="stat-label">Staff Pay</span><span class="stat-val" id="netStaff">₹0</span></div>
+        <div class="stat-card"><small>Green/Oil</small><div id="netGreen" style="font-weight:bold;">₹0</div></div>
+        <div class="stat-card"><small>Moped Net</small><div id="netMoped" style="font-weight:bold;">₹0</div></div>
+        <div class="stat-card"><small>Staff Pay</small><div id="netStaff" style="font-weight:bold;">₹0</div></div>
     </div>
 
-    <h3>Active Workshop Floor</h3>
-    <div id="activeJobs">Syncing database...</div>
-</div>
+    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3>Open Job Cards</h3>
+        <a href="new-jobcard.html" style="background:var(--success); color:white; padding:10px 15px; border-radius:8px; text-decoration:none; font-weight:bold;">+ NEW JOB</a>
+    </div>
+
+    <div id="activeJobs">Syncing workshop...</div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
@@ -53,33 +38,26 @@
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     async function loadDashboard() {
-        // 1. Calc Warehouse Totals (Today)
-        const today = new Date().toISOString().split('T')[0];
-        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed').eq('jc_date', today);
-        let g = 0, m = 0;
-        sales?.forEach(row => {
-            g += (parseFloat(row.green_total) || 0) + (parseFloat(row.lubricant_total) || 0);
-            m += (parseFloat(row.moped_total) || 0);
-        });
-        document.getElementById('netGreen').innerText = "₹" + g;
-        document.getElementById('netMoped').innerText = "₹" + m;
-
-        // 2. Calc Staff Total Payable
-        const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
-        let staffBal = 0;
-        ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
-        document.getElementById('netStaff').innerText = "₹" + staffBal;
-
-        // 3. Load Open Jobs
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
+        // Fetch Open Jobs + Mechanic Names
+        const { data: jobs } = await supabaseClient.from('job_cards')
+            .select('id, total_invoice_value, vehicles(reg_number, make_model), mechanics(name)')
+            .eq('status', 'Open');
+        
         let html = '';
         jobs?.forEach(j => {
-            html += `<div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
-                <strong>${j.vehicles.reg_number}</strong> - ${j.vehicles.make_model}<br>
-                <small>Customer: ${j.customer_mobile}</small>
-            </div>`;
+            html += `
+                <div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
+                    <div class="card-header">
+                        <div>
+                            <span class="reg-no">${j.vehicles.reg_number}</span><br>
+                            <small>${j.vehicles.make_model}</small><br>
+                            <span class="mech-tag">Technician: ${j.mechanics?.name || 'Unassigned'}</span>
+                        </div>
+                        <div class="amount">₹${j.total_invoice_value || 0}</div>
+                    </div>
+                </div>`;
         });
-        document.getElementById('activeJobs').innerHTML = html || '<p>Workshop is empty.</p>';
+        document.getElementById('activeJobs').innerHTML = html || 'No bikes on floor.';
     }
     loadDashboard();
 </script>
