@@ -3,250 +3,263 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Billing Engine - My Care ERP</title>
+    <title>Floor Ledger Engine - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
-            --primary: #2c3e50; --success: #27ae60; --moped: #e67e22; --service: #2980b9; 
-            --light: #f4f7f6; --border: #ddd; 
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f1c40f; 
+            --light: #f4f7f6; --border: #e2e8f0; --text: #334155;
         }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); margin: 0; padding-bottom: 120px; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 110px; color: var(--text); }
         
-        .sticky-nav { background: white; padding: 12px 15px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .btn-home { font-weight: bold; color: var(--service); text-decoration: none; font-size: 0.9rem; }
-        .role-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+        .header-strip { background: white; padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .back-nav { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 4px; }
+        .role-tag { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
 
-        .container { max-width: 850px; margin: auto; padding: 15px; box-sizing: border-box; }
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
         
-        /* Failsafe Layout Alignment */
-        .info-card { background: white; padding: 16px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; border-left: 5px solid var(--primary); }
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 0.9rem; }
-        .info-label { font-size: 0.75rem; color: #777; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
-        .info-val { font-weight: bold; color: var(--primary); font-size: 1.05rem; }
+        /* Persistent Asset Banner Header */
+        .asset-summary-box { background: white; padding: 16px 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+        .asset-details { display: flex; flex-direction: column; gap: 4px; }
+        .asset-plate { font-size: 1.25rem; font-weight: 700; color: var(--primary); margin: 0; }
+        .asset-meta { font-size: 0.8rem; color: #64748b; }
+        .advance-chip { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; }
 
-        /* Inventory Insertion Blocks */
-        .insertion-controls { display: flex; gap: 10px; margin-bottom: 15px; }
-        .btn-part { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-lube { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #34495e; }
-        
-        .part-green { background: var(--success); }
-        .part-moped { background: var(--moped); }
+        /* Inventory Stack Action Row */
+        .insert-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+        .btn-stack { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: white; cursor: pointer; transition: opacity 0.1s; }
+        .btn-stack:hover { opacity: 0.9; }
+        .btn-green-part { background: var(--success); }
+        .btn-moped-part { background: var(--moped); }
+        .btn-lube-part { background: #475569; }
 
-        /* Table Architecture */
-        .table-card { background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th { background: #f8f9fa; color: #555; padding: 12px 15px; text-align: left; font-size: 0.8rem; border-bottom: 2px solid var(--border); text-transform: uppercase; }
-        td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #333; }
-        .tag-ware { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; color: white; font-weight: bold; }
-        .ware-green { background: var(--success); }
-        .ware-moped { background: var(--moped); }
-        .btn-del { color: #e74c3c; cursor: pointer; font-weight: bold; font-size: 1.1rem; border: none; background: none; }
+        /* Structured Table Layout */
+        .table-holder { background: white; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; }
+        .line-del { color: #ef4444; font-weight: 700; cursor: pointer; border: none; background: none; font-size: 1.1rem; padding: 0 4px; }
+        .ware-pill { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: white; }
+        .pill-green { background: var(--success); }
+        .pill-moped { background: var(--moped); }
 
-        /* Service Parameters Form */
-        .service-form { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: none; }
-        .param-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
-        .param-group { display: flex; flex-direction: column; gap: 5px; }
-        .param-group label { font-size: 0.8rem; font-weight: bold; color: #555; }
-        .param-group input { padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+        /* Scoped Parameter Blocks */
+        .service-parameters { background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); display: none; }
+        .service-parameters h3 { font-size: 0.95rem; margin: 0 0 16px 0; color: var(--primary); }
+        .param-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+        .input-block { display: flex; flex-direction: column; gap: 6px; }
+        .input-block label { font-size: 0.75rem; font-weight: 700; color: #64748b; }
+        .input-block input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
 
-        /* Action Panel Container */
-        .action-strip { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 15px 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 99; }
-        .total-display { font-size: 1.5rem; font-weight: bold; color: var(--success); }
-        .btn-process { padding: 14px 25px; background: var(--success); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; }
+        /* Footer Command Consoles */
+        .command-footer { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 100; box-shadow: 0 -1px 3px rgba(0,0,0,0.02); }
+        .net-valuation { font-size: 1.35rem; font-weight: 700; color: var(--success); }
+        .process-closure-btn { padding: 12px 24px; background: var(--success); color: white; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: none; }
+        .role-lock-msg { font-size: 0.8rem; font-weight: 700; color: #e3a008; display: none; }
     </style>
 </head>
 <body>
 
-<div class="sticky-nav">
-    <a href="index.html" class="btn-home">← MAIN FLOOR</a>
-    <div style="display:flex; gap:10px; align-items:center;">
-        <span id="roleDisplay" class="role-badge">GUEST</span>
-    </div>
+<div class="header-strip">
+    <a href="index.html" class="back-nav">← LEAVE LEDGER</a>
+    <span id="roleBadge" class="role-tag">GUEST</span>
 </div>
 
 <div class="container">
-    <div class="info-card">
-        <div class="info-grid">
-            <div><div class="info-label">Asset Tag</div><div id="vehReg" class="info-val">Loading...</div></div>
-            <div><div class="info-label">Assigned Tech</div><div id="mechName" class="info-val">--</div></div>
-            <div><div class="info-label">Prepaid Buffer</div><div id="advPaid" class="info-val" style="color:#27ae60;">₹0</div></div>
-            <div><div class="info-label">Historical Directive</div><div id="symptoms" style="font-size:0.85rem; color:#666; margin-top:2px;">--</div></div>
+    <div id="bannerAsset" class="asset-summary-box">
+        <div class="asset-details">
+            <h2 id="regPlate" class="asset-plate">Loading...</h2>
+            <span id="modelContext" class="asset-meta">Querying metadata...</span>
+            <span id="mechContext" class="asset-meta" style="color:var(--primary); font-weight:700;">Technician: --</span>
         </div>
+        <div id="advanceBuffer" class="advance-chip">Prepaid: ₹0</div>
     </div>
 
-    <div id="insertGroupGreen" class="insertion-controls" style="display:none;">
-        <button class="btn-part part-green" onclick="injectPart('Green', false)">+ GREEN SPARE</button>
-        <button class="btn-lube" onclick="injectPart('Green', true)">+ GREEN LUBRICANT (ML)</button>
+    <div id="toolbarGreen" class="insert-bar" style="display:none;">
+        <button class="btn-stack btn-green-part" onclick="stackElementLine('Green', false)">+ STACK GREEN PART</button>
+        <button class="btn-stack btn-lube-part" onclick="stackElementLine('Green', true)">+ ADD LUBRICANT (ML)</button>
     </div>
 
-    <div id="insertGroupMoped" class="insertion-controls" style="display:none;">
-        <button class="btn-part part-moped" onclick="injectPart('Moped', false)">+ MOPED SPARE</button>
-        <button class="btn-lube" onclick="injectPart('Moped', true)">+ MOPED LUBRICANT (ML)</button>
+    <div id="toolbarMoped" class="insert-bar" style="display:none;">
+        <button class="btn-stack btn-moped-part" onclick="stackElementLine('Moped', false)">+ STACK MOPED PART</button>
+        <button class="btn-stack btn-lube-part" onclick="stackElementLine('Moped', true)">+ ADD LUBRICANT (ML)</button>
     </div>
 
-    <div class="table-card">
+    <div class="table-holder">
         <table>
             <thead>
                 <tr>
-                    <th>Type</th>
-                    <th>Part Specs / Brand</th>
-                    <th>Qty / Vol</th>
+                    <th>Warehouse</th>
+                    <th>Part & Brand Identity</th>
+                    <th>Vol / Qty</th>
                     <th>Price</th>
                     <th>Total</th>
-                    <th id="delColumnHeader" style="display:none; width:40px;"></th>
+                    <th id="delHeader" style="width:32px; display:none;"></th>
                 </tr>
             </thead>
-            <tbody id="lineItemsBody"></tbody>
+            <tbody id="tableStackBody"></tbody>
         </table>
     </div>
 
-    <div id="serviceParamsBlock" class="service-form">
-        <strong style="color:var(--primary); display:block; margin-bottom:15px; font-size:1.05rem;">Operational Cost Tracking Matrix</strong>
-        <div class="param-grid">
-            <div class="param-group"><label>Labour Applied (₹)</label><input type="number" id="pLabour" value="0" min="0" oninput="compileTotals()"></div>
-            <div class="param-group"><label>Lathe Contract (₹)</label><input type="number" id="pLathe" value="0" min="0" oninput="compileTotals()"></div>
-            <div class="param-group"><label>Flat Concession (₹)</label><input type="number" id="pFlatDisc" value="0" min="0" oninput="compileTotals()"></div>
-            <div class="param-group"><label>Adv Buffer Adjustment (₹)</label><input type="number" id="pAdvance" value="0" min="0" oninput="compileTotals()"></div>
+    <div id="adminParametersBlock" class="service-parameters">
+        <h3>Overarching Invoice Modification Logic</h3>
+        <div class="param-matrix">
+            <div class="input-block"><label>Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" min="0" oninput="compileRuntimeTotals()"></div>
+            <div class="param-group input-block"><label>Lathe Contract (₹)</label><input type="number" id="vLathe" value="0" min="0" oninput="compileRuntimeTotals()"></div>
+            <div class="input-block"><label>Direct Discount (₹)</label><input type="number" id="vFlatDisc" value="0" min="0" oninput="compileRuntimeTotals()"></div>
+            <div class="input-block"><label>Prepaid Advance Modulator (₹)</label><input type="number" id="vAdvance" value="0" min="0" oninput="compileRuntimeTotals()"></div>
         </div>
     </div>
 </div>
 
-<div class="action-strip">
+<div class="command-footer">
     <div>
-        <span style="font-size:0.75rem; color:#777; font-weight:bold; display:block; text-transform:uppercase;">Invoice Aggregate</span>
-        <div id="aggregateTotal" class="total-display">₹0</div>
+        <span style="font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; display:block;">Invoice Aggregation Net</span>
+        <div id="netAmountDisplay" class="net-valuation">₹0</div>
     </div>
-    <button id="btnFinalize" class="btn-process" onclick="commitBillingWorkflow()">PROCESS TO BILL</button>
+    <button id="btnProcessClosure" class="process-closure-btn" onclick="executeFinalClosure()">PROCESS TO BILL</button>
+    <span id="roleLockIndicator" class="role-lock-msg">🔒 CLOSURE RESERVED FOR SERVICE MANAGER</span>
 </div>
 
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const jcId = urlParams.get('id');
+    const contextUrlParams = new URLSearchParams(window.location.search);
+    const activeTargetId = contextUrlParams.get('id');
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let role = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    let baseSparesSum = 0;
+    const targetRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let baseInventoryValuation = 0;
 
-    function applyRbacPermissions() {
-        document.getElementById('roleDisplay').innerText = role;
+    function applySecurityContext() {
+        document.getElementById('roleBadge').innerText = targetRole;
+
+        // Toolbar Injections
+        if(targetRole === 'green' || targetRole === 'admin') document.getElementById('toolbarGreen').style.display = 'flex';
+        if(targetRole === 'moped' || targetRole === 'admin') document.getElementById('toolbarMoped').style.display = 'flex';
         
-        // Scope Visibility Injector
-        if(role === 'green' || role === 'admin') document.getElementById('insertGroupGreen').style.display = 'flex';
-        if(role === 'moped' || role === 'admin') document.getElementById('insertGroupMoped').style.display = 'flex';
-        if(role === 'service' || role === 'admin') {
-            document.getElementById('serviceParamsBlock').style.display = 'block';
-            document.getElementById('delColumnHeader').style.display = 'table-cell';
+        // Administrative Closure Checks natively isolated per point constraints
+        if(targetRole === 'service' || targetRole === 'admin') {
+            document.getElementById('adminParametersBlock').style.display = 'block';
+            document.getElementById('btnProcessClosure').style.display = 'block';
+            document.getElementById('delHeader').style.display = 'table-cell';
+        } else {
+            document.getElementById('roleLockIndicator').style.display = 'block';
         }
-        
-        if(role === 'green' || role === 'moped') {
-            document.getElementById('delColumnHeader').style.display = 'table-cell';
+
+        if(targetRole === 'green' || targetRole === 'moped') {
+            document.getElementById('delHeader').style.display = 'table-cell';
         }
     }
 
-    async function loadJobInstance() {
-        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', jcId).single();
-        if(job) {
-            document.getElementById('vehReg').innerText = job.vehicles?.reg_number || "Direct Tag";
-            document.getElementById('mechName').innerText = job.mechanics?.name || "Unassigned";
-            document.getElementById('advPaid').innerText = "₹" + (parseFloat(job.advance_paid) || 0);
-            document.getElementById('symptoms').innerText = job.problem_mentioned || "Routine Processing";
+    async function loadJobContext() {
+        const { data: entity } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', activeTargetId).single();
+        if(entity) {
+            // Apply Dynamic Border rule indicator matching main portal edge parameters
+            document.getElementById('bannerAsset').style.borderLeft = `6px solid var(--${entity.source_role || 'service'})`;
+            
+            document.getElementById('regPlate').innerText = entity.vehicles?.reg_number || "DIRECT ASSET";
+            document.getElementById('modelContext').innerText = `${entity.vehicles?.make_model || 'Spares Instance'} | Customer Complaint: ${entity.problem_mentioned || 'N/A'}`;
+            document.getElementById('mechContext').innerText = `Technician: ${entity.mechanics?.name || 'Unassigned'}`;
+            document.getElementById('advanceBuffer').innerText = `Prepaid Buffer: ₹${parseFloat(entity.advance_paid) || 0}`;
 
-            // Initialize param fields natively if opened via service admin scope
-            document.getElementById('pLabour').value = parseFloat(job.labour_charges) || 0;
-            document.getElementById('pAdvance').value = parseFloat(job.advance_paid) || 0;
+            // Initialize Form bindings natively
+            document.getElementById('vLabour').value = parseFloat(entity.labour_charges) || 0;
+            document.getElementById('vAdvance').value = parseFloat(entity.advance_paid) || 0;
 
-            loadLineItems();
+            loadInventoryStack();
         }
     }
 
-    async function loadLineItems() {
-        const { data: items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', jcId);
-        const tbody = document.getElementById('lineItemsBody');
+    async function loadInventoryStack() {
+        const { data: stack } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', activeTargetId);
+        const tbody = document.getElementById('tableStackBody');
         tbody.innerHTML = '';
-        baseSparesSum = 0;
+        baseInventoryValuation = 0;
 
-        items?.forEach(i => {
-            baseSparesSum += parseFloat(i.total_price);
-            const isAuthorizedToDel = role === 'admin' || role === 'service' || role === i.warehouse_type.toLowerCase();
-            const delCell = isAuthorizedToDel ? `<button class="btn-del" onclick="destroyRow('${i.id}')">×</button>` : '';
+        stack?.forEach(item => {
+            baseInventoryValuation += parseFloat(item.total_price);
+            const dropAuth = targetRole === 'admin' || targetRole === 'service' || targetRole === item.warehouse_type.toLowerCase();
+            const delAction = dropAuth ? `<button class="line-del" onclick="dropLineElement('${item.id}')">×</button>` : '';
 
             tbody.innerHTML += `
                 <tr>
-                    <td><span class="tag-ware ware-${i.warehouse_type.toLowerCase()}">${i.warehouse_type}</span></td>
-                    <td><strong>${i.item_name}</strong></td>
-                    <td>${i.qty}</td>
-                    <td>₹${i.unit_price}</td>
-                    <td><strong>₹${i.total_price}</strong></td>
-                    <td style="display:${document.getElementById('delColumnHeader').style.display}; text-align:center;">${delCell}</td>
+                    <td><span class="ware-pill pill-${item.warehouse_type.toLowerCase()}">${item.warehouse_type}</span></td>
+                    <td><strong>${item.item_name}</strong></td>
+                    <td>${item.qty}</td>
+                    <td>₹${item.unit_price}</td>
+                    <td><strong>₹${item.total_price}</strong></td>
+                    <td style="display:${document.getElementById('delHeader').style.display}; text-align:center;">${delAction}</td>
                 </tr>`;
         });
-        compileTotals();
+        compileRuntimeTotals();
     }
 
-    async function injectPart(wareTarget, isLube) {
-        const labelType = isLube ? "Lubricant" : "Spare Part";
-        const name = prompt(`Input ${labelType} Item Spec:`);
-        if(!name) return;
-        
-        const brand = prompt(`Input ${labelType} Brand Context:`, "Standard");
-        const qtyLabel = isLube ? "Numeric Fluid Volume in ML:" : "Discrete Quantity Applied:";
-        const qty = prompt(qtyLabel, isLube ? "900" : "1");
-        const price = prompt(`Unit Charge Price (₹):`);
+    async function stackElementLine(wareTarget, isFluid) {
+        const typeSpec = isFluid ? "Volumetric Fluid Lube" : "Discrete Spare Part";
+        const partName = prompt(`Identify specific ${typeSpec} specification:`);
+        if(!partName) return;
 
-        if(qty && price) {
-            const formatMetric = isLube ? `${qty} ML` : `${qty} Unit(s)`;
-            const compositeSpec = `${name} (${brand})`;
+        const partBrand = prompt(`Input related ${typeSpec} manufacturing brand context:`, "Standard OEM");
+        const qtyRequest = isFluid ? "Numeric Volume measured in ML:" : "Discrete physical inventory quantity:";
+        const amountMetric = prompt(qtyRequest, isFluid ? "900" : "1");
+        const unitCharge = prompt(`Define Unit Price Allocation (₹):`);
+
+        if(amountMetric && unitCharge) {
+            const formatMetric = isFluid ? `${amountMetric} ML` : `${amountMetric} Unit(s)`;
+            const identityContext = `${partName} (${partBrand})`;
+
+            // Store cleanly directly to Product Catalog database table natively
+            await supabaseClient.from('product_master').upsert({ item_name: partName, brand: partBrand, warehouse_type: wareTarget }, { onConflict: 'item_name,brand' });
 
             await supabaseClient.from('job_card_items').insert({
-                job_card_id: jcId,
+                job_card_id: activeTargetId,
                 warehouse_type: wareTarget,
-                item_name: compositeSpec,
+                item_name: identityContext,
                 qty: formatMetric,
-                unit_price: parseFloat(price)
+                unit_price: parseFloat(unitCharge)
             });
-            loadLineItems();
+            loadInventoryStack();
         }
     }
 
-    async function destroyRow(rowId) {
-        if(confirm("Confirm destructive drop of asset item?")) {
-            await supabaseClient.from('job_card_items').delete().eq('id', rowId);
-            loadLineItems();
+    async function dropLineElement(id) {
+        if(confirm("Confirm action to drop active asset entry?")) {
+            await supabaseClient.from('job_card_items').delete().eq('id', id);
+            loadInventoryStack();
         }
     }
 
-    function compileTotals() {
-        const lab = parseFloat(document.getElementById('pLabour').value) || 0;
-        const lat = parseFloat(document.getElementById('pLathe').value) || 0;
-        const flt = parseFloat(document.getElementById('pFlatDisc').value) || 0;
-        const adv = parseFloat(document.getElementById('pAdvance').value) || 0;
+    function compileRuntimeTotals() {
+        const l = parseFloat(document.getElementById('vLabour').value) || 0;
+        const w = parseFloat(document.getElementById('vLathe').value) || 0;
+        const d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
+        const a = parseFloat(document.getElementById('vAdvance').value) || 0;
 
-        const sub = baseSparesSum + lab + lat;
-        const finalNet = (sub - flt) - adv;
+        const gross = baseInventoryValuation + l + w;
+        const netAggregate = (gross - d) - a;
 
-        document.getElementById('aggregateTotal').innerText = "₹" + Math.round(finalNet);
+        document.getElementById('netAmountDisplay').innerText = "₹" + Math.round(netAggregate);
     }
 
-    async function commitBillingWorkflow() {
-        const finalVal = document.getElementById('aggregateTotal').innerText.replace('₹','');
-        const lab = parseFloat(document.getElementById('pLabour').value) || 0;
-        const adv = parseFloat(document.getElementById('pAdvance').value) || 0;
+    async function executeFinalClosure() {
+        const netValuation = document.getElementById('netAmountDisplay').innerText.replace('₹','');
+        const labCost = parseFloat(document.getElementById('vLabour').value) || 0;
+        const bufferVal = parseFloat(document.getElementById('vAdvance').value) || 0;
 
         await supabaseClient.from('job_cards').update({
-            total_invoice_value: finalVal,
-            labour_charges: lab,
-            advance_paid: adv,
+            total_invoice_value: netValuation,
+            labour_charges: labCost,
+            advance_paid: bufferVal,
             status: 'Closed'
-        }).eq('id', jcId);
+        }).eq('id', activeTargetId);
 
-        alert("Invoice Closed successfully. Aggregate ledgers updated.");
+        alert("Final closure authorization processing successfully executed. Aggregate general corporate ledgers modified.");
         window.location.href = 'index.html';
     }
 
-    applyRbacPermissions();
-    loadJobInstance();
+    applySecurityContext();
+    loadJobContext();
 </script>
 </body>
 </html>
