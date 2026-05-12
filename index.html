@@ -3,64 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - Command Center</title>
+    <title>Dashboard - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --light: #f4f7f6; --white: #ffffff; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--light); margin: 0; padding: 0; }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --moped: #e67e22; --service: #2980b9; 
+            --light: #f4f7f6; --warning: #f1c40f; --border: #ddd; 
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); margin: 0; padding: 0; }
         
-        .app-header { background: var(--white); padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .container { padding: 15px; max-width: 600px; margin: auto; }
+        /* Unified Header Layout */
+        .header { background: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .header-branding { display: flex; align-items: center; gap: 15px; }
+        .header-branding img { height: 35px; }
+        .role-indicator { background: var(--primary); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* Navigation Grid */
-        .nav-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .nav-item { background: var(--info); color: white; padding: 12px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 0.85rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
-        .btn-new { background: var(--success); grid-column: span 2; padding: 15px; font-size: 1.05rem; }
-        .btn-admin { background: #34495e; border-left: 4px solid #e74c3c; }
+        .container { max-width: 900px; margin: auto; padding: 20px; box-sizing: border-box; }
 
-        /* Stats */
-        .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-box { background: white; padding: 10px; border-radius: 8px; text-align: center; border-top: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .stat-label { font-size: 0.65rem; color: #777; font-weight: bold; display: block; }
-        .stat-val { font-size: 1rem; font-weight: bold; color: var(--primary); margin-top: 3px; display: block; }
+        /* Navigation Matrix */
+        .nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 25px; }
+        .nav-btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.85rem; color: white; cursor: pointer; text-align: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: none; }
+        .nav-btn:hover { opacity: 0.9; }
+        
+        .btn-green { background: var(--success); }
+        .btn-moped { background: var(--moped); }
+        .btn-service { background: var(--service); }
+        .btn-report { background: #8e44ad; }
+        .btn-admin { background: #34495e; }
 
-        /* Floor Cards */
-        .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; display: flex; justify-content: space-between; align-items: center; }
-        .job-card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 12px; border-left: 6px solid var(--warning); box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
-        .jc-row { display: flex; justify-content: space-between; align-items: center; }
-        .jc-reg { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
-        .jc-amt { font-size: 1.2rem; font-weight: bold; color: var(--success); }
-        .mech-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--primary); font-weight: bold; }
+        /* Floor Cards Display */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+        .section-title { font-size: 1.2rem; font-weight: bold; color: var(--primary); margin: 0; }
+        
+        .jobs-container { display: flex; flex-direction: column; gap: 12px; }
+        .job-card { background: white; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 6px solid var(--primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: transform 0.15s; }
+        .job-card:hover { transform: translateY(-2px); }
+        
+        /* Dynamic Role Border Coding */
+        .jc-source-green { border-left-color: var(--success); }
+        .jc-source-moped { border-left-color: var(--moped); }
+        .jc-source-service { border-left-color: var(--service); }
+
+        .jc-meta { font-size: 0.85rem; color: #666; margin-top: 4px; }
+        .jc-reg { font-size: 1.15rem; font-weight: bold; color: var(--primary); }
+        .jc-prepaid-tag { background: #e8f5e9; color: #2e7d32; font-size: 0.75rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 8px; border: 1px solid #c8e6c9; }
+        .jc-total { font-size: 1.3rem; font-weight: bold; color: var(--success); }
+        
+        .logout-link { font-size: 0.8rem; color: #e74c3c; cursor: pointer; text-decoration: underline; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="app-header">
-    <img src="logo-main.jpg" height="40" onerror="this.style.display='none'">
-    <strong style="letter-spacing: 1px;">MY CARE ERP</strong>
-    <img src="logo-green.png" height="30" onerror="this.style.display='none'">
+<div class="header">
+    <div class="header-branding">
+        <img src="logo-main.jpg" onerror="this.style.display='none'">
+        <strong style="color:var(--primary);">MY CARE ERP</strong>
+        <img src="logo-green.png" onerror="this.style.display='none'">
+    </div>
+    <div style="display:flex; align-items:center; gap:15px;">
+        <span id="roleDisplay" class="role-indicator">GUEST</span>
+        <span class="logout-link" onclick="logout()">LOGOUT</span>
+    </div>
 </div>
 
 <div class="container">
-    <div class="stats-row">
-        <div class="stat-box"><span class="stat-label">Green/Oil</span><span class="stat-val" id="netGreen">₹0</span></div>
-        <div class="stat-box"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
-        <div class="stat-box"><span class="stat-label">Staff Pay</span><span class="stat-val" id="netStaff">₹0</span></div>
+    <div id="navMenu" class="nav-grid">
+        <a href="new-jobcard.html" id="btnJcGreen" class="nav-btn btn-green">+ JC (GREEN)</a>
+        <a href="pos-green.html" id="btnPosGreen" class="nav-btn btn-green">🛒 GREEN POS</a>
+        <a href="reports.html?source=green" id="btnRepGreen" class="nav-btn btn-report">📊 GREEN REPORTS</a>
+        <a href="ledger.html?type=credit_green" id="btnLedGreen" class="nav-btn btn-green">👥 CREDIT LEDGER</a>
+
+        <a href="new-jobcard.html" id="btnJcMoped" class="nav-btn btn-moped">+ JC (MOPED)</a>
+        <a href="reports.html?source=moped" id="btnRepMoped" class="nav-btn btn-report">📊 MOPED REPORTS</a>
+
+        <a href="new-jobcard.html" id="btnJcService" class="nav-btn btn-service">+ OPEN JOB CARD</a>
+        <a href="ledger.html?type=service" id="btnLedService" class="nav-btn btn-service">👥 CUSTOMER ACCOUNTS</a>
+        <a href="admin-console.html" id="btnAdminConsole" class="nav-btn btn-admin">⚙️ CONSOLE</a>
     </div>
 
-    <div class="nav-menu">
-        <a href="new-jobcard.html" class="nav-item btn-new">+ NEW JOB CARD</a>
-        <a href="reports.html" class="nav-item" style="background:#8e44ad;">📊 REPORTS</a>
-        <a href="staff-ledger.html" class="nav-item">👥 STAFF LEDGER</a>
-        <a href="pos-green.html" class="nav-item" style="background:var(--success);">🛒 GREEN POS</a>
-        <a href="admin-console.html" class="nav-item btn-admin">⚙️ MASTER ADMIN</a>
+    <div class="section-header">
+        <h2 class="section-title">Active Floor Dispatch</h2>
+        <button onclick="loadFloor()" style="border:none; background:none; color:var(--service); cursor:pointer; font-weight:bold;">↻ REFRESH</button>
     </div>
-
-    <div class="section-title">
-        <span>Active Floor View</span>
-        <button onclick="loadDashboard()" style="border:none; background:none; color:var(--info); font-weight:bold; cursor:pointer;">Refresh ↻</button>
+    
+    <div id="floorContainer" class="jobs-container">
+        <div style="text-align:center; color:#888; padding:30px;">Checking Active Instances...</div>
     </div>
-    <div id="activeJobs">Pulling live floor data...</div>
 </div>
 
 <script>
@@ -68,53 +96,71 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadDashboard() {
-        // 1. Fetch Closed Sales (All Time History for testing visibility)
-        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed');
-        let g = 0, m = 0;
-        sales?.forEach(s => {
-            g += (parseFloat(s.green_total) || 0) + (parseFloat(s.lubricant_total) || 0);
-            m += (parseFloat(s.moped_total) || 0);
+    let activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+
+    function initInterface() {
+        if(activeRole === 'guest') {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        document.getElementById('roleDisplay').innerText = activeRole;
+
+        // Visibility Rule Evaluation Matrix
+        const matrix = {
+            green: ['btnJcGreen', 'btnPosGreen', 'btnRepGreen', 'btnLedGreen'],
+            moped: ['btnJcMoped', 'btnRepMoped'],
+            service: ['btnJcService', 'btnLedService', 'btnAdminConsole'],
+            admin: ['btnJcGreen', 'btnPosGreen', 'btnRepGreen', 'btnLedGreen', 'btnJcMoped', 'btnRepMoped', 'btnJcService', 'btnLedService', 'btnAdminConsole']
+        };
+
+        matrix[activeRole]?.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.style.display = 'block';
         });
-        document.getElementById('netGreen').innerText = "₹" + g;
-        document.getElementById('netMoped').innerText = "₹" + m;
 
-        // 2. Fetch Net Staff Payable
-        const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
-        let staffBal = 0;
-        ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
-        document.getElementById('netStaff').innerText = "₹" + staffBal;
+        loadFloor();
+    }
 
-        // 3. Robust Floor Pull (LEFT JOIN guarantees display even if foreign keys are broken)
+    async function loadFloor() {
         const { data: jobs, error } = await supabaseClient.from('job_cards')
-            .select('id, total_invoice_value, customer_mobile, vehicles(reg_number, make_model), mechanics(name)')
-            .eq('status', 'Open');
+            .select('id, total_invoice_value, advance_paid, source_role, customer_mobile, vehicles(reg_number, make_model), mechanics(name)')
+            .eq('status', 'Open')
+            .order('jc_date', { ascending: false });
 
-        let html = '';
-        if (jobs && jobs.length > 0) {
+        const cont = document.getElementById('floorContainer');
+        cont.innerHTML = '';
+
+        if(jobs && jobs.length > 0) {
             jobs.forEach(j => {
-                const reg = j.vehicles?.reg_number || "UNREGISTERED / ACC";
-                const model = j.vehicles?.make_model || "General Service";
-                const mech = j.mechanics?.name || "Unassigned";
+                const reg = j.vehicles?.reg_number || 'ACC/WALK-IN';
+                const model = j.vehicles?.make_model || 'Direct Spares';
+                const source = j.source_role || 'service';
+                const advance = parseFloat(j.advance_paid) || 0;
                 
-                html += `
-                    <div class="job-card" onclick="window.location.href='billing.html?id=${j.id}'">
-                        <div class="jc-row">
-                            <div>
-                                <div class="jc-reg">${reg}</div>
-                                <div style="font-size:0.8rem; color:#666;">${model} | Mob: ${j.customer_mobile}</div>
-                                <div style="margin-top:5px;"><span class="mech-tag">Tech: ${mech}</span></div>
-                            </div>
-                            <div class="jc-amt">₹${Math.round(j.total_invoice_value || 0)}</div>
+                let advanceTag = advance > 0 ? `<span class="jc-prepaid-tag">Prepaid: ₹${advance}</span>` : '';
+
+                cont.innerHTML += `
+                    <div class="job-card jc-source-${source}" onclick="window.location.href='billing.html?id=${j.id}'">
+                        <div>
+                            <div class="jc-reg">${reg} ${advanceTag}</div>
+                            <div class="jc-meta">${model} | Mob: ${j.customer_mobile}</div>
+                            <div class="jc-meta" style="color:var(--primary); font-weight:bold;">Assigned: ${j.mechanics?.name || 'Unassigned'}</div>
                         </div>
+                        <div class="jc-total">₹${Math.round(j.total_invoice_value || 0)}</div>
                     </div>`;
             });
-        } else { html = '<div style="text-align:center; color:#888; padding:20px 0;">No active job cards found.</div>'; }
-        
-        document.getElementById('activeJobs').innerHTML = html;
-        if(error) alert("Sync Warning: " + error.message);
+        } else {
+            cont.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Floor is clear. No active processing jobs.</div>';
+        }
     }
-    loadDashboard();
+
+    function logout() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
+    }
+
+    initInterface();
 </script>
 </body>
 </html>
