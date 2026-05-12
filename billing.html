@@ -1,137 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Digital Job Card - My Care</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Engine - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --green: #27ae60; --moped: #e67e22; --primary: #2c3e50; }
-        body { font-family: sans-serif; margin: 0; background: #f0f2f5; padding-bottom: 100px; }
-        .navbar { background: var(--primary); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .sticky-header { background: white; padding: 15px; border-bottom: 2px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .item-list { background: white; margin: 10px; border-radius: 10px; overflow: hidden; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; font-size: 0.75rem; padding: 10px; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; }
-        .action-bar { position: fixed; bottom: 0; width: 100%; background: white; padding: 15px; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; }
-        .btn-add { border: none; padding: 10px; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
-        .hidden { display: none !important; }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --moped: #e67e22; --service: #2980b9; 
+            --light: #f4f7f6; --border: #ddd; 
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); margin: 0; padding-bottom: 120px; }
+        
+        .sticky-nav { background: white; padding: 12px 15px; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-home { font-weight: bold; color: var(--service); text-decoration: none; font-size: 0.9rem; }
+        .role-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+
+        .container { max-width: 850px; margin: auto; padding: 15px; box-sizing: border-box; }
+        
+        /* Failsafe Layout Alignment */
+        .info-card { background: white; padding: 16px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; border-left: 5px solid var(--primary); }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 0.9rem; }
+        .info-label { font-size: 0.75rem; color: #777; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .info-val { font-weight: bold; color: var(--primary); font-size: 1.05rem; }
+
+        /* Inventory Insertion Blocks */
+        .insertion-controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-part { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-lube { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #34495e; }
+        
+        .part-green { background: var(--success); }
+        .part-moped { background: var(--moped); }
+
+        /* Table Architecture */
+        .table-card { background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { background: #f8f9fa; color: #555; padding: 12px 15px; text-align: left; font-size: 0.8rem; border-bottom: 2px solid var(--border); text-transform: uppercase; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #333; }
+        .tag-ware { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; color: white; font-weight: bold; }
+        .ware-green { background: var(--success); }
+        .ware-moped { background: var(--moped); }
+        .btn-del { color: #e74c3c; cursor: pointer; font-weight: bold; font-size: 1.1rem; border: none; background: none; }
+
+        /* Service Parameters Form */
+        .service-form { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: none; }
+        .param-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .param-group { display: flex; flex-direction: column; gap: 5px; }
+        .param-group label { font-size: 0.8rem; font-weight: bold; color: #555; }
+        .param-group input { padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+
+        /* Action Panel Container */
+        .action-strip { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 15px 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 99; }
+        .total-display { font-size: 1.5rem; font-weight: bold; color: var(--success); }
+        .btn-process { padding: 14px 25px; background: var(--success); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.05rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div class="navbar">
-        <a href="index.html" style="color:white; text-decoration:none; font-weight:bold;">← HOME</a>
-        <div id="roleDisplay" style="font-size: 0.7rem;">ROLE: GUEST</div>
+<div class="sticky-nav">
+    <a href="index.html" class="btn-home">← MAIN FLOOR</a>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <span id="roleDisplay" class="role-badge">GUEST</span>
+    </div>
+</div>
+
+<div class="container">
+    <div class="info-card">
+        <div class="info-grid">
+            <div><div class="info-label">Asset Tag</div><div id="vehReg" class="info-val">Loading...</div></div>
+            <div><div class="info-label">Assigned Tech</div><div id="mechName" class="info-val">--</div></div>
+            <div><div class="info-label">Prepaid Buffer</div><div id="advPaid" class="info-val" style="color:#27ae60;">₹0</div></div>
+            <div><div class="info-label">Historical Directive</div><div id="symptoms" style="font-size:0.85rem; color:#666; margin-top:2px;">--</div></div>
+        </div>
     </div>
 
-    <div class="sticky-header">
-        <div id="vehInfo" style="font-size: 1.2rem; font-weight: bold;">Loading...</div>
-        <div id="mechInfo" style="color: #666; font-size: 0.9rem;">Technician: --</div>
+    <div id="insertGroupGreen" class="insertion-controls" style="display:none;">
+        <button class="btn-part part-green" onclick="injectPart('Green', false)">+ GREEN SPARE</button>
+        <button class="btn-lube" onclick="injectPart('Green', true)">+ GREEN LUBRICANT (ML)</button>
     </div>
 
-    <div class="item-list">
+    <div id="insertGroupMoped" class="insertion-controls" style="display:none;">
+        <button class="btn-part part-moped" onclick="injectPart('Moped', false)">+ MOPED SPARE</button>
+        <button class="btn-lube" onclick="injectPart('Moped', true)">+ MOPED LUBRICANT (ML)</button>
+    </div>
+
+    <div class="table-card">
         <table>
             <thead>
-                <tr><th>Category</th><th>Item & Brand</th><th>Qty</th><th>Total</th><th></th></tr>
+                <tr>
+                    <th>Type</th>
+                    <th>Part Specs / Brand</th>
+                    <th>Qty / Vol</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th id="delColumnHeader" style="display:none; width:40px;"></th>
+                </tr>
             </thead>
-            <tbody id="itemsBody"></tbody>
+            <tbody id="lineItemsBody"></tbody>
         </table>
     </div>
 
-    <div style="padding: 15px;">
-        <button onclick="changeRole()">🔑 Switch Access</button>
-    </div>
-
-    <div class="action-bar">
-        <div id="controlsSpare" class="hidden">
-            <button class="btn-add" style="background:var(--green);" onclick="openAddModal('Green')">+ Green/Lube</button>
-            <button class="btn-add" style="background:var(--moped);" onclick="openAddModal('Moped')">+ Moped Part</button>
-        </div>
-        <div id="controlsWorkshop" class="hidden">
-            <div style="font-weight:bold;">Final Collection: ₹<span id="grandTotal">0</span></div>
+    <div id="serviceParamsBlock" class="service-form">
+        <strong style="color:var(--primary); display:block; margin-bottom:15px; font-size:1.05rem;">Operational Cost Tracking Matrix</strong>
+        <div class="param-grid">
+            <div class="param-group"><label>Labour Applied (₹)</label><input type="number" id="pLabour" value="0" min="0" oninput="compileTotals()"></div>
+            <div class="param-group"><label>Lathe Contract (₹)</label><input type="number" id="pLathe" value="0" min="0" oninput="compileTotals()"></div>
+            <div class="param-group"><label>Flat Concession (₹)</label><input type="number" id="pFlatDisc" value="0" min="0" oninput="compileTotals()"></div>
+            <div class="param-group"><label>Adv Buffer Adjustment (₹)</label><input type="number" id="pAdvance" value="0" min="0" oninput="compileTotals()"></div>
         </div>
     </div>
+</div>
 
-    <datalist id="productList"></datalist>
-    <datalist id="brandList"></datalist>
+<div class="action-strip">
+    <div>
+        <span style="font-size:0.75rem; color:#777; font-weight:bold; display:block; text-transform:uppercase;">Invoice Aggregate</span>
+        <div id="aggregateTotal" class="total-display">₹0</div>
+    </div>
+    <button id="btnFinalize" class="btn-process" onclick="commitBillingWorkflow()">PROCESS TO BILL</button>
+</div>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const jobId = urlParams.get('id');
+    const jcId = urlParams.get('id');
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let currentRole = 'guest';
+    let role = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let baseSparesSum = 0;
 
-    // Point 1: Authorization
-    function changeRole() {
-        const pin = prompt("Enter PIN:");
-        if (pin === "1111") setRole('green'); // Green Spare Mgr
-        else if (pin === "2222") setRole('moped'); // Moped Spare Mgr
-        else if (pin === "3333") setRole('workshop'); // Workshop Mgr
-        else if (pin === "0000") setRole('admin'); // Admin
-        else alert("Invalid PIN");
-    }
-
-    function setRole(role) {
-        currentRole = role;
-        document.getElementById('roleDisplay').innerText = "ROLE: " + role.toUpperCase();
-        document.getElementById('controlsSpare').classList.toggle('hidden', role !== 'green' && role !== 'moped' && role !== 'admin');
-        document.getElementById('controlsWorkshop').classList.toggle('hidden', role !== 'workshop' && role !== 'admin');
-    }
-
-    async function loadJob() {
-        const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', jobId).single();
-        if (data) {
-            document.getElementById('vehInfo').innerText = data.vehicles.reg_number + " (" + data.vehicles.make_model + ")";
-            document.getElementById('mechInfo').innerText = "Technician: " + (data.mechanics?.name || "Unassigned");
-            loadItems();
-        }
-    }
-
-    // Point 3 & 4: Add Product with Master Search
-    async function openAddModal(warehouse) {
-        if (currentRole !== 'admin' && currentRole !== warehouse.toLowerCase()) {
-            return alert("Access Denied for " + warehouse);
+    function applyRbacPermissions() {
+        document.getElementById('roleDisplay').innerText = role;
+        
+        // Scope Visibility Injector
+        if(role === 'green' || role === 'admin') document.getElementById('insertGroupGreen').style.display = 'flex';
+        if(role === 'moped' || role === 'admin') document.getElementById('insertGroupMoped').style.display = 'flex';
+        if(role === 'service' || role === 'admin') {
+            document.getElementById('serviceParamsBlock').style.display = 'block';
+            document.getElementById('delColumnHeader').style.display = 'table-cell';
         }
         
-        const name = prompt("Enter Item Name (Autocomplete will learn this):");
-        const brand = prompt("Enter Brand:");
-        const isLube = confirm("Is this a Lubricant? (Cancel for Spare)");
-        const qty = prompt("Quantity:", "1");
-        const price = prompt("Price per unit:");
-
-        if (name && qty && price) {
-            // Save to Master for future autocomplete (Upsert)
-            await supabaseClient.from('product_master').upsert({ item_name: name, brand: brand, warehouse_type: warehouse });
-            
-            // Save to Job
-            await supabaseClient.from('job_card_items').insert({
-                job_card_id: jobId,
-                warehouse_type: warehouse,
-                item_name: name + " (" + brand + ")",
-                qty: qty,
-                unit_price: price
-            });
-            loadItems();
+        if(role === 'green' || role === 'moped') {
+            document.getElementById('delColumnHeader').style.display = 'table-cell';
         }
     }
 
-    async function loadItems() {
-        const { data } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', jobId);
-        const tbody = document.getElementById('itemsBody');
-        tbody.innerHTML = '';
-        let total = 0;
-        data?.forEach(i => {
-            total += i.total_price;
-            tbody.innerHTML += `<tr><td>${i.warehouse_type}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${i.total_price}</td><td>×</td></tr>`;
-        });
-        document.getElementById('grandTotal').innerText = total;
+    async function loadJobInstance() {
+        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', jcId).single();
+        if(job) {
+            document.getElementById('vehReg').innerText = job.vehicles?.reg_number || "Direct Tag";
+            document.getElementById('mechName').innerText = job.mechanics?.name || "Unassigned";
+            document.getElementById('advPaid').innerText = "₹" + (parseFloat(job.advance_paid) || 0);
+            document.getElementById('symptoms').innerText = job.problem_mentioned || "Routine Processing";
+
+            // Initialize param fields natively if opened via service admin scope
+            document.getElementById('pLabour').value = parseFloat(job.labour_charges) || 0;
+            document.getElementById('pAdvance').value = parseFloat(job.advance_paid) || 0;
+
+            loadLineItems();
+        }
     }
 
-    loadJob();
+    async function loadLineItems() {
+        const { data: items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', jcId);
+        const tbody = document.getElementById('lineItemsBody');
+        tbody.innerHTML = '';
+        baseSparesSum = 0;
+
+        items?.forEach(i => {
+            baseSparesSum += parseFloat(i.total_price);
+            const isAuthorizedToDel = role === 'admin' || role === 'service' || role === i.warehouse_type.toLowerCase();
+            const delCell = isAuthorizedToDel ? `<button class="btn-del" onclick="destroyRow('${i.id}')">×</button>` : '';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><span class="tag-ware ware-${i.warehouse_type.toLowerCase()}">${i.warehouse_type}</span></td>
+                    <td><strong>${i.item_name}</strong></td>
+                    <td>${i.qty}</td>
+                    <td>₹${i.unit_price}</td>
+                    <td><strong>₹${i.total_price}</strong></td>
+                    <td style="display:${document.getElementById('delColumnHeader').style.display}; text-align:center;">${delCell}</td>
+                </tr>`;
+        });
+        compileTotals();
+    }
+
+    async function injectPart(wareTarget, isLube) {
+        const labelType = isLube ? "Lubricant" : "Spare Part";
+        const name = prompt(`Input ${labelType} Item Spec:`);
+        if(!name) return;
+        
+        const brand = prompt(`Input ${labelType} Brand Context:`, "Standard");
+        const qtyLabel = isLube ? "Numeric Fluid Volume in ML:" : "Discrete Quantity Applied:";
+        const qty = prompt(qtyLabel, isLube ? "900" : "1");
+        const price = prompt(`Unit Charge Price (₹):`);
+
+        if(qty && price) {
+            const formatMetric = isLube ? `${qty} ML` : `${qty} Unit(s)`;
+            const compositeSpec = `${name} (${brand})`;
+
+            await supabaseClient.from('job_card_items').insert({
+                job_card_id: jcId,
+                warehouse_type: wareTarget,
+                item_name: compositeSpec,
+                qty: formatMetric,
+                unit_price: parseFloat(price)
+            });
+            loadLineItems();
+        }
+    }
+
+    async function destroyRow(rowId) {
+        if(confirm("Confirm destructive drop of asset item?")) {
+            await supabaseClient.from('job_card_items').delete().eq('id', rowId);
+            loadLineItems();
+        }
+    }
+
+    function compileTotals() {
+        const lab = parseFloat(document.getElementById('pLabour').value) || 0;
+        const lat = parseFloat(document.getElementById('pLathe').value) || 0;
+        const flt = parseFloat(document.getElementById('pFlatDisc').value) || 0;
+        const adv = parseFloat(document.getElementById('pAdvance').value) || 0;
+
+        const sub = baseSparesSum + lab + lat;
+        const finalNet = (sub - flt) - adv;
+
+        document.getElementById('aggregateTotal').innerText = "₹" + Math.round(finalNet);
+    }
+
+    async function commitBillingWorkflow() {
+        const finalVal = document.getElementById('aggregateTotal').innerText.replace('₹','');
+        const lab = parseFloat(document.getElementById('pLabour').value) || 0;
+        const adv = parseFloat(document.getElementById('pAdvance').value) || 0;
+
+        await supabaseClient.from('job_cards').update({
+            total_invoice_value: finalVal,
+            labour_charges: lab,
+            advance_paid: adv,
+            status: 'Closed'
+        }).eq('id', jcId);
+
+        alert("Invoice Closed successfully. Aggregate ledgers updated.");
+        window.location.href = 'index.html';
+    }
+
+    applyRbacPermissions();
+    loadJobInstance();
 </script>
 </body>
 </html>
