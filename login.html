@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gateway - My Care ERP</title>
+    <style>
+        :root { --primary: #2c3e50; --light: #f4f7f6; --success: #27ae60; --moped: #e67e22; --border: #ccc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; border-top: 5px solid var(--primary); }
+        .logo-area { margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .logo-area img { height: 40px; }
+        h2 { margin: 0 0 5px 0; color: var(--primary); font-size: 1.5rem; }
+        p { color: #777; font-size: 0.9rem; margin-bottom: 25px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { font-size: 0.85rem; font-weight: bold; color: #555; display: block; margin-bottom: 8px; }
+        input { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 1.1rem; text-align: center; letter-spacing: 3px; box-sizing: border-box; }
+        input:focus { border-color: var(--primary); outline: none; }
+        .btn { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .error-msg { color: #e74c3c; font-size: 0.85rem; margin-top: 15px; display: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="logo-area">
+        <img src="logo-main.jpg" onerror="this.style.display='none'">
+        <h2>MY CARE ERP</h2>
+        <img src="logo-green.png" onerror="this.style.display='none'">
+    </div>
+    <p>Secure Floor Access Authentication</p>
+    
+    <div class="input-group">
+        <label>ENTER AUTHORIZATION PIN</label>
+        <input type="password" id="authPin" placeholder="••••" maxlength="8" autofocus onkeydown="if(event.key === 'Enter') authenticate()">
+    </div>
+    
+    <button class="btn" onclick="authenticate()">VERIFY ACCESS</button>
+    <div id="errorMsg" class="error-msg">INVALID CREDENTIALS</div>
+</div>
+
+<script>
+    function authenticate() {
+        const pin = document.getElementById('authPin').value.trim();
+        const err = document.getElementById('errorMsg');
+        err.style.display = 'none';
+
+        // PIN Mappings Configured per spec
+        const routing = {
+            "1111": { role: "green", path: "index.html" },
+            "2222": { role: "moped", path: "index.html" },
+            "3333": { role: "service", path: "index.html" },
+            "0000": { role: "admin", path: "index.html" }
+        };
+
+        if (routing[pin]) {
+            localStorage.setItem('ERP_ACTIVE_ROLE', routing[pin].role);
+            window.location.href = routing[pin].path;
+        } else {
+            err.style.display = 'block';
+            document.getElementById('authPin').value = '';
+            document.getElementById('authPin').focus();
+        }
+    }
+</script>
+</body>
+</html>
