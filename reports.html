@@ -5,27 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; }
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin: 0; }
+        .nav-back { text-decoration: none; color: #2980b9; font-weight: bold; margin-bottom: 20px; display: block; }
         .report-card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
         .pending-lathe { border-left: 5px solid #e74c3c; padding-left: 10px; }
-        .tag { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; color: white; }
-        .tag-red { background: #e74c3c; }
-        .tag-green { background: #27ae60; }
+        .tag-red { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
     </style>
 </head>
 <body>
 
-    <h2>Daily Workshop Report</h2>
+    <a href="index.html" class="nav-back">← Back to Dashboard</a>
+    <h2>Business Reports</h2>
+
+    <div class="report-card" style="border-left: 6px solid #8e44ad; cursor: pointer;" onclick="window.location.href='staff-ledger.html'">
+        <strong>Detailed Mechanic Ledger</strong><br>
+        <small>Click to view earnings and advances for all staff.</small>
+    </div>
     
     <div class="report-card">
-        <h3>Sales Summary (Today)</h3>
-        <div id="salesSummary">Loading totals...</div>
+        <h3>Today's Collection Summary</h3>
+        <div id="salesSummary">Loading...</div>
     </div>
 
     <div class="report-card">
-        <h3>Pending Lathe Payments</h3>
-        <div id="latheLedger">Checking third-party debts...</div>
+        <h3>Pending Lathe Payments (Debts)</h3>
+        <div id="latheLedger">Checking...</div>
     </div>
 
 <script>
@@ -48,26 +53,20 @@
         });
 
         document.getElementById('salesSummary').innerHTML = `
-            <div class="stat-row"><span>Green Warehouse:</span> <strong>₹${green}</strong></div>
-            <div class="stat-row"><span>Moped Warehouse:</span> <strong>₹${moped}</strong></div>
-            <div class="stat-row"><span>Oil/Lubricants:</span> <strong>₹${oil}</strong></div>
-            <div class="stat-row"><span>Labour Total:</span> <strong>₹${labour}</strong></div>
+            <div class="stat-row"><span>Green Spares:</span> <strong>₹${green}</strong></div>
+            <div class="stat-row"><span>Moped Spares:</span> <strong>₹${moped}</strong></div>
+            <div class="stat-row"><span>Lubricants:</span> <strong>₹${oil}</strong></div>
+            <div class="stat-row"><span>Total Labour:</span> <strong>₹${labour}</strong></div>
         `;
 
-        // 2. Fetch ALL Pending Lathe Work
-        const { data: lathePending } = await supabaseClient.from('job_cards').select('id, lathe_welding, customer_mobile').eq('lathe_status', 'Pending').gt('lathe_welding', 0);
-        
+        // 2. Lathe Debts
+        const { data: lathePending } = await supabaseClient.from('job_cards').select('*').eq('lathe_status', 'Pending').gt('lathe_welding', 0);
         let latheHtml = '';
         lathePending?.forEach(l => {
-            latheHtml += `
-                <div class="stat-row pending-lathe">
-                    <span>Mob: ${l.customer_mobile}</span>
-                    <strong>₹${l.lathe_welding} <span class="tag tag-red">UNPAID</span></strong>
-                </div>`;
+            latheHtml += `<div class="stat-row pending-lathe"><span>Mob: ${l.customer_mobile}</span> <strong>₹${l.lathe_welding} <span class="tag-red">UNPAID</span></strong></div>`;
         });
-        document.getElementById('latheLedger').innerHTML = latheHtml || 'All lathe works settled!';
+        document.getElementById('latheLedger').innerHTML = latheHtml || 'No lathe debts!';
     }
-
     loadReports();
 </script>
 </body>
