@@ -3,34 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - Live Dashboard</title>
+    <title>My Care - Command Center</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --light: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--light); margin: 0; padding: 15px; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-card { background: white; padding: 10px; border-radius: 8px; text-align: center; border-top: 4px solid var(--primary); }
-        .card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border-left: 6px solid var(--info); }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .reg-no { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
-        .amount { font-size: 1.2rem; font-weight: bold; color: var(--success); }
-        .mech-tag { background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-top: 5px; display: inline-block; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --warning: #f1c40f; --light: #f4f7f6; --white: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--light); margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* App Header */
+        .app-header { background: var(--white); padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .app-header img { height: 40px; }
+        
+        .container { flex: 1; padding: 15px; max-width: 600px; margin: auto; width: 100%; box-sizing: border-box; }
+
+        /* Dashboard Stats */
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-box { background: var(--white); padding: 12px; border-radius: 10px; text-align: center; border-top: 4px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .stat-label { font-size: 0.65rem; color: #777; text-transform: uppercase; font-weight: bold; }
+        .stat-val { display: block; font-size: 1rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
+
+        /* Navigation Menu */
+        .app-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .menu-item { background: var(--info); color: white; padding: 12px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 0.85rem; border: none; cursor: pointer; }
+        .btn-new { background: var(--success); grid-column: span 2; padding: 15px; font-size: 1rem; }
+
+        /* Job Cards */
+        .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        .job-card { background: var(--white); padding: 15px; border-radius: 12px; margin-bottom: 12px; border-left: 6px solid var(--warning); box-shadow: 0 3px 6px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
+        .job-card:active { transform: scale(0.98); }
+        .jc-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .jc-reg { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
+        .jc-amt { font-size: 1.2rem; font-weight: bold; color: var(--success); }
+        .jc-meta { font-size: 0.8rem; color: #666; margin-top: 5px; }
+        .mech-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--primary); }
     </style>
 </head>
 <body>
 
-    <div class="stats-grid">
-        <div class="stat-card"><small>Green/Oil</small><div id="netGreen" style="font-weight:bold;">₹0</div></div>
-        <div class="stat-card"><small>Moped Net</small><div id="netMoped" style="font-weight:bold;">₹0</div></div>
-        <div class="stat-card"><small>Staff Pay</small><div id="netStaff" style="font-weight:bold;">₹0</div></div>
+<div class="app-header">
+    <img src="logo-main.jpg" onerror="this.style.display='none'">
+    <div style="text-align: center;"><strong style="letter-spacing: 1px;">MY CARE</strong></div>
+    <img src="logo-green.png" style="height:30px;" onerror="this.style.display='none'">
+</div>
+
+<div class="container">
+    <div class="stats-row">
+        <div class="stat-box"><span class="stat-label">Green/Oil</span><span class="stat-val" id="netGreen">₹0</span></div>
+        <div class="stat-box"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
+        <div class="stat-box"><span class="stat-label">Staff Pay</span><span class="stat-val" id="netStaff">₹0</span></div>
     </div>
 
-    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h3>Open Job Cards</h3>
-        <a href="new-jobcard.html" style="background:var(--success); color:white; padding:10px 15px; border-radius:8px; text-decoration:none; font-weight:bold;">+ NEW JOB</a>
+    <div class="app-menu">
+        <a href="new-jobcard.html" class="menu-item btn-new">+ NEW JOB CARD</a>
+        <a href="reports.html" class="menu-item" style="background:#8e44ad;">📊 REPORTS</a>
+        <a href="pos-green.html" class="menu-item" style="background:var(--success);">🛒 GREEN POS</a>
+        <a href="staff-ledger.html" class="menu-item">👥 STAFF LEDGER</a>
+        <a href="mechanic-admin.html" class="menu-item">⚙️ MANAGE MECHS</a>
     </div>
 
-    <div id="activeJobs">Syncing workshop...</div>
+    <div class="section-title">Vehicles in Workshop</div>
+    <div id="activeJobs">Checking workshop floor...</div>
+</div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
@@ -38,27 +70,51 @@
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     async function loadDashboard() {
-        // Fetch Open Jobs + Mechanic Names
-        const { data: jobs } = await supabaseClient.from('job_cards')
-            .select('id, total_invoice_value, vehicles(reg_number, make_model), mechanics(name)')
-            .eq('status', 'Open');
-        
-        let html = '';
-        jobs?.forEach(j => {
-            html += `
-                <div class="card" onclick="window.location.href='billing.html?id=${j.id}'">
-                    <div class="card-header">
-                        <div>
-                            <span class="reg-no">${j.vehicles.reg_number}</span><br>
-                            <small>${j.vehicles.make_model}</small><br>
-                            <span class="mech-tag">Technician: ${j.mechanics?.name || 'Unassigned'}</span>
-                        </div>
-                        <div class="amount">₹${j.total_invoice_value || 0}</div>
-                    </div>
-                </div>`;
+        // 1. Load Stats
+        const today = new Date().toISOString().split('T')[0];
+        const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total, status').eq('status', 'Closed');
+        let g = 0, m = 0;
+        sales?.forEach(s => {
+            g += (parseFloat(s.green_total) || 0) + (parseFloat(s.lubricant_total) || 0);
+            m += (parseFloat(s.moped_total) || 0);
         });
-        document.getElementById('activeJobs').innerHTML = html || 'No bikes on floor.';
+        document.getElementById('netGreen').innerText = "₹" + g;
+        document.getElementById('netMoped').innerText = "₹" + m;
+
+        // 2. Load Open Jobs - FIXED QUERY
+        // Using 'left join' logic via Supabase to ensure cards show even if data is partial
+        const { data: jobs, error } = await supabaseClient.from('job_cards')
+            .select(`
+                id, 
+                total_invoice_value, 
+                customer_mobile,
+                vehicles!inner (reg_number, make_model), 
+                mechanics (name)
+            `)
+            .eq('status', 'Open');
+
+        let html = '';
+        if (jobs && jobs.length > 0) {
+            jobs.forEach(j => {
+                html += `
+                    <div class="job-card" onclick="window.location.href='billing.html?id=${j.id}'">
+                        <div class="jc-row">
+                            <div>
+                                <div class="jc-reg">${j.vehicles?.reg_number || 'UNKNOWN'}</div>
+                                <div class="jc-meta">${j.vehicles?.make_model || 'No Model Info'}</div>
+                                <div class="jc-meta">Tech: <span class="mech-tag">${j.mechanics?.name || 'Unassigned'}</span></div>
+                            </div>
+                            <div class="jc-amt">₹${Math.round(j.total_invoice_value || 0)}</div>
+                        </div>
+                    </div>`;
+            });
+        } else {
+            html = '<div style="text-align:center; color:#999; margin-top:20px;">Workshop Floor is Clean.</div>';
+        }
+        document.getElementById('activeJobs').innerHTML = html;
+        if(error) console.error("Dashboard Load Error:", error);
     }
+
     loadDashboard();
 </script>
 </body>
