@@ -1,34 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Green POS - Counter Sale</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green POS Counter - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #e8f5e9; padding: 15px; }
-        .pos-container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; }
-        .item-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 5px; margin-bottom: 10px; }
-        input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
-        .total-banner { background: #27ae60; color: white; padding: 15px; text-align: center; font-size: 1.5rem; border-radius: 8px; margin-top: 20px; }
-        .btn-save { background: #2e7d32; color: white; width: 100%; border: none; padding: 15px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        :root { --success: #27ae60; --primary: #2c3e50; --light: #f4f7f6; --border: #ddd; }
+        body { font-family: sans-serif; background: var(--light); padding: 15px; margin: 0; box-sizing: border-box; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .header a { font-weight: bold; color: var(--success); text-decoration: none; font-size: 0.9rem; }
+        .pos-container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .section-header { font-size: 1.1rem; font-weight: bold; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 15px; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        label { font-size: 0.8rem; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        
+        /* Interactive Row Configuration */
+        .item-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .btn-add { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
+        .btn-del { background: #e74c3c; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        .total-banner { background: var(--success); color: white; padding: 15px; border-radius: 8px; font-size: 1.5rem; text-align: center; font-weight: bold; margin-top: 15px; }
+        .btn-commit { width: 100%; padding: 15px; background: #2e7d32; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 15px; }
+        .link-ledger { display: block; text-align: center; margin-top: 15px; font-weight: bold; color: var(--primary); text-decoration: underline; font-size: 0.85rem; }
     </style>
 </head>
 <body>
+
+<div class="header">
+    <a href="index.html">← COMMAND CENTER (GREEN FLOOR)</a>
+    <span style="font-weight:bold; color:var(--primary);">POS INVOICER</span>
+</div>
+
 <div class="pos-container">
-    <h2>Green Spare: Counter Sale</h2>
-    <input type="text" id="custName" placeholder="Customer Name" style="width:100%; margin-bottom:10px;">
+    <div class="section-header">1. Target Customer Profile (Cross-Link Checking Natively)</div>
+    <div class="grid">
+        <div><label>Mobile Tracker</label><input type="tel" id="cMobile" placeholder="10 Digits" maxlength="10" onblur="checkIdentity()"></div>
+        <div><label>Customer Name</label><input type="text" id="cName" placeholder="Full Identity"></div>
+    </div>
     
-    <div id="itemsList">
+    <div class="section-header">2. Transaction Line Items Matrix</div>
+    <div id="dynamicRowsContainer">
         <div class="item-row">
-            <input type="text" placeholder="Item Name" class="i-name">
-            <input type="number" placeholder="Qty" class="i-qty" oninput="calcPos()">
-            <input type="number" placeholder="Price" class="i-price" oninput="calcPos()">
+            <input type="text" placeholder="Item Name Specification" class="p-name">
+            <input type="text" placeholder="Brand Context" class="p-brand" value="Standard">
+            <input type="number" placeholder="Qty" class="p-qty" value="1" min="1" oninput="compilePosSubtotal()">
+            <input type="number" placeholder="Price (₹)" class="p-price" value="0" min="0" oninput="compilePosSubtotal()">
+            <button class="btn-del" onclick="dropElementRow(this)">×</button>
         </div>
     </div>
-    <button onclick="addItemRow()">+ Add Item</button>
+    <button class="btn-add" onclick="pushItemEntry()">+ STACK NEW ENTRY</button>
 
-    <div class="total-banner">Total: ₹<span id="posTotal">0</span></div>
-    <button class="btn-save" onclick="saveSale()">Complete Sale & Print</button>
+    <div class="section-header">3. Settlement Dispatch Rules</div>
+    <div class="grid">
+        <div><label>Payment Target Route</label>
+            <select id="pMode">
+                <option value="Cash">Cash Handling</option>
+                <option value="UPI">UPI Digital Transfer</option>
+                <option value="Credit">Credit Extension (Debtor)</option>
+            </select>
+        </div>
+        <div><label>Concession Discount (₹)</label><input type="number" id="pDisc" value="0" min="0" oninput="compilePosSubtotal()"></div>
+    </div>
+
+    <div class="total-banner">NET AGGREGATE: ₹<span id="posNetAggregate">0</span></div>
+    <button class="btn-commit" onclick="savePosLedger()">COMMIT DIRECT TRANSACTION</button>
+    <a href="ledger.html?type=credit_green" class="link-ledger">ACCESS CREDITOR EXTENSION LEDGER</a>
 </div>
 
 <script>
@@ -36,36 +75,70 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    function addItemRow() {
-        const div = document.createElement('div');
-        div.className = 'item-row';
-        div.innerHTML = `<input type="text" placeholder="Item Name" class="i-name">
-                         <input type="number" placeholder="Qty" class="i-qty" oninput="calcPos()">
-                         <input type="number" placeholder="Price" class="i-price" oninput="calcPos()">`;
-        document.getElementById('itemsList').appendChild(div);
+    async function checkIdentity() {
+        const phone = document.getElementById('cMobile').value.trim();
+        if(phone.length < 10) return;
+
+        const { data: c } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
+        if(c) {
+            document.getElementById('cName').value = c.name;
+        }
     }
 
-    function calcPos() {
-        let total = 0;
-        const rows = document.querySelectorAll('.item-row');
-        rows.forEach(row => {
-            const q = row.querySelector('.i-qty').value || 0;
-            const p = row.querySelector('.i-price').value || 0;
-            total += (q * p);
+    function pushItemEntry() {
+        const cont = document.getElementById('dynamicRowsContainer');
+        const node = document.createElement('div');
+        node.className = 'item-row';
+        node.innerHTML = `
+            <input type="text" placeholder="Item Name Specification" class="p-name">
+            <input type="text" placeholder="Brand Context" class="p-brand" value="Standard">
+            <input type="number" placeholder="Qty" class="p-qty" value="1" min="1" oninput="compilePosSubtotal()">
+            <input type="number" placeholder="Price (₹)" class="p-price" value="0" min="0" oninput="compilePosSubtotal()">
+            <button class="btn-del" onclick="dropElementRow(this)">×</button>`;
+        cont.appendChild(node);
+    }
+
+    function dropElementRow(btnInstance) {
+        btnInstance.parentElement.remove();
+        compilePosSubtotal();
+    }
+
+    function compilePosSubtotal() {
+        let gross = 0;
+        document.querySelectorAll('.item-row').forEach(row => {
+            const q = parseFloat(row.querySelector('.p-qty').value) || 0;
+            const p = parseFloat(row.querySelector('.p-price').value) || 0;
+            gross += (q * p);
         });
-        document.getElementById('posTotal').innerText = total;
+        const disc = parseFloat(document.getElementById('pDisc').value) || 0;
+        document.getElementById('posNetAggregate').innerText = Math.round(gross - disc);
     }
 
-    async function saveSale() {
-        const total = document.getElementById('posTotal').innerText;
-        const { data: sale } = await supabaseClient.from('counter_sales').insert({
-            customer_name: document.getElementById('custName').value,
-            total_amount: total,
-            payment_mode: 'Cash'
-        }).select().single();
+    async function savePosLedger() {
+        const mobile = document.getElementById('cMobile').value.trim();
+        const name = document.getElementById('cName').value.trim();
+        const mode = document.getElementById('pMode').value;
+        const finalVal = document.getElementById('posNetAggregate').innerText;
 
-        alert("Sale Saved! Total: ₹" + total);
-        location.reload();
+        if(!mobile || !name) return alert("System Alert: Unassigned account mapping details.");
+
+        // Upsert standard customer layer dynamically
+        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name });
+
+        // Commit core record layer
+        const { error } = await supabaseClient.from('counter_sales').insert({
+            customer_mobile: mobile,
+            customer_name: name,
+            total_amount: finalVal,
+            payment_mode: mode
+        });
+
+        if(!error) {
+            alert(`POS Sales Entry Recorded via route: ${mode}`);
+            window.location.href = 'index.html';
+        } else {
+            alert("Database Error Transaction Abort:\n" + error.message);
+        }
     }
 </script>
 </body>
