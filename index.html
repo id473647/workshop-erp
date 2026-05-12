@@ -3,91 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - My Care ERP</title>
+    <title>Floor Command - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
-            --primary: #2c3e50; --success: #27ae60; --moped: #e67e22; --service: #2980b9; 
-            --light: #f4f7f6; --warning: #f1c40f; --border: #ddd; 
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f1c40f; 
+            --light: #f4f7f6; --border: #e2e8f0; --text-main: #1e293b;
         }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding: 0; color: var(--text-main); }
         
-        /* Unified Header Layout */
-        .header { background: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .header-branding { display: flex; align-items: center; gap: 15px; }
-        .header-branding img { height: 35px; }
-        .role-indicator { background: var(--primary); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        /* Unified Top Navigation Console */
+        .top-nav { background: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .nav-brand { display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--primary); letter-spacing: 0.5px; }
+        .nav-brand img { height: 32px; }
+        .user-console { display: flex; align-items: center; gap: 16px; }
+        .role-pill { background: var(--primary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .logout-btn { color: #ef4444; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: none; }
 
-        .container { max-width: 900px; margin: auto; padding: 20px; box-sizing: border-box; }
+        .wrapper { max-width: 1000px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
 
-        /* Navigation Matrix */
-        .nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 25px; }
-        .nav-btn { padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.85rem; color: white; cursor: pointer; text-align: center; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: none; }
-        .nav-btn:hover { opacity: 0.9; }
-        
-        .btn-green { background: var(--success); }
-        .btn-moped { background: var(--moped); }
-        .btn-service { background: var(--service); }
-        .btn-report { background: #8e44ad; }
-        .btn-admin { background: #34495e; }
+        /* Dashboard Metrics Row */
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .metric-card { background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-top: 4px solid var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .metric-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .metric-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
 
-        /* Floor Cards Display */
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-        .section-title { font-size: 1.2rem; font-weight: bold; color: var(--primary); margin: 0; }
+        /* Matrix Function Controls */
+        .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 32px; }
+        .action-btn { padding: 12px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: white; cursor: pointer; text-align: center; text-decoration: none; display: none; transition: opacity 0.15s; }
+        .action-btn:hover { opacity: 0.9; }
         
-        .jobs-container { display: flex; flex-direction: column; gap: 12px; }
-        .job-card { background: white; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 6px solid var(--primary); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: transform 0.15s; }
-        .job-card:hover { transform: translateY(-2px); }
-        
-        /* Dynamic Role Border Coding */
-        .jc-source-green { border-left-color: var(--success); }
-        .jc-source-moped { border-left-color: var(--moped); }
-        .jc-source-service { border-left-color: var(--service); }
+        .bg-green { background: var(--success); }
+        .bg-moped { background: var(--moped); }
+        .bg-service { background: var(--primary); }
+        .bg-console { background: #475569; }
 
-        .jc-meta { font-size: 0.85rem; color: #666; margin-top: 4px; }
-        .jc-reg { font-size: 1.15rem; font-weight: bold; color: var(--primary); }
-        .jc-prepaid-tag { background: #e8f5e9; color: #2e7d32; font-size: 0.75rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 8px; border: 1px solid #c8e6c9; }
-        .jc-total { font-size: 1.3rem; font-weight: bold; color: var(--success); }
+        /* Job Execution Pipeline Layout */
+        .section-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+        .section-bar h2 { font-size: 1.1rem; margin: 0; color: var(--primary); }
+        .refresh-trigger { border: none; background: none; color: var(--primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+
+        .pipeline-stack { display: flex; flex-direction: column; gap: 12px; }
+        .dispatch-card { background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.02); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: transform 0.1s; }
+        .dispatch-card:hover { transform: translateY(-1px); }
         
-        .logout-link { font-size: 0.8rem; color: #e74c3c; cursor: pointer; text-decoration: underline; font-weight: bold; }
+        /* Persistent Edge Rule Implementations */
+        .source-edge-green { border-left: 6px solid var(--success); }
+        .source-edge-moped { border-left: 6px solid var(--moped); }
+        .source-edge-service { border-left: 6px solid var(--service); }
+
+        .card-primary { font-size: 1.1rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .card-meta { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+        .prepaid-badge { background: #f1f5f9; color: #0f766e; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .card-valuation { font-size: 1.2rem; font-weight: 700; color: var(--success); }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="header-branding">
+<nav class="top-nav">
+    <div class="nav-brand">
         <img src="logo-main.jpg" onerror="this.style.display='none'">
-        <strong style="color:var(--primary);">MY CARE ERP</strong>
-        <img src="logo-green.png" onerror="this.style.display='none'">
+        <span>MY CARE ERP</span>
     </div>
-    <div style="display:flex; align-items:center; gap:15px;">
-        <span id="roleDisplay" class="role-indicator">GUEST</span>
-        <span class="logout-link" onclick="logout()">LOGOUT</span>
+    <div class="user-console">
+        <span id="roleIndicator" class="role-pill">GUEST</span>
+        <a href="login.html" class="logout-btn" onclick="flushSession()">LOGOUT</a>
     </div>
-</div>
+</nav>
 
-<div class="container">
-    <div id="navMenu" class="nav-grid">
-        <a href="new-jobcard.html" id="btnJcGreen" class="nav-btn btn-green">+ JC (GREEN)</a>
-        <a href="pos-green.html" id="btnPosGreen" class="nav-btn btn-green">🛒 GREEN POS</a>
-        <a href="reports.html?source=green" id="btnRepGreen" class="nav-btn btn-report">📊 GREEN REPORTS</a>
-        <a href="ledger.html?type=credit_green" id="btnLedGreen" class="nav-btn btn-green">👥 CREDIT LEDGER</a>
-
-        <a href="new-jobcard.html" id="btnJcMoped" class="nav-btn btn-moped">+ JC (MOPED)</a>
-        <a href="reports.html?source=moped" id="btnRepMoped" class="nav-btn btn-report">📊 MOPED REPORTS</a>
-
-        <a href="new-jobcard.html" id="btnJcService" class="nav-btn btn-service">+ OPEN JOB CARD</a>
-        <a href="ledger.html?type=service" id="btnLedService" class="nav-btn btn-service">👥 CUSTOMER ACCOUNTS</a>
-        <a href="admin-console.html" id="btnAdminConsole" class="nav-btn btn-admin">⚙️ CONSOLE</a>
+<div class="wrapper">
+    <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">Green Spares Flow</div><div id="mGreen" class="metric-value">₹0</div></div>
+        <div class="metric-card"><div class="metric-label">Moped Warehouse Net</div><div id="mMoped" class="metric-value">₹0</div></div>
+        <div class="metric-card"><div class="metric-label">Lubricants Allocation</div><div id="mLube" class="metric-value">₹0</div></div>
+        <div class="metric-card"><div class="metric-label">Net Staff Payable</div><div id="mStaff" class="metric-value">₹0</div></div>
     </div>
 
-    <div class="section-header">
-        <h2 class="section-title">Active Floor Dispatch</h2>
-        <button onclick="loadFloor()" style="border:none; background:none; color:var(--service); cursor:pointer; font-weight:bold;">↻ REFRESH</button>
+    <div class="controls-grid">
+        <a href="new-jobcard.html" id="btnJcGreen" class="action-btn bg-green">+ GREEN JOB CARD</a>
+        <a href="pos-green.html" id="btnPosGreen" class="action-btn bg-green">🛒 RETAIL POS</a>
+        <a href="ledger.html?scope=credit" id="btnLedgerGreen" class="action-btn bg-green">👥 CREDIT LEDGER</a>
+
+        <a href="new-jobcard.html" id="btnJcMoped" class="action-btn bg-moped">+ MOPED JOB CARD</a>
+        
+        <a href="new-jobcard.html" id="btnJcService" class="action-btn bg-service">+ SERVICE DISPATCH</a>
+        <a href="admin-console.html" id="btnConsole" class="action-btn bg-console">⚙️ MASTER ADMIN</a>
+    </div>
+
+    <div class="section-bar">
+        <h2>Active Floor Dispatch List</h2>
+        <button class="refresh-trigger" onclick="syncFloorState()">↻ REFRESH DATA</button>
     </div>
     
-    <div id="floorContainer" class="jobs-container">
-        <div style="text-align:center; color:#888; padding:30px;">Checking Active Instances...</div>
+    <div id="floorStack" class="pipeline-stack">
+        <div style="text-align:center; padding:32px; color:#94a3b8; font-size:0.9rem;">Querying instances from central cloud...</div>
     </div>
 </div>
 
@@ -96,71 +105,93 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
 
-    function initInterface() {
-        if(activeRole === 'guest') {
+    function compileRbacRules() {
+        if(sessionRole === 'guest') {
             window.location.href = 'login.html';
             return;
         }
 
-        document.getElementById('roleDisplay').innerText = activeRole;
+        document.getElementById('roleIndicator').innerText = sessionRole;
 
-        // Visibility Rule Evaluation Matrix
-        const matrix = {
-            green: ['btnJcGreen', 'btnPosGreen', 'btnRepGreen', 'btnLedGreen'],
-            moped: ['btnJcMoped', 'btnRepMoped'],
-            service: ['btnJcService', 'btnLedService', 'btnAdminConsole'],
-            admin: ['btnJcGreen', 'btnPosGreen', 'btnRepGreen', 'btnLedGreen', 'btnJcMoped', 'btnRepMoped', 'btnJcService', 'btnLedService', 'btnAdminConsole']
+        // Visibility Arrays Configured natively per spec constraints
+        const permissions = {
+            green: ['btnJcGreen', 'btnPosGreen', 'btnLedgerGreen'],
+            moped: ['btnJcMoped'],
+            service: ['btnJcService', 'btnConsole'],
+            admin: ['btnJcGreen', 'btnPosGreen', 'btnLedgerGreen', 'btnJcMoped', 'btnJcService', 'btnConsole']
         };
 
-        matrix[activeRole]?.forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.style.display = 'block';
+        permissions[sessionRole]?.forEach(id => {
+            const node = document.getElementById(id);
+            if(node) node.style.display = 'block';
         });
 
-        loadFloor();
+        compileDashboardMetrics();
+        syncFloorState();
     }
 
-    async function loadFloor() {
-        const { data: jobs, error } = await supabaseClient.from('job_cards')
+    async function compileDashboardMetrics() {
+        const { data: records } = await supabaseClient.from('job_cards')
+            .select('green_total, moped_total, lubricant_total')
+            .eq('status', 'Closed');
+
+        let gSum = 0, mSum = 0, lSum = 0;
+        records?.forEach(r => {
+            gSum += parseFloat(r.green_total) || 0;
+            mSum += parseFloat(r.moped_total) || 0;
+            lSum += parseFloat(r.lubricant_total) || 0;
+        });
+
+        document.getElementById('mGreen').innerText = "₹" + gSum;
+        document.getElementById('mMoped').innerText = "₹" + mSum;
+        document.getElementById('mLube').innerText = "₹" + lSum;
+
+        const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
+        let staffBal = 0;
+        ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
+        document.getElementById('mStaff').innerText = "₹" + staffBal;
+    }
+
+    async function syncFloorState() {
+        const { data: instances } = await supabaseClient.from('job_cards')
             .select('id, total_invoice_value, advance_paid, source_role, customer_mobile, vehicles(reg_number, make_model), mechanics(name)')
             .eq('status', 'Open')
             .order('jc_date', { ascending: false });
 
-        const cont = document.getElementById('floorContainer');
-        cont.innerHTML = '';
+        const container = document.getElementById('floorStack');
+        container.innerHTML = '';
 
-        if(jobs && jobs.length > 0) {
-            jobs.forEach(j => {
-                const reg = j.vehicles?.reg_number || 'ACC/WALK-IN';
-                const model = j.vehicles?.make_model || 'Direct Spares';
-                const source = j.source_role || 'service';
-                const advance = parseFloat(j.advance_paid) || 0;
+        if(instances && instances.length > 0) {
+            instances.forEach(j => {
+                const plate = j.vehicles?.reg_number || 'UNREGISTERED';
+                const baseModel = j.vehicles?.make_model || 'Direct Line Processing';
+                const creator = j.source_role || 'service';
+                const prepay = parseFloat(j.advance_paid) || 0;
                 
-                let advanceTag = advance > 0 ? `<span class="jc-prepaid-tag">Prepaid: ₹${advance}</span>` : '';
+                const prepayIndicator = prepay > 0 ? `<span class="prepaid-badge">Prepaid Buffer: ₹${prepay}</span>` : '';
 
-                cont.innerHTML += `
-                    <div class="job-card jc-source-${source}" onclick="window.location.href='billing.html?id=${j.id}'">
+                container.innerHTML += `
+                    <div class="dispatch-card source-edge-${creator}" onclick="window.location.href='billing.html?id=${j.id}'">
                         <div>
-                            <div class="jc-reg">${reg} ${advanceTag}</div>
-                            <div class="jc-meta">${model} | Mob: ${j.customer_mobile}</div>
-                            <div class="jc-meta" style="color:var(--primary); font-weight:bold;">Assigned: ${j.mechanics?.name || 'Unassigned'}</div>
+                            <div class="card-primary">${plate} ${prepayIndicator}</div>
+                            <div class="card-meta">${baseModel} | Mobile: ${j.customer_mobile}</div>
+                            <div class="card-meta" style="color:var(--primary); font-weight:700;">Floor Technician: ${j.mechanics?.name || 'Unassigned'}</div>
                         </div>
-                        <div class="jc-total">₹${Math.round(j.total_invoice_value || 0)}</div>
+                        <div class="card-valuation">₹${Math.round(j.total_invoice_value || 0)}</div>
                     </div>`;
             });
         } else {
-            cont.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Floor is clear. No active processing jobs.</div>';
+            container.innerHTML = '<div style="text-align:center; padding:24px; color:#94a3b8; font-size:0.9rem;">Floor view is clear. No unclosed service tasks pending.</div>';
         }
     }
 
-    function logout() {
+    function flushSession() {
         localStorage.removeItem('ERP_ACTIVE_ROLE');
-        window.location.href = 'login.html';
     }
 
-    initInterface();
+    compileRbacRules();
 </script>
 </body>
 </html>
