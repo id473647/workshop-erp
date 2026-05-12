@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Billing Engine - My Care ERP</title>
+    <title>Floor Billing Console - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
@@ -12,14 +12,14 @@
         }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 130px; color: var(--text); }
         
-        /* Command Navigation Console */
+        /* Navigation & Status Header */
         .sticky-nav { background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 4px; }
         .badge-role { background: var(--primary); color: white; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 
         .container { max-width: 950px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
         
-        /* Persistent Context Identification Strip */
+        /* Persistent Asset Context Banner */
         .context-banner { background: white; padding: 16px 24px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .context-meta { display: flex; flex-direction: column; gap: 4px; }
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 12px; }
@@ -27,7 +27,7 @@
         .edit-trigger-btn { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: none; }
         .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; }
 
-        /* Insertion Interlocks */
+        /* Scoped Inventory Insertion Actions */
         .action-toolbar { display: flex; gap: 12px; margin-bottom: 20px; }
         .stack-btn { flex: 1; padding: 12px 16px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: white; cursor: pointer; transition: opacity 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .stack-btn:hover { opacity: 0.9; }
@@ -35,7 +35,7 @@
         .btn-moped { background: var(--moped); }
         .btn-lube { background: #475569; }
 
-        /* Document Table Layout */
+        /* Line Items Rendering Table */
         .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
         th { background: #f8fafc; padding: 14px 20px; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
@@ -45,7 +45,7 @@
         .ware-moped { background: var(--moped); }
         .row-destroyer { color: #ef4444; font-weight: 700; cursor: pointer; border: none; background: none; font-size: 1.2rem; padding: 0 6px; }
 
-        /* Modification Fields Matrix */
+        /* Protected Cost Parameters Matrix */
         .parameter-matrix { background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 24px; }
         .matrix-title { font-size: 1rem; font-weight: 700; color: var(--primary); margin: 0 0 16px 0; }
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
@@ -53,12 +53,12 @@
         .field-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
         .field-group input { padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
 
-        /* Runtime Scoping Modals */
+        /* Editing Modal Setup */
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); backdrop-filter: blur(2px); z-index: 200; display: none; justify-content: center; align-items: center; }
         .modal-body { background: white; padding: 28px; border-radius: 12px; width: 100%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box; }
         .modal-body h3 { margin: 0 0 16px 0; color: var(--primary); }
 
-        /* Action Footer */
+        /* Persistent Action Footer */
         .action-footer { position: fixed; bottom: 0; left: 0; width: 100%; background: white; padding: 16px 28px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 100; box-shadow: 0 -1px 3px rgba(0,0,0,0.02); }
         .aggregate-net { font-size: 1.45rem; font-weight: 700; color: var(--success); }
         .btn-group { display: flex; gap: 12px; }
@@ -78,10 +78,10 @@
     <div id="bannerAsset" class="context-banner">
         <div class="context-meta">
             <div class="plate-header">
-                <span id="regPlate">Loading context...</span>
-                <button id="btnTriggerEditModal" class="edit-trigger-btn" onclick="openModificationModal()">✏️ EDIT JOB SPEC & TECH</button>
+                <span id="regPlate">Loading active instance...</span>
+                <button id="btnTriggerEditModal" class="edit-trigger-btn" onclick="openModificationModal()">✏️ EDIT SPEC & TECH</button>
             </div>
-            <span id="modelLabel" class="meta-text">Querying schema logic...</span>
+            <span id="modelLabel" class="meta-text">Syncing pipeline maps...</span>
             <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700;">Assigned Tech: --</span>
         </div>
         <div id="prepaidPill" class="prepaid-badge">Prepaid Advance: ₹0</div>
@@ -102,10 +102,10 @@
             <thead>
                 <tr>
                     <th>Warehouse</th>
-                    <th>Product Specs / Manufacturer Brand</th>
-                    <th>Metric Scale</th>
-                    <th>Unit Cost</th>
-                    <th>Net Gross</th>
+                    <th>Product Context / Brand</th>
+                    <th>Scalar Unit</th>
+                    <th>Unit Rate</th>
+                    <th>Total Valuation</th>
                     <th id="columnDestroyer" style="width:36px; display:none;"></th>
                 </tr>
             </thead>
@@ -114,34 +114,34 @@
     </div>
 
     <div id="matrixParameters" class="parameter-matrix">
-        <div class="matrix-title">Runtime Service Ledger Variables</div>
+        <div class="matrix-title">Overarching Service Costs Scope</div>
         <div class="inputs-grid">
             <div class="field-group"><label>Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" min="0" oninput="compileDynamicSums()"></div>
             <div class="field-group"><label>Lathe Contract Work (₹)</label><input type="number" id="vLathe" value="0" min="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Applied Deduction (₹)</label><input type="number" id="vFlatDisc" value="0" min="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Prepaid Buffer Adjustment (₹)</label><input type="number" id="vAdvance" value="0" min="0" oninput="compileDynamicSums()"></div>
+            <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" min="0" oninput="compileDynamicSums()"></div>
+            <div class="field-group"><label>Prepaid Advance Allocation (₹)</label><input type="number" id="vAdvance" value="0" min="0" oninput="compileDynamicSums()"></div>
         </div>
     </div>
 </div>
 
 <div id="modalEditJob" class="overlay-modal">
     <div class="modal-body">
-        <h3>Modify Core Job Architecture</h3>
+        <h3>Modify Core Job Constraints</h3>
         <div style="display:flex; flex-direction:column; gap:14px;">
             <div class="field-group">
-                <label>Update Client Directive / Faults</label>
+                <label>Active Work Directive / Faults</label>
                 <textarea id="modalProblem" rows="3" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border);"></textarea>
             </div>
             <div class="field-group">
-                <label>Adjust Initial Budget Estimate (₹)</label>
+                <label>Allocated Budget Estimate (₹)</label>
                 <input type="number" id="modalEstimate" min="0">
             </div>
             <div class="field-group">
-                <label>Reassign Core Floor Technician</label>
+                <label>Reassign Assigned Technician</label>
                 <select id="modalMechSelect" style="width:100%; padding:10px; border-radius:6px; border:1px solid var(--border);"></select>
             </div>
             <div style="display:flex; gap:10px; margin-top:12px;">
-                <button class="stack-btn btn-green" onclick="commitJobModifications()">SAVE UPDATES</button>
+                <button class="stack-btn btn-green" onclick="commitJobModifications()">COMMIT REVISIONS</button>
                 <button class="stack-btn" style="background:#e2e8f0; color:#334155;" onclick="document.getElementById('modalEditJob').style.display='none'">CANCEL</button>
             </div>
         </div>
@@ -172,11 +172,9 @@
     function secureRbacVisibility() {
         document.getElementById('roleTag').innerText = sessionRole;
         
-        // Scope Check Array logic
         if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('barGreen').style.display = 'flex';
         if(sessionRole === 'moped' || sessionRole === 'admin') document.getElementById('barMoped').style.display = 'flex';
         
-        // Restrictive access scoping mapped for Point 3 Admin Modals & closures
         if(sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('btnTriggerEditModal').style.display = 'inline-block';
             document.getElementById('btnProcessInvoice').style.display = 'block';
@@ -189,28 +187,31 @@
     }
 
     async function initializeJobContext() {
-        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', targetJobId).single();
+        if(!targetJobId) return;
+        const { data: job, error } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', targetJobId).single();
+        
         if(job) {
             document.getElementById('bannerAsset').style.borderLeft = `6px solid var(--${job.source_role || 'service'})`;
-            document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "DIRECT PIPELINE";
+            document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "DIRECT ASSET";
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || 'Standard'} | Stated Directive: ${job.problem_mentioned || 'N/A'} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('mechLabel').innerText = `Floor Technician: ${job.mechanics?.name || 'Unassigned'}`;
             document.getElementById('prepaidPill').innerText = `Prepaid Advance: ₹${parseFloat(job.advance_paid) || 0}`;
 
-            // Initialize param fields natively
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
-            // Cache data states downstream to modal inputs parameters natively
             document.getElementById('modalProblem').value = job.problem_mentioned || '';
             document.getElementById('modalEstimate').value = parseFloat(job.estimate_given) || 0;
 
             loadInventoryLedgers();
+        } else if (error) {
+            console.error("Context mapping failed:", error);
         }
     }
 
     async function loadInventoryLedgers() {
+        if(!targetJobId) return;
         const { data: items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', targetJobId);
         const tbody = document.getElementById('lineItemsContainer');
         tbody.innerHTML = '';
@@ -234,40 +235,57 @@
         compileDynamicSums();
     }
 
-    // --- FAILSALFE INSERTION METHOD (DECOUPLED STRING HANDLING) ---
+    // --- SECURE INSERTION PIPELINE EQUIPPED WITH EXPLICIT ALERTS ---
     async function injectLineNode(warehouseTarget, isVolumetric) {
+        if(!targetJobId) {
+            alert("Execution Interlock: Unable to resolve targeted Job Card ID context.");
+            return;
+        }
+
         const itemType = isVolumetric ? "Volumetric Fluid Lube" : "Discrete Component Item";
-        const partName = prompt(`Identify specific ${itemType} inventory string context:`);
-        if(!partName) return;
+        const partName = prompt(`Input targeted ${itemType} spec descriptor:`);
+        if(!partName || !partName.trim()) return;
 
-        const partBrand = prompt(`Input manufacturing catalog brand context:`, "Standard OEM");
-        const numericMetricPrompt = isVolumetric ? "Strict Numeric Volume (e.g., 900):" : "Strict Physical Quantity Multiplier (e.g., 1):";
+        const partBrand = prompt(`Input manufacturing source brand:`, "Standard OEM");
+        const numericMetricPrompt = isVolumetric ? "Strict Numeric Volume in ML (Numbers only, e.g. 900):" : "Strict Physical Multiplier (Numbers only, e.g. 1):";
         const quantityRaw = prompt(numericMetricPrompt, isVolumetric ? "900" : "1");
-        const unitCost = prompt(`Define Cost Rate Allocation per scalar (₹):`);
+        if(!quantityRaw) return;
 
-        if(quantityRaw && unitCost) {
-            const cleanQuantityNumeric = parseFloat(quantityRaw) || 1;
-            const appliedMetricSuffix = isVolumetric ? "ML" : "Pcs";
-            const integratedStringSpec = `${partName} (${partBrand})`;
+        const unitCost = prompt(`Define Allocated Unit Charge Rate (₹):`);
+        if(!unitCost) return;
 
-            // Non-blocking asynchronous update dispatch for general catalog index
-            supabaseClient.from('product_master').upsert({ item_name: partName, brand: partBrand, warehouse_type: warehouseTarget }).then();
+        const cleanQuantityNumeric = parseFloat(quantityRaw) || 1;
+        const appliedMetricSuffix = isVolumetric ? "ML" : "Pcs";
+        const integratedStringSpec = `${partName.trim()} (${partBrand ? partBrand.trim() : 'Standard'})`;
 
-            // Secure pure computational DB constraints natively
-            await supabaseClient.from('job_card_items').insert({
-                job_card_id: targetJobId,
-                warehouse_type: warehouseTarget,
-                item_name: integratedStringSpec,
-                qty: cleanQuantityNumeric,
-                unit_metric: appliedMetricSuffix,
-                unit_price: parseFloat(unitCost)
-            });
+        // Attempt secondary product catalog indexing dynamically
+        supabaseClient.from('product_master').upsert({ 
+            item_name: partName.trim(), 
+            brand: partBrand ? partBrand.trim() : 'Standard', 
+            warehouse_type: warehouseTarget 
+        }).then().catch(e => console.warn("Catalog indexing skipped:", e));
+
+        // Execute critical insertion command directly monitored for exceptions
+        const { data, error } = await supabaseClient.from('job_card_items').insert({
+            job_card_id: targetJobId,
+            warehouse_type: warehouseTarget,
+            item_name: integratedStringSpec,
+            qty: cleanQuantityNumeric,
+            unit_metric: appliedMetricSuffix,
+            unit_price: parseFloat(unitCost)
+        }).select();
+
+        if(error) {
+            // Instantly render database constraint logic failures explicitly
+            alert(`⚠️ DATABASE INSERTION REJECTED:\n${error.message}\n\nTroubleshooting Action: Verify the 'unit_metric' column maps perfectly inside Supabase Table Editor.`);
+            console.error("Insertion aborted:", error);
+        } else {
             loadInventoryLedgers();
         }
     }
 
     async function dropActiveRow(nodeId) {
-        if(confirm("Confirm dropping line-item allocation specification?")) {
+        if(confirm("Confirm dropping item array element?")) {
             await supabaseClient.from('job_card_items').delete().eq('id', nodeId);
             loadInventoryLedgers();
         }
@@ -285,11 +303,10 @@
         document.getElementById('netValuationDisplay').innerText = "₹" + Math.round(aggregateObligationNet);
     }
 
-    // --- POINTS 2 & 3: OPEN EDIT DESCRIPTORS MODAL ---
     async function openModificationModal() {
         const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
         const selectBox = document.getElementById('modalMechSelect');
-        selectBox.innerHTML = '<option value="">-- Drop Assignment Mapping --</option>';
+        selectBox.innerHTML = '<option value="">-- Clear Allocation Mapping --</option>';
         
         staff?.forEach(member => {
             selectBox.innerHTML += `<option value="${member.id}">${member.name}</option>`;
@@ -313,7 +330,6 @@
         initializeJobContext();
     }
 
-    // --- POINT 4: DRAFT SAVING ENGINE LOGIC ---
     async function executeRuntimeDraftSave() {
         const evaluatedNet = document.getElementById('netValuationDisplay').innerText.replace('₹','');
         const activeLabour = parseFloat(document.getElementById('vLabour').value) || 0;
@@ -325,16 +341,15 @@
             labour_charges: activeLabour,
             lathe_welding: activeLathe,
             advance_paid: activeAdvance
-            // State deliberately unchanged -> kept open to retain live operational capacity
         }).eq('id', targetJobId);
 
-        alert("Draft states updated natively. Values explicitly accessible across cloud portals.");
+        alert("Draft state compiled natively. Pipeline tracking metrics secured across general views.");
     }
 
     async function commitInvoiceClosure() {
-        await executeRuntimeDraftSave(); // Save parameter state variables first
+        await executeRuntimeDraftSave();
         await supabaseClient.from('job_cards').update({ status: 'Closed' }).eq('id', targetJobId);
-        alert("Final closure command parsed successfully. Task record fully secured.");
+        alert("Final invoice settlement authorization executed successfully.");
         window.location.href = 'index.html';
     }
 
