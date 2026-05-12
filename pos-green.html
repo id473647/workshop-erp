@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Green POS - Counter Sale</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #e8f5e9; padding: 15px; }
+        .pos-container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; }
+        .item-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        .total-banner { background: #27ae60; color: white; padding: 15px; text-align: center; font-size: 1.5rem; border-radius: 8px; margin-top: 20px; }
+        .btn-save { background: #2e7d32; color: white; width: 100%; border: none; padding: 15px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="pos-container">
+    <h2>Green Spare: Counter Sale</h2>
+    <input type="text" id="custName" placeholder="Customer Name" style="width:100%; margin-bottom:10px;">
+    
+    <div id="itemsList">
+        <div class="item-row">
+            <input type="text" placeholder="Item Name" class="i-name">
+            <input type="number" placeholder="Qty" class="i-qty" oninput="calcPos()">
+            <input type="number" placeholder="Price" class="i-price" oninput="calcPos()">
+        </div>
+    </div>
+    <button onclick="addItemRow()">+ Add Item</button>
+
+    <div class="total-banner">Total: ₹<span id="posTotal">0</span></div>
+    <button class="btn-save" onclick="saveSale()">Complete Sale & Print</button>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    function addItemRow() {
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.innerHTML = `<input type="text" placeholder="Item Name" class="i-name">
+                         <input type="number" placeholder="Qty" class="i-qty" oninput="calcPos()">
+                         <input type="number" placeholder="Price" class="i-price" oninput="calcPos()">`;
+        document.getElementById('itemsList').appendChild(div);
+    }
+
+    function calcPos() {
+        let total = 0;
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach(row => {
+            const q = row.querySelector('.i-qty').value || 0;
+            const p = row.querySelector('.i-price').value || 0;
+            total += (q * p);
+        });
+        document.getElementById('posTotal').innerText = total;
+    }
+
+    async function saveSale() {
+        const total = document.getElementById('posTotal').innerText;
+        const { data: sale } = await supabaseClient.from('counter_sales').insert({
+            customer_name: document.getElementById('custName').value,
+            total_amount: total,
+            payment_mode: 'Cash'
+        }).select().single();
+
+        alert("Sale Saved! Total: ₹" + total);
+        location.reload();
+    }
+</script>
+</body>
+</html>
