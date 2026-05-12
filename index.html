@@ -13,21 +13,22 @@
         .container { padding: 15px; max-width: 600px; margin: auto; }
 
         /* Navigation Grid */
-        .nav-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 25px; }
-        .nav-item { background: var(--info); color: white; padding: 15px; border-radius: 12px; text-align: center; text-decoration: none; font-weight: bold; font-size: 0.9rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .btn-new { background: var(--success); grid-column: span 2; font-size: 1.1rem; }
-        .btn-report { background: #8e44ad; }
-        .btn-admin { background: #34495e; }
+        .nav-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .nav-item { background: var(--info); color: white; padding: 12px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 0.85rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+        .btn-new { background: var(--success); grid-column: span 2; padding: 15px; font-size: 1.05rem; }
+        .btn-admin { background: #34495e; border-left: 4px solid #e74c3c; }
 
-        /* Summary Stats */
+        /* Stats */
         .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-box { background: white; padding: 10px; border-radius: 8px; text-align: center; border-top: 4px solid var(--primary); }
-        .stat-val { display: block; font-weight: bold; color: var(--primary); margin-top: 5px; }
+        .stat-box { background: white; padding: 10px; border-radius: 8px; text-align: center; border-top: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-label { font-size: 0.65rem; color: #777; font-weight: bold; display: block; }
+        .stat-val { font-size: 1rem; font-weight: bold; color: var(--primary); margin-top: 3px; display: block; }
 
         /* Floor Cards */
-        .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; display: flex; justify-content: space-between; }
+        .section-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 20px 0 10px 0; display: flex; justify-content: space-between; align-items: center; }
         .job-card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 12px; border-left: 6px solid var(--warning); box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
         .jc-row { display: flex; justify-content: space-between; align-items: center; }
+        .jc-reg { font-size: 1.1rem; font-weight: bold; color: var(--primary); }
         .jc-amt { font-size: 1.2rem; font-weight: bold; color: var(--success); }
         .mech-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--primary); font-weight: bold; }
     </style>
@@ -36,30 +37,30 @@
 
 <div class="app-header">
     <img src="logo-main.jpg" height="40" onerror="this.style.display='none'">
-    <strong>MY CARE SERVICE</strong>
+    <strong style="letter-spacing: 1px;">MY CARE ERP</strong>
     <img src="logo-green.png" height="30" onerror="this.style.display='none'">
 </div>
 
 <div class="container">
     <div class="stats-row">
-        <div class="stat-box"><small>Green/Oil</small><span class="stat-val" id="netGreen">₹0</span></div>
-        <div class="stat-box"><small>Moped Net</small><span class="stat-val" id="netMoped">₹0</span></div>
-        <div class="stat-box"><small>Staff Pay</small><span class="stat-val" id="netStaff">₹0</span></div>
+        <div class="stat-box"><span class="stat-label">Green/Oil</span><span class="stat-val" id="netGreen">₹0</span></div>
+        <div class="stat-box"><span class="stat-label">Moped Net</span><span class="stat-val" id="netMoped">₹0</span></div>
+        <div class="stat-box"><span class="stat-label">Staff Pay</span><span class="stat-val" id="netStaff">₹0</span></div>
     </div>
 
     <div class="nav-menu">
         <a href="new-jobcard.html" class="nav-item btn-new">+ NEW JOB CARD</a>
-        <a href="reports.html" class="nav-item btn-report">📊 SYSTEM REPORTS</a>
+        <a href="reports.html" class="nav-item" style="background:#8e44ad;">📊 REPORTS</a>
         <a href="staff-ledger.html" class="nav-item">👥 STAFF LEDGER</a>
         <a href="pos-green.html" class="nav-item" style="background:var(--success);">🛒 GREEN POS</a>
-        <a href="mechanic-admin.html" class="nav-item btn-admin">⚙️ MECHANIC ADMIN</a>
+        <a href="admin-console.html" class="nav-item btn-admin">⚙️ MASTER ADMIN</a>
     </div>
 
     <div class="section-title">
-        <span>Workshop Floor</span>
-        <button onclick="loadDashboard()" style="font-size:0.7rem; cursor:pointer;">Refresh ↻</button>
+        <span>Active Floor View</span>
+        <button onclick="loadDashboard()" style="border:none; background:none; color:var(--info); font-weight:bold; cursor:pointer;">Refresh ↻</button>
     </div>
-    <div id="activeJobs">Syncing data...</div>
+    <div id="activeJobs">Pulling live floor data...</div>
 </div>
 
 <script>
@@ -68,7 +69,7 @@
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     async function loadDashboard() {
-        // 1. Fetch Summary Totals
+        // 1. Fetch Closed Sales (All Time History for testing visibility)
         const { data: sales } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed');
         let g = 0, m = 0;
         sales?.forEach(s => {
@@ -78,30 +79,40 @@
         document.getElementById('netGreen').innerText = "₹" + g;
         document.getElementById('netMoped').innerText = "₹" + m;
 
-        // 2. Load Active Jobs
-        const { data: jobs } = await supabaseClient.from('job_cards')
-            .select('id, total_invoice_value, vehicles(reg_number, make_model), mechanics(name)')
+        // 2. Fetch Net Staff Payable
+        const { data: ledger } = await supabaseClient.from('staff_ledger').select('amount, entry_type');
+        let staffBal = 0;
+        ledger?.forEach(e => staffBal += (e.entry_type === 'EARNING' ? parseFloat(e.amount) : -parseFloat(e.amount)));
+        document.getElementById('netStaff').innerText = "₹" + staffBal;
+
+        // 3. Robust Floor Pull (LEFT JOIN guarantees display even if foreign keys are broken)
+        const { data: jobs, error } = await supabaseClient.from('job_cards')
+            .select('id, total_invoice_value, customer_mobile, vehicles(reg_number, make_model), mechanics(name)')
             .eq('status', 'Open');
 
         let html = '';
         if (jobs && jobs.length > 0) {
             jobs.forEach(j => {
+                const reg = j.vehicles?.reg_number || "UNREGISTERED / ACC";
+                const model = j.vehicles?.make_model || "General Service";
+                const mech = j.mechanics?.name || "Unassigned";
+                
                 html += `
                     <div class="job-card" onclick="window.location.href='billing.html?id=${j.id}'">
                         <div class="jc-row">
                             <div>
-                                <div style="font-weight:bold; color:var(--primary);">${j.vehicles?.reg_number || 'REG PENDING'}</div>
-                                <div style="font-size:0.8rem; color:#666;">${j.vehicles?.make_model || 'Loading...'}</div>
-                                <div style="margin-top:5px;"><span class="mech-tag">${j.mechanics?.name || 'Unassigned'}</span></div>
+                                <div class="jc-reg">${reg}</div>
+                                <div style="font-size:0.8rem; color:#666;">${model} | Mob: ${j.customer_mobile}</div>
+                                <div style="margin-top:5px;"><span class="mech-tag">Tech: ${mech}</span></div>
                             </div>
                             <div class="jc-amt">₹${Math.round(j.total_invoice_value || 0)}</div>
                         </div>
                     </div>`;
             });
-        } else {
-            html = '<div style="text-align:center; color:#999; margin-top:30px;">Floor is empty. Click + New Job to start.</div>';
-        }
+        } else { html = '<div style="text-align:center; color:#888; padding:20px 0;">No active job cards found.</div>'; }
+        
         document.getElementById('activeJobs').innerHTML = html;
+        if(error) alert("Sync Warning: " + error.message);
     }
     loadDashboard();
 </script>
