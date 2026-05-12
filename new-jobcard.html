@@ -3,157 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - New Job Card</title>
+    <title>New Job Card - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--light); padding: 15px; margin: 0; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .step { display: none; }
-        .active { display: block; }
-        label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.85rem; color: #555; }
-        input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        :root { 
+            --primary: #2c3e50; 
+            --success: #27ae60; 
+            --info: #2980b9; 
+            --light: #f4f7f6; 
+            --warning-bg: #fff9db;
+            --border-color: #ddd;
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--light); 
+            padding: 15px; 
+            margin: 0; 
+        }
+        .app-header { 
+            background: white; 
+            padding: 12px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 3px solid var(--primary); 
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        }
+        .app-header img { height: 35px; }
         
-        /* Step 3 Icons */
-        .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .veh-rect { border: 2px solid var(--info); padding: 12px; border-radius: 8px; cursor: pointer; background: #f0f7ff; text-align: center; font-weight: bold; font-size: 0.9rem; }
-        .veh-rect:hover { background: #d0e7ff; }
+        .container { 
+            max-width: 550px; 
+            margin: auto; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+            box-sizing: border-box;
+        }
         
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 10px 20px; }
+        /* Step Flow Controllers */
+        .step-box { display: none; margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee; }
+        .active-step { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.85rem; color: #444; text-transform: uppercase; }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 5px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--info); outline: none; }
+
+        /* Step 3: Vehicle Selection Rectangles */
+        .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 15px 0; }
+        .veh-rect { 
+            border: 2px solid var(--info); 
+            padding: 12px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            background: #f0f7ff; 
+            text-align: center; 
+            transition: all 0.2s ease; 
+        }
+        .veh-rect:hover { background: #d0e7ff; transform: translateY(-2px); box-shadow: 0 2px 8px rgba(41,128,185,0.2); }
+        .veh-rect b { display: block; font-size: 1.05rem; color: var(--primary); }
+        .veh-rect small { font-size: 0.8rem; color: #666; display: block; margin-top: 2px; }
+
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 15px; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 0 20px; }
         .btn-success { background: var(--success); color: white; }
-        .btn-add { background: none; border: 1px dashed var(--info); color: var(--info); }
-        .loading { display:none; text-align: center; color: var(--info); font-weight: bold; margin-top: 10px; }
+        .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); font-weight: bold; padding: 12px; }
+        
+        .status-badge { background: #e8f5e9; padding: 10px 15px; border-radius: 8px; font-weight: bold; color: #2e7d32; margin-bottom: 15px; border-left: 4px solid var(--success); }
+        .loading-screen { display: none; text-align: center; color: var(--info); font-weight: bold; margin-top: 15px; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
+<div class="container" style="max-width: 600px; padding: 0; background: none; box-shadow: none;">
+    <div class="app-header">
+        <img src="logo-main.jpg" onerror="this.style.display='none'">
+        <strong style="color: var(--primary);">CREATE JOB CARD</strong>
+        <img src="logo-green.png" onerror="this.style.display='none'">
+    </div>
+</div>
+
 <div class="container">
-    <a href="index.html" style="text-decoration:none; font-size: 0.8rem;">← Dashboard</a>
+    <a href="index.html" style="text-decoration:none; color: var(--info); font-weight: bold; font-size: 0.9rem;">← Back to Command Center</a>
     
-    <div id="step1" class="step active">
-        <h2>Step 1: Customer Mobile</h2>
-        <div style="display:flex; gap:10px;">
-            <input type="tel" id="mobile" placeholder="10 Digits">
-            <button class="btn btn-search" onclick="searchCustomer()">SEARCH</button>
+    <div id="step1" class="active-step">
+        <label>1. Customer Mobile Number</label>
+        <div style="display:flex; gap:10px; margin-top: 5px;">
+            <input type="tel" id="mobile" placeholder="Enter 10 Digit Mobile" maxlength="10" autofocus>
+            <button class="btn btn-search" onclick="processStep1()">SEARCH</button>
         </div>
-        
-        <div id="step2" style="display:none; margin-top:15px; background:#fff9db; padding:15px; border-radius:10px;">
-            <h3 style="margin:0 0 10px 0; font-size:1rem;">New Customer Details</h3>
-            <label>Name</label><input type="text" id="custName">
-            <label>Address</label><input type="text" id="custAddress">
-            <button class="btn btn-success" onclick="saveCustomer()">SAVE & NEXT</button>
+
+        <div id="step2" style="display:none; margin-top:20px; background: var(--warning-bg); padding:15px; border-radius:8px; border: 1px solid #ffe082;">
+            <strong style="color: #b78103; font-size: 0.9rem; display:block; margin-bottom: 8px;">⚠️ Unregistered Customer: Profile Setup Required</strong>
+            <label>Customer Full Name</label>
+            <input type="text" id="custName" placeholder="e.g. Rajesh Kumar">
+            <label>Address / Local Area</label>
+            <input type="text" id="custAddress" placeholder="e.g. Vijay Nagar">
+            <button class="btn btn-success" onclick="saveNewCustomer()">SAVE PROFILE & CONTINUE</button>
         </div>
     </div>
 
-    <div id="step3" class="step">
-        <h2>Step 3: Select Vehicle</h2>
-        <div id="vehicleIcons" class="veh-grid"></div>
-        <button class="btn btn-add" onclick="showNewVehForm()">+ Link New Vehicle</button>
+    <div id="step3" class="step-box">
+        <label>2. Select Linked Vehicle</label>
+        <div id="vehicleGrid" class="veh-grid"></div>
         
-        <div id="newVehForm" style="display:none; margin-top:15px; background:#f0f0f0; padding:15px; border-radius:10px;">
-            <label>Brand</label><input type="text" id="vBrand">
-            <label>Vehicle Name</label><input type="text" id="vName">
-            <label>Colour</label><input type="text" id="vColor">
-            <label>Number</label><input type="text" id="vNumber" placeholder="MP-04-XX-0000">
-            <button class="btn btn-success" onclick="linkNewVehicle()">LINK & SELECT</button>
+        <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ REGISTER NEW VEHICLE / ACC SALE</button>
+        
+        <div id="newVehicleForm" style="display:none; margin-top:15px; background:#f9f9f9; padding:15px; border-radius:8px; border: 1px solid #eee;">
+            <strong style="font-size:0.9rem; color:var(--primary); display:block; margin-bottom:10px;">Vehicle Profile Specification</strong>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div><label>Brand</label><input type="text" id="vBrand" placeholder="Bajaj / Honda"></div>
+                <div><label>Model Name</label><input type="text" id="vName" placeholder="Pulsar 220 / Activa"></div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:5px;">
+                <div><label>Colour</label><input type="text" id="vColor" placeholder="Black / Red"></div>
+                <div>
+                    <label>Reg Number</label>
+                    <input type="text" id="vNumber" placeholder="Leave blank for ACC">
+                </div>
+            </div>
+            <small style="color:#888; display:block; margin-top:8px;">*Note: Leave registration blank for counter accessory orders.</small>
+            <button class="btn btn-success" onclick="executeVehicleLink()">LINK VEHICLE & PROCEED</button>
         </div>
     </div>
 
-    <div id="step4" class="step">
-        <h2>Step 4: Finalize Job</h2>
-        <div id="vehLabel" style="background:#e8f5e9; padding:10px; border-radius:8px; font-weight:bold; color:#2e7d32; margin-bottom:15px;"></div>
-        <label>Complaint</label><textarea id="complaint" rows="3"></textarea>
-        <label>Estimate (₹)</label><input type="number" id="estimate" value="0">
-        <label>Mechanic</label><select id="mechSelect"></select>
+    <div id="step4" class="step-box">
+        <div id="activeTargetBadge" class="status-badge">Target: --</div>
         
-        <div id="loader" class="loading">SAVING TO CLOUD...</div>
-        <button id="finalBtn" class="btn btn-success" onclick="createJobCard()">OPEN JOB CARD</button>
+        <label>Customer Directives / Symptoms</label>
+        <textarea id="complaint" rows="3" placeholder="Describe exact issues requested by customer..."></textarea>
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+                <label>Initial Estimate (₹)</label>
+                <input type="number" id="estimate" value="0" min="0">
+            </div>
+            <div>
+                <label>Assign Floor Tech</label>
+                <select id="mechSelect"></select>
+            </div>
+        </div>
+        
+        <div id="dispatchLoader" class="loading-screen">DISPATCHING TO CLOUD...</div>
+        <button id="btnOpenJob" class="btn btn-success" style="padding:16px; font-size:1.1rem;" onclick="finalizeJobCardCreation()">DISPATCH OPEN JOB CARD</button>
     </div>
 </div>
 
 <script>
+    // System Integration Constants
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let selectedVehicleId = null;
+    // Operational Context Memory
+    let activeCustomerPhone = null;
+    let activeTargetVehicleId = null;
 
-    async function searchCustomer() {
-        const phone = document.getElementById('mobile').value;
-        const { data: customer } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
+    // --- STEP 1 LOGIC: IDENTIFY ACCOUNT ---
+    async function processStep1() {
+        const phoneInput = document.getElementById('mobile').value.trim();
+        if (phoneInput.length < 10) {
+            alert("System Alert: Please enter a valid 10-digit mobile number.");
+            return;
+        }
         
+        activeCustomerPhone = phoneInput;
+        
+        // Execute lookup
+        const { data: customer, error } = await supabaseClient
+            .from('customers')
+            .select('*')
+            .eq('mobile_number', activeCustomerPhone)
+            .single();
+            
         if (customer) {
-            document.getElementById('custName').value = customer.name;
-            document.getElementById('custAddress').value = customer.address;
-            goToStep3(phone);
+            // Account validated natively -> Skip Step 2 directly to Step 3
+            document.getElementById('step2').style.display = 'none';
+            initializeStep3();
         } else {
+            // Trigger Step 2 Profile expansion
             document.getElementById('step2').style.display = 'block';
+            document.getElementById('custName').focus();
         }
     }
 
-    async function saveCustomer() {
-        const phone = document.getElementById('mobile').value;
-        await supabaseClient.from('customers').upsert({
-            mobile_number: phone, name: document.getElementById('custName').value, address: document.getElementById('custAddress').value
+    // --- STEP 2 LOGIC: REGISTER NEW PROFILE ---
+    async function saveNewCustomer() {
+        const name = document.getElementById('custName').value.trim();
+        const address = document.getElementById('custAddress').value.trim();
+        
+        if (!name) {
+            alert("Profile Entry Requirement: Primary identity name cannot be omitted.");
+            return;
+        }
+
+        const { error } = await supabaseClient.from('customers').upsert({
+            mobile_number: activeCustomerPhone,
+            name: name,
+            address: address || 'Workshop Walk-in'
         });
-        goToStep3(phone);
+
+        if (error) {
+            alert("Database write abort: " + error.message);
+            return;
+        }
+
+        // Collapse profile register block and transition state downstream
+        document.getElementById('step2').style.display = 'none';
+        initializeStep3();
     }
 
-    async function goToStep3(phone) {
-        document.getElementById('step1').classList.remove('active');
-        document.getElementById('step3').classList.add('active');
-        
-        const { data: vehicles } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', phone);
-        const grid = document.getElementById('vehicleIcons');
+    // --- STEP 3 LOGIC: ASSEMBLE ASSOCIATED FLEET ---
+    async function initializeStep3() {
+        // Disable header block to solidify workflow progression
+        document.getElementById('step1').classList.remove('active-step');
+        document.getElementById('step3').classList.add('active-step');
+
+        const { data: fleet } = await supabaseClient
+            .from('vehicles')
+            .select('*')
+            .eq('customer_mobile', activeCustomerPhone);
+
+        const grid = document.getElementById('vehicleGrid');
         grid.innerHTML = '';
-        vehicles?.forEach(v => {
-            grid.innerHTML += `<div class="veh-rect" onclick="selectVeh('${v.id}', '${v.reg_number}')">${v.reg_number}<br><small>${v.make_model}</small></div>`;
-        });
+
+        if (fleet && fleet.length > 0) {
+            fleet.forEach(v => {
+                const identifier = v.reg_number.startsWith('ACC-') ? 'ACCESSORY / PART' : v.reg_number;
+                grid.innerHTML += `
+                    <div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model}')">
+                        <b>${identifier}</b>
+                        <small>${v.make_model || 'Standard Unit'} (${v.color || 'N/A'})</small>
+                    </div>`;
+            });
+        } else {
+            grid.innerHTML = `<div style="grid-column: span 2; text-align:center; padding:10px; color:#888;">No historical records mapped to this number.</div>`;
+            // Auto expand if mandatory linking needed
+            document.getElementById('newVehicleForm').style.display = 'block';
+        }
     }
 
-    function showNewVehForm() { document.getElementById('newVehForm').style.display = 'block'; }
+    function toggleNewVehicleForm() {
+        const form = document.getElementById('newVehicleForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
 
-    async function linkNewVehicle() {
-        const { data, error } = await supabaseClient.from('vehicles').insert({
-            customer_mobile: document.getElementById('mobile').value,
-            brand: document.getElementById('vBrand').value,
-            make_model: document.getElementById('vName').value,
-            color: document.getElementById('vColor').value,
-            reg_number: document.getElementById('vNumber').value
+    // --- STEP 3.5: REGISTER & LINK NEW ASSET ---
+    async function executeVehicleLink() {
+        let plateInput = document.getElementById('vNumber').value.trim().toUpperCase();
+        const brandInput = document.getElementById('vBrand').value.trim();
+        const modelInput = document.getElementById('vName').value.trim();
+        const colorInput = document.getElementById('vColor').value.trim();
+
+        // FAILSAFE INTERLOCK: Generate collision-free IDs for accessories or unplated chassis
+        if (!plateInput || plateInput === 'NEW') {
+            plateInput = "ACC-" + Math.floor(100000 + Math.random() * 900000);
+        }
+
+        const compositeModel = (brandInput + " " + modelInput).trim() || 'Counter Line Item';
+
+        const { data: newVehicle, error } = await supabaseClient.from('vehicles').insert({
+            customer_mobile: activeCustomerPhone,
+            brand: brandInput || 'Generic',
+            make_model: compositeModel,
+            color: colorInput || 'Standard',
+            reg_number: plateInput
         }).select().single();
-        if(data) selectVeh(data.id, data.reg_number);
-        else alert("Vehicle link failed: " + error.message);
+
+        if (error) {
+            alert("Constraint violation detected: " + error.message);
+            return;
+        }
+
+        // Auto route to job instantiation phase
+        document.getElementById('newVehicleForm').style.display = 'none';
+        stageTargetVehicle(newVehicle.id, newVehicle.reg_number, newVehicle.make_model);
     }
 
-    async function selectVeh(id, label) {
-        selectedVehicleId = id;
-        document.getElementById('vehLabel').innerText = "Vehicle: " + label;
-        document.getElementById('step3').classList.remove('active');
-        document.getElementById('step4').classList.add('active');
+    // --- STEP 4 LOGIC: FINALIZE DISPATCH PARAMETERS ---
+    async function stageTargetVehicle(vId, vReg, vModel) {
+        activeTargetVehicleId = vId;
         
-        const { data: mechs } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
-        const sel = document.getElementById('mechSelect');
-        sel.innerHTML = '<option value="">Select Mechanic</option>';
-        mechs?.forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
+        const displayPlate = vReg.startsWith('ACC-') ? 'Counter Order Entry' : vReg;
+        document.getElementById('activeTargetBadge').innerText = `Active Pipeline Target: ${displayPlate} (${vModel})`;
+        
+        document.getElementById('step3').classList.remove('active-step');
+        document.getElementById('step4').classList.add('active-step');
+
+        // Populate dynamic operational routing targets (Mechanics)
+        const { data: floorCrew } = await supabaseClient
+            .from('mechanics')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name');
+
+        const routingSelect = document.getElementById('mechSelect');
+        routingSelect.innerHTML = '<option value="">-- Leave Unassigned --</option>';
+        
+        floorCrew?.forEach(tech => {
+            routingSelect.innerHTML += `<option value="${tech.id}">${tech.name}</option>`;
+        });
+        
+        document.getElementById('complaint').focus();
     }
 
-    async function createJobCard() {
-        const btn = document.getElementById('finalBtn');
-        const loader = document.getElementById('loader');
-        btn.style.display = 'none'; loader.style.display = 'block';
+    // --- DISPATCH COMMITMENT ---
+    async function finalizeJobCardCreation() {
+        const triggerBtn = document.getElementById('btnOpenJob');
+        const loaderUi = document.getElementById('dispatchLoader');
+        
+        triggerBtn.style.display = 'none';
+        loaderUi.style.display = 'block';
+
+        const assignedTech = document.getElementById('mechSelect').value || null;
+        const recordedDirectives = document.getElementById('complaint').value.trim() || 'General Evaluation Pipeline';
+        const declaredEstimate = parseFloat(document.getElementById('estimate').value) || 0;
 
         const { error } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: document.getElementById('mobile').value,
-            vehicle_id: selectedVehicleId,
-            mech_id: document.getElementById('mechSelect').value,
-            problem_mentioned: document.getElementById('complaint').value,
-            estimate_given: document.getElementById('estimate').value,
-            status: 'Open'
+            customer_mobile: activeCustomerPhone,
+            vehicle_id: activeTargetVehicleId,
+            mech_id: assignedTech,
+            problem_mentioned: recordedDirectives,
+            estimate_given: declaredEstimate,
+            status: 'Open',
+            jc_date: new Date().toISOString().split('T')[0]
         });
 
-        if (!error) window.location.href = 'index.html';
-        else { alert("Error: " + error.message); btn.style.display = 'block'; loader.style.display = 'none'; }
+        if (error) {
+            alert("System Transaction Exception:\n" + error.message);
+            triggerBtn.style.display = 'block';
+            loaderUi.style.display = 'none';
+        } else {
+            // Pipeline entry secured cleanly -> Flush context and sync main app terminal
+            window.location.href = 'index.html';
+        }
     }
 </script>
 </body>
