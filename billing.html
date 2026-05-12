@@ -1,119 +1,60 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Job Card - My Care</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --green: #27ae60; --moped: #e67e22; --light: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--light); padding: 10px; margin: 0; }
-        .jc-container { max-width: 800px; margin: auto; background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
-        
-        /* Branding & Header */
-        .jc-header { padding: 20px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .logo { height: 50px; }
-        
-        /* Role Switcher */
-        .role-bar { background: #34495e; color: white; padding: 10px; display: flex; justify-content: center; gap: 20px; font-size: 0.8rem; }
-        .role-btn { cursor: pointer; opacity: 0.6; }
-        .role-btn.active { opacity: 1; font-weight: bold; text-decoration: underline; }
-
-        .section { padding: 15px; border-bottom: 1px solid #eee; }
-        .section-title { font-weight: bold; color: var(--primary); margin-bottom: 10px; display: flex; justify-content: space-between; }
-        
-        /* Table Styles */
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 0.85rem; }
-        th { background: #f8f9fa; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; }
-        td { padding: 8px; border-bottom: 1px solid #eee; }
-        .type-tag { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; color: white; }
-        .tag-green { background: var(--green); }
-        .tag-moped { background: var(--moped); }
-
-        .input-inline { width: 60px; padding: 4px; border: 1px solid #ddd; }
-        .btn-add { font-size: 0.7rem; background: var(--primary); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
-        .btn-del { color: #e74c3c; cursor: pointer; font-weight: bold; }
-        
-        /* Footer Controls */
-        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #fdfdfd; padding: 15px; }
-        .total-strip { background: var(--primary); color: white; padding: 20px; text-align: center; font-size: 1.5rem; }
+        :root { --green: #27ae60; --moped: #e67e22; --primary: #2c3e50; }
+        body { font-family: sans-serif; margin: 0; background: #f0f2f5; padding-bottom: 100px; }
+        .navbar { background: var(--primary); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .sticky-header { background: white; padding: 15px; border-bottom: 2px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .item-list { background: white; margin: 10px; border-radius: 10px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; font-size: 0.75rem; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; }
+        .action-bar { position: fixed; bottom: 0; width: 100%; background: white; padding: 15px; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; }
+        .btn-add { border: none; padding: 10px; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div class="jc-container">
-    <div class="role-bar">
-        <span>VIEWING AS:</span>
-        <div id="roleSpare" class="role-btn active" onclick="setRole('spare')">SPARE MANAGER</div>
-        <div id="roleWorkshop" class="role-btn" onclick="setRole('workshop')">WORKSHOP MANAGER</div>
+    <div class="navbar">
+        <a href="index.html" style="color:white; text-decoration:none; font-weight:bold;">← HOME</a>
+        <div id="roleDisplay" style="font-size: 0.7rem;">ROLE: GUEST</div>
     </div>
 
-    <div class="jc-header">
-        <img src="logo-main.jpg" class="logo" onerror="this.style.display='none'">
-        <div style="text-align: right;">
-            <h2 style="margin:0;">DIGITAL JOB CARD</h2>
-            <div id="vehReg" style="font-weight: bold; color: var(--info);"></div>
-        </div>
+    <div class="sticky-header">
+        <div id="vehInfo" style="font-size: 1.2rem; font-weight: bold;">Loading...</div>
+        <div id="mechInfo" style="color: #666; font-size: 0.9rem;">Technician: --</div>
     </div>
 
-    <div class="section" style="background: #fff9c4;">
-        <div id="jobDetails">Loading original complaints...</div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">
-            <span>SPARES & LUBRICANTS</span>
-            <div class="spare-only">
-                <button class="btn-add" onclick="addItem('Green')">+ Green Item</button>
-                <button class="btn-add" onclick="addItem('Moped')">+ Moped Item</button>
-            </div>
-        </div>
+    <div class="item-list">
         <table>
             <thead>
-                <tr>
-                    <th>Type</th>
-                    <th>Item Description</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Total</th>
-                    <th class="spare-only"></th>
-                </tr>
+                <tr><th>Category</th><th>Item & Brand</th><th>Qty</th><th>Total</th><th></th></tr>
             </thead>
-            <tbody id="itemsBody">
-                </tbody>
+            <tbody id="itemsBody"></tbody>
         </table>
     </div>
 
-    <div class="controls-grid">
-        <div class="mgr-only">
-            <label style="display:block; font-size: 0.8rem; font-weight: bold;">Labour Charges (₹)</label>
-            <input type="number" id="labour" value="0" oninput="calculateGrandTotal()" style="width:100%; padding:8px;">
-            
-            <label style="display:block; font-size: 0.8rem; font-weight: bold; margin-top:10px;">Lathe Work (₹)</label>
-            <input type="number" id="lathe" value="0" oninput="calculateGrandTotal()" style="width:100%; padding:8px;">
-        </div>
-        <div class="mgr-only">
-            <label style="display:block; font-size: 0.8rem; font-weight: bold;">Advance Paid (₹)</label>
-            <input type="number" id="prePaid" value="0" oninput="calculateGrandTotal()" style="width:100%; padding:8px;">
-            
-            <label style="display:block; font-size: 0.8rem; font-weight: bold; margin-top:10px;">Discount (₹ / %)</label>
-            <div style="display:flex; gap:5px;">
-                <input type="number" id="flatD" placeholder="₹" oninput="calculateGrandTotal()" style="width:50%; padding:8px;">
-                <input type="number" id="percD" placeholder="%" oninput="calculateGrandTotal()" style="width:50%; padding:8px;">
-            </div>
-        </div>
-    </div>
-
-    <div class="total-strip">
-        <small style="font-size: 0.7rem; display: block; opacity: 0.8;">NET PAYABLE BY CUSTOMER</small>
-        ₹<span id="grandTotal">0</span>
-    </div>
-
     <div style="padding: 15px;">
-        <button class="btn-add" style="width:100%; padding:15px; background:var(--green); font-size:1rem;" onclick="finalizeJob()">FINALIZE & CLOSE JOB</button>
+        <button onclick="changeRole()">🔑 Switch Access</button>
     </div>
-</div>
+
+    <div class="action-bar">
+        <div id="controlsSpare" class="hidden">
+            <button class="btn-add" style="background:var(--green);" onclick="openAddModal('Green')">+ Green/Lube</button>
+            <button class="btn-add" style="background:var(--moped);" onclick="openAddModal('Moped')">+ Moped Part</button>
+        </div>
+        <div id="controlsWorkshop" class="hidden">
+            <div style="font-weight:bold;">Final Collection: ₹<span id="grandTotal">0</span></div>
+        </div>
+    </div>
+
+    <datalist id="productList"></datalist>
+    <datalist id="brandList"></datalist>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -122,33 +63,58 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let currentRole = 'spare';
-    let sparesTotal = 0;
+    let currentRole = 'guest';
 
-    // 1. Role Permission Logic
+    // Point 1: Authorization
+    function changeRole() {
+        const pin = prompt("Enter PIN:");
+        if (pin === "1111") setRole('green'); // Green Spare Mgr
+        else if (pin === "2222") setRole('moped'); // Moped Spare Mgr
+        else if (pin === "3333") setRole('workshop'); // Workshop Mgr
+        else if (pin === "0000") setRole('admin'); // Admin
+        else alert("Invalid PIN");
+    }
+
     function setRole(role) {
         currentRole = role;
-        document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(role === 'spare' ? 'roleSpare' : 'roleWorkshop').classList.add('active');
-        
-        if (role === 'workshop') {
-            document.querySelectorAll('.spare-only').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.mgr-only').forEach(el => el.classList.remove('hidden'));
-        } else {
-            document.querySelectorAll('.spare-only').forEach(el => el.classList.remove('hidden'));
-            document.querySelectorAll('.mgr-only').forEach(el => el.classList.add('hidden'));
+        document.getElementById('roleDisplay').innerText = "ROLE: " + role.toUpperCase();
+        document.getElementById('controlsSpare').classList.toggle('hidden', role !== 'green' && role !== 'moped' && role !== 'admin');
+        document.getElementById('controlsWorkshop').classList.toggle('hidden', role !== 'workshop' && role !== 'admin');
+    }
+
+    async function loadJob() {
+        const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', jobId).single();
+        if (data) {
+            document.getElementById('vehInfo').innerText = data.vehicles.reg_number + " (" + data.vehicles.make_model + ")";
+            document.getElementById('mechInfo').innerText = "Technician: " + (data.mechanics?.name || "Unassigned");
+            loadItems();
         }
     }
 
-    // 2. Load Data
-    async function loadJob() {
-        const { data } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', jobId).single();
-        if (data) {
-            document.getElementById('vehReg').innerText = data.vehicles.reg_number;
-            document.getElementById('jobDetails').innerHTML = `
-                <b>Original Complaint:</b> ${data.problem_mentioned || 'N/A'}<br>
-                <b>Initial Estimate:</b> ₹${data.estimate_given || 0}
-            `;
+    // Point 3 & 4: Add Product with Master Search
+    async function openAddModal(warehouse) {
+        if (currentRole !== 'admin' && currentRole !== warehouse.toLowerCase()) {
+            return alert("Access Denied for " + warehouse);
+        }
+        
+        const name = prompt("Enter Item Name (Autocomplete will learn this):");
+        const brand = prompt("Enter Brand:");
+        const isLube = confirm("Is this a Lubricant? (Cancel for Spare)");
+        const qty = prompt("Quantity:", "1");
+        const price = prompt("Price per unit:");
+
+        if (name && qty && price) {
+            // Save to Master for future autocomplete (Upsert)
+            await supabaseClient.from('product_master').upsert({ item_name: name, brand: brand, warehouse_type: warehouse });
+            
+            // Save to Job
+            await supabaseClient.from('job_card_items').insert({
+                job_card_id: jobId,
+                warehouse_type: warehouse,
+                item_name: name + " (" + brand + ")",
+                qty: qty,
+                unit_price: price
+            });
             loadItems();
         }
     }
@@ -157,72 +123,15 @@
         const { data } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', jobId);
         const tbody = document.getElementById('itemsBody');
         tbody.innerHTML = '';
-        sparesTotal = 0;
-        
-        data?.forEach(item => {
-            sparesTotal += parseFloat(item.total_price);
-            tbody.innerHTML += `
-                <tr>
-                    <td><span class="type-tag tag-${item.warehouse_type.toLowerCase()}">${item.warehouse_type}</span></td>
-                    <td>${item.item_name}</td>
-                    <td>${item.qty}</td>
-                    <td>₹${item.unit_price}</td>
-                    <td><b>₹${item.total_price}</b></td>
-                    <td class="spare-only ${currentRole === 'workshop' ? 'hidden' : ''}">
-                        <span class="btn-del" onclick="deleteItem('${item.id}')">×</span>
-                    </td>
-                </tr>`;
+        let total = 0;
+        data?.forEach(i => {
+            total += i.total_price;
+            tbody.innerHTML += `<tr><td>${i.warehouse_type}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${i.total_price}</td><td>×</td></tr>`;
         });
-        calculateGrandTotal();
-    }
-
-    async function addItem(type) {
-        const name = prompt("Enter Part Name:");
-        const qty = prompt("Quantity:", "1");
-        const price = prompt("Unit Price (₹):");
-        
-        if (name && qty && price) {
-            await supabaseClient.from('job_card_items').insert({
-                job_card_id: jobId,
-                warehouse_type: type,
-                item_name: name,
-                qty: parseFloat(qty),
-                unit_price: parseFloat(price)
-            });
-            loadItems();
-        }
-    }
-
-    async function deleteItem(id) {
-        if (confirm("Remove this item?")) {
-            await supabaseClient.from('job_card_items').delete().eq('id', id);
-            loadItems();
-        }
-    }
-
-    function calculateGrandTotal() {
-        const labour = parseFloat(document.getElementById('labour').value) || 0;
-        const lathe = parseFloat(document.getElementById('lathe').value) || 0;
-        const prePaid = parseFloat(document.getElementById('prePaid').value) || 0;
-        const flat = parseFloat(document.getElementById('flatD').value) || 0;
-        const perc = parseFloat(document.getElementById('percD').value) || 0;
-
-        let subtotal = sparesTotal + labour + lathe;
-        let afterFlat = subtotal - flat;
-        let discounted = afterFlat - (afterFlat * (perc / 100));
-        let final = discounted - prePaid;
-
-        document.getElementById('grandTotal').innerText = Math.round(final);
-    }
-
-    async function finalizeJob() {
-        // Here you would save the final figures to the job_cards table and close it
-        alert("Job Finalized! Values saved to main ledger.");
-        window.location.href = 'index.html';
+        document.getElementById('grandTotal').innerText = total;
     }
 
     loadJob();
-    setRole('spare'); // Default view
 </script>
 </body>
 </html>
