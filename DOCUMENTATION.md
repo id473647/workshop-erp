@@ -30,3 +30,14 @@ To digitize the manual workflow of a multi-brand two-wheeler workshop. The syste
 - [x] Third-party Lathe/Welding Debt Tracking.
 - [x] WhatsApp Integration.
 - [x] Branding & UI Customization.
+
+
+## NEW UPDATE DATE 12 May 2026 ##
+# Comprehensive Core Implementation Architecture v3.2
+
+## System Infrastructure Strategy
+The Core ERP Application functions on a distributed model using high-efficiency **Client-Side Storage State Integration (LocalStorage)** running native **Row Level Dynamic Permissions via Role Access Controllers (RBAC)** linked to enterprise records on **Supabase PostgreSQL**.
+
+---
+
+## Technical Data Flow Pipeline
