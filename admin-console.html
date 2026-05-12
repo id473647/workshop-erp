@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Admin Console - My Care</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin:0; }
+        .console-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 800px; margin: auto; }
+        .section { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        .btn { padding: 12px; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-save { background: #27ae60; width: 100%; margin-top: 10px; }
+        .btn-danger { background: #e74c3c; padding: 6px 10px; font-size:0.8rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size:0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #2c3e50; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="console-card">
+    <a href="index.html" style="text-decoration:none; color:#2980b9; font-weight:bold;">← Command Center</a>
+    <h2 style="color:#2c3e50; border-bottom:3px solid #e74c3c; padding-bottom:5px;">MASTER ADMIN CONSOLE</h2>
+
+    <div class="section">
+        <h3 style="margin-bottom:5px;">🔒 System Access PINs</h3>
+        <small style="color:#666;">Manage internal authorization codes for floor operations.</small>
+        <div class="grid">
+            <div><label><small>Green Warehouse PIN</small></label><input type="text" id="pinGreen" value="1111"></div>
+            <div><label><small>Moped Warehouse PIN</small></label><input type="text" id="pinMoped" value="2222"></div>
+            <div><label><small>Workshop Manager PIN</small></label><input type="text" id="pinWorkshop" value="3333"></div>
+            <div><label><small>Master Admin Override</small></label><input type="password" id="pinAdmin" value="0000"></div>
+        </div>
+        <button class="btn btn-save" onclick="savePins()">Update Security PINs</button>
+    </div>
+
+    <div class="section">
+        <h3 style="margin-bottom:5px;">🛠️ Staff & Technician Directory</h3>
+        <div class="grid">
+            <input type="text" id="mName" placeholder="Technician Name">
+            <input type="number" id="mComm" placeholder="Commission % (Default: 10)">
+        </div>
+        <button class="btn btn-save" style="background:#2980b9;" onclick="addTech()">+ Register Technician</button>
+        
+        <table style="margin-top:20px;">
+            <thead><tr><th>Technician</th><th>Comm. Rate</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="techTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    function savePins() {
+        // In client-only setups, PINs can be saved to LocalStorage or a Supabase Config table
+        localStorage.setItem('PIN_GREEN', document.getElementById('pinGreen').value);
+        localStorage.setItem('PIN_MOPED', document.getElementById('pinMoped').value);
+        localStorage.setItem('PIN_WORKSHOP', document.getElementById('pinWorkshop').value);
+        localStorage.setItem('PIN_ADMIN', document.getElementById('pinAdmin').value);
+        alert("Security PINs Updated Locally!");
+    }
+
+    async function addTech() {
+        const name = document.getElementById('mName').value;
+        const comm = document.getElementById('mComm').value || 10;
+        if(!name) return alert("Enter Name");
+        await supabaseClient.from('mechanics').insert({ name, commission_rate: comm });
+        loadDirectory();
+    }
+
+    async function loadDirectory() {
+        const { data } = await supabaseClient.from('mechanics').select('*').order('name');
+        const tbody = document.getElementById('techTable');
+        tbody.innerHTML = '';
+        data?.forEach(m => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${m.name}</strong></td>
+                <td>${m.commission_rate}%</td>
+                <td><span style="color:${m.is_active?'green':'red'}">${m.is_active?'Active':'Suspended'}</span></td>
+                <td><button class="btn btn-danger" onclick="toggleStatus('${m.id}', ${!m.is_active})">${m.is_active?'Suspend':'Activate'}</button></td>
+            </tr>`;
+        });
+    }
+
+    async function toggleStatus(id, targetState) {
+        await supabaseClient.from('mechanics').update({ is_active: targetState }).eq('id', id);
+        loadDirectory();
+    }
+
+    loadDirectory();
+</script>
+</body>
+</html>
