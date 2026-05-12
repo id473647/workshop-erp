@@ -3,71 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Green POS Counter - My Care ERP</title>
+    <title>Retail Cash POS - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --success: #27ae60; --primary: #2c3e50; --light: #f4f7f6; --border: #ddd; }
-        body { font-family: sans-serif; background: var(--light); padding: 15px; margin: 0; box-sizing: border-box; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .header a { font-weight: bold; color: var(--success); text-decoration: none; font-size: 0.9rem; }
-        .pos-container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .section-header { font-size: 1.1rem; font-weight: bold; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 15px; }
+        :root { --success: #27ae60; --primary: #2c3e50; --light: #f4f7f6; --border: #e2e8f0; }
+        body { font-family: system-ui, sans-serif; background: var(--light); padding: 24px; margin: 0; box-sizing: border-box; color: #1e293b; }
+        .nav-banner { background: white; padding: 12px 20px; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .nav-banner a { font-weight: 700; color: var(--success); text-decoration: none; font-size: 0.85rem; }
         
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        label { font-size: 0.8rem; font-weight: bold; color: #555; display: block; margin-bottom: 4px; }
-        input, select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        .pos-panel { max-width: 850px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* Interactive Row Configuration */
-        .item-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
-        .btn-add { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
-        .btn-del { background: #e74c3c; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .input-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .field-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
         
-        .total-banner { background: var(--success); color: white; padding: 15px; border-radius: 8px; font-size: 1.5rem; text-align: center; font-weight: bold; margin-top: 15px; }
-        .btn-commit { width: 100%; padding: 15px; background: #2e7d32; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; margin-top: 15px; }
-        .link-ledger { display: block; text-align: center; margin-top: 15px; font-weight: bold; color: var(--primary); text-decoration: underline; font-size: 0.85rem; }
+        .customer-classification-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
+        .tag-cash { background: #fef3c7; color: #b45309; }
+        .tag-work { background: #e0f2fe; color: #0369a1; }
+        .tag-reg { background: #dcfce7; color: #15803d; }
+
+        /* Inline Item Entry Architecture */
+        .line-item-matrix { display: grid; grid-template-columns: 2fr 1.2fr 0.6fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .inline-add-btn { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+        .inline-drop-btn { color: #ef4444; background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
+
+        .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin-top: 24px; }
+        .commit-trigger { width: 100%; padding: 14px; background: #16a34a; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 16px; }
+        .ledger-anchor { display: block; text-align: center; margin-top: 16px; font-size: 0.8rem; font-weight: 700; color: var(--primary); text-decoration: underline; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <a href="index.html">← COMMAND CENTER (GREEN FLOOR)</a>
-    <span style="font-weight:bold; color:var(--primary);">POS INVOICER</span>
+<div class="nav-banner">
+    <a href="index.html">← LEAVE RETAIL COUNTER</a>
+    <span style="font-weight:700; color:var(--primary); font-size:0.85rem;">GREEN DIRECT SALES CONSOLE</span>
 </div>
 
-<div class="pos-container">
-    <div class="section-header">1. Target Customer Profile (Cross-Link Checking Natively)</div>
-    <div class="grid">
-        <div><label>Mobile Tracker</label><input type="tel" id="cMobile" placeholder="10 Digits" maxlength="10" onblur="checkIdentity()"></div>
-        <div><label>Customer Name</label><input type="text" id="cName" placeholder="Full Identity"></div>
+<div class="pos-panel">
+    <div class="block-title"><span>1. Upfront Account Recon Check</span></div>
+    <div class="input-matrix">
+        <div class="field-group">
+            <label>Customer Mobile Entry</label>
+            <input type="tel" id="rMobile" placeholder="Enter 10 Digits" maxlength="10" autofocus onblur="resolveIdentityClassification()">
+        </div>
+        <div class="field-group">
+            <label>Profile Identity Binding</label>
+            <input type="text" id="rName" placeholder="Full Account Name">
+            <div id="cClassificationWrapper"></div>
+        </div>
+    </div>
+
+    <div class="block-title"><span>2. Direct Processing Line Inventory</span></div>
+    <div id="runtimeLinesContainer">
+        <div class="line-item-matrix">
+            <input type="text" placeholder="Product Line Context" class="e-name">
+            <input type="text" placeholder="Brand Code" class="e-brand" value="Standard">
+            <input type="number" placeholder="Qty" class="e-qty" value="1" min="1" oninput="compileDynamicPosSubtotals()">
+            <input type="number" placeholder="Unit Price" class="e-price" value="0" min="0" oninput="compileDynamicPosSubtotals()">
+            <input type="number" placeholder="Item Disc (₹)" class="e-disc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
+            <button class="inline-drop-btn" onclick="destroyPosRow(this)">×</button>
+        </div>
     </div>
     
-    <div class="section-header">2. Transaction Line Items Matrix</div>
-    <div id="dynamicRowsContainer">
-        <div class="item-row">
-            <input type="text" placeholder="Item Name Specification" class="p-name">
-            <input type="text" placeholder="Brand Context" class="p-brand" value="Standard">
-            <input type="number" placeholder="Qty" class="p-qty" value="1" min="1" oninput="compilePosSubtotal()">
-            <input type="number" placeholder="Price (₹)" class="p-price" value="0" min="0" oninput="compilePosSubtotal()">
-            <button class="btn-del" onclick="dropElementRow(this)">×</button>
-        </div>
-    </div>
-    <button class="btn-add" onclick="pushItemEntry()">+ STACK NEW ENTRY</button>
+    <button class="inline-add-btn" onclick="appendInlinePosRow()" title="Append Line Node">+</button>
 
-    <div class="section-header">3. Settlement Dispatch Rules</div>
-    <div class="grid">
-        <div><label>Payment Target Route</label>
-            <select id="pMode">
-                <option value="Cash">Cash Handling</option>
-                <option value="UPI">UPI Digital Transfer</option>
-                <option value="Credit">Credit Extension (Debtor)</option>
+    <div class="block-title"><span>3. Financial Allocation Protocols</span></div>
+    <div class="input-matrix">
+        <div class="field-group">
+            <label>Dispatch Payment Mode</label>
+            <select id="rMode">
+                <option value="Cash">Cash Currency Over Counter</option>
+                <option value="UPI">UPI Digital Payment Asset</option>
+                <option value="Credit">Credit Ext / Deferred Debt</option>
             </select>
         </div>
-        <div><label>Concession Discount (₹)</label><input type="number" id="pDisc" value="0" min="0" oninput="compilePosSubtotal()"></div>
+        <div class="field-group">
+            <label>Overarching Concession Buffer (₹)</label>
+            <input type="number" id="rGlobalDisc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
+        </div>
     </div>
 
-    <div class="total-banner">NET AGGREGATE: ₹<span id="posNetAggregate">0</span></div>
-    <button class="btn-commit" onclick="savePosLedger()">COMMIT DIRECT TRANSACTION</button>
-    <a href="ledger.html?type=credit_green" class="link-ledger">ACCESS CREDITOR EXTENSION LEDGER</a>
+    <div class="valuation-banner">NET INVOICE AGGREGATE: ₹<span id="posNetMetric">0</span></div>
+    <button class="commit-trigger" onclick="commitPosTransaction()">PROCESS IMMEDIATE COUNTER INVOICE</button>
+    <a href="ledger.html?scope=credit" class="ledger-anchor">ACCESS CREDITOR EXTENSION LEDGER</a>
 </div>
 
 <script>
@@ -75,69 +95,99 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function checkIdentity() {
-        const phone = document.getElementById('cMobile').value.trim();
-        if(phone.length < 10) return;
+    async function resolveIdentityClassification() {
+        const targetNumber = document.getElementById('rMobile').value.trim();
+        const wrapper = document.getElementById('cClassificationWrapper');
+        wrapper.innerHTML = '';
+        if(targetNumber.length < 10) return;
 
-        const { data: c } = await supabaseClient.from('customers').select('*').eq('mobile_number', phone).single();
-        if(c) {
-            document.getElementById('cName').value = c.name;
+        // Execute parallel operational layer pulls natively
+        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', targetNumber).single();
+        const { data: jcData } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', targetNumber).limit(1);
+        const { data: posData } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', targetNumber).limit(1);
+
+        const hasJc = jcData && jcData.length > 0;
+        const hasPos = posData && posData.length > 0;
+
+        if(cData) {
+            document.getElementById('rName').value = cData.name;
+        }
+
+        // Output specific verification tags requested in feedback point 4
+        if(hasJc && hasPos) {
+            wrapper.innerHTML = '<span class="customer-classification-tag tag-reg">(c) Regular Customer</span>';
+        } else if(hasJc) {
+            wrapper.innerHTML = '<span class="customer-classification-tag tag-work">(b) Already a workshop Customer</span>';
+        } else if(hasPos) {
+            wrapper.innerHTML = '<span class="customer-classification-tag tag-cash">(a) Already a cash customer</span>';
         }
     }
 
-    function pushItemEntry() {
-        const cont = document.getElementById('dynamicRowsContainer');
+    function appendInlinePosRow() {
+        const stack = document.getElementById('runtimeLinesContainer');
         const node = document.createElement('div');
-        node.className = 'item-row';
+        node.className = 'line-item-matrix';
         node.innerHTML = `
-            <input type="text" placeholder="Item Name Specification" class="p-name">
-            <input type="text" placeholder="Brand Context" class="p-brand" value="Standard">
-            <input type="number" placeholder="Qty" class="p-qty" value="1" min="1" oninput="compilePosSubtotal()">
-            <input type="number" placeholder="Price (₹)" class="p-price" value="0" min="0" oninput="compilePosSubtotal()">
-            <button class="btn-del" onclick="dropElementRow(this)">×</button>`;
-        cont.appendChild(node);
+            <input type="text" placeholder="Product Line Context" class="e-name">
+            <input type="text" placeholder="Brand Code" class="e-brand" value="Standard">
+            <input type="number" placeholder="Qty" class="e-qty" value="1" min="1" oninput="compileDynamicPosSubtotals()">
+            <input type="number" placeholder="Unit Price" class="e-price" value="0" min="0" oninput="compileDynamicPosSubtotals()">
+            <input type="number" placeholder="Item Disc (₹)" class="e-disc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
+            <button class="inline-drop-btn" onclick="destroyPosRow(this)">×</button>`;
+        stack.appendChild(node);
     }
 
-    function dropElementRow(btnInstance) {
-        btnInstance.parentElement.remove();
-        compilePosSubtotal();
+    function destroyPosRow(nodeReference) {
+        if(confirm("Confirm dropping inventory mapping line?")) {
+            nodeReference.parentElement.remove();
+            compileDynamicPosSubtotals();
+        }
     }
 
-    function compilePosSubtotal() {
-        let gross = 0;
-        document.querySelectorAll('.item-row').forEach(row => {
-            const q = parseFloat(row.querySelector('.p-qty').value) || 0;
-            const p = parseFloat(row.querySelector('.p-price').value) || 0;
-            gross += (q * p);
+    function compileDynamicPosSubtotals() {
+        let cumulativeGross = 0;
+        document.querySelectorAll('.line-item-matrix').forEach(row => {
+            const q = parseFloat(row.querySelector('.e-qty').value) || 0;
+            const p = parseFloat(row.querySelector('.e-price').value) || 0;
+            const d = parseFloat(row.querySelector('.e-disc').value) || 0;
+            cumulativeGross += ((q * p) - d);
         });
-        const disc = parseFloat(document.getElementById('pDisc').value) || 0;
-        document.getElementById('posNetAggregate').innerText = Math.round(gross - disc);
+        const overarchingDiscount = parseFloat(document.getElementById('rGlobalDisc').value) || 0;
+        document.getElementById('posNetMetric').innerText = Math.round(cumulativeGross - overarchingDiscount);
     }
 
-    async function savePosLedger() {
-        const mobile = document.getElementById('cMobile').value.trim();
-        const name = document.getElementById('cName').value.trim();
-        const mode = document.getElementById('pMode').value;
-        const finalVal = document.getElementById('posNetAggregate').innerText;
+    async function commitPosTransaction() {
+        const mobile = document.getElementById('rMobile').value.trim();
+        const identity = document.getElementById('rName').value.trim();
+        const mode = document.getElementById('rMode').value;
+        const aggregate = document.getElementById('posNetMetric').innerText;
 
-        if(!mobile || !name) return alert("System Alert: Unassigned account mapping details.");
+        if(!mobile || !identity) return alert("Validation Alert: Provide customer identity mapping details.");
 
-        // Upsert standard customer layer dynamically
-        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name });
+        // Commit profile tracking
+        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: identity });
 
-        // Commit core record layer
-        const { error } = await supabaseClient.from('counter_sales').insert({
+        const { data: salesInstance, error } = await supabaseClient.from('counter_sales').insert({
             customer_mobile: mobile,
-            customer_name: name,
-            total_amount: finalVal,
+            customer_name: identity,
+            total_amount: aggregate,
             payment_mode: mode
-        });
+        }).select().single();
 
-        if(!error) {
-            alert(`POS Sales Entry Recorded via route: ${mode}`);
+        if(!error && salesInstance) {
+            // Auto Store entered product catalogs in backend database mappings asynchronously
+            document.querySelectorAll('.line-item-matrix').forEach(async row => {
+                const part = row.querySelector('.e-name').value.trim();
+                const brand = row.querySelector('.e-brand').value.trim() || 'Standard';
+                if(part) {
+                    await supabaseClient.from('product_master').upsert({ item_name: part, brand: brand, warehouse_type: 'Green' }, { onConflict: 'item_name,brand' });
+                }
+            });
+
+            alert(`Direct Retail Transaction successfully closed via route: ${mode}`);
             window.location.href = 'index.html';
         } else {
-            alert("Database Error Transaction Abort:\n" + error.message);
+            alert("Database Error Context:\n" + error?.message);
         }
     }
 </script>
