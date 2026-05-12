@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanic Admin - My Care</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-add { background: #27ae60; color: white; }
+        .btn-print { background: #2980b9; color: white; margin-top: 10px; }
+        @media print { .no-print { display: none; } body { background: white; } .card { box-shadow: none; border: none; } }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="no-print">
+        <a href="index.html" style="text-decoration:none;">← Dashboard</a>
+        <h2>Mechanic Management</h2>
+        
+        <div class="grid">
+            <input type="text" id="mName" placeholder="Mechanic Name">
+            <input type="number" id="mComm" placeholder="Commission % (e.g. 10)">
+        </div>
+        <button class="btn btn-add" onclick="addMechanic()">+ Add New Mechanic</button>
+        <hr>
+        <h3>Settlement & History</h3>
+        <select id="mechList" onchange="loadLedger()"><option value="">Select Mechanic to View Ledger</option></select>
+        <button class="btn btn-print" onclick="window.print()">Print/Save PDF Settlement</button>
+    </div>
+
+    <div id="printArea">
+        <h2 id="printTitle">Mechanic Settlement Report</h2>
+        <div id="mechSummary" style="margin-bottom: 20px; font-weight: bold;"></div>
+        <table id="ledgerTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    async function addMechanic() {
+        const name = document.getElementById('mName').value;
+        const comm = document.getElementById('mComm').value;
+        if(!name || !comm) return alert("Fill all fields");
+        await supabaseClient.from('mechanics').insert({ name, commission_rate: comm });
+        alert("Mechanic Added!");
+        location.reload();
+    }
+
+    async function loadMechs() {
+        const { data } = await supabaseClient.from('mechanics').select('*').eq('is_active', true);
+        const sel = document.getElementById('mechList');
+        data?.forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
+    }
+
+    async function loadLedger() {
+        const mid = document.getElementById('mechList').value;
+        if(!mid) return;
+
+        // Fetch last 15 transactions
+        const { data: ledger } = await supabaseClient.from('staff_ledger')
+            .select('*').eq('mechanic_id', mid).order('created_at', { ascending: false }).limit(15);
+        
+        const tbody = document.querySelector('#ledgerTable tbody');
+        tbody.innerHTML = '';
+        let bal = 0;
+        
+        ledger?.forEach(item => {
+            const date = new Date(item.created_at).toLocaleDateString();
+            tbody.innerHTML += `<tr><td>${date}</td><td>${item.description || 'Service'}</td><td>${item.entry_type}</td><td>₹${item.amount}</td></tr>`;
+        });
+    }
+
+    loadMechs();
+</script>
+</body>
+</html>
