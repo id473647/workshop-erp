@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMC & Offer Portal - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --accent: #d97706; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        /* Universal Standards: Bound layouts with centered Home action */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--accent); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        
+        /* Layout Modules */
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 700; cursor: pointer; display: block; width: 100%; text-align: center; }
+        
+        /* Table Directives */
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .status-pill { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">OFFER & AMC MODULE</span>
+</nav>
+
+<div class="wrapper">
+    <div class="card-panel" style="border-left: 5px solid var(--accent);">
+        <div class="block-title">Instantiate Annual Maintenance Contract (AMC)</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Customer Mobile Target</label><input type="tel" id="amcMobile" placeholder="10 Digits" maxlength="10"></div>
+            <div class="field-group"><label>Vehicle Reg Plate</label><input type="text" id="amcReg" placeholder="e.g. MP-04-XX-0000"></div>
+            <div class="field-group">
+                <label>Subscription Tier Selection</label>
+                <select id="amcTier">
+                    <option value="Silver">Standard Silver (3 Washes / 3 Services)</option>
+                    <option value="Gold">Gold Fleet (5 Comprehensive Services)</option>
+                    <option value="Platinum">Platinum Shield (Unlimited Checkups)</option>
+                </select>
+            </div>
+            <div class="field-group"><label>Contract Duration</label><select id="amcDuration"><option value="1">1 Year Coverage</option></select></div>
+        </div>
+        <button class="btn-action" style="background:var(--accent);" onclick="instantiateAmcSubscription()">INITIALIZE SUBSCRIPTION PLAN</button>
+    </div>
+
+    <div class="card-panel">
+        <div class="block-title">Active Contract Ledgers</div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Target Plate</th><th>Client Contact</th><th>Tier Scope</th><th>Remaining Quotas</th><th>Contract State</th></tr></thead>
+                <tbody id="amcRegisterBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    async function instantiateAmcSubscription() {
+        const mob = document.getElementById('amcMobile').value.trim();
+        const reg = document.getElementById('amcReg').value.trim().toUpperCase();
+        const tier = document.getElementById('amcTier').value;
+
+        if(mob.length < 10 || !reg) return alert("System Guard: Check required primary indices.");
+
+        // Calculate absolute expiry timelines dynamically
+        const expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        const resolvedExpiryString = expiryDate.toISOString().split('T')[0];
+
+        // Route initialization targets mapping base quotas
+        const baseServices = tier === 'Gold' ? 5 : (tier === 'Platinum' ? 10 : 3);
+
+        const { error } = await supabaseClient.from('amc_contracts').insert({
+            customer_mobile: mob,
+            vehicle_reg: reg,
+            tier_level: tier,
+            expiry_date: resolvedExpiryString,
+            remaining_washes: baseServices,
+            remaining_services: baseServices
+        });
+
+        if(error) alert("Database Insertion Abortion:\n" + error.message);
+        else {
+            alert(`Subscription contract level '${tier}' securely logged to core target chassis: ${reg}`);
+            loadContractLedgers();
+        }
+    }
+
+    async function loadContractLedgers() {
+        const { data: contracts } = await supabaseClient.from('amc_contracts').select('*').order('activation_date', { ascending: false }).limit(10);
+        const tbody = document.getElementById('amcRegisterBody');
+        tbody.innerHTML = '';
+
+        if(contracts && contracts.length > 0) {
+            contracts.forEach(plan => {
+                const statusPillStyle = plan.is_active ? 'background:#dcfce7; color:#15803d;' : 'background:#fee2e2; color:#b91c1c;';
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${plan.vehicle_reg}</strong></td>
+                        <td>${plan.customer_mobile}</td>
+                        <td><strong>${plan.tier_level}</strong></td>
+                        <td>Washes: ${plan.remaining_washes} | Services: ${plan.remaining_services}</td>
+                        <td><span class="status-pill" style="${statusPillStyle}">${plan.is_active ? 'Active' : 'Expired'}</span></td>
+                    </tr>`;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No active annual maintenance profiles detected.</td></tr>';
+        }
+    }
+
+    loadContractLedgers();
+</script>
+</body>
+</html>
