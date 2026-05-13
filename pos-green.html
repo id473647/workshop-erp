@@ -271,6 +271,7 @@
     let targetInspectionRecordId = null;
     let inspectedRecordObject = null;
 
+    // Formatting string conversion utility converting values directly to standard word string structures
     function convertNumberToWords(amount) {
         const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
         let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only';
@@ -283,6 +284,12 @@
             return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : '');
         }
         return helper(num) + ' Rupees Only';
+    }
+
+    // Explicit format preparation wrapper function executing string formatting natively
+    function formatTitleCaseString(str) {
+        if(!str) return '';
+        return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
 
     async function evaluateAccountFlow() {
@@ -335,8 +342,12 @@
     async function commitAccountProfile() {
         const rawName = document.getElementById('newAccName').value.trim();
         if(!rawName) return alert("Provide valid target Identity context.");
-        await supabaseClient.from('customers').upsert({ mobile_number: evaluatedPhoneContext, name: rawName });
-        document.getElementById('terminalName').value = rawName; transitionFlowPanels('transactionInvoicerFlow');
+        
+        // Execute clean Title Case mappings preventing DB case leaks
+        const formattedTitleName = formatTitleCaseString(rawName);
+        await supabaseClient.from('customers').upsert({ mobile_number: evaluatedPhoneContext, name: formattedTitleName });
+        document.getElementById('terminalName').value = formattedTitleName; 
+        transitionFlowPanels('transactionInvoicerFlow');
     }
 
     function pushRuntimeStackRow() {
@@ -359,43 +370,54 @@
         document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
     }
 
-    // --- CRITICAL REPLACEMENT: WRAPPING INSERTIONS IN A STRICT PROMISE.ALL() BARRIER ---
+    // --- CRITICAL RE-ENGINEERING: WRAPPING INSERTIONS IN STRICT PROMISE.ALL() SYNCHRONIZATION BARRIER ---
     async function commitInvoiceExecution(modeTarget, statusTarget) {
         const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
-        // Stage primary invoice header write operations
+        // Stage primary sales header initialization record writes
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
-            customer_mobile: evaluatedPhoneContext, customer_name: mappedClientName, total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole
+            customer_mobile: evaluatedPhoneContext, 
+            customer_name: formatTitleCaseString(mappedClientName), 
+            total_amount: finalNetValuation, 
+            payment_mode: modeTarget, 
+            status: statusTarget, 
+            source_role: activeRole
         }).select().single();
 
         if(error) return alert("System Commitment Error:\n" + error.message);
         
         if(finalRecord) {
-            // Collect DOM array items and compile mapping promises securely before executing redirections
+            // Collect DOM rows and compile child insertion promises explicitly before triggering redirect actions
             const itemPromises = [];
             const rowNodes = document.querySelectorAll('.inline-item-row');
             
             for(let i = 0; i < rowNodes.length; i++) {
                 const row = rowNodes[i];
-                const itemSpec = row.querySelector('.i-name').value.trim(); 
-                const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
+                const rawSpec = row.querySelector('.i-name').value.trim(); 
+                const rawBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
                 const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; 
                 const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; 
                 const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
                 
-                if(itemSpec) {
+                if(rawSpec) {
+                    const cleanSpec = formatTitleCaseString(rawSpec);
+                    const cleanBrand = formatTitleCaseString(rawBrand);
                     const rawLineTotal = qScalar * rScalar; 
                     const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
                     
-                    // Asynchronous indexing catalog map calls cleanly decoupled
-                    supabaseClient.from('product_master').upsert({ item_name: itemSpec, brand: itemBrand, warehouse_type: 'Green' }).then();
+                    // Asynchronous indexing catalog updates decoupled natively
+                    supabaseClient.from('product_master').upsert({ 
+                        item_name: cleanSpec, 
+                        brand: cleanBrand, 
+                        warehouse_type: 'Green' 
+                    }).then().catch(e => console.warn("Catalog duplication skip:", e));
                     
-                    // Push network execution string mappings to global completion evaluation array
+                    // Push individual database item entries to parallel mapping array
                     const promiseWrite = supabaseClient.from('counter_sale_items').insert({ 
                         sale_id: finalRecord.id, 
-                        item_name: `${itemSpec} (${itemBrand})`, 
+                        item_name: `${cleanSpec} (${cleanBrand})`, 
                         qty: qScalar, 
                         unit_price: rScalar, 
                         total_price: finalNetTotal 
@@ -404,7 +426,7 @@
                 }
             }
             
-            // Failsafe Interlock: Halt execution flow absolutely until all line item mappings write natively
+            // Failsafe Execution Block: Ensure all related row mappings serialize over the network safely
             if(itemPromises.length > 0) {
                 await Promise.all(itemPromises);
             }
@@ -428,12 +450,13 @@
         });
     }
 
-    // --- POPULATING 3-INCH (80mm) THERMAL STACKED LAYOUT ---
+    // --- ROBUST EXTRACTION ENGINE POPULATING 3-INCH STACKED THERMAL INTERFACES ---
     async function instantiateInspectionScope(id) {
         targetInspectionRecordId = id;
         
+        // Execute primary database query block mapping potential extraction exceptions natively
         const { data: record, error: recError } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
-        if(recError) return alert("Retrieval Check Error:\n" + recError.message);
+        if(recError) return alert("Retrieval Exception Interlock:\n" + recError.message);
         
         if(record) {
             inspectedRecordObject = record;
@@ -466,10 +489,10 @@
         }
     }
 
-    // Resolves database arrays injecting mapped rows directly into stacked double-line text blocks
+    // Safely reads target item lines populating monospaced stacked text components directly
     async function refreshInspectionLineItems(isEditable) {
         const { data: lines, error: lineErr } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
-        if(lineErr) console.error("Line fetch failed:", lineErr);
+        if(lineErr) console.error("Line mapping retrieval exception:", lineErr);
         
         const container = document.getElementById('thStackedItemsContainer'); 
         container.innerHTML = '';
@@ -479,8 +502,8 @@
             lines.forEach(line => {
                 calcGrossSubtotal += parseFloat(line.total_price) || 0;
                 
-                // Absolute Failsafe: Extracts core item names cleanly without crashing on trailing string splits
-                let parsedName = line.item_name || 'Unnamed Asset';
+                // Bulletproof extraction parameters mapping descriptor rows cleanly
+                let parsedName = line.item_name || 'Asset Spec';
                 let parsedBrand = "Standard";
                 if(line.item_name && line.item_name.includes('(')) {
                     const parts = line.item_name.split('(');
@@ -488,7 +511,7 @@
                     parsedBrand = parts[1].replace(')','').trim();
                 }
                 
-                // Protects physical print roll frames via monospaced line constraints
+                // Protects physical print width limits via monospaced boundary truncation logic
                 const safeNameTruncated = parsedName.length > 24 ? parsedName.substring(0, 22) + '..' : parsedName;
                 const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? 
                     `<span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer; margin-left:6px;">[Drop]</span>` : '';
@@ -526,8 +549,15 @@
         const rVal = parseFloat(document.getElementById('revRate').value) || 0;
         if(!partString) return;
         
+        const cleanPartStr = formatTitleCaseString(partString);
         const newScalarNet = qVal * rVal;
-        await supabaseClient.from('counter_sale_items').insert({ sale_id: targetInspectionRecordId, item_name: `${partString} (Appended)`, qty: qVal, unit_price: rVal, total_price: newScalarNet });
+        await supabaseClient.from('counter_sale_items').insert({ 
+            sale_id: targetInspectionRecordId, 
+            item_name: `${cleanPartStr} (Appended)`, 
+            qty: qVal, 
+            unit_price: rVal, 
+            total_price: newScalarNet 
+        });
 
         const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0;
         const compiledUpdatedNet = prevTotal + newScalarNet;
