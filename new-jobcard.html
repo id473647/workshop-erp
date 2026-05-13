@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Job Card - My Care ERP</title>
+    <title>Job Card Creator Engine - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
-        body { font-family: system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --info: #2980b9; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; 
+            --amber: #f59e0b;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
         
-        /* Universal Standards: Centered layout boxes mapped to exactly 950px */
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
@@ -18,66 +22,121 @@
         .wrapper { max-width: 950px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
         .container { background: white; padding: 28px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
         
-        .step-box { display: none; margin-top: 24px; padding-top: 20px; border-top: 2px solid #f1f5f9; }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
+        
+        .step-box { display: none; animation: fadeIn 0.2s ease-out; }
         .active-step { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
         label { display: block; margin-top: 14px; font-weight: 700; font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--info); box-shadow: 0 0 0 3px rgba(41,128,185,0.1); }
 
-        .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
-        .veh-rect { border: 2px solid var(--border); padding: 14px; border-radius: 8px; cursor: pointer; background: #f8fafc; text-align: center; }
-        .veh-rect:hover { border-color: var(--info); background: #f0f7ff; }
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .field-group { display: flex; flex-direction: column; }
 
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; font-size: 0.9rem; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; font-size: 0.95rem; transition: opacity 0.15s; }
+        .btn:hover { opacity: 0.9; }
+        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 0 24px; }
         .btn-success { background: var(--success); color: white; }
-        .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); }
+        .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); margin-top: 12px; padding: 10px; }
         
-        .status-badge { background: #f0fdf4; padding: 12px; border-radius: 8px; font-weight: 700; color: #15803d; border: 1px solid #bbf7d0; margin-bottom: 20px; }
-        .warranty-alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; display: none; }
-        
-        .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
+        /* Classification Metadata Pill Tag Styling */
+        .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; margin-top: 6px; }
         .tag-cash { background: #fef3c7; color: #b45309; }
         .tag-work { background: #e0f2fe; color: #0369a1; }
         .tag-reg { background: #dcfce7; color: #15803d; }
+        
+        /* Dynamic Vehicle Matrix Displays */
+        .veh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+        .veh-rect { border: 2px solid var(--border); padding: 16px; border-radius: 8px; cursor: pointer; background: #f8fafc; text-align: center; transition: all 0.15s; }
+        .veh-rect:hover { border-color: var(--info); background: #f0f7ff; transform: translateY(-2px); }
+        .veh-rect b { font-size: 1.1rem; color: var(--primary); display: block; }
+        .veh-rect small { color: #64748b; font-size: 0.8rem; margin-top: 4px; display: block; }
+
+        .status-badge { background: #f0fdf4; padding: 14px; border-radius: 8px; font-weight: 700; color: #15803d; border: 1px solid #bbf7d0; margin-bottom: 20px; font-size: 1rem; }
+        .warranty-alert { background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; display: none; }
+        
+        /* Inline Autocomplete Input Support Container Rules */
+        .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: none; }
+        .autocomplete-item { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+        .autocomplete-item:hover { background: #f8fafc; color: var(--primary); font-weight: 700; }
+
+        /* Point 3 Inline Stack Controls Optimization */
+        .inline-item-row { display: grid; grid-template-columns: 2fr 1.2fr 0.8fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 10px; position: relative; }
+        .inline-num { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; font-weight: 700; color: var(--primary); text-align: center; box-sizing: border-box; margin: 0; }
+        .btn-add-line { background: var(--success); color: white; border: none; width: 36px; height: 36px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; transition: opacity 0.15s; }
+        .btn-add-line:hover { opacity: 0.9; }
+        .btn-del-line { color: var(--danger); background: none; border: none; font-size: 1.3rem; font-weight: 700; cursor: pointer; padding: 0 6px; }
+        
+        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <a href="index.html" class="nav-anchor">← BACK</a>
+    <a href="index.html" class="nav-anchor">← RETURN TO DASHBOARD</a>
     <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <span class="badge-role">JOB CREATOR</span>
+    <span class="badge-role">JOB CARD ENGINE</span>
 </nav>
 
 <div class="wrapper">
     <div class="container">
         <div id="step1" class="active-step">
-            <label>1. Customer Mobile</label>
-            <input type="tel" id="mobile" placeholder="Enter 10 Digits" maxlength="10" autofocus oninput="processAutonomousPhoneSearch(this.value)">
+            <div class="block-title">Customer Account Verification</div>
+            <label style="margin-top:0;">1. Customer Mobile Number</label>
+            <div style="display:flex; gap:10px; margin-top: 4px;">
+                <input type="tel" id="mobile" placeholder="Enter 10 Digits" maxlength="10" autofocus>
+                <button id="btnVerifyClient" class="btn btn-search" onclick="processClientAccountSearch()" style="display:flex; align-items:center; gap:8px;">
+                    <span>SEARCH</span>
+                    <div id="searchSpinner" class="loading-ring"></div>
+                </button>
+            </div>
             
-            <div id="terminalTagsWrapper" style="margin-top:8px;"></div>
-            
-            <div id="step2" style="display:none; margin-top:20px; background: #fff9db; padding:20px; border-radius:8px; border:1px solid #fde047;">
-                <span style="font-size:0.8rem; font-weight:700; color:#854d0e; display:block; margin-bottom:10px;">⚠️ Unmapped Account Verification Required</span>
-                <label style="margin-top:0;">Customer Name</label><input type="text" id="custName" placeholder="Full Client Identity">
-                <label>Registered Address</label><input type="text" id="custAddress" placeholder="Physical location sector">
-                <div style="font-size:0.7rem; color:#64748b; margin-top:8px;">*Defaults assigned account mapping parameter silently to 'Regular' status tier.</div>
-                <button class="btn btn-success" onclick="commitCustomerProfileRegistration()">SAVE PROFILE & PROCEED</button>
+            <div id="verifiedProfileContainer" style="display:none; margin-top:16px; padding:16px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
+                <span style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; display:block;">Verified Account Owner</span>
+                <div style="font-size:1.15rem; font-weight:700; color:var(--primary); margin-top:2px;" id="dispVerifiedName">--</div>
+                <div id="clientClassificationWrapper" style="margin-top:4px;"></div>
+                <button class="btn btn-success" style="padding:10px; margin-top:14px;" onclick="initializeStep3()">CONFIRM OWNER & LINK CHASSIS</button>
+            </div>
+
+            <div id="unmappedProfileSetup" style="display:none; margin-top:20px; background: #fff9db; padding:20px; border-radius:8px; border:1px solid #fde047;">
+                <span style="font-size:0.85rem; font-weight:700; color:#854d0e; display:block; margin-bottom:12px;">⚠️ Client Record Missing: Setup Profile Required</span>
+                <div class="inputs-grid">
+                    <div class="field-group"><label style="margin-top:0;">Customer Name</label><input type="text" id="intakeName" placeholder="Full Client Identity"></div>
+                    <div class="field-group"><label style="margin-top:0;">Registered Address</label><input type="text" id="intakeAddress" placeholder="Physical location specifics"></div>
+                </div>
+                <div style="font-size:0.7rem; color:#64748b; margin-top:10px;">*Account category assigns automatically to 'Regular' target access boundaries.</div>
+                <button id="btnSaveNewClient" class="btn btn-success" onclick="commitCustomerProfileRegistration()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span>SAVE PROFILE & PROCEED</span>
+                    <div id="saveClientSpinner" class="loading-ring"></div>
+                </button>
             </div>
         </div>
 
         <div id="step3" class="step-box">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label style="margin:0;">2. Select Vehicle Chassis</label>
-                <span id="activeNameDisplay" style="font-size:0.85rem; font-weight:700; color:var(--primary);"></span>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:16px;">
+                <span style="font-size:1.05rem; font-weight:700; color:var(--primary);">2. Link Vehicle Chassis</span>
+                <span id="headerClientMeta" style="font-size:0.85rem; font-weight:700; color:var(--info);"></span>
             </div>
+            
+            <label style="margin-top:0;">Select Fleet Component</label>
             <div id="vehicleGrid" class="veh-grid"></div>
-            <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ ADD NEW VEHICLE CHASSIS</button>
+            <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ REGISTER NEW VEHICLE CHASSIS</button>
             
             <div id="newVehicleForm" style="display:none; margin-top:16px; background:#f8fafc; padding:20px; border-radius:8px; border:1px solid var(--border);">
-                <label style="margin-top:0;">Manufacturer Brand</label><input type="text" id="vBrand" placeholder="e.g. HONDA" oninput="this.value=this.value.toUpperCase()">
-                <label>Model Classification</label><input type="text" id="vName" placeholder="e.g. ACTIVA 6G">
-                <label>Registration Plate</label><input type="text" id="vNumber" placeholder="e.g. MP-04-XX-0000" oninput="this.value=this.value.toUpperCase()">
-                <button class="btn btn-success" onclick="executeVehicleLink()">LINK CHASSIS & PROCEED</button>
+                <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Register Component Specifications</span>
+                <div class="inputs-grid">
+                    <div class="field-group"><label style="margin-top:0;">Brand</label><input type="text" id="vBrand" placeholder="e.g. HONDA" oninput="this.value=this.value.toUpperCase()"></div>
+                    <div class="field-group"><label style="margin-top:0;">Model Scope</label><input type="text" id="vName" placeholder="e.g. ACTIVA 6G"></div>
+                </div>
+                <label>Registration Number</label>
+                <input type="text" id="vNumber" placeholder="e.g. MP-04-XX-0000" oninput="this.value=this.value.toUpperCase()">
+                <button id="btnCommitChassis" class="btn btn-success" onclick="executeVehicleLink()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span>LINK & PROCEED</span>
+                    <div id="linkChassisSpinner" class="loading-ring"></div>
+                </button>
             </div>
         </div>
 
@@ -85,132 +144,207 @@
             <div id="activeTargetBadge" class="status-badge">--</div>
             <div id="activeWarrantyAlert" class="warranty-alert">⚠️ CONDITIONAL ENGINE OVERHAUL WARRANTY ACTIVE ON TARGET CHASSIS</div>
             
-            <label>Stated Mechanical Faults / Directives</label>
-            <textarea id="complaint" rows="3" placeholder="Document requested work operations cleanly"></textarea>
+            <div class="block-title">Operational Directive Parameters</div>
+            <label style="margin-top:0;">Stated Repair Complaints / Scope</label>
+            <textarea id="complaint" rows="3" placeholder="Outline active client intake statements explicitly"></textarea>
             
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
-                <div><label>Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
-                <div><label>Upfront Advance Deposit (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
+            <div class="inputs-grid" style="margin-top:12px;">
+                <div class="field-group"><label style="margin-top:0;">Authorized Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
+                <div class="field-group"><label style="margin-top:0;">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
 
             <div style="margin-top:16px; padding:14px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
-                <label style="margin-top:0; color:var(--primary);">Operational Category Scope</label>
+                <label style="margin-top:0; color:var(--primary);">Coverage Extension Trigger</label>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
                     <input type="checkbox" id="isEngineOverhaul" style="width:auto; margin:0;">
                     <span style="font-size:0.85rem; font-weight:700; color:#334155;">Flag as Full Engine Overhaul (Instantiates Conditional Coverage Tracking)</span>
                 </div>
             </div>
 
-            <label style="margin-top:16px;">Assign Mechanical Technician</label>
+            <div class="block-title" style="margin-top:24px;">Direct Spares & Consumables Allocation</div>
+            <div id="dynamicRowsContainer">
+                <div class="inline-item-row" data-index="0">
+                    <div style="position:relative;">
+                        <input type="text" placeholder="Part Spec" class="i-name" oninput="queryCatalogAutocomplete(this, 0)" onblur="hideAutocomplete(0)">
+                        <div id="autolist-0" class="autocomplete-container"></div>
+                    </div>
+                    <input type="text" placeholder="Brand" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(0)">
+                    <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty">
+                    <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate">
+                    <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %">
+                    <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>
+                </div>
+            </div>
+            <button class="btn-add-line" onclick="pushRuntimeStackRow()">+</button>
+
+            <label style="margin-top:16px;">Assign Workshop Technician</label>
             <select id="mechSelect" style="margin-top:4px;"></select>
-            <button class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">OPEN JOB CARD</button>
+            
+            <button id="btnCommitFinalJob" class="btn btn-success" style="margin-top:24px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="finalizeJobCardCreation()">
+                <span>COMMIT JOB CARD & DISPATCH</span>
+                <div id="commitJobSpinner" class="loading-ring"></div>
+            </button>
         </div>
     </div>
 </div>
 
 <script>
+    // Core Engine Cloud Connectivity Layer
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let activePhone = null, activeVehId = null, targetVehObj = null;
+    let evaluatedPhoneContext = null;
+    let targetCustomerProfile = null;
+    let activeVehId = null;
+    let globalCatalogCache = [];
+    let rowSequenceIndex = 1;
 
     function enforceTitleCaseNomenclature(str) {
         if(!str) return '';
         return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     }
 
-    // --- POS RULE RECONCILIATION: AUTOMATED SEARCH TRIGGER LOOP ---
-    async function processAutonomousPhoneSearch(phoneStringVal) {
-        const cleanStr = phoneStringVal.trim();
-        if(cleanStr.length !== 10) {
-            document.getElementById('step2').style.display = 'none';
-            document.getElementById('terminalTagsWrapper').innerHTML = '';
-            return;
-        }
+    function toggleLoaderSpinner(buttonId, spinnerId, isExecuting) {
+        const btn = document.getElementById(buttonId);
+        const spin = document.getElementById(spinnerId);
+        if(!btn || !spin) return;
+        btn.disabled = isExecuting;
+        spin.style.display = isExecuting ? 'inline-block' : 'none';
+        btn.style.opacity = isExecuting ? '0.7' : '1';
+    }
+
+    // --- POINT 1 IMPLEMENTATION: ACCOUNT SEARCH ENGINE ---
+    async function processClientAccountSearch() {
+        const inputStr = document.getElementById('mobile').value.trim();
+        if(inputStr.length !== 10) return alert("System Verification: Provide explicit 10-digit primary account string key.");
         
-        activePhone = cleanStr;
-        const wrapper = document.getElementById('terminalTagsWrapper'); wrapper.innerHTML = '';
+        evaluatedPhoneContext = inputStr;
+        toggleLoaderSpinner('btnVerifyClient', 'searchSpinner', true);
+        
+        // Hide existing elements safely to clear stale states
+        document.getElementById('verifiedProfileContainer').style.display = 'none';
+        document.getElementById('unmappedProfileSetup').style.display = 'none';
+        document.getElementById('clientClassificationWrapper').innerHTML = '';
+        targetCustomerProfile = null;
 
-        // Query profile ledgers mirroring POS rules parameters
-        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', activePhone).single();
-        const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', activePhone).limit(1);
-        const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', activePhone).limit(1);
+        try {
+            // Execute non-blocking parallel queries targeting operational registries
+            const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
+            const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
+            const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
 
-        const hasJc = jcList && jcList.length > 0;
-        const hasPos = posList && posList.length > 0;
+            const hasJcHistory = jcList && jcList.length > 0;
+            const hasPosHistory = posList && posList.length > 0;
 
-        if(cData) {
-            document.getElementById('activeNameDisplay').innerText = `Client: ${cData.name}`;
-            
-            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">Customer for both</span>';
-            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Already a workshop customer</span>';
-            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">Already a customer</span>';
+            if(cData) {
+                targetCustomerProfile = cData;
+                document.getElementById('dispVerifiedName').innerText = cData.name || 'Unnamed Client';
+                
+                // Point 1 output tag compilation matrix logic
+                const wrapper = document.getElementById('clientClassificationWrapper');
+                if(hasJcHistory && hasPosHistory) wrapper.innerHTML = '<span class="c-tag tag-reg">(c) Regular Customer</span>';
+                else if(hasJcHistory) wrapper.innerHTML = '<span class="c-tag tag-work">(b) Already a workshop Customer</span>';
+                else if(hasPosHistory) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Already a cash customer</span>';
+                else wrapper.innerHTML = '<span class="c-tag" style="background:#f1f5f9; color:#475569;">Registered Master Index</span>';
 
-            initializeStep3();
-        } else {
-            // Unmapped client target -> open core profile setup array directly
-            document.getElementById('step2').style.display = 'block';
-            document.getElementById('custName').focus();
+                document.getElementById('verifiedProfileContainer').style.display = 'block';
+                prefetchCentralCatalog();
+            } else {
+                // Client missing -> Expose intake parameters capturing Name and Address dynamically
+                document.getElementById('unmappedProfileSetup').style.display = 'block';
+                document.getElementById('intakeName').focus();
+            }
+        } catch(e) {
+            console.error("Search API timeout mapping execution check:", e);
+            alert("Database Network Evaluation Exception. Please test connection structures.");
+        } finally {
+            toggleLoaderSpinner('btnVerifyClient', 'searchSpinner', false);
         }
     }
 
     async function commitCustomerProfileRegistration() {
-        const rawName = document.getElementById('custName').value.trim();
-        const rawAddress = document.getElementById('custAddress').value.trim();
-        if(!rawName) return alert("System Verification: Specify valid target client Identity.");
+        const rawName = document.getElementById('intakeName').value.trim();
+        const rawAddress = document.getElementById('intakeAddress').value.trim();
+        if(!rawName) return alert("System Guard: Specify explicit client identity descriptor.");
 
-        const cleanNameStr = enforceTitleCaseNomenclature(rawName);
+        toggleLoaderSpinner('btnSaveNewClient', 'saveClientSpinner', true);
+        const compiledName = enforceTitleCaseNomenclature(rawName);
 
-        // Safe profile commit applying standard Regular fallback tier natively
-        const { data: c, error } = await supabaseClient.from('customers').insert({
-            mobile_number: activePhone,
-            name: cleanNameStr,
-            address: rawAddress || 'Workshop Floor Intakes',
-            category: 'Regular'
-        }).select().single();
+        try {
+            const { data: cData, error } = await supabaseClient.from('customers').insert({
+                mobile_number: evaluatedPhoneContext,
+                name: compiledName,
+                address: rawAddress || 'Workshop Hub Account',
+                category: 'Regular'
+            }).select().single();
 
-        if(!error && c) {
-            document.getElementById('activeNameDisplay').innerText = `Client: ${cleanNameStr}`;
-            document.getElementById('step2').style.display = 'none';
-            initializeStep3();
-        } else alert(`⚠️ CREATION FAULT:\n${error?.message}`);
+            if(!error && cData) {
+                targetCustomerProfile = cData;
+                document.getElementById('dispVerifiedName').innerText = compiledName;
+                document.getElementById('clientClassificationWrapper').innerHTML = '<span class="c-tag tag-work">Newly Registered Account</span>';
+                
+                document.getElementById('unmappedProfileSetup').style.display = 'none';
+                document.getElementById('verifiedProfileContainer').style.display = 'block';
+                prefetchCentralCatalog();
+                initializeStep3(); // Transition step pipeline seamlessly
+            } else alert(`⚠️ REGISTRATION ABORTED:\n${error?.message}`);
+        } catch(e) {
+            alert("Network connection failure during insertion lifecycle loops.");
+        } finally {
+            toggleLoaderSpinner('btnSaveNewClient', 'saveClientSpinner', false);
+        }
     }
 
     async function initializeStep3() {
+        if(!targetCustomerProfile) return alert("System Flow Blocked: Validate owner identity before linking assets.");
+        
         document.getElementById('step1').classList.remove('active-step');
         document.getElementById('step3').classList.add('active-step');
+        document.getElementById('headerClientMeta').innerText = `Owner: ${targetCustomerProfile.name}`;
         
-        const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', activePhone);
-        const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
+        const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', evaluatedPhoneContext);
+        const grid = document.getElementById('vehicleGrid'); 
+        grid.innerHTML = '';
         
-        fleet?.forEach(v => {
-            const encodedObj = encodeURIComponent(JSON.stringify(v));
-            grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${encodedObj}')"><b>${v.reg_number}</b><small style="display:block; margin-top:2px; color:#64748b;">${v.make_model}</small></div>`;
-        });
+        if(fleet && fleet.length > 0) {
+            fleet.forEach(v => {
+                const encodedContext = encodeURIComponent(JSON.stringify(v));
+                grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${encodedContext}')"><b>${v.reg_number}</b><small>${v.make_model}</small></div>`;
+            });
+        } else {
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:16px; font-size:0.85rem; color:#888;">No attached chassis assets extracted. Please register new unit.</div>';
+            toggleNewVehicleForm();
+        }
     }
 
     function toggleNewVehicleForm() { document.getElementById('newVehicleForm').style.display = 'block'; }
 
     async function executeVehicleLink() {
-        let reg = document.getElementById('vNumber').value.trim() || "ACC-" + Math.floor(Math.random()*900000);
+        const regPlate = document.getElementById('vNumber').value.trim() || "ACC-" + Math.floor(Math.random()*900000);
         const makeMod = document.getElementById('vName').value.trim() || 'Generic Asset';
-        const brand = document.getElementById('vBrand').value.trim() || 'OEM';
+        const vBrand = document.getElementById('vBrand').value.trim() || 'OEM';
 
-        const { data: v, error } = await supabaseClient.from('vehicles').insert({
-            customer_mobile: activePhone, brand: brand, make_model: makeMod, reg_number: reg
-        }).select().single();
+        toggleLoaderSpinner('btnCommitChassis', 'linkChassisSpinner', true);
 
-        if(error) return alert("Vehicle Ingestion Abort:\n" + error.message);
-        
-        const encodedObj = encodeURIComponent(JSON.stringify(v));
-        stageTargetVehicle(v.id, v.reg_number, v.make_model, encodedObj);
+        try {
+            const { data: v, error } = await supabaseClient.from('vehicles').insert({
+                customer_mobile: evaluatedPhoneContext, brand: vBrand, make_model: makeMod, reg_number: regPlate
+            }).select().single();
+
+            if(!error && v) {
+                const encodedContext = encodeURIComponent(JSON.stringify(v));
+                stageTargetVehicle(v.id, v.reg_number, v.make_model, encodedContext);
+            } else alert("Chassis Insertion Exception:\n" + error?.message);
+        } catch(e) {
+            alert("Database processing fault during vehicle linkage execution.");
+        } finally {
+            toggleLoaderSpinner('btnCommitChassis', 'linkChassisSpinner', false);
+        }
     }
 
     async function stageTargetVehicle(id, reg, model, encodedContextData) {
         activeVehId = id;
-        targetVehObj = JSON.stringify(decodeURIComponent(encodedContextData));
-        
         document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
         document.getElementById('step3').classList.remove('active-step');
         document.getElementById('step4').classList.add('active-step');
@@ -234,31 +368,183 @@
 
         const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
         const sel = document.getElementById('mechSelect'); 
-        sel.innerHTML = '<option value="">-- Direct Tech Allocation --</option>';
+        sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
         m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
     }
 
+    // --- POINTS 2 & 3 IMPLEMENTATION: STACK CONTROLS & AUTOCOMPLETE ARRAYS ---
+    async function prefetchCentralCatalog() {
+        const { data: master } = await supabaseClient.from('product_master').select('*');
+        globalCatalogCache = master || [];
+    }
+
+    function queryCatalogAutocomplete(inputRef, targetIdx) {
+        const searchVal = inputRef.value.trim().toLowerCase();
+        const listContainer = document.getElementById(`autolist-${targetIdx}`);
+        listContainer.innerHTML = '';
+        
+        if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
+
+        const filtered = globalCatalogCache.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 15);
+        
+        if(filtered.length > 0) {
+            filtered.forEach(p => {
+                listContainer.innerHTML += `
+                    <div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx}, '${p.item_name.replace(/'/g,"\\'")}', '${p.brand.replace(/'/g,"\\'")}', ${p.default_price || 0})">
+                        <span><strong>${p.item_name}</strong></span>
+                        <span style="color:#888; font-size:0.75rem;">${p.brand} | ₹${p.default_price || 0}</span>
+                    </div>`;
+            });
+            listContainer.style.display = 'block';
+        } else listContainer.style.display = 'none';
+    }
+
+    function hideAutocomplete(targetIdx) {
+        setTimeout(() => {
+            const list = document.getElementById(`autolist-${targetIdx}`);
+            if(list) list.style.display = 'none';
+        }, 200);
+    }
+
+    function applySelectedCatalogItem(targetIdx, nameStr, brandStr, defaultRate) {
+        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`);
+        if(!rowNode) return;
+        
+        rowNode.querySelector('.i-name').value = nameStr;
+        rowNode.querySelector('.i-brand').value = brandStr;
+        rowNode.querySelector('.i-rate').value = defaultRate;
+        
+        document.getElementById(`autolist-${targetIdx}`).style.display = 'none';
+        evaluateRuleDiscounts(targetIdx);
+    }
+
+    async function evaluateRuleDiscounts(targetIdx) {
+        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`);
+        if(!rowNode || !targetCustomerProfile) return;
+        
+        const brandCode = rowNode.querySelector('.i-brand').value.trim().toUpperCase();
+        if(!brandCode) return;
+
+        const customOverrides = targetCustomerProfile.custom_brand_discounts || {};
+        if(customOverrides[brandCode] !== undefined) {
+            rowNode.querySelector('.i-disc').value = customOverrides[brandCode];
+            return;
+        }
+
+        const { data: bMaster } = await supabaseClient.from('brand_master').select('*').eq('brand_name', brandCode).single();
+        if(bMaster) {
+            const catTarget = targetCustomerProfile.category ? `disc_${targetCustomerProfile.category.toLowerCase()}` : 'disc_regular';
+            rowNode.querySelector('.i-disc').value = parseFloat(bMaster[catTarget]) || 0;
+        }
+    }
+
+    // Point 3 addition triggers compact array entries instantly
+    function pushRuntimeStackRow() {
+        const stack = document.getElementById('dynamicRowsContainer'); 
+        const node = document.createElement('div'); 
+        node.className = 'inline-item-row';
+        node.setAttribute('data-index', rowSequenceIndex);
+        
+        node.innerHTML = `
+            <div style="position:relative;">
+                <input type="text" placeholder="Part Spec" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})">
+                <div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div>
+            </div>
+            <input type="text" placeholder="Brand" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
+            <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty">
+            <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate">
+            <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %">
+            <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
+            
+        stack.appendChild(node);
+        rowSequenceIndex++;
+    }
+
+    // Point 3 explicit removal check implementing interactive confirmation guards
+    function dropActiveInlineRow(btnTrigger) {
+        if(confirm("Confirm destructive drop of uncommitted component row?")) {
+            btnTrigger.parentElement.remove();
+        }
+    }
+
+    // --- Point 2 & Final Commitment Strategy: Auto Storing Allocated Directives ---
     async function finalizeJobCardCreation() {
         const isOverhaulFlagged = document.getElementById('isEngineOverhaul').checked;
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'service';
         
-        const { data: newJc, error } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: activePhone, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
-            problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
-            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
-        }).select().single();
+        toggleLoaderSpinner('btnCommitFinalJob', 'commitJobSpinner', true);
+        
+        try {
+            // Stage initial Job Card record mapping core authorization payload
+            const { data: newJc, error: jcError } = await supabaseClient.from('job_cards').insert({
+                customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
+                problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
+                advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
+            }).select().single();
 
-        if(error) return alert("System Commitment Error:\n" + error.message);
+            if(jcError) return alert("System Job Initialization Abort:\n" + jcError.message);
 
-        if(newJc && isOverhaulFlagged) {
-            await supabaseClient.from('vehicles').update({
-                last_overhaul_date: new Date().toISOString().split('T')[0],
-                warranty_active: true
-            }).eq('id', activeVehId);
+            if(newJc) {
+                // Overhaul specific chassis updates triggers conditional coverage maps
+                if(isOverhaulFlagged) {
+                    await supabaseClient.from('vehicles').update({
+                        last_overhaul_date: new Date().toISOString().split('T')[0],
+                        warranty_active: true
+                    }).eq('id', activeVehId);
+                }
+
+                // Point 2 implementation: Silently write runtime lines directly into target storage arrays
+                const lineWrites = [];
+                let computedSparesSubtotal = 0;
+                const rowNodes = document.querySelectorAll('.inline-item-row');
+
+                for(let i=0; i<rowNodes.length; i++) {
+                    const row = rowNodes[i];
+                    const pName = row.querySelector('.i-name').value.trim();
+                    const pBrand = row.querySelector('.i-brand').value.trim() || 'STANDARD';
+                    const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1;
+                    const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0;
+                    const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
+
+                    if(pName) {
+                        const cleanName = enforceTitleCaseNomenclature(pName);
+                        const cleanBrand = pBrand.toUpperCase();
+                        const lineGross = qScalar * rScalar;
+                        const netLineCost = lineGross - (lineGross * (dPercentage / 100));
+                        computedSparesSubtotal += netLineCost;
+
+                        // Non-blocking catalog index updates decoupled directly
+                        supabaseClient.from('product_master').upsert({
+                            item_name: cleanName, brand: cleanBrand, warehouse_type: 'Service', default_price: rScalar
+                        }).then().catch(e => console.warn("Catalog ingest override skip:", e));
+
+                        const pushCall = supabaseClient.from('job_card_items').insert({
+                            job_card_id: newJc.id,
+                            warehouse_type: 'Service',
+                            item_name: `${cleanName} (${cleanBrand})`,
+                            qty: qScalar,
+                            unit_price: rScalar,
+                            total_price: netLineCost
+                        });
+                        lineWrites.push(pushCall);
+                    }
+                }
+
+                // Await background line array updates safely ensuring clean data integration loops
+                if(lineWrites.length > 0) {
+                    await Promise.all(lineWrites);
+                    // Commit precalculated spares sum upward into primary invoice registers
+                    await supabaseClient.from('job_cards').update({ total_invoice_value: computedSparesSubtotal }).eq('id', newJc.id);
+                }
+
+                alert("Job Card closed successfully. All allocated items securely routed.");
+                window.location.href = 'index.html';
+            }
+        } catch(e) {
+            alert("Execution network disconnect during transaction compilation cycles.");
+        } finally {
+            toggleLoaderSpinner('btnCommitFinalJob', 'commitJobSpinner', false);
         }
-
-        alert("Job Card initialized securely. Pipeline workflows staging successfully.");
-        window.location.href = 'index.html';
     }
 </script>
 </body>
