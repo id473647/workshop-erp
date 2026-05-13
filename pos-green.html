@@ -6,190 +6,551 @@
     <title>Retail Cash POS - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --success: #27ae60; --primary: #2c3e50; --light: #f4f7f6; --border: #e2e8f0; }
-        body { font-family: system-ui, sans-serif; background: var(--light); padding: 24px; margin: 0; box-sizing: border-box; color: #1e293b; }
-        .nav-banner { background: white; padding: 12px 20px; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .nav-banner a { font-weight: 700; color: var(--success); text-decoration: none; font-size: 0.85rem; }
+        :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        .pos-panel { max-width: 850px; margin: 0 auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        /* Universal Formatting Rules #1 and #2: Bound header layout with centered Home target */
+        .sticky-nav { 
+            max-width: 950px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 12px 20px; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-sizing: border-box; 
+        }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        
+        /* Layout Card Architecture */
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         
-        .input-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-        .field-group { display: flex; flex-direction: column; gap: 6px; }
-        label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
         
-        .customer-classification-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
+        /* Interactive Step Flows */
+        .step-section { display: none; }
+        .active-step { display: block; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Dynamic Tags & Alerts */
+        .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
         .tag-cash { background: #fef3c7; color: #b45309; }
         .tag-work { background: #e0f2fe; color: #0369a1; }
         .tag-reg { background: #dcfce7; color: #15803d; }
+        .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 8px; display: none; }
 
-        /* Inline Item Entry Architecture */
-        .line-item-matrix { display: grid; grid-template-columns: 2fr 1.2fr 0.6fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 12px; }
-        .inline-add-btn { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
-        .inline-drop-btn { color: #ef4444; background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
+        /* Table Rendering Setup */
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .clickable-ref { color: var(--primary); font-weight: 700; text-decoration: underline; cursor: pointer; }
+        
+        /* Inline Inventory Modifiers */
+        .inline-item-row { display: grid; grid-template-columns: 2fr 1.2fr 0.8fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .inline-num { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 700; color: var(--primary); text-align: center; box-sizing: border-box; }
+        .btn-add-line { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .btn-del-line { color: #ef4444; background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
 
-        .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin-top: 24px; }
-        .commit-trigger { width: 100%; padding: 14px; background: #16a34a; color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 16px; }
-        .ledger-anchor { display: block; text-align: center; margin-top: 16px; font-size: 0.8rem; font-weight: 700; color: var(--primary); text-decoration: underline; }
+        /* Action Settlement Buttons Matrix */
+        .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
+        .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; }
+        .btn-cash { background: #16a34a; }
+        .btn-upi { background: #2563eb; }
+        .btn-credit { background: #d97706; }
+        .btn-save { background: #475569; }
+
+        /* Scoped Invoice Details Overlay */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 600px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        .modal-action-bar { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-print { background: var(--primary); flex: 1; padding: 12px; border: none; border-radius: 6px; color: white; font-weight: 700; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="nav-banner">
-    <a href="index.html">← LEAVE RETAIL COUNTER</a>
-    <span style="font-weight:700; color:var(--primary); font-size:0.85rem;">GREEN DIRECT SALES CONSOLE</span>
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">RETAIL POS ENGINE</span>
+</nav>
+
+<div class="wrapper">
+    <div id="flowHub" class="card-panel active-step">
+        <div class="block-title">Customer Contact Verification</div>
+        <div class="inputs-grid">
+            <div class="field-group">
+                <label>Primary Mobile Number</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="tel" id="terminalMobile" placeholder="10 Digits" maxlength="10" autofocus style="flex:1;">
+                    <button onclick="evaluateAccountFlow()" style="background:var(--primary); color:white; border:none; padding:0 16px; border-radius:6px; font-weight:700; cursor:pointer;">VERIFY</button>
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Mapped Profile Target</label>
+                <input type="text" id="terminalName" placeholder="Awaiting Input Evaluation..." readonly style="background:#f1f5f9;">
+                <div id="terminalTagsWrapper"></div>
+            </div>
+        </div>
+        <div id="creditAlertBox" class="credit-alert">⚠️ WARNING: ACTIVE UNSETTLED DEBT HISTORY DETECTED ON ACCOUNT</div>
+
+        <div id="recentSalesBlock" style="display:none; margin-top:16px;">
+            <div class="block-title" style="font-size:0.85rem; color:#64748b;">Recent Mapped Encounters</div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Invoice Hash</th><th>Compile Date</th><th>Amount</th><th>Method</th></tr></thead>
+                    <tbody id="recentSalesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div style="margin-top:32px;">
+            <div class="block-title">
+                <span>Historical Terminal Register</span>
+                <button onclick="toggleFilterScope()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer;">⚙️ FILTER</button>
+            </div>
+            
+            <div id="filterScopeBox" class="inputs-grid" style="display:none; background:#f8fafc; padding:12px; border-radius:6px; border:1px solid var(--border);">
+                <div class="field-group"><label>Start Boundary</label><input type="date" id="fStart"></div>
+                <div class="field-group"><label>End Boundary</label><input type="date" id="fEnd"></div>
+                <div class="field-group"><label>Min Net (₹)</label><input type="number" id="fMinVal" placeholder="0"></div>
+                <button onclick="loadTerminalRegister()" style="background:var(--success); color:white; border:none; padding:10px; border-radius:6px; font-weight:700; cursor:pointer; align-self:end;">APPLY</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Invoice Hash</th><th>Mobile Index</th><th>Valuation</th><th>Status</th></tr></thead>
+                    <tbody id="masterRegisterBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="profileSetupFlow" class="card-panel step-section" style="border-left:5px solid var(--warning);">
+        <div class="block-title" style="color:var(--warning);">Profile Setup Interlock Required</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Target Account Name</label><input type="text" id="newAccName" placeholder="Full Registered Identity"></div>
+            <div class="field-group"><label>Geographical Vector</label><input type="text" id="newAccAddr" placeholder="Physical location parameters"></div>
+        </div>
+        <button onclick="commitAccountProfile()" style="background:var(--warning); color:white; border:none; padding:12px 24px; border-radius:6px; font-weight:700; cursor:pointer;">CONFIRM MAPPING & DISPATCH SALE</button>
+    </div>
+
+    <div id="transactionInvoicerFlow" class="card-panel step-section">
+        <div class="block-title">Direct Operational Stack Compilation</div>
+        <div id="dynamicRowsContainer">
+            <div class="inline-item-row">
+                <input type="text" placeholder="Component Context" class="i-name">
+                <input type="text" placeholder="Brand" class="i-brand" value="Standard">
+                <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+                <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+                <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+                <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>
+            </div>
+        </div>
+        <button class="btn-add-line" onclick="pushRuntimeStackRow()">+</button>
+
+        <div class="block-title" style="margin-top:16px;">Concession Adjusters</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Flat Global Deduction (₹)</label><input type="number" id="globalDeductionRupees" value="0" min="0" oninput="compileDynamicInvoicerSums()"></div>
+        </div>
+
+        <div class="valuation-banner">NET PAYABLE: ₹<span id="posActiveAggregate">0</span></div>
+
+        <div class="block-title" style="font-size:0.85rem; color:#64748b; margin-bottom:8px;">Settlement Routings</div>
+        <div class="settle-matrix">
+            <button class="btn-action btn-cash" onclick="commitInvoiceExecution('Cash', 'Closed')">CASH SETTLEMENT</button>
+            <button class="btn-action btn-upi" onclick="commitInvoiceExecution('UPI', 'Closed')">UPI / CARD TRANSFER</button>
+            <button class="btn-action btn-credit" onclick="commitInvoiceExecution('Credit', 'Closed')">CREDIT EXTENSION</button>
+            <button class="btn-action btn-save" onclick="commitInvoiceExecution('Pending', 'Open')">HOLD ACTIVE DRAFT</button>
+        </div>
+    </div>
 </div>
 
-<div class="pos-panel">
-    <div class="block-title"><span>1. Upfront Account Recon Check</span></div>
-    <div class="input-matrix">
-        <div class="field-group">
-            <label>Customer Mobile Entry</label>
-            <input type="tel" id="rMobile" placeholder="Enter 10 Digits" maxlength="10" autofocus onblur="resolveIdentityClassification()">
+<div id="modalInspectInvoice" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
+            <h3 style="margin:0; color:var(--primary);" id="modalInvoiceHashDisplay">Invoice Scope</h3>
+            <button onclick="closeInspectionModal()" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
         </div>
-        <div class="field-group">
-            <label>Profile Identity Binding</label>
-            <input type="text" id="rName" placeholder="Full Account Name">
-            <div id="cClassificationWrapper"></div>
+        
+        <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:16px;">
+            <div><strong>Identity:</strong> <span id="mClientName">--</span></div>
+            <div><strong>Created:</strong> <span id="mCompileDate">--</span></div>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Context Specifics</th><th>Qty</th><th>Rate</th><th>Net Gross</th><th></th></tr></thead>
+                <tbody id="modalLineItemsBody"></tbody>
+            </table>
+        </div>
+
+        <div id="modalRevisionStack" style="margin-top:16px; display:none;">
+            <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:8px;">Append Array Items</div>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="revPart" placeholder="Part Context" style="flex:2;">
+                <input type="number" id="revQty" placeholder="Qty" style="flex:1;">
+                <input type="number" id="revRate" placeholder="Rate" style="flex:1;">
+                <button onclick="commitRuntimeItemRevision()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:700; cursor:pointer;">+</button>
+            </div>
+        </div>
+
+        <div style="text-align:right; font-size:1.2rem; font-weight:700; color:var(--success); margin-top:16px;">
+            Adjusted Ledger Valuation: ₹<span id="modalAggregateDisplay">0</span>
+        </div>
+
+        <div class="modal-action-bar">
+            <button class="btn-print" onclick="executePrintProtocol()">🖨️ PRINT RECORD</button>
+            <button class="btn-print" style="background:#25d366;" onclick="dispatchWhatsAppNotification()">💬 WHATSAPP DISPATCH</button>
+        </div>
+        <div id="revisionLockAlert" style="font-size:0.75rem; color:#ef4444; font-weight:700; text-align:center; margin-top:12px; display:none;">
+            🔒 MODIFICATION PROHIBITED: RECORD HAS PASSED REVISION BOUNDARY
         </div>
     </div>
-
-    <div class="block-title"><span>2. Direct Processing Line Inventory</span></div>
-    <div id="runtimeLinesContainer">
-        <div class="line-item-matrix">
-            <input type="text" placeholder="Product Line Context" class="e-name">
-            <input type="text" placeholder="Brand Code" class="e-brand" value="Standard">
-            <input type="number" placeholder="Qty" class="e-qty" value="1" min="1" oninput="compileDynamicPosSubtotals()">
-            <input type="number" placeholder="Unit Price" class="e-price" value="0" min="0" oninput="compileDynamicPosSubtotals()">
-            <input type="number" placeholder="Item Disc (₹)" class="e-disc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
-            <button class="inline-drop-btn" onclick="destroyPosRow(this)">×</button>
-        </div>
-    </div>
-    
-    <button class="inline-add-btn" onclick="appendInlinePosRow()" title="Append Line Node">+</button>
-
-    <div class="block-title"><span>3. Financial Allocation Protocols</span></div>
-    <div class="input-matrix">
-        <div class="field-group">
-            <label>Dispatch Payment Mode</label>
-            <select id="rMode">
-                <option value="Cash">Cash Currency Over Counter</option>
-                <option value="UPI">UPI Digital Payment Asset</option>
-                <option value="Credit">Credit Ext / Deferred Debt</option>
-            </select>
-        </div>
-        <div class="field-group">
-            <label>Overarching Concession Buffer (₹)</label>
-            <input type="number" id="rGlobalDisc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
-        </div>
-    </div>
-
-    <div class="valuation-banner">NET INVOICE AGGREGATE: ₹<span id="posNetMetric">0</span></div>
-    <button class="commit-trigger" onclick="commitPosTransaction()">PROCESS IMMEDIATE COUNTER INVOICE</button>
-    <a href="ledger.html?scope=credit" class="ledger-anchor">ACCESS CREDITOR EXTENSION LEDGER</a>
 </div>
 
 <script>
+    // Integration Access Driver Hub
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function resolveIdentityClassification() {
-        const targetNumber = document.getElementById('rMobile').value.trim();
-        const wrapper = document.getElementById('cClassificationWrapper');
+    let evaluatedPhoneContext = null;
+    let targetInspectionRecordId = null;
+
+    // --- STEP 1 & 3: FLOW CHART SEARCH EVALUATION ---
+    async function evaluateAccountFlow() {
+        const inputString = document.getElementById('terminalMobile').value.trim();
+        if(inputString.length < 10) return alert("Validation Guard: Enter primary 10-digit account key.");
+        
+        evaluatedPhoneContext = inputString;
+        document.getElementById('creditAlertBox').style.display = 'none';
+
+        // Perform asynchronous multidatabase verification mapping natively
+        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
+        const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
+        const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
+
+        const hasJc = jcList && jcList.length > 0;
+        const hasPos = posList && posList.length > 0;
+
+        const wrapper = document.getElementById('terminalTagsWrapper');
         wrapper.innerHTML = '';
-        if(targetNumber.length < 10) return;
-
-        // Execute parallel operational layer pulls natively
-        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', targetNumber).single();
-        const { data: jcData } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', targetNumber).limit(1);
-        const { data: posData } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', targetNumber).limit(1);
-
-        const hasJc = jcData && jcData.length > 0;
-        const hasPos = posData && posData.length > 0;
 
         if(cData) {
-            document.getElementById('rName').value = cData.name;
-        }
+            // Mapped Customer Present -> Apply Name Context & Classify Scope
+            document.getElementById('terminalName').value = cData.name;
+            
+            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">(iii) Customer for both</span>';
+            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">(ii) Already a workshop customer</span>';
+            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">(i) Already a customer</span>';
 
-        // Output specific verification tags requested in feedback point 4
-        if(hasJc && hasPos) {
-            wrapper.innerHTML = '<span class="customer-classification-tag tag-reg">(c) Regular Customer</span>';
-        } else if(hasJc) {
-            wrapper.innerHTML = '<span class="customer-classification-tag tag-work">(b) Already a workshop Customer</span>';
-        } else if(hasPos) {
-            wrapper.innerHTML = '<span class="customer-classification-tag tag-cash">(a) Already a cash customer</span>';
+            // Query core tracking arrays to satisfy recent history checks natively
+            const { data: recentHistory } = await supabaseClient.from('counter_sales')
+                .select('*').eq('customer_mobile', evaluatedPhoneContext).order('created_at', { ascending: false }).limit(3);
+
+            // Cross Check Open Ledger Contexts for active debtor alerts
+            const { data: creditInstances } = await supabaseClient.from('counter_sales')
+                .select('id').eq('customer_mobile', evaluatedPhoneContext).eq('payment_mode', 'Credit').limit(1);
+            
+            if(creditInstances && creditInstances.length > 0) {
+                document.getElementById('creditAlertBox').style.display = 'block';
+            }
+
+            // Populate recent sales UI view if present
+            if(recentHistory && recentHistory.length > 0) {
+                document.getElementById('recentSalesBlock').style.display = 'block';
+                const tbody = document.getElementById('recentSalesBody');
+                tbody.innerHTML = '';
+                recentHistory.forEach(row => {
+                    const compiledDate = new Date(row.created_at).toLocaleDateString();
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><span class="clickable-ref" onclick="instantiateInspectionScope('${row.id}')">POS-${row.id.split('-')[0].toUpperCase()}</span></td>
+                            <td>${compiledDate}</td>
+                            <td>₹${row.total_amount}</td>
+                            <td><strong>${row.payment_mode || 'Cash'}</strong></td>
+                        </tr>`;
+                });
+            }
+
+            // Immediately clear runtime hub elements and progress state logic downstream
+            transitionFlowPanels('transactionInvoicerFlow');
+        } else {
+            // Unregistered Mobile string -> trigger setup profiles panel execution
+            transitionFlowPanels('profileSetupFlow');
+            document.getElementById('newAccName').focus();
         }
     }
 
-    function appendInlinePosRow() {
-        const stack = document.getElementById('runtimeLinesContainer');
+    function transitionFlowPanels(targetId) {
+        document.querySelectorAll('.card-panel').forEach(p => p.classList.remove('active-step'));
+        document.getElementById(targetId).classList.add('active-step');
+    }
+
+    // --- STEP 3e: COMMIT PROFILE ---
+    async function commitAccountProfile() {
+        const rawName = document.getElementById('newAccName').value.trim();
+        const rawAddress = document.getElementById('newAccAddr').value.trim();
+        if(!rawName) return alert("Account Allocation Error: Provide valid target Identity context.");
+
+        await supabaseClient.from('customers').upsert({ mobile_number: evaluatedPhoneContext, name: rawName, address: rawAddress || 'POS Base Terminal' });
+        document.getElementById('terminalName').value = rawName;
+        
+        transitionFlowPanels('transactionInvoicerFlow');
+    }
+
+    // --- STEP 3f & 3g: INVENTORY COMPILATION EXECUTION ---
+    function pushRuntimeStackRow() {
+        const stack = document.getElementById('dynamicRowsContainer');
         const node = document.createElement('div');
-        node.className = 'line-item-matrix';
+        node.className = 'inline-item-row';
         node.innerHTML = `
-            <input type="text" placeholder="Product Line Context" class="e-name">
-            <input type="text" placeholder="Brand Code" class="e-brand" value="Standard">
-            <input type="number" placeholder="Qty" class="e-qty" value="1" min="1" oninput="compileDynamicPosSubtotals()">
-            <input type="number" placeholder="Unit Price" class="e-price" value="0" min="0" oninput="compileDynamicPosSubtotals()">
-            <input type="number" placeholder="Item Disc (₹)" class="e-disc" value="0" min="0" oninput="compileDynamicPosSubtotals()">
-            <button class="inline-drop-btn" onclick="destroyPosRow(this)">×</button>`;
+            <input type="text" placeholder="Component Context" class="i-name">
+            <input type="text" placeholder="Brand" class="i-brand" value="Standard">
+            <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+            <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
         stack.appendChild(node);
     }
 
-    function destroyPosRow(nodeReference) {
-        if(confirm("Confirm dropping inventory mapping line?")) {
-            nodeReference.parentElement.remove();
-            compileDynamicPosSubtotals();
-        }
+    function dropActiveInlineRow(btnTrigger) {
+        btnTrigger.parentElement.remove();
+        compileDynamicInvoicerSums();
     }
 
-    function compileDynamicPosSubtotals() {
-        let cumulativeGross = 0;
-        document.querySelectorAll('.line-item-matrix').forEach(row => {
-            const q = parseFloat(row.querySelector('.e-qty').value) || 0;
-            const p = parseFloat(row.querySelector('.e-price').value) || 0;
-            const d = parseFloat(row.querySelector('.e-disc').value) || 0;
-            cumulativeGross += ((q * p) - d);
+    function compileDynamicInvoicerSums() {
+        let itemsGrossAggregate = 0;
+        document.querySelectorAll('.inline-item-row').forEach(row => {
+            const q = parseFloat(row.querySelector('.i-qty').value) || 0;
+            const r = parseFloat(row.querySelector('.i-rate').value) || 0;
+            const dPerc = parseFloat(row.querySelector('.i-disc').value) || 0;
+            
+            const rawLineVal = q * r;
+            const finalLineVal = rawLineVal - (rawLineVal * (dPerc / 100));
+            itemsGrossAggregate += finalLineVal;
         });
-        const overarchingDiscount = parseFloat(document.getElementById('rGlobalDisc').value) || 0;
-        document.getElementById('posNetMetric').innerText = Math.round(cumulativeGross - overarchingDiscount);
+
+        const globalDeduction = parseFloat(document.getElementById('globalDeductionRupees').value) || 0;
+        document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
     }
 
-    async function commitPosTransaction() {
-        const mobile = document.getElementById('rMobile').value.trim();
-        const identity = document.getElementById('rName').value.trim();
-        const mode = document.getElementById('rMode').value;
-        const aggregate = document.getElementById('posNetMetric').innerText;
+    // --- STEP 3h & 3i & 3j: FINAL TRANSACTION RECORDING ---
+    async function commitInvoiceExecution(modeTarget, statusTarget) {
+        const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
+        const mappedClientName = document.getElementById('terminalName').value.trim();
 
-        if(!mobile || !identity) return alert("Validation Alert: Provide customer identity mapping details.");
-
-        // Commit profile tracking
-        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: identity });
-
-        const { data: salesInstance, error } = await supabaseClient.from('counter_sales').insert({
-            customer_mobile: mobile,
-            customer_name: identity,
-            total_amount: aggregate,
-            payment_mode: mode
+        // Push baseline primary invoice entry record layers
+        const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
+            customer_mobile: evaluatedPhoneContext,
+            customer_name: mappedClientName,
+            total_amount: finalNetValuation,
+            payment_mode: modeTarget,
+            status: statusTarget,
+            source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'green'
         }).select().single();
 
-        if(!error && salesInstance) {
-            // Auto Store entered product catalogs in backend database mappings asynchronously
-            document.querySelectorAll('.line-item-matrix').forEach(async row => {
-                const part = row.querySelector('.e-name').value.trim();
-                const brand = row.querySelector('.e-brand').value.trim() || 'Standard';
-                if(part) {
-                    await supabaseClient.from('product_master').upsert({ item_name: part, brand: brand, warehouse_type: 'Green' }, { onConflict: 'item_name,brand' });
+        if(error) return alert("System Commitment Error:\n" + error.message);
+
+        // Map line items securely into storage logic loops
+        if(finalRecord) {
+            document.querySelectorAll('.inline-item-row').forEach(async row => {
+                const itemSpec = row.querySelector('.i-name').value.trim();
+                const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
+                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1;
+                const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0;
+                const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
+
+                if(itemSpec) {
+                    const rawLineTotal = qScalar * rScalar;
+                    const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
+                    const identityTagString = `${itemSpec} (${itemBrand})`;
+
+                    // Autonomously map elements into product master references
+                    supabaseClient.from('product_master').upsert({ item_name: itemSpec, brand: itemBrand, warehouse_type: 'Green' }).then();
+
+                    await supabaseClient.from('counter_sale_items').insert({
+                        sale_id: finalRecord.id,
+                        item_name: identityTagString,
+                        qty: qScalar,
+                        unit_price: rScalar,
+                        total_price: finalNetTotal
+                    });
                 }
             });
 
-            alert(`Direct Retail Transaction successfully closed via route: ${mode}`);
+            alert(`Retail POS Task closed successfully via routing: ${modeTarget}`);
             window.location.href = 'index.html';
-        } else {
-            alert("Database Error Context:\n" + error?.message);
         }
     }
+
+    // --- STEP 2: MASTER HISTORICAL TERMINAL LOADER ---
+    function toggleFilterScope() {
+        const el = document.getElementById('filterScopeBox');
+        el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+    }
+
+    async function loadTerminalRegister() {
+        // Implement overarching baseline load parameters explicitly
+        let query = supabaseClient.from('counter_sales').select('*').order('created_at', { ascending: false });
+        
+        const fStart = document.getElementById('fStart').value;
+        const fEnd = document.getElementById('fEnd').value;
+        const fMin = document.getElementById('fMinVal').value;
+
+        if(fStart) query = query.gte('created_at', fStart);
+        if(fEnd) query = query.lte('created_at', fEnd);
+        if(fMin) query = query.gte('total_amount', fMin);
+
+        // Fetch up to 20 sales array items explicitly
+        const { data: fullRegister } = await query.limit(20);
+        const tbody = document.getElementById('masterRegisterBody');
+        tbody.innerHTML = '';
+
+        if(fullRegister && fullRegister.length > 0) {
+            // Apply Step 3j Automated Retention checks runtime arrays
+            const currentEpoch = new Date().getTime();
+            
+            fullRegister.forEach(async inst => {
+                const compileEpoch = new Date(inst.created_at).getTime();
+                const hoursPassed = (currentEpoch - compileEpoch) / (1000 * 60 * 60);
+
+                // Auto drop draft references crossing runtime boundaries
+                if(inst.status === 'Open' && hoursPassed > 36) {
+                    await supabaseClient.from('counter_sales').delete().eq('id', inst.id);
+                    return; // Skip drawing expired drafts
+                }
+
+                const stylePill = inst.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><span class="clickable-ref" onclick="instantiateInspectionScope('${inst.id}')">POS-${inst.id.split('-')[0].toUpperCase()}</span></td>
+                        <td>${inst.customer_mobile || 'Unmapped'}</td>
+                        <td><strong>₹${inst.total_amount}</strong></td>
+                        <td><span style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${inst.status || 'Closed'}</span></td>
+                    </tr>`;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#94a3b8;">Terminal record sets matching target configuration not found.</td></tr>';
+        }
+    }
+
+    // --- STEP 2(III) & 2(IV): INVOICE REVISION CONTROLLERS ---
+    async function instantiateInspectionScope(id) {
+        targetInspectionRecordId = id;
+        const { data: record } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
+        
+        if(record) {
+            document.getElementById('modalInvoiceHashDisplay').innerText = `Invoice reference: POS-${record.id.split('-')[0].toUpperCase()}`;
+            document.getElementById('mClientName').innerText = record.customer_name || record.customer_mobile;
+            document.getElementById('mCompileDate').innerText = new Date(record.created_at).toLocaleString();
+            document.getElementById('modalAggregateDisplay').innerText = record.total_amount;
+
+            // Runtime UI context checks mapping Revision authorization
+            const compiledTimestamp = new Date(record.created_at).getTime();
+            const daysSinceCompile = (new Date().getTime() - compiledTimestamp) / (1000 * 60 * 60 * 24);
+            const isWithinEditWindow = daysSinceCompile <= 7;
+
+            document.getElementById('modalRevisionStack').style.display = isWithinEditWindow ? 'block' : 'none';
+            document.getElementById('revisionLockAlert').style.display = isWithinEditWindow ? 'none' : 'block';
+
+            await refreshInspectionLineItems(isWithinEditWindow);
+            document.getElementById('modalInspectInvoice').style.display = 'flex';
+        }
+    }
+
+    async function refreshInspectionLineItems(isEditable) {
+        const { data: lines } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
+        const tbody = document.getElementById('modalLineItemsBody');
+        tbody.innerHTML = '';
+
+        lines?.forEach(line => {
+            const delTriggerCell = isEditable ? `<button onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:#ef4444; border:none; background:none; font-weight:700; cursor:pointer;">×</button>` : '';
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${line.item_name}</strong></td>
+                    <td>${line.qty}</td>
+                    <td>₹${line.unit_price}</td>
+                    <td><strong>₹${line.total_price}</strong></td>
+                    <td style="text-align:center;">${delTriggerCell}</td>
+                </tr>`;
+        });
+    }
+
+    async function executeLineDeletion(lineId, lineAmount) {
+        if(confirm("Confirm destructive drop of allocated invoicing string? Amount will be fully refunded.")) {
+            // Drop target index
+            await supabaseClient.from('counter_sale_items').delete().eq('id', lineId);
+            
+            // Recalculate runtime variables dynamically
+            const oldNet = parseFloat(document.getElementById('modalAggregateDisplay').innerText) || 0;
+            const adjustedNet = Math.max(0, oldNet - lineAmount);
+            
+            await supabaseClient.from('counter_sales').update({ total_amount: adjustedNet }).eq('id', targetInspectionRecordId);
+            document.getElementById('modalAggregateDisplay').innerText = adjustedNet;
+            
+            refreshInspectionLineItems(true);
+            loadTerminalRegister(); // Refresh background views natively
+        }
+    }
+
+    async function commitRuntimeItemRevision() {
+        const partString = document.getElementById('revPart').value.trim();
+        const qVal = parseFloat(document.getElementById('revQty').value) || 1;
+        const rVal = parseFloat(document.getElementById('revRate').value) || 0;
+        
+        if(!partString) return;
+        const newScalarNet = qVal * rVal;
+
+        await supabaseClient.from('counter_sale_items').insert({
+            sale_id: targetInspectionRecordId,
+            item_name: partString + " (Appended Line)",
+            qty: qVal,
+            unit_price: rVal,
+            total_price: newScalarNet
+        });
+
+        const prevTotal = parseFloat(document.getElementById('modalAggregateDisplay').innerText) || 0;
+        const compiledUpdatedNet = prevTotal + newScalarNet;
+
+        await supabaseClient.from('counter_sales').update({ total_amount: compiledUpdatedNet }).eq('id', targetInspectionRecordId);
+        document.getElementById('modalAggregateDisplay').innerText = compiledUpdatedNet;
+
+        // Reset input interface values natively
+        document.getElementById('revPart').value = '';
+        document.getElementById('revQty').value = '';
+        document.getElementById('revRate').value = '';
+
+        refreshInspectionLineItems(true);
+        loadTerminalRegister();
+    }
+
+    function closeInspectionModal() { document.getElementById('modalInspectInvoice').style.display = 'none'; }
+
+    function executePrintProtocol() {
+        window.print();
+    }
+
+    function dispatchWhatsAppNotification() {
+        const targetAmount = document.getElementById('modalAggregateDisplay').innerText;
+        const messageString = encodeURIComponent(`*My Care Service Invoice*\nTotal Authorized Amount: ₹${targetAmount}\nThank you for choosing our certified Spares & Components distribution networks.`);
+        window.open(`https://api.whatsapp.com/send?text=${messageString}`, '_blank');
+    }
+
+    // Auto trigger initial registers setup natively upon portal view initializations
+    loadTerminalRegister();
 </script>
 </body>
 </html>
