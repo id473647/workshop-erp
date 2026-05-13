@@ -64,7 +64,7 @@
         .receipt-meta { font-size: 0.75rem; margin: 1px 0; }
         .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
         
-        /* Stacked Layout Row Structure: Formats items into robust, wrapless frames */
+        /* Enforces Stacked Layout Rows optimized for 80mm thermal character limitations */
         .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; }
         .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; }
         .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; }
@@ -222,7 +222,7 @@
             </div>
             
             <div class="receipt-meta" style="margin-top:6px; font-size:0.65rem;">
-                *Note: Valuation includes 18% integrated standard native tax arrays.
+                *Note: Valuation includes 18% standard integrated native tax arrays.
             </div>
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
                 Settlement Route: <span id="thMode">--</span>
@@ -359,27 +359,58 @@
         document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
     }
 
+    // --- CRITICAL REPLACEMENT: WRAPPING INSERTIONS IN A STRICT PROMISE.ALL() BARRIER ---
     async function commitInvoiceExecution(modeTarget, statusTarget) {
         const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
+        // Stage primary invoice header write operations
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
             customer_mobile: evaluatedPhoneContext, customer_name: mappedClientName, total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole
         }).select().single();
 
         if(error) return alert("System Commitment Error:\n" + error.message);
+        
         if(finalRecord) {
-            document.querySelectorAll('.inline-item-row').forEach(async row => {
-                const itemSpec = row.querySelector('.i-name').value.trim(); const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
-                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
+            // Collect DOM array items and compile mapping promises securely before executing redirections
+            const itemPromises = [];
+            const rowNodes = document.querySelectorAll('.inline-item-row');
+            
+            for(let i = 0; i < rowNodes.length; i++) {
+                const row = rowNodes[i];
+                const itemSpec = row.querySelector('.i-name').value.trim(); 
+                const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
+                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; 
+                const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; 
+                const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
+                
                 if(itemSpec) {
-                    const rawLineTotal = qScalar * rScalar; const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
+                    const rawLineTotal = qScalar * rScalar; 
+                    const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
+                    
+                    // Asynchronous indexing catalog map calls cleanly decoupled
                     supabaseClient.from('product_master').upsert({ item_name: itemSpec, brand: itemBrand, warehouse_type: 'Green' }).then();
-                    await supabaseClient.from('counter_sale_items').insert({ sale_id: finalRecord.id, item_name: `${itemSpec} (${itemBrand})`, qty: qScalar, unit_price: rScalar, total_price: finalNetTotal });
+                    
+                    // Push network execution string mappings to global completion evaluation array
+                    const promiseWrite = supabaseClient.from('counter_sale_items').insert({ 
+                        sale_id: finalRecord.id, 
+                        item_name: `${itemSpec} (${itemBrand})`, 
+                        qty: qScalar, 
+                        unit_price: rScalar, 
+                        total_price: finalNetTotal 
+                    });
+                    itemPromises.push(promiseWrite);
                 }
-            });
-            alert(`Task closed successfully via routing: ${modeTarget}`); window.location.href = 'index.html';
+            }
+            
+            // Failsafe Interlock: Halt execution flow absolutely until all line item mappings write natively
+            if(itemPromises.length > 0) {
+                await Promise.all(itemPromises);
+            }
+            
+            alert(`Task closed successfully via routing: ${modeTarget}`); 
+            window.location.href = 'index.html';
         }
     }
 
@@ -397,13 +428,12 @@
         });
     }
 
-    // --- SANITIZED POPULATION METHOD HOOKING 3-INCH STACKED ARRAYS ---
+    // --- POPULATING 3-INCH (80mm) THERMAL STACKED LAYOUT ---
     async function instantiateInspectionScope(id) {
         targetInspectionRecordId = id;
         
-        // Execute direct database verification calls cleanly logging potential payload connection exceptions
         const { data: record, error: recError } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
-        if(recError) return alert("Database Data Extraction Fault:\n" + recError.message);
+        if(recError) return alert("Retrieval Check Error:\n" + recError.message);
         
         if(record) {
             inspectedRecordObject = record;
@@ -436,10 +466,10 @@
         }
     }
 
-    // Resolves array splits securely rendering values cleanly into robust double-line blocks
+    // Resolves database arrays injecting mapped rows directly into stacked double-line text blocks
     async function refreshInspectionLineItems(isEditable) {
         const { data: lines, error: lineErr } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
-        if(lineErr) console.error("Line item resolution mapping fault:", lineErr);
+        if(lineErr) console.error("Line fetch failed:", lineErr);
         
         const container = document.getElementById('thStackedItemsContainer'); 
         container.innerHTML = '';
@@ -449,8 +479,8 @@
             lines.forEach(line => {
                 calcGrossSubtotal += parseFloat(line.total_price) || 0;
                 
-                // Extracts explicit context parameters cleanly by securing dynamic string splits
-                let parsedName = line.item_name;
+                // Absolute Failsafe: Extracts core item names cleanly without crashing on trailing string splits
+                let parsedName = line.item_name || 'Unnamed Asset';
                 let parsedBrand = "Standard";
                 if(line.item_name && line.item_name.includes('(')) {
                     const parts = line.item_name.split('(');
@@ -458,7 +488,7 @@
                     parsedBrand = parts[1].replace(')','').trim();
                 }
                 
-                // Character limit enforcement safely formatting layout values to support thermal widths
+                // Protects physical print roll frames via monospaced line constraints
                 const safeNameTruncated = parsedName.length > 24 ? parsedName.substring(0, 22) + '..' : parsedName;
                 const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? 
                     `<span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer; margin-left:6px;">[Drop]</span>` : '';
@@ -476,7 +506,7 @@
                     </div>`;
             });
         } else {
-            container.innerHTML = '<div style="text-align:center; padding:8px; font-size:0.7rem; color:#888;">Allocated component inventories completely missing from database arrays.</div>';
+            container.innerHTML = '<div style="text-align:center; padding:8px; font-size:0.7rem; color:#888;">No product rows extracted for target record.</div>';
         }
         
         document.getElementById('thSub').innerText = `₹${calcGrossSubtotal}`;
@@ -550,7 +580,7 @@
                 const fileInst = new File([blob], `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`, { type: "image/jpeg" });
                 
                 if(navigator.canShare && navigator.canShare({ files: [fileInst] })) {
-                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share logic aborted:", e));
+                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share check skipped:", e));
                 } else {
                     window.open(targetBlobUrl, '_blank');
                     alert("Document rendered to Blob layout cleanly. Please download and upload the resulting receipt preview directly into WhatsApp.");
