@@ -5,29 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retail Cash POS - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* Universal Formatting Rules #1 and #2: Bound header layout with centered Home target */
-        .sticky-nav { 
-            max-width: 950px; 
-            margin: 0 auto; 
-            background: white; 
-            padding: 12px 20px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            box-sizing: border-box; 
-        }
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
         .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        
-        /* Layout Card Architecture */
         .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         
@@ -36,32 +25,25 @@
         label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
         input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
         
-        /* Interactive Step Flows */
         .step-section { display: none; }
-        .active-step { display: block; animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Dynamic Tags & Alerts */
+        .active-step { display: block; }
         .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
         .tag-cash { background: #fef3c7; color: #b45309; }
         .tag-work { background: #e0f2fe; color: #0369a1; }
         .tag-reg { background: #dcfce7; color: #15803d; }
         .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 8px; display: none; }
 
-        /* Table Rendering Setup */
         .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .clickable-ref { color: var(--primary); font-weight: 700; text-decoration: underline; cursor: pointer; }
         
-        /* Inline Inventory Modifiers */
         .inline-item-row { display: grid; grid-template-columns: 2fr 1.2fr 0.8fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
         .inline-num { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 700; color: var(--primary); text-align: center; box-sizing: border-box; }
         .btn-add-line { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
         .btn-del-line { color: #ef4444; background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
 
-        /* Action Settlement Buttons Matrix */
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; }
@@ -70,11 +52,29 @@
         .btn-credit { background: #d97706; }
         .btn-save { background: #475569; }
 
-        /* Scoped Invoice Details Overlay */
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 600px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
-        .modal-action-bar { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-print { background: var(--primary); flex: 1; padding: 12px; border: none; border-radius: 6px; color: white; font-weight: 700; cursor: pointer; }
+        /* Integrated UI layers matching Points A through L constraints natively */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        /* Thermal printing receipt style formatting block */
+        .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 15px; border: 1px solid #ccc; max-width: 400px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.85rem; }
+        .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; }
+        .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .receipt-logo-container img { height: 35px; filter: grayscale(100%); }
+        .receipt-shop-title { font-size: 1.15rem; font-weight: bold; margin: 4px 0; }
+        .receipt-meta { font-size: 0.75rem; margin: 2px 0; }
+        .receipt-divider { border-top: 1px dashed black; margin: 8px 0; }
+        
+        .receipt-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 10px 0; }
+        .receipt-table th { border-bottom: 1px solid black; padding: 4px 0; text-transform: uppercase; font-weight: bold; text-align: left; }
+        .receipt-table td { padding: 4px 0; vertical-align: top; }
+        .receipt-table td.amt-col, .receipt-table th.amt-col { text-align: right; }
+        
+        .receipt-footer { font-size: 0.75rem; text-align: center; margin-top: 15px; border-top: 1px dashed black; padding-top: 10px; }
+        .action-strip-bar { display: flex; gap: 8px; margin-top: auto; }
+        .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
+
+        @media print { body * { visibility: hidden; } #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; padding: 0; border: none; margin: 0; } }
     </style>
 </head>
 <body>
@@ -115,18 +115,7 @@
         </div>
 
         <div style="margin-top:32px;">
-            <div class="block-title">
-                <span>Historical Terminal Register</span>
-                <button onclick="toggleFilterScope()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer;">⚙️ FILTER</button>
-            </div>
-            
-            <div id="filterScopeBox" class="inputs-grid" style="display:none; background:#f8fafc; padding:12px; border-radius:6px; border:1px solid var(--border);">
-                <div class="field-group"><label>Start Boundary</label><input type="date" id="fStart"></div>
-                <div class="field-group"><label>End Boundary</label><input type="date" id="fEnd"></div>
-                <div class="field-group"><label>Min Net (₹)</label><input type="number" id="fMinVal" placeholder="0"></div>
-                <button onclick="loadTerminalRegister()" style="background:var(--success); color:white; border:none; padding:10px; border-radius:6px; font-weight:700; cursor:pointer; align-self:end;">APPLY</button>
-            </div>
-
+            <div class="block-title">Historical Terminal Register</div>
             <div class="table-wrapper">
                 <table>
                     <thead><tr><th>Invoice Hash</th><th>Mobile Index</th><th>Valuation</th><th>Status</th></tr></thead>
@@ -179,117 +168,162 @@
 <div id="modalInspectInvoice" class="overlay-modal">
     <div class="modal-card">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
-            <h3 style="margin:0; color:var(--primary);" id="modalInvoiceHashDisplay">Invoice Scope</h3>
+            <h3 style="margin:0; color:var(--primary);">Thermal Document Core</h3>
             <button onclick="closeInspectionModal()" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
         </div>
         
-        <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:16px;">
-            <div><strong>Identity:</strong> <span id="mClientName">--</span></div>
-            <div><strong>Created:</strong> <span id="mCompileDate">--</span></div>
-        </div>
-
-        <div class="table-wrapper">
-            <table>
-                <thead><tr><th>Context Specifics</th><th>Qty</th><th>Rate</th><th>Net Gross</th><th></th></tr></thead>
-                <tbody id="modalLineItemsBody"></tbody>
+        <div id="renderThermalReceiptTarget" class="receipt-container">
+            <div class="receipt-header">
+                <div class="receipt-logo-container">
+                    <img src="logo-main.jpg" onerror="this.style.display='none'">
+                    <img src="logo-green.png" onerror="this.style.display='none'">
+                </div>
+                <div id="thermalShopName" class="receipt-shop-title">Green Scooter Center</div>
+                <div id="thermalGst" class="receipt-meta">GSTIN: 23BCVPB4126J1ZM</div>
+                <div class="receipt-meta">Gurudwara Road, Ganj Betul</div>
+                <div class="receipt-meta">PH: 9425002214, 8989171751, 9691600001</div>
+                <div class="receipt-meta" style="margin-top:4px; font-weight:bold;">WhatsApp Comp: 07141-230214</div>
+            </div>
+            
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <div>Date: <span id="thDate">--</span></div>
+                <div>Time: <span id="thTime">--</span></div>
+            </div>
+            <div class="receipt-meta" style="margin-top:4px;">
+                Bill Hash: <strong id="thBillNo">--</strong>
+            </div>
+            <div class="receipt-divider"></div>
+            
+            <div class="receipt-meta">
+                Client Contact: <strong id="thClientInfo">--</strong>
+            </div>
+            <div class="receipt-divider"></div>
+            
+            <table class="receipt-table">
+                <thead><tr><th>Description / Brand Context</th><th style="text-align:center;">Qty</th><th class="amt-col">Amt</th></tr></thead>
+                <tbody id="thLineItemsBody"></tbody>
             </table>
-        </div>
-
-        <div id="modalRevisionStack" style="margin-top:16px; display:none;">
-            <div style="font-size:0.8rem; font-weight:700; color:var(--primary); margin-bottom:8px;">Append Array Items</div>
-            <div style="display:flex; gap:6px;">
-                <input type="text" id="revPart" placeholder="Part Context" style="flex:2;">
-                <input type="number" id="revQty" placeholder="Qty" style="flex:1;">
-                <input type="number" id="revRate" placeholder="Rate" style="flex:1;">
-                <button onclick="commitRuntimeItemRevision()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:700; cursor:pointer;">+</button>
+            
+            <div class="receipt-divider"></div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Subtotal Gross:</span><strong id="thSub">₹0</strong>
+            </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Concession Rebate:</span><strong id="thDisc">₹0</strong>
+            </div>
+            <div class="receipt-divider"></div>
+            
+            <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1.05rem; font-weight:bold;">
+                <span>NET TOTAL:</span><span id="thNet">₹0</span>
+            </div>
+            
+            <div class="receipt-meta" style="margin-top:6px; font-style:italic; font-size:0.75rem;">
+                Amount in words:<br><strong id="thWords">--</strong>
+            </div>
+            
+            <div class="receipt-meta" style="margin-top:8px; font-size:0.7rem;">
+                *Note: All items are inclusive of 18% native tax rates transferred to state ledger departments natively.
+            </div>
+            <div class="receipt-meta" style="margin-top:4px; font-weight:bold;">
+                Settlement Strategy: <span id="thMode">--</span>
+            </div>
+            
+            <div class="receipt-footer">
+                Computer Generated Document.<br>No Physical Signature Needed.
             </div>
         </div>
 
-        <div style="text-align:right; font-size:1.2rem; font-weight:700; color:var(--success); margin-top:16px;">
-            Adjusted Ledger Valuation: ₹<span id="modalAggregateDisplay">0</span>
+        <div id="creditModifierInterface" style="display:none; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px;">
+            <div style="font-size:0.8rem; font-weight:bold; color:var(--warning); margin-bottom:8px;">Credit Payment Conversion Loop</div>
+            <div style="display:flex; gap:8px;">
+                <select id="thConvertMode" style="flex:1; padding:8px;"><option value="Cash">Convert to Cash</option><option value="UPI">Convert to UPI</option></select>
+                <button onclick="commitCreditConversion()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer;">SETTLE NOW</button>
+            </div>
         </div>
 
-        <div class="modal-action-bar">
-            <button class="btn-print" onclick="executePrintProtocol()">🖨️ PRINT RECORD</button>
-            <button class="btn-print" style="background:#25d366;" onclick="dispatchWhatsAppNotification()">💬 WHATSAPP DISPATCH</button>
+        <div id="revisionStackBlock" style="margin-bottom:16px; display:none; border-top:1px solid var(--border); padding-top:12px;">
+            <div style="font-size:0.8rem; font-weight:bold; color:var(--primary); margin-bottom:8px;">Append Array Items</div>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="revPart" placeholder="Part Context" style="flex:2; padding:6px;">
+                <input type="number" id="revQty" placeholder="Qty" style="flex:1; padding:6px;">
+                <input type="number" id="revRate" placeholder="Rate" style="flex:1; padding:6px;">
+                <button onclick="commitRuntimeItemRevision()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
+            </div>
         </div>
-        <div id="revisionLockAlert" style="font-size:0.75rem; color:#ef4444; font-weight:700; text-align:center; margin-top:12px; display:none;">
-            🔒 MODIFICATION PROHIBITED: RECORD HAS PASSED REVISION BOUNDARY
+
+        <div class="action-strip-bar">
+            <button id="btnToggleEditStack" class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="toggleRevisionInterface()">✏️ REVISE BILL</button>
+            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="window.print()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WHATSAPP</button>
+        </div>
+        <div id="revisionLockAlert" style="font-size:0.75rem; color:#ef4444; font-weight:bold; text-align:center; margin-top:12px; display:none;">
+            🔒 REVISION PROHIBITED: INVOICE WINDOW PASSED 7-DAY THRESHOLD
         </div>
     </div>
 </div>
 
 <script>
-    // Integration Access Driver Hub
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     let evaluatedPhoneContext = null;
     let targetInspectionRecordId = null;
+    let inspectedRecordObject = null;
 
-    // --- STEP 1 & 3: FLOW CHART SEARCH EVALUATION ---
+    function convertNumberToWords(amount) {
+        const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
+        let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only';
+        function helper(n) {
+            if (n < 20) return words[n];
+            if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
+            if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : '');
+            if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : '');
+            if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : '');
+            return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : '');
+        }
+        return helper(num) + ' Rupees Only';
+    }
+
     async function evaluateAccountFlow() {
         const inputString = document.getElementById('terminalMobile').value.trim();
-        if(inputString.length < 10) return alert("Validation Guard: Enter primary 10-digit account key.");
-        
+        if(inputString.length < 10) return alert("Enter primary 10-digit account key.");
         evaluatedPhoneContext = inputString;
         document.getElementById('creditAlertBox').style.display = 'none';
 
-        // Perform asynchronous multidatabase verification mapping natively
         const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
         const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
         const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
 
         const hasJc = jcList && jcList.length > 0;
         const hasPos = posList && posList.length > 0;
-
-        const wrapper = document.getElementById('terminalTagsWrapper');
-        wrapper.innerHTML = '';
+        const wrapper = document.getElementById('terminalTagsWrapper'); wrapper.innerHTML = '';
 
         if(cData) {
-            // Mapped Customer Present -> Apply Name Context & Classify Scope
             document.getElementById('terminalName').value = cData.name;
-            
-            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">(iii) Customer for both</span>';
-            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">(ii) Already a workshop customer</span>';
-            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">(i) Already a customer</span>';
+            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">Customer for both</span>';
+            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Already a workshop customer</span>';
+            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">Already a customer</span>';
 
-            // Query core tracking arrays to satisfy recent history checks natively
-            const { data: recentHistory } = await supabaseClient.from('counter_sales')
-                .select('*').eq('customer_mobile', evaluatedPhoneContext).order('created_at', { ascending: false }).limit(3);
+            const { data: recentHistory } = await supabaseClient.from('counter_sales').select('*').eq('customer_mobile', evaluatedPhoneContext).order('created_at', { ascending: false }).limit(3);
+            const { data: creditInstances } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).eq('payment_mode', 'Credit').limit(1);
+            if(creditInstances && creditInstances.length > 0) document.getElementById('creditAlertBox').style.display = 'block';
 
-            // Cross Check Open Ledger Contexts for active debtor alerts
-            const { data: creditInstances } = await supabaseClient.from('counter_sales')
-                .select('id').eq('customer_mobile', evaluatedPhoneContext).eq('payment_mode', 'Credit').limit(1);
-            
-            if(creditInstances && creditInstances.length > 0) {
-                document.getElementById('creditAlertBox').style.display = 'block';
-            }
-
-            // Populate recent sales UI view if present
             if(recentHistory && recentHistory.length > 0) {
                 document.getElementById('recentSalesBlock').style.display = 'block';
-                const tbody = document.getElementById('recentSalesBody');
-                tbody.innerHTML = '';
+                const tbody = document.getElementById('recentSalesBody'); tbody.innerHTML = '';
                 recentHistory.forEach(row => {
-                    const compiledDate = new Date(row.created_at).toLocaleDateString();
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><span class="clickable-ref" onclick="instantiateInspectionScope('${row.id}')">POS-${row.id.split('-')[0].toUpperCase()}</span></td>
-                            <td>${compiledDate}</td>
-                            <td>₹${row.total_amount}</td>
-                            <td><strong>${row.payment_mode || 'Cash'}</strong></td>
-                        </tr>`;
+                    tbody.innerHTML += `<tr>
+                        <td><span class="clickable-ref" onclick="instantiateInspectionScope('${row.id}')">POS-${row.id.split('-')[0].toUpperCase()}</span></td>
+                        <td>${new Date(row.created_at).toLocaleDateString()}</td>
+                        <td>₹${row.total_amount}</td>
+                        <td><strong>${row.payment_mode || 'Cash'}</strong></td>
+                    </tr>`;
                 });
             }
-
-            // Immediately clear runtime hub elements and progress state logic downstream
             transitionFlowPanels('transactionInvoicerFlow');
         } else {
-            // Unregistered Mobile string -> trigger setup profiles panel execution
-            transitionFlowPanels('profileSetupFlow');
-            document.getElementById('newAccName').focus();
+            transitionFlowPanels('profileSetupFlow'); document.getElementById('newAccName').focus();
         }
     }
 
@@ -298,37 +332,20 @@
         document.getElementById(targetId).classList.add('active-step');
     }
 
-    // --- STEP 3e: COMMIT PROFILE ---
     async function commitAccountProfile() {
         const rawName = document.getElementById('newAccName').value.trim();
-        const rawAddress = document.getElementById('newAccAddr').value.trim();
-        if(!rawName) return alert("Account Allocation Error: Provide valid target Identity context.");
-
-        await supabaseClient.from('customers').upsert({ mobile_number: evaluatedPhoneContext, name: rawName, address: rawAddress || 'POS Base Terminal' });
-        document.getElementById('terminalName').value = rawName;
-        
-        transitionFlowPanels('transactionInvoicerFlow');
+        if(!rawName) return alert("Provide valid target Identity context.");
+        await supabaseClient.from('customers').upsert({ mobile_number: evaluatedPhoneContext, name: rawName });
+        document.getElementById('terminalName').value = rawName; transitionFlowPanels('transactionInvoicerFlow');
     }
 
-    // --- STEP 3f & 3g: INVENTORY COMPILATION EXECUTION ---
     function pushRuntimeStackRow() {
-        const stack = document.getElementById('dynamicRowsContainer');
-        const node = document.createElement('div');
-        node.className = 'inline-item-row';
-        node.innerHTML = `
-            <input type="text" placeholder="Component Context" class="i-name">
-            <input type="text" placeholder="Brand" class="i-brand" value="Standard">
-            <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
-            <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
-            <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
-            <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
+        const stack = document.getElementById('dynamicRowsContainer'); const node = document.createElement('div'); node.className = 'inline-item-row';
+        node.innerHTML = `<input type="text" placeholder="Component Context" class="i-name"><input type="text" placeholder="Brand" class="i-brand" value="Standard"><input type="number" class="inline-num i-qty" value="1" min="1" oninput="compileDynamicInvoicerSums()"><input type="number" class="inline-num i-rate" value="0" min="0" oninput="compileDynamicInvoicerSums()"><input type="number" class="inline-num i-disc" value="0" min="0" oninput="compileDynamicInvoicerSums()"><button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
         stack.appendChild(node);
     }
 
-    function dropActiveInlineRow(btnTrigger) {
-        btnTrigger.parentElement.remove();
-        compileDynamicInvoicerSums();
-    }
+    function dropActiveInlineRow(btnTrigger) { btnTrigger.parentElement.remove(); compileDynamicInvoicerSums(); }
 
     function compileDynamicInvoicerSums() {
         let itemsGrossAggregate = 0;
@@ -336,135 +353,82 @@
             const q = parseFloat(row.querySelector('.i-qty').value) || 0;
             const r = parseFloat(row.querySelector('.i-rate').value) || 0;
             const dPerc = parseFloat(row.querySelector('.i-disc').value) || 0;
-            
-            const rawLineVal = q * r;
-            const finalLineVal = rawLineVal - (rawLineVal * (dPerc / 100));
-            itemsGrossAggregate += finalLineVal;
+            const rawLineVal = q * r; itemsGrossAggregate += (rawLineVal - (rawLineVal * (dPerc / 100)));
         });
-
         const globalDeduction = parseFloat(document.getElementById('globalDeductionRupees').value) || 0;
         document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
     }
 
-    // --- STEP 3h & 3i & 3j: FINAL TRANSACTION RECORDING ---
     async function commitInvoiceExecution(modeTarget, statusTarget) {
         const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
         const mappedClientName = document.getElementById('terminalName').value.trim();
+        const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
-        // Push baseline primary invoice entry record layers
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
-            customer_mobile: evaluatedPhoneContext,
-            customer_name: mappedClientName,
-            total_amount: finalNetValuation,
-            payment_mode: modeTarget,
-            status: statusTarget,
-            source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'green'
+            customer_mobile: evaluatedPhoneContext, customer_name: mappedClientName, total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole
         }).select().single();
 
         if(error) return alert("System Commitment Error:\n" + error.message);
-
-        // Map line items securely into storage logic loops
         if(finalRecord) {
             document.querySelectorAll('.inline-item-row').forEach(async row => {
-                const itemSpec = row.querySelector('.i-name').value.trim();
-                const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
-                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1;
-                const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0;
-                const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
-
+                const itemSpec = row.querySelector('.i-name').value.trim(); const itemBrand = row.querySelector('.i-brand').value.trim() || 'Standard';
+                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
                 if(itemSpec) {
-                    const rawLineTotal = qScalar * rScalar;
-                    const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
-                    const identityTagString = `${itemSpec} (${itemBrand})`;
-
-                    // Autonomously map elements into product master references
+                    const rawLineTotal = qScalar * rScalar; const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
                     supabaseClient.from('product_master').upsert({ item_name: itemSpec, brand: itemBrand, warehouse_type: 'Green' }).then();
-
-                    await supabaseClient.from('counter_sale_items').insert({
-                        sale_id: finalRecord.id,
-                        item_name: identityTagString,
-                        qty: qScalar,
-                        unit_price: rScalar,
-                        total_price: finalNetTotal
-                    });
+                    await supabaseClient.from('counter_sale_items').insert({ sale_id: finalRecord.id, item_name: `${itemSpec} (${itemBrand})`, qty: qScalar, unit_price: rScalar, total_price: finalNetTotal });
                 }
             });
-
-            alert(`Retail POS Task closed successfully via routing: ${modeTarget}`);
-            window.location.href = 'index.html';
+            alert(`Task closed successfully via routing: ${modeTarget}`); window.location.href = 'index.html';
         }
-    }
-
-    // --- STEP 2: MASTER HISTORICAL TERMINAL LOADER ---
-    function toggleFilterScope() {
-        const el = document.getElementById('filterScopeBox');
-        el.style.display = el.style.display === 'none' ? 'grid' : 'none';
     }
 
     async function loadTerminalRegister() {
-        // Implement overarching baseline load parameters explicitly
-        let query = supabaseClient.from('counter_sales').select('*').order('created_at', { ascending: false });
-        
-        const fStart = document.getElementById('fStart').value;
-        const fEnd = document.getElementById('fEnd').value;
-        const fMin = document.getElementById('fMinVal').value;
-
-        if(fStart) query = query.gte('created_at', fStart);
-        if(fEnd) query = query.lte('created_at', fEnd);
-        if(fMin) query = query.gte('total_amount', fMin);
-
-        // Fetch up to 20 sales array items explicitly
-        const { data: fullRegister } = await query.limit(20);
-        const tbody = document.getElementById('masterRegisterBody');
-        tbody.innerHTML = '';
-
-        if(fullRegister && fullRegister.length > 0) {
-            // Apply Step 3j Automated Retention checks runtime arrays
-            const currentEpoch = new Date().getTime();
-            
-            fullRegister.forEach(async inst => {
-                const compileEpoch = new Date(inst.created_at).getTime();
-                const hoursPassed = (currentEpoch - compileEpoch) / (1000 * 60 * 60);
-
-                // Auto drop draft references crossing runtime boundaries
-                if(inst.status === 'Open' && hoursPassed > 36) {
-                    await supabaseClient.from('counter_sales').delete().eq('id', inst.id);
-                    return; // Skip drawing expired drafts
-                }
-
-                const stylePill = inst.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td><span class="clickable-ref" onclick="instantiateInspectionScope('${inst.id}')">POS-${inst.id.split('-')[0].toUpperCase()}</span></td>
-                        <td>${inst.customer_mobile || 'Unmapped'}</td>
-                        <td><strong>₹${inst.total_amount}</strong></td>
-                        <td><span style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${inst.status || 'Closed'}</span></td>
-                    </tr>`;
-            });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#94a3b8;">Terminal record sets matching target configuration not found.</td></tr>';
-        }
+        const { data: fullRegister } = await supabaseClient.from('counter_sales').select('*').order('created_at', { ascending: false }).limit(20);
+        const tbody = document.getElementById('masterRegisterBody'); tbody.innerHTML = '';
+        fullRegister?.forEach(inst => {
+            const stylePill = inst.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
+            tbody.innerHTML += `<tr>
+                <td><span class="clickable-ref" onclick="instantiateInspectionScope('${inst.id}')">POS-${inst.id.split('-')[0].toUpperCase()}</span></td>
+                <td>${inst.customer_mobile || 'Unmapped'}</td>
+                <td><strong>₹${inst.total_amount}</strong></td>
+                <td><span style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${inst.status || 'Closed'}</span></td>
+            </tr>`;
+        });
     }
 
-    // --- STEP 2(III) & 2(IV): INVOICE REVISION CONTROLLERS ---
+    // --- POINTS A THROUGH L: INITIALIZING THERMAL CORE DOCUMENT ---
     async function instantiateInspectionScope(id) {
         targetInspectionRecordId = id;
         const { data: record } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
-        
         if(record) {
-            document.getElementById('modalInvoiceHashDisplay').innerText = `Invoice reference: POS-${record.id.split('-')[0].toUpperCase()}`;
-            document.getElementById('mClientName').innerText = record.customer_name || record.customer_mobile;
-            document.getElementById('mCompileDate').innerText = new Date(record.created_at).toLocaleString();
-            document.getElementById('modalAggregateDisplay').innerText = record.total_amount;
+            inspectedRecordObject = record;
+            
+            // Map header attributes based on origin meta rules
+            const isWorkshopSource = record.source_role === 'service' || record.source_role === 'moped';
+            document.getElementById('thermalShopName').innerText = isWorkshopSource ? "My Care Service" : "Green Scooter Center";
+            document.getElementById('thermalGst').innerText = isWorkshopSource ? "GSTIN: 23ANAPB4613K1ZJ" : "GSTIN: 23BCVPB4126J1ZM";
+            
+            const compileDateObj = new Date(record.created_at);
+            document.getElementById('thDate').innerText = compileDateObj.toLocaleDateString();
+            document.getElementById('thTime').innerText = compileDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            document.getElementById('thBillNo').innerText = `POS-${record.id.split('-')[0].toUpperCase()}`;
+            document.getElementById('thClientInfo').innerText = `${record.customer_mobile || ''} | ${record.customer_name || 'Walk-in'}`;
+            
+            document.getElementById('thNet').innerText = `₹${record.total_amount}`;
+            document.getElementById('thWords').innerText = convertNumberToWords(record.total_amount);
+            document.getElementById('thMode').innerText = record.payment_mode || 'Cash';
 
-            // Runtime UI context checks mapping Revision authorization
-            const compiledTimestamp = new Date(record.created_at).getTime();
-            const daysSinceCompile = (new Date().getTime() - compiledTimestamp) / (1000 * 60 * 60 * 24);
+            // Point 2 implementation: Unlocking optional payment status actions targeting credit accounts
+            const isCreditAccount = record.payment_mode === 'Credit';
+            document.getElementById('creditModifierInterface').style.display = isCreditAccount ? 'block' : 'none';
+
+            // Revision controls visibility logic evaluation
+            const daysSinceCompile = (new Date().getTime() - compileDateObj.getTime()) / (1000 * 60 * 60 * 24);
             const isWithinEditWindow = daysSinceCompile <= 7;
-
-            document.getElementById('modalRevisionStack').style.display = isWithinEditWindow ? 'block' : 'none';
+            document.getElementById('btnToggleEditStack').style.display = isWithinEditWindow ? 'block' : 'none';
             document.getElementById('revisionLockAlert').style.display = isWithinEditWindow ? 'none' : 'block';
+            document.getElementById('revisionStackBlock').style.display = 'none';
 
             await refreshInspectionLineItems(isWithinEditWindow);
             document.getElementById('modalInspectInvoice').style.display = 'flex';
@@ -473,83 +437,114 @@
 
     async function refreshInspectionLineItems(isEditable) {
         const { data: lines } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
-        const tbody = document.getElementById('modalLineItemsBody');
-        tbody.innerHTML = '';
+        const tbody = document.getElementById('thLineItemsBody'); tbody.innerHTML = '';
+        let calcGrossSubtotal = 0;
 
         lines?.forEach(line => {
-            const delTriggerCell = isEditable ? `<button onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:#ef4444; border:none; background:none; font-weight:700; cursor:pointer;">×</button>` : '';
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${line.item_name}</strong></td>
-                    <td>${line.qty}</td>
-                    <td>₹${line.unit_price}</td>
-                    <td><strong>₹${line.total_price}</strong></td>
-                    <td style="text-align:center;">${delTriggerCell}</td>
-                </tr>`;
+            calcGrossSubtotal += parseFloat(line.total_price);
+            const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? 
+                `<br><span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer;">[Drop Item]</span>` : '';
+            
+            tbody.innerHTML += `<tr>
+                <td><strong>${line.item_name}</strong>${delCell}</td>
+                <td style="text-align:center;">${line.qty}</td>
+                <td class="amt-col">${line.total_price}</td>
+            </tr>`;
         });
+        
+        document.getElementById('thSub').innerText = `₹${calcGrossSubtotal}`;
+        const finalNet = parseFloat(inspectedRecordObject.total_amount) || 0;
+        document.getElementById('thDisc').innerText = `₹${Math.max(0, calcGrossSubtotal - finalNet)}`;
     }
 
-    async function executeLineDeletion(lineId, lineAmount) {
-        if(confirm("Confirm destructive drop of allocated invoicing string? Amount will be fully refunded.")) {
-            // Drop target index
-            await supabaseClient.from('counter_sale_items').delete().eq('id', lineId);
-            
-            // Recalculate runtime variables dynamically
-            const oldNet = parseFloat(document.getElementById('modalAggregateDisplay').innerText) || 0;
-            const adjustedNet = Math.max(0, oldNet - lineAmount);
-            
-            await supabaseClient.from('counter_sales').update({ total_amount: adjustedNet }).eq('id', targetInspectionRecordId);
-            document.getElementById('modalAggregateDisplay').innerText = adjustedNet;
-            
-            refreshInspectionLineItems(true);
-            loadTerminalRegister(); // Refresh background views natively
-        }
+    function toggleRevisionInterface() {
+        const block = document.getElementById('revisionStackBlock');
+        const nextState = block.style.display === 'none' ? 'block' : 'none';
+        block.style.display = nextState;
+        refreshInspectionLineItems(true); // Toggles line deletion visibility indicators dynamically
     }
 
     async function commitRuntimeItemRevision() {
         const partString = document.getElementById('revPart').value.trim();
         const qVal = parseFloat(document.getElementById('revQty').value) || 1;
         const rVal = parseFloat(document.getElementById('revRate').value) || 0;
-        
         if(!partString) return;
+        
         const newScalarNet = qVal * rVal;
+        await supabaseClient.from('counter_sale_items').insert({ sale_id: targetInspectionRecordId, item_name: `${partString} (Appended)`, qty: qVal, unit_price: rVal, total_price: newScalarNet });
 
-        await supabaseClient.from('counter_sale_items').insert({
-            sale_id: targetInspectionRecordId,
-            item_name: partString + " (Appended Line)",
-            qty: qVal,
-            unit_price: rVal,
-            total_price: newScalarNet
-        });
-
-        const prevTotal = parseFloat(document.getElementById('modalAggregateDisplay').innerText) || 0;
+        const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0;
         const compiledUpdatedNet = prevTotal + newScalarNet;
 
         await supabaseClient.from('counter_sales').update({ total_amount: compiledUpdatedNet }).eq('id', targetInspectionRecordId);
-        document.getElementById('modalAggregateDisplay').innerText = compiledUpdatedNet;
+        inspectedRecordObject.total_amount = compiledUpdatedNet;
+        
+        document.getElementById('thNet').innerText = `₹${compiledUpdatedNet}`;
+        document.getElementById('thWords').innerText = convertNumberToWords(compiledUpdatedNet);
+        
+        document.getElementById('revPart').value = ''; document.getElementById('revQty').value = ''; document.getElementById('revRate').value = '';
+        refreshInspectionLineItems(true); loadTerminalRegister();
+    }
 
-        // Reset input interface values natively
-        document.getElementById('revPart').value = '';
-        document.getElementById('revQty').value = '';
-        document.getElementById('revRate').value = '';
+    async function executeLineDeletion(lineId, lineAmount) {
+        if(confirm("Confirm dropping item? Total amount drops proportionally.")) {
+            await supabaseClient.from('counter_sale_items').delete().eq('id', lineId);
+            const oldNet = parseFloat(inspectedRecordObject.total_amount) || 0;
+            const adjustedNet = Math.max(0, oldNet - lineAmount);
+            
+            await supabaseClient.from('counter_sales').update({ total_amount: adjustedNet }).eq('id', targetInspectionRecordId);
+            inspectedRecordObject.total_amount = adjustedNet;
+            
+            document.getElementById('thNet').innerText = `₹${adjustedNet}`;
+            document.getElementById('thWords').innerText = convertNumberToWords(adjustedNet);
+            refreshInspectionLineItems(true); loadTerminalRegister();
+        }
+    }
 
-        refreshInspectionLineItems(true);
+    // --- POINT 2 CONVERSION LOOP FUNCTION ---
+    async function commitCreditConversion() {
+        const nextMode = document.getElementById('thConvertMode').value;
+        await supabaseClient.from('counter_sales').update({ payment_mode: nextMode, status: 'Closed' }).eq('id', targetInspectionRecordId);
+        inspectedRecordObject.payment_mode = nextMode;
+        document.getElementById('thMode').innerText = nextMode;
+        document.getElementById('creditModifierInterface').style.display = 'none';
+        alert(`Record cleanly converted to settlement method: ${nextMode}`);
         loadTerminalRegister();
     }
 
     function closeInspectionModal() { document.getElementById('modalInspectInvoice').style.display = 'none'; }
 
-    function executePrintProtocol() {
-        window.print();
+    // WhatsApp canvas export logic generating high-fidelity document models
+    function dispatchWhatsAppImageReceipt() {
+        const layoutTarget = document.getElementById('renderThermalReceiptTarget');
+        
+        // Temporarily force display overrides ensuring correct canvas scale parsing
+        const origBorder = layoutTarget.style.border;
+        layoutTarget.style.border = 'none';
+        
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            layoutTarget.style.border = origBorder; // Restores view border state
+            
+            canvas.toBlob(blob => {
+                const targetBlobUrl = URL.createObjectURL(blob);
+                const fileInst = new File([blob], `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`, { type: "image/jpeg" });
+                
+                // Construct Web Share array checks if browser configuration permits native execution
+                if(navigator.canShare && navigator.canShare({ files: [fileInst] })) {
+                    navigator.share({
+                        files: [fileInst],
+                        title: 'My Care Document Receipt',
+                        text: 'Attached document details your complete certified invoice items.'
+                    }).catch(e => console.warn("Native file sharing aborted:", e));
+                } else {
+                    // Fallback to opening direct blob URL interface in unsupporting client setups
+                    window.open(targetBlobUrl, '_blank');
+                    alert("System Reminder: Document rendered to Blob layout cleanly. Please download and upload the resulting receipt preview directly into WhatsApp.");
+                }
+            }, 'image/jpeg', 0.95);
+        });
     }
 
-    function dispatchWhatsAppNotification() {
-        const targetAmount = document.getElementById('modalAggregateDisplay').innerText;
-        const messageString = encodeURIComponent(`*My Care Service Invoice*\nTotal Authorized Amount: ₹${targetAmount}\nThank you for choosing our certified Spares & Components distribution networks.`);
-        window.open(`https://api.whatsapp.com/send?text=${messageString}`, '_blank');
-    }
-
-    // Auto trigger initial registers setup natively upon portal view initializations
     loadTerminalRegister();
 </script>
 </body>
