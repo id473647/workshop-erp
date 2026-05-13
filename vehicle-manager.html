@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet Categorization Manager - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --service: #f39c12; --danger: #e74c3c; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--service); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .btn-del { color: var(--danger); background: none; border: none; font-weight: 700; cursor: pointer; font-size: 1.1rem; }
+        
+        .access-block-alert { background: #fee2e2; color: #b91c1c; padding: 20px; border-radius: 8px; border: 1px solid #fca5a5; font-weight: 700; text-align: center; margin-top: 40px; display: none; }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">FLEET MASTER HUB</span>
+</nav>
+
+<div id="unauthorizedBlock" class="wrapper" style="display:none;">
+    <div class="access-block-alert" style="display:block;">
+        🔒 SYSTEM AUTHORIZATION FAULT: RESTRICTED ACCESS BOUNDARY<br><br>
+        <span style="font-size:0.85rem; font-weight:normal;">Your active local session credentials do not contain administrative or service authority. Please authenticate through the primary Gateway verification panel using master credentials.</span>
+    </div>
+</div>
+
+<div id="authorizedConsole" class="wrapper" style="display:none;">
+    <div class="card-panel" style="border-left: 5px solid var(--service);">
+        <div class="block-title">Append Global Master Classification Catalog</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Manufacturer Brand</label><input type="text" id="mBrand" placeholder="e.g. HERO" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Model Variant Spec</label><input type="text" id="mModel" placeholder="e.g. SUPER SPLENDOUR" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group">
+                <label>Assigned Group Category</label>
+                <select id="mCategory">
+                    <option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option>
+                    <option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option>
+                    <option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option>
+                    <option value="(D) Premium New Bikes 115-140CC New">(D) Premium New Bikes 115-140CC New</option>
+                    <option value="(E) Premium Bikes Old 140-180CC">(E) Premium Bikes Old 140-180CC</option>
+                    <option value="(F) Premium Bikes New 140-200CC">(F) Premium Bikes New 140-200CC</option>
+                    <option value="(G) Lifestyle Bikes Old Upto 300CC">(G) Lifestyle Bikes Old Upto 300CC</option>
+                    <option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option>
+                    <option value="(I) Scooterate">(I) Scooterate</option>
+                    <option value="(K) Elec Scooterate">(K) Elec Scooterate</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn-action" style="background:var(--service);" onclick="upsertVehicleCatalogRecord()">COMMIT MASTER CLASSIFICATION ENTRY</button>
+    </div>
+
+    <div class="card-panel">
+        <div class="block-title">Configured Predefined Catalog Mapping Models</div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Brand Identifier</th><th>Model Specification</th><th>Assigned Category Group</th><th>Action</th></tr></thead>
+                <tbody id="vehicleMasterTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+
+    function verifyManagementPrivileges() {
+        if(activeSessionRole === 'admin' || activeSessionRole === 'service') {
+            document.getElementById('authorizedConsole').style.display = 'block';
+            pullCompleteCatalogDirectory();
+        } else {
+            document.getElementById('unauthorizedBlock').style.display = 'block';
+        }
+    }
+
+    async function upsertVehicleCatalogRecord() {
+        const brandStr = document.getElementById('mBrand').value.trim();
+        const modelStr = document.getElementById('mModel').value.trim();
+        const catStr = document.getElementById('mCategory').value;
+
+        if(!brandStr || !modelStr) return alert("System Action Denied: Mandatory parameters mapping strings required.");
+
+        await supabaseClient.from('vehicle_master').upsert({
+            brand: brandStr, model_name: modelStr, category_group: catStr
+        });
+
+        alert(`Catalog values successfully updated targeting chassis variant: ${modelStr}`);
+        document.getElementById('mModel').value = ''; // Resets field natively for serial insertion updates
+        pullCompleteCatalogDirectory();
+    }
+
+    async function dropCatalogRecord(recordUuidHash) {
+        if(confirm("WARNING: Dropping core master configuration model record sets. Confirm action?")) {
+            await supabaseClient.from('vehicle_master').delete().eq('id', recordUuidHash);
+            pullCompleteCatalogDirectory();
+        }
+    }
+
+    async function pullCompleteCatalogDirectory() {
+        const { data: master } = await supabaseClient.from('vehicle_master').select('*').order('category_group').order('model_name');
+        const vBody = document.getElementById('vehicleMasterTableBody');
+        vBody.innerHTML = '';
+        
+        master?.forEach(row => {
+            vBody.innerHTML += `
+                <tr>
+                    <td><strong>${row.brand}</strong></td>
+                    <td>${row.model_name}</td>
+                    <td><strong style="color:var(--service);">${row.category_group}</strong></td>
+                    <td style="text-align:center;"><button class="btn-del" onclick="dropCatalogRecord('${row.id}')">×</button></td>
+                </tr>`;
+        });
+    }
+
+    verifyManagementPrivileges();
+</script>
+</body>
+</html>
