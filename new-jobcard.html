@@ -9,8 +9,8 @@
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
         
-        /* Universal Formatting Rules #1 and #2: Bound header layout with centered Home target */
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        /* Universal Standards: Centered layout boxes mapped to exactly 950px */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
         .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
@@ -20,20 +20,24 @@
         
         .step-box { display: none; margin-top: 24px; padding-top: 20px; border-top: 2px solid #f1f5f9; }
         .active-step { display: block; }
-        label { display: block; margin-top: 14px; font-weight: 700; font-size: 0.8rem; color: #64748b; text-transform: uppercase; }
+        label { display: block; margin-top: 14px; font-weight: 700; font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }
 
         .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
         .veh-rect { border: 2px solid var(--border); padding: 14px; border-radius: 8px; cursor: pointer; background: #f8fafc; text-align: center; }
         .veh-rect:hover { border-color: var(--info); background: #f0f7ff; }
 
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; }
-        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 0 20px; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; font-size: 0.9rem; }
         .btn-success { background: var(--success); color: white; }
         .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); }
         
         .status-badge { background: #f0fdf4; padding: 12px; border-radius: 8px; font-weight: 700; color: #15803d; border: 1px solid #bbf7d0; margin-bottom: 20px; }
         .warranty-alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; display: none; }
+        
+        .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 4px; }
+        .tag-cash { background: #fef3c7; color: #b45309; }
+        .tag-work { background: #e0f2fe; color: #0369a1; }
+        .tag-reg { background: #dcfce7; color: #15803d; }
     </style>
 </head>
 <body>
@@ -48,26 +52,32 @@
     <div class="container">
         <div id="step1" class="active-step">
             <label>1. Customer Mobile</label>
-            <div style="display:flex; gap:10px; margin-top: 4px;">
-                <input type="tel" id="mobile" placeholder="10 Digits" maxlength="10" autofocus>
-                <button class="btn btn-search" onclick="processStep1()">SEARCH</button>
-            </div>
-            <div id="step2" style="display:none; margin-top:20px; background: #fff9db; padding:16px; border-radius:8px;">
-                <label>Name</label><input type="text" id="custName">
-                <label>Address</label><input type="text" id="custAddress">
-                <button class="btn btn-success" onclick="saveNewCustomer()">SAVE & PROCEED</button>
+            <input type="tel" id="mobile" placeholder="Enter 10 Digits" maxlength="10" autofocus oninput="processAutonomousPhoneSearch(this.value)">
+            
+            <div id="terminalTagsWrapper" style="margin-top:8px;"></div>
+            
+            <div id="step2" style="display:none; margin-top:20px; background: #fff9db; padding:20px; border-radius:8px; border:1px solid #fde047;">
+                <span style="font-size:0.8rem; font-weight:700; color:#854d0e; display:block; margin-bottom:10px;">⚠️ Unmapped Account Verification Required</span>
+                <label style="margin-top:0;">Customer Name</label><input type="text" id="custName" placeholder="Full Client Identity">
+                <label>Registered Address</label><input type="text" id="custAddress" placeholder="Physical location sector">
+                <div style="font-size:0.7rem; color:#64748b; margin-top:8px;">*Defaults assigned account mapping parameter silently to 'Regular' status tier.</div>
+                <button class="btn btn-success" onclick="commitCustomerProfileRegistration()">SAVE PROFILE & PROCEED</button>
             </div>
         </div>
 
         <div id="step3" class="step-box">
-            <label>2. Select Vehicle</label>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label style="margin:0;">2. Select Vehicle Chassis</label>
+                <span id="activeNameDisplay" style="font-size:0.85rem; font-weight:700; color:var(--primary);"></span>
+            </div>
             <div id="vehicleGrid" class="veh-grid"></div>
-            <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ ADD NEW VEHICLE</button>
-            <div id="newVehicleForm" style="display:none; margin-top:16px; background:#f8fafc; padding:16px; border-radius:8px;">
-                <label>Brand</label><input type="text" id="vBrand">
-                <label>Model</label><input type="text" id="vName">
-                <label>Reg Number</label><input type="text" id="vNumber">
-                <button class="btn btn-success" onclick="executeVehicleLink()">LINK & PROCEED</button>
+            <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ ADD NEW VEHICLE CHASSIS</button>
+            
+            <div id="newVehicleForm" style="display:none; margin-top:16px; background:#f8fafc; padding:20px; border-radius:8px; border:1px solid var(--border);">
+                <label style="margin-top:0;">Manufacturer Brand</label><input type="text" id="vBrand" placeholder="e.g. HONDA" oninput="this.value=this.value.toUpperCase()">
+                <label>Model Classification</label><input type="text" id="vName" placeholder="e.g. ACTIVA 6G">
+                <label>Registration Plate</label><input type="text" id="vNumber" placeholder="e.g. MP-04-XX-0000" oninput="this.value=this.value.toUpperCase()">
+                <button class="btn btn-success" onclick="executeVehicleLink()">LINK CHASSIS & PROCEED</button>
             </div>
         </div>
 
@@ -75,23 +85,25 @@
             <div id="activeTargetBadge" class="status-badge">--</div>
             <div id="activeWarrantyAlert" class="warranty-alert">⚠️ CONDITIONAL ENGINE OVERHAUL WARRANTY ACTIVE ON TARGET CHASSIS</div>
             
-            <label>Complaint Directives</label><textarea id="complaint" rows="3"></textarea>
+            <label>Stated Mechanical Faults / Directives</label>
+            <textarea id="complaint" rows="3" placeholder="Document requested work operations cleanly"></textarea>
             
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
-                <div><label>Budget Estimate (₹)</label><input type="number" id="estimate" value="0"></div>
-                <div><label>Upfront Deposit Buffer (₹)</label><input type="number" id="prepaidBuffer" value="0"></div>
+                <div><label>Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
+                <div><label>Upfront Advance Deposit (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
 
-            <div style="margin-top:14px; padding:12px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
-                <label style="margin-top:0; color:var(--primary);">Operational Scope Parameter</label>
+            <div style="margin-top:16px; padding:14px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
+                <label style="margin-top:0; color:var(--primary);">Operational Category Scope</label>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
                     <input type="checkbox" id="isEngineOverhaul" style="width:auto; margin:0;">
-                    <span style="font-size:0.85rem; font-weight:700; color:#334155;">Flag as Full Engine Overhaul (Instantiates Conditional Coverage Loop)</span>
+                    <span style="font-size:0.85rem; font-weight:700; color:#334155;">Flag as Full Engine Overhaul (Instantiates Conditional Coverage Tracking)</span>
                 </div>
             </div>
 
-            <select id="mechSelect" style="margin-top:15px;"></select>
-            <button class="btn btn-success" onclick="finalizeJobCardCreation()">OPEN JOB CARD</button>
+            <label style="margin-top:16px;">Assign Mechanical Technician</label>
+            <select id="mechSelect" style="margin-top:4px;"></select>
+            <button class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">OPEN JOB CARD</button>
         </div>
     </div>
 </div>
@@ -103,35 +115,94 @@
 
     let activePhone = null, activeVehId = null, targetVehObj = null;
 
-    async function processStep1() {
-        activePhone = document.getElementById('mobile').value;
-        const { data: c } = await supabaseClient.from('customers').select('*').eq('mobile_number', activePhone).single();
-        if(c) initializeStep3(); else document.getElementById('step2').style.display = 'block';
+    function enforceTitleCaseNomenclature(str) {
+        if(!str) return '';
+        return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     }
 
-    async function saveNewCustomer() {
-        await supabaseClient.from('customers').upsert({ mobile_number: activePhone, name: document.getElementById('custName').value, address: document.getElementById('custAddress').value });
-        initializeStep3();
+    // --- POS RULE RECONCILIATION: AUTOMATED SEARCH TRIGGER LOOP ---
+    async function processAutonomousPhoneSearch(phoneStringVal) {
+        const cleanStr = phoneStringVal.trim();
+        if(cleanStr.length !== 10) {
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('terminalTagsWrapper').innerHTML = '';
+            return;
+        }
+        
+        activePhone = cleanStr;
+        const wrapper = document.getElementById('terminalTagsWrapper'); wrapper.innerHTML = '';
+
+        // Query profile ledgers mirroring POS rules parameters
+        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', activePhone).single();
+        const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', activePhone).limit(1);
+        const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', activePhone).limit(1);
+
+        const hasJc = jcList && jcList.length > 0;
+        const hasPos = posList && posList.length > 0;
+
+        if(cData) {
+            document.getElementById('activeNameDisplay').innerText = `Client: ${cData.name}`;
+            
+            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">Customer for both</span>';
+            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Already a workshop customer</span>';
+            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">Already a customer</span>';
+
+            initializeStep3();
+        } else {
+            // Unmapped client target -> open core profile setup array directly
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('custName').focus();
+        }
+    }
+
+    async function commitCustomerProfileRegistration() {
+        const rawName = document.getElementById('custName').value.trim();
+        const rawAddress = document.getElementById('custAddress').value.trim();
+        if(!rawName) return alert("System Verification: Specify valid target client Identity.");
+
+        const cleanNameStr = enforceTitleCaseNomenclature(rawName);
+
+        // Safe profile commit applying standard Regular fallback tier natively
+        const { data: c, error } = await supabaseClient.from('customers').insert({
+            mobile_number: activePhone,
+            name: cleanNameStr,
+            address: rawAddress || 'Workshop Floor Intakes',
+            category: 'Regular'
+        }).select().single();
+
+        if(!error && c) {
+            document.getElementById('activeNameDisplay').innerText = `Client: ${cleanNameStr}`;
+            document.getElementById('step2').style.display = 'none';
+            initializeStep3();
+        } else alert(`⚠️ CREATION FAULT:\n${error?.message}`);
     }
 
     async function initializeStep3() {
         document.getElementById('step1').classList.remove('active-step');
         document.getElementById('step3').classList.add('active-step');
+        
         const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', activePhone);
         const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
+        
         fleet?.forEach(v => {
             const encodedObj = encodeURIComponent(JSON.stringify(v));
-            grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model}', '${encodedObj}')"><b>${v.reg_number}</b><small>${v.make_model}</small></div>`;
+            grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${encodedObj}')"><b>${v.reg_number}</b><small style="display:block; margin-top:2px; color:#64748b;">${v.make_model}</small></div>`;
         });
     }
 
     function toggleNewVehicleForm() { document.getElementById('newVehicleForm').style.display = 'block'; }
 
     async function executeVehicleLink() {
-        let reg = document.getElementById('vNumber').value || "ACC-" + Math.floor(Math.random()*900000);
-        const { data: v } = await supabaseClient.from('vehicles').insert({
-            customer_mobile: activePhone, brand: document.getElementById('vBrand').value, make_model: document.getElementById('vName').value, reg_number: reg
+        let reg = document.getElementById('vNumber').value.trim() || "ACC-" + Math.floor(Math.random()*900000);
+        const makeMod = document.getElementById('vName').value.trim() || 'Generic Asset';
+        const brand = document.getElementById('vBrand').value.trim() || 'OEM';
+
+        const { data: v, error } = await supabaseClient.from('vehicles').insert({
+            customer_mobile: activePhone, brand: brand, make_model: makeMod, reg_number: reg
         }).select().single();
+
+        if(error) return alert("Vehicle Ingestion Abort:\n" + error.message);
+        
         const encodedObj = encodeURIComponent(JSON.stringify(v));
         stageTargetVehicle(v.id, v.reg_number, v.make_model, encodedObj);
     }
@@ -140,46 +211,45 @@
         activeVehId = id;
         targetVehObj = JSON.stringify(decodeURIComponent(encodedContextData));
         
-        document.getElementById('activeTargetBadge').innerText = reg + " (" + model + ")";
+        document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
         document.getElementById('step3').classList.remove('active-step');
         document.getElementById('step4').classList.add('active-step');
         
-        // Runtime evaluations parsing Point 8 active engine coverage flags
         const parsedVeh = JSON.parse(decodeURIComponent(encodedContextData));
         if(parsedVeh && parsedVeh.warranty_active) {
             document.getElementById('activeWarrantyAlert').style.display = 'block';
             
-            // Check delta schedule boundaries autonomously
             if(parsedVeh.last_overhaul_date) {
                 const overhaulTime = new Date(parsedVeh.last_overhaul_date).getTime();
                 const timeDiffDays = (new Date().getTime() - overhaulTime) / (1000 * 60 * 60 * 24);
-                if(timeDiffDays > 120) { # e.g. target interval expiration boundary
+                if(timeDiffDays > 120) { 
                     document.getElementById('activeWarrantyAlert').innerText = "⚠️ SYSTEM ALERT: TARGET CHASSIS EXCEEDED SERVICE INTERVAL TIMELINE. CONDITIONAL COVERAGE SUSPENDED.";
                     document.getElementById('activeWarrantyAlert').style.backgroundColor = "#fee2e2";
                     document.getElementById('activeWarrantyAlert').style.color = "#b91c1c";
                     
-                    # Log runtime updates asynchronously
                     supabaseClient.from('vehicles').update({ warranty_active: false, lifetime_breach_log: "Periodic validation breach parsed natively." }).eq('id', id).then();
                 }
             }
         }
 
-        const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
-        const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">Select Tech</option>';
+        const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
+        const sel = document.getElementById('mechSelect'); 
+        sel.innerHTML = '<option value="">-- Direct Tech Allocation --</option>';
         m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
     }
 
     async function finalizeJobCardCreation() {
         const isOverhaulFlagged = document.getElementById('isEngineOverhaul').checked;
+        const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'service';
         
-        // Push primary database creation commands
-        const { data: newJc } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: activePhone, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value,
-            problem_mentioned: document.getElementById('complaint').value, estimate_given: document.getElementById('estimate').value, 
-            advance_paid: document.getElementById('prepaidBuffer').value, source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'service', status: 'Open'
+        const { data: newJc, error } = await supabaseClient.from('job_cards').insert({
+            customer_mobile: activePhone, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
+            problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
+            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
         }).select().single();
 
-        // Autonomously update vehicle parameters if marked as Overhaul job origin
+        if(error) return alert("System Commitment Error:\n" + error.message);
+
         if(newJc && isOverhaulFlagged) {
             await supabaseClient.from('vehicles').update({
                 last_overhaul_date: new Date().toISOString().split('T')[0],
@@ -187,6 +257,7 @@
             }).eq('id', activeVehId);
         }
 
+        alert("Job Card initialized securely. Pipeline workflows staging successfully.");
         window.location.href = 'index.html';
     }
 </script>
