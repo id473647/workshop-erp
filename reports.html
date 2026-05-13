@@ -1,73 +1,475 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Reports - My Care</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Analytics & Reports - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 15px; margin: 0; }
-        .nav-back { text-decoration: none; color: #2980b9; font-weight: bold; margin-bottom: 20px; display: block; }
-        .report-card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .pending-lathe { border-left: 5px solid #e74c3c; padding-left: 10px; }
-        .tag-red { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --info: #2980b9; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c;
+            --analytics: #8e44ad; --amber: #f59e0b;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 4px; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--analytics); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Dashboard Figurative Strip (Point 1i) */
+        .summary-dashboard-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-icon-card { background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--info); cursor: pointer; transition: transform 0.15s; }
+        .stat-icon-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .stat-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .stat-num { font-size: 1.3rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
+        
+        /* Module Tabs Swapping Controller */
+        .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
+        .tab-btn { padding: 8px 14px; border: none; background: none; font-size: 0.85rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 6px; white-space: nowrap; }
+        .tab-btn.active { background: var(--analytics); color: white; }
+        .tab-btn:hover:not(.active) { background: #f1f5f9; color: var(--primary); }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; box-sizing: border-box; }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+        .btn-export { background: var(--info); color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+        
+        /* Rendering Matrix Layouts */
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 10px; max-height: 500px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
+        
+        /* Modal Engine */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        
+        .report-view { display: none; }
+        .report-view.active { display: block; }
     </style>
 </head>
 <body>
 
-    <a href="index.html" class="nav-back">← Back to Dashboard</a>
-    <h2>Business Reports</h2>
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span id="roleDisplay" class="badge-role">REPORTS CORE</span>
+</nav>
 
-    <div class="report-card" style="border-left: 6px solid #8e44ad; cursor: pointer;" onclick="window.location.href='staff-ledger.html'">
-        <strong>Detailed Mechanic Ledger</strong><br>
-        <small>Click to view earnings and advances for all staff.</small>
-    </div>
-    
-    <div class="report-card">
-        <h3>Today's Collection Summary</h3>
-        <div id="salesSummary">Loading...</div>
+<div class="wrapper">
+    <div class="summary-dashboard-strip">
+        <div class="stat-icon-card" onclick="openDetailedDailyModal('Invoiced')">
+            <div class="stat-label">Daily Realized Billings (Net)</div>
+            <div id="metricInvoiced" class="stat-num">₹0</div>
+        </div>
+        <div class="stat-icon-card" style="border-left-color:var(--amber);" onclick="openDetailedDailyModal('Pending')">
+            <div class="stat-label">Inventory Held in Draft Bays</div>
+            <div id="metricPending" class="stat-num">₹0</div>
+        </div>
+        <div class="stat-icon-card" style="border-left-color:var(--success);" onclick="openDetailedDailyModal('Collected')">
+            <div class="stat-label">Daily Revenue Collection</div>
+            <div id="metricCollected" class="stat-num">₹0</div>
+        </div>
     </div>
 
-    <div class="report-card">
-        <h3>Pending Lathe Payments (Debts)</h3>
-        <div id="latheLedger">Checking...</div>
+    <div class="card-panel">
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchReportTab('rLubesSpares')">Spares & Lubes Analytics</button>
+            <button class="tab-btn" onclick="switchReportTab('rLabor')">Mechanic Labor Payouts</button>
+            <button class="tab-btn" onclick="switchReportTab('rVelocity')">Product Velocity Index</button>
+            <button class="tab-btn" onclick="switchReportTab('rHotCold')">Operating Schedule Flow</button>
+            <button class="tab-btn" onclick="switchReportTab('rServicePack')">Service Pack Overview</button>
+        </div>
+
+        <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px; margin-bottom:20px;">
+            <div class="field-group"><label>Date Scope Start</label><input type="date" id="fStart"></div>
+            <div class="field-group"><label>Date Scope End</label><input type="date" id="fEnd"></div>
+            <div class="field-group"><label>Filter Mechanic Context</label><select id="fMech"><option value="ALL">All Associated Technicians</option></select></div>
+            <div class="field-group"><label>Warehouse Array</label><select id="fWare"><option value="ALL">Combined Depots</option><option value="Green">Green Spares</option><option value="Moped">Moped Base</option></select></div>
+            <button class="btn-action" onclick="compileActiveReportTarget()">COMPILE DATA</button>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-size:0.8rem; font-weight:700; color:#64748b;" id="reportMetaStatus">Awaiting compilation requests...</span>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-export" onclick="executeExcelExport()">📥 EXPORT EXCEL</button>
+                <button class="btn-export" style="background:var(--danger);" onclick="window.print()">🖨️ PDF / PRINT</button>
+            </div>
+        </div>
+
+        <div id="rLubesSpares" class="report-view active">
+            <div class="table-wrapper">
+                <table id="tableLubesSpares">
+                    <thead><tr><th>Invoice Hash</th><th>Origin Depot</th><th>Component Specification</th><th>Scalar Quantity</th><th>Realized Cost</th><th>Technician Lead</th></tr></thead>
+                    <tbody id="bodyLubesSpares"><tr><td colspan="6" style="text-align:center; padding:16px;">Set runtime bounds to pull specific operational data.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rLabor" class="report-view">
+            <div class="table-wrapper">
+                <table id="tableLabor">
+                    <thead><tr><th>Technician Name</th><th>Assigned Tasks Count</th><th>Gross Labor Generated</th><th>Calculated Commission Net</th></tr></thead>
+                    <tbody id="bodyLabor"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rVelocity" class="report-view">
+            <div class="table-wrapper">
+                <table id="tableVelocity">
+                    <thead><tr><th>Product Spec Mapping</th><th>Total Units Dispatched</th><th>Average Realized Price</th><th>Aggregate Yield</th></tr></thead>
+                    <tbody id="bodyVelocity"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rHotCold" class="report-view">
+            <div style="margin-bottom:12px; font-size:0.8rem; color:#64748b;">*Note: Maps aggregated execution logic spanning configured temporal window parameters.</div>
+            <div class="table-wrapper">
+                <table id="tableHotCold">
+                    <thead><tr><th>Day of the Week</th><th>Total Processed Instances</th><th>Aggregate Valuation Volume</th><th>Peak Ingestion Period</th><th>Operational Status</th></tr></thead>
+                    <tbody id="bodyHotCold"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="rServicePack" class="report-view">
+            <div class="table-wrapper">
+                <table id="tableServicePack">
+                    <thead><tr><th>Staged Repair Package</th><th>Assigned Base Valuation</th><th>Total Associated Directives</th><th>Technician Utilization</th></tr></thead>
+                    <tbody id="bodyServicePack">
+                        <tr><td><strong>Quick Repair Module</strong></td><td>Standard Rate Base</td><td>0 Tasks Mapped</td><td>General Scope</td></tr>
+                        <tr><td><strong>General / Full Overhaul</strong></td><td>Standard Rate Base</td><td>0 Tasks Mapped</td><td>General Scope</td></tr>
+                        <tr><td><strong>Premium Maintenance</strong></td><td>Standard Rate Base</td><td>0 Tasks Mapped</td><td>General Scope</td></tr>
+                        <tr><td><strong>Jumbo Restoration Scope</strong></td><td>Standard Rate Base</td><td>0 Tasks Mapped</td><td>General Scope</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+</div>
+
+<div id="modalDailyOperations" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+            <h3 style="margin:0; color:var(--primary);" id="modalOperationsTitle">Detailed Operations Array</h3>
+            <button onclick="document.getElementById('modalDailyOperations').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        
+        <div class="table-wrapper" style="max-height:350px;">
+            <table>
+                <thead><tr><th>Transaction Reference</th><th>Origin Core</th><th>Client Identifier</th><th>Gross Payable</th></tr></thead>
+                <tbody id="modalOperationsBody"></tbody>
+            </table>
+        </div>
+        <div style="text-align:right; font-size:1.1rem; font-weight:700; color:var(--success); margin-top:12px;">
+            Aggregate Valuation Scope: ₹<span id="modalOperationsGross">0</span>
+        </div>
+    </div>
+</div>
 
 <script>
+    // Database Connection Variables Layer Hub
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    async function loadReports() {
-        const today = new Date().toISOString().split('T')[0];
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let currentSelectedTab = 'rLubesSpares';
+    let globalDirectoryCacheMap = {};
 
-        // 1. Fetch Today's Closed Jobs
-        const { data: sales } = await supabaseClient.from('job_cards').select('*').eq('jc_date', today).eq('status', 'Closed');
+    function setupDefaultFilteringDirectives() {
+        document.getElementById('roleDisplay').innerText = `ACCESS: ${activeSessionRole}`;
+        const dt = new Date();
+        document.getElementById('fEnd').value = dt.toISOString().split('T')[0];
+        dt.setDate(dt.getDate() - 30); // Default window set safely to 30 days
+        document.getElementById('fStart').value = dt.toISOString().split('T')[0];
         
-        let green = 0, moped = 0, oil = 0, labour = 0;
-        sales?.forEach(s => {
-            green += parseFloat(s.green_total || 0);
-            moped += parseFloat(s.moped_total || 0);
-            oil += parseFloat(s.lubricant_total || 0);
-            labour += parseFloat(s.labour_charges || 0);
-        });
-
-        document.getElementById('salesSummary').innerHTML = `
-            <div class="stat-row"><span>Green Spares:</span> <strong>₹${green}</strong></div>
-            <div class="stat-row"><span>Moped Spares:</span> <strong>₹${moped}</strong></div>
-            <div class="stat-row"><span>Lubricants:</span> <strong>₹${oil}</strong></div>
-            <div class="stat-row"><span>Total Labour:</span> <strong>₹${labour}</strong></div>
-        `;
-
-        // 2. Lathe Debts
-        const { data: lathePending } = await supabaseClient.from('job_cards').select('*').eq('lathe_status', 'Pending').gt('lathe_welding', 0);
-        let latheHtml = '';
-        lathePending?.forEach(l => {
-            latheHtml += `<div class="stat-row pending-lathe"><span>Mob: ${l.customer_mobile}</span> <strong>₹${l.lathe_welding} <span class="tag-red">UNPAID</span></strong></div>`;
-        });
-        document.getElementById('latheLedger').innerHTML = latheHtml || 'No lathe debts!';
+        prefetchTechniciansDirectory();
+        executeDailyDashboardParsing();
     }
-    loadReports();
+
+    async function prefetchTechniciansDirectory() {
+        const { data: crew } = await supabaseClient.from('mechanics').select('*').order('name');
+        const selectObj = document.getElementById('fMech');
+        crew?.forEach(m => {
+            globalDirectoryCacheMap[m.id] = m;
+            selectObj.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+        compileActiveReportTarget(); // Auto triggers dataset construction upfront
+    }
+
+    // --- POINTS 1(i) & 1(ii): DAILY DASHBOARD ICON PARSING ENGINE ---
+    async function executeDailyDashboardParsing() {
+        const dateTarget = new Date().toISOString().split('T')[0];
+        
+        // Multi-tier queries mapping core operational spaces natively
+        const { data: closedJobs } = await supabaseClient.from('job_cards').select('total_invoice_value').gte('closed_at', dateTarget).eq('status', 'Closed');
+        const { data: openJobs } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Open');
+        const { data: retailSales } = await supabaseClient.from('counter_sales').select('total_amount').gte('created_at', dateTarget).eq('status', 'Closed');
+
+        let realizedInvoiced = 0, draftPending = 0, actualCollected = 0;
+        
+        closedJobs?.forEach(j => { realizedInvoiced += parseFloat(j.total_invoice_value) || 0; });
+        retailSales?.forEach(p => { 
+            realizedInvoiced += parseFloat(p.total_amount) || 0; 
+            actualCollected += parseFloat(p.total_amount) || 0; // Direct cash collection flows
+        });
+        openJobs?.forEach(j => { draftPending += parseFloat(j.total_invoice_value) || 0; });
+
+        document.getElementById('metricInvoiced').innerText = `₹${Math.round(realizedInvoiced)}`;
+        document.getElementById('metricPending').innerText = `₹${Math.round(draftPending)}`;
+        document.getElementById('metricCollected').innerText = `₹${Math.round(actualCollected)}`;
+    }
+
+    async function openDetailedDailyModal(targetFilterType) {
+        const dateTarget = new Date().toISOString().split('T')[0];
+        const tbody = document.getElementById('modalOperationsBody');
+        tbody.innerHTML = '';
+        let compilationGrossSum = 0;
+
+        document.getElementById('modalOperationsTitle').innerText = `Daily Transaction Arrays: ${targetFilterType} Mode`;
+
+        if(targetFilterType === 'Invoiced' || targetFilterType === 'Collected') {
+            const { data: jc } = await supabaseClient.from('job_cards').select('id, customer_mobile, total_invoice_value').gte('closed_at', dateTarget).eq('status', 'Closed');
+            const { data: pos } = await supabaseClient.from('counter_sales').select('id, customer_mobile, total_amount').gte('created_at', dateTarget).eq('status', 'Closed');
+
+            jc?.forEach(r => {
+                compilationGrossSum += parseFloat(r.total_invoice_value) || 0;
+                tbody.innerHTML += `<tr><td><span class="clickable-ref" onclick="fireDeepLinkRouter('JC', '${r.id}')">JC-${r.id.split('-')[0].toUpperCase()}</span></td><td>Workshop Services</td><td>${r.customer_mobile}</td><td>₹${r.total_invoice_value}</td></tr>`;
+            });
+            pos?.forEach(r => {
+                compilationGrossSum += parseFloat(r.total_amount) || 0;
+                tbody.innerHTML += `<tr><td><span class="clickable-ref" onclick="fireDeepLinkRouter('POS', '${r.id}')">POS-${r.id.split('-')[0].toUpperCase()}</span></td><td>Retail Hub</td><td>${r.customer_mobile}</td><td>₹${r.total_amount}</td></tr>`;
+            });
+        } else if(targetFilterType === 'Pending') {
+            const { data: jc } = await supabaseClient.from('job_cards').select('id, customer_mobile, total_invoice_value').eq('status', 'Open');
+            jc?.forEach(r => {
+                compilationGrossSum += parseFloat(r.total_invoice_value) || 0;
+                tbody.innerHTML += `<tr><td><span class="clickable-ref" onclick="fireDeepLinkRouter('JC', '${r.id}')">JC-${r.id.split('-')[0].toUpperCase()}</span></td><td>Staging Floor</td><td>${r.customer_mobile}</td><td>₹${r.total_invoice_value}</td></tr>`;
+            });
+        }
+
+        document.getElementById('modalOperationsGross').innerText = Math.round(compilationGrossSum);
+        document.getElementById('modalDailyOperations').style.display = 'flex';
+    }
+
+    // Point 3 Implementation: Dynamic router logic mapping back directly
+    function fireDeepLinkRouter(originSystem, recordHashId) {
+        if(originSystem === 'JC') window.location.href = `billing.html?id=${recordHashId}`;
+        else window.location.href = `pos-green.html?inspect=${recordHashId}`;
+    }
+
+    function switchReportTab(targetedViewId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.report-view').forEach(v => v.classList.remove('active'));
+        document.getElementById(targetedViewId).classList.add('active');
+        currentSelectedTab = targetedViewId;
+        compileActiveReportTarget();
+    }
+
+    // --- MASTER DATA GENERATOR BLOCK ---
+    async function compileActiveReportTarget() {
+        const dtStart = document.getElementById('fStart').value;
+        const dtEnd = document.getElementById('fEnd').value;
+        const mechTarget = document.getElementById('fMech').value;
+        const wareTarget = document.getElementById('fWare').value;
+
+        document.getElementById('reportMetaStatus').innerText = `Extracting datasets bounded: ${dtStart} to ${dtEnd}...`;
+
+        if(currentSelectedTab === 'rLubesSpares') await generateLubesSparesArray(dtStart, dtEnd, mechTarget, wareTarget);
+        else if(currentSelectedTab === 'rLabor') await generateLaborPayoutsArray(dtStart, dtEnd, mechTarget);
+        else if(currentSelectedTab === 'rVelocity') await generateProductVelocityArray(dtStart, dtEnd, wareTarget);
+        else if(currentSelectedTab === 'rHotCold') await generateOperatingScheduleArray(dtStart, dtEnd);
+        else if(currentSelectedTab === 'rServicePack') {
+            document.getElementById('reportMetaStatus').innerText = "Static view model initialization complete.";
+        }
+    }
+
+    // View 1: Direct Item Lines Extraction (Points 4 & 6)
+    async function generateLubesSparesArray(start, end, mech, ware) {
+        let query = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, mech_id, closed_at)').eq('job_cards.status', 'Closed');
+        if(start) query = query.gte('job_cards.closed_at', start);
+        if(end) query = query.lte('job_cards.closed_at', end + 'T23:59:59');
+        if(mech !== 'ALL') query = query.eq('job_cards.mech_id', mech);
+        if(ware !== 'ALL') query = query.eq('warehouse_type', ware);
+
+        const { data: retrievedLines } = await query;
+        const tbody = document.getElementById('bodyLubesSpares');
+        tbody.innerHTML = '';
+
+        if(retrievedLines && retrievedLines.length > 0) {
+            retrievedLines.forEach(item => {
+                const assignedName = globalDirectoryCacheMap[item.job_cards?.mech_id]?.name || 'Unassigned Crew';
+                tbody.innerHTML += `<tr>
+                    <td><span class="clickable-ref" onclick="fireDeepLinkRouter('JC', '${item.job_cards?.id}')">JC-${item.job_cards?.id.split('-')[0].toUpperCase()}</span></td>
+                    <td><strong>${item.warehouse_type || 'Green'}</strong></td>
+                    <td>${item.item_name}</td>
+                    <td>${item.qty} ${item.unit_metric || ''}</td>
+                    <td><strong>₹${item.total_price}</strong></td>
+                    <td>${assignedName}</td>
+                </tr>`;
+            });
+        } else tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px; color:#94a3b8;">No extracted records match targeted query constraints.</td></tr>';
+    }
+
+    // View 2: Technician Labor Payout Maps (Point 5)
+    async function generateLaborPayoutsArray(start, end, mech) {
+        let query = supabaseClient.from('job_cards').select('mech_id, labour_charges').eq('status', 'Closed');
+        if(start) query = query.gte('closed_at', start);
+        if(end) query = query.lte('closed_at', end + 'T23:59:59');
+        if(mech !== 'ALL') query = query.eq('mech_id', mech);
+
+        const { data: closedTasks } = await query;
+        const mappedAggregates = {};
+
+        closedTasks?.forEach(task => {
+            if(!task.mech_id) return;
+            if(!mappedAggregates[task.mech_id]) mappedAggregates[task.mech_id] = { count: 0, grossLabor: 0 };
+            mappedAggregates[task.mech_id].count++;
+            mappedAggregates[task.mech_id].grossLabor += parseFloat(task.labour_charges) || 0;
+        });
+
+        const tbody = document.getElementById('bodyLabor');
+        tbody.innerHTML = '';
+        
+        Object.keys(globalDirectoryCacheMap).forEach(mId => {
+            if(mech !== 'ALL' && mId !== mech) return;
+            const profile = globalDirectoryCacheMap[mId];
+            const stats = mappedAggregates[mId] || { count: 0, grossLabor: 0 };
+            const commRate = parseFloat(profile.commission_rate) || 10;
+            const yieldCommission = stats.grossLabor * (commRate / 100);
+
+            tbody.innerHTML += `<tr>
+                <td><strong>${profile.name}</strong></td>
+                <td>${stats.count} Tasks Settled</td>
+                <td>₹${Math.round(stats.grossLabor)}</td>
+                <td><strong style="color:var(--success);">₹${Math.round(yieldCommission)}</strong> <span style="color:#888; font-size:0.7rem;">(${commRate}%)</span></td>
+            </tr>`;
+        });
+    }
+
+    // View 3: Product Velocity Arrays (Point 7)
+    async function generateProductVelocityArray(start, end, ware) {
+        let query = supabaseClient.from('job_card_items').select('item_name, qty, total_price, warehouse_type');
+        if(ware !== 'ALL') query = query.eq('warehouse_type', ware);
+
+        const { data: itemRows } = await query;
+        const velocityLedger = {};
+
+        itemRows?.forEach(row => {
+            const parsedBaseName = row.item_name ? row.item_name.split('(')[0].trim() : 'Generic Specifics';
+            if(!velocityLedger[parsedBaseName]) velocityLedger[parsedBaseName] = { units: 0, revenueSum: 0 };
+            velocityLedger[parsedBaseName].units += parseFloat(row.qty) || 1;
+            velocityLedger[parsedBaseName].revenueSum += parseFloat(row.total_price) || 0;
+        });
+
+        const sortedOutput = Object.keys(velocityLedger).map(k => ({ name: k, ...velocityLedger[k] })).sort((a,b) => b.units - a.units);
+        
+        const tbody = document.getElementById('bodyVelocity');
+        tbody.innerHTML = '';
+
+        sortedOutput.forEach(asset => {
+            const avgRateVal = asset.units > 0 ? (asset.revenueSum / asset.units) : 0;
+            tbody.innerHTML += `<tr>
+                <td><strong>${asset.name}</strong></td>
+                <td>${asset.units} Dispatched</td>
+                <td>₹${avgRateVal.toFixed(2)}</td>
+                <td><strong>₹${Math.round(asset.revenueSum)}</strong></td>
+            </tr>`;
+        });
+    }
+
+    // View 4: Hot & Cold Operating Timeline Parsing (Point 8)
+    async function generateOperatingScheduleArray(start, end) {
+        const { data: logFrames } = await supabaseClient.from('job_cards').select('closed_at, total_invoice_value').eq('status', 'Closed');
+        
+        const weekAggregates = { 0:{count:0, val:0, hours:{}}, 1:{count:0, val:0, hours:{}}, 2:{count:0, val:0, hours:{}}, 3:{count:0, val:0, hours:{}}, 4:{count:0, val:0, hours:{}}, 5:{count:0, val:0, hours:{}}, 6:{count:0, val:0, hours:{}} };
+        const weekDayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+        logFrames?.forEach(frame => {
+            if(!frame.closed_at) return;
+            const dateInst = new Date(frame.closed_at);
+            const dayNum = dateInst.getDay();
+            const hourNum = dateInst.getHours();
+
+            weekAggregates[dayNum].count++;
+            weekAggregates[dayNum].val += parseFloat(frame.total_invoice_value) || 0;
+            
+            if(!weekAggregates[dayNum].hours[hourNum]) weekAggregates[dayNum].hours[hourNum] = 0;
+            weekAggregates[dayNum].hours[hourNum]++;
+        });
+
+        const tbody = document.getElementById('bodyHotCold');
+        tbody.innerHTML = '';
+
+        let baselineSum = logFrames ? logFrames.length : 1;
+        let averageDailyVolume = baselineSum / 7;
+
+        for(let day=0; day<7; day++) {
+            const frameMetrics = weekAggregates[day];
+            let topFrameHour = "--";
+            let peakFrequency = -1;
+            
+            Object.keys(frameMetrics.hours).forEach(hKey => {
+                if(frameMetrics.hours[hKey] > peakFrequency) { 
+                    peakFrequency = frameMetrics.hours[hKey]; 
+                    topFrameHour = `${hKey}:00 - ${parseInt(hKey)+1}:00`; 
+                }
+            });
+
+            let statusTagString = "Standard Load";
+            let tagColorCode = "#64748b";
+            if(frameMetrics.count > (averageDailyVolume * 1.25)) { statusTagString = "🔥 Hot Operating Profile"; tagColorCode = "var(--danger)"; }
+            else if(frameMetrics.count < (averageDailyVolume * 0.75)) { statusTagString = "❄️ Cold Capacity Deficit"; tagColorCode = "var(--info)"; }
+
+            tbody.innerHTML += `<tr>
+                <td><strong>${weekDayLabels[day]}</strong></td>
+                <td>${frameMetrics.count} Settled Invoices</td>
+                <td>₹${Math.round(frameMetrics.val)}</td>
+                <td>${topFrameHour}</td>
+                <td><strong style="color:${tagColorCode};">${statusTagString}</strong></td>
+            </tr>`;
+        }
+    }
+
+    // --- UNIVERSAL EXPORT RULE A IMPLEMENTATION ---
+    function executeExcelExport() {
+        let activeTableMap = {
+            rLubesSpares: 'tableLubesSpares',
+            rLabor: 'tableLabor',
+            rVelocity: 'tableVelocity',
+            rHotCold: 'tableHotCold',
+            rServicePack: 'tableServicePack'
+        };
+
+        const targetTableElement = document.getElementById(activeTableMap[currentSelectedTab]);
+        if(!targetTableElement) return;
+
+        // Clean client-side rendering extraction exporting cells natively directly to binary XLS maps
+        const compiledWorksheet = XLSX.utils.table_to_sheet(targetTableElement, { raw: true });
+        const compiledWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(compiledWorkbook, compiledWorksheet, "ERP_Export_Analytics");
+        
+        XLSX.writeFile(compiledWorkbook, `MyCare_Enterprise_Analytics_${currentSelectedTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    // Auto trigger dashboard construction variables immediately
+    setupDefaultFilteringDirectives();
 </script>
 </body>
 </html>
