@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brand Master Console - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --info: #2980b9; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        
+        .btn-action { background: var(--info); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">BRAND CONFIGURATOR</span>
+</nav>
+
+<div class="wrapper">
+    <div class="card-panel" style="border-left: 5px solid var(--info);">
+        <div class="block-title">Instantiate Global Brand Discount Mappings</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Brand Context</label><input type="text" id="mBrand" placeholder="e.g. ANL" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Regular Disc %</label><input type="number" id="dReg" value="0" min="0" max="100"></div>
+            <div class="field-group"><label>Silver Disc %</label><input type="number" id="dSil" value="5" min="0" max="100"></div>
+            <div class="field-group"><label>Gold Disc %</label><input type="number" id="dGol" value="10" min="0" max="100"></div>
+            <div class="field-group"><label>Platinum Disc %</label><input type="number" id="dPla" value="15" min="0" max="100"></div>
+        </div>
+        <button class="btn-action" onclick="commitBrandMatrix()">SAVE GLOBAL CONFIGURATION</button>
+    </div>
+
+    <div class="card-panel">
+        <div class="block-title">Assign Dedicated Client-Specific Target Overrides</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Client Phone Index</label><input type="tel" id="cMobile" placeholder="10 Digits" maxlength="10"></div>
+            <div class="field-group"><label>Brand Hash</label><input type="text" id="cBrand" placeholder="e.g. BARDHAL" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Override Deduction %</label><input type="number" id="cDisc" placeholder="Fixed Rate" min="0" max="100"></div>
+        </div>
+        <button class="btn-action" style="background:var(--success);" onclick="commitClientSpecificOverride()">APPLY TARGET MAPPING</button>
+    </div>
+
+    <div class="card-panel">
+        <div class="block-title">Configured Matrix Records</div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Brand Metadata</th><th>Regular</th><th>Silver</th><th>Gold</th><th>Platinum</th></tr></thead>
+                <tbody id="brandMatrixBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    async function commitBrandMatrix() {
+        const brandCode = document.getElementById('mBrand').value.trim();
+        if(!brandCode) return alert("System Guard: Brand entry variable payload required.");
+
+        await supabaseClient.from('brand_master').upsert({
+            brand_name: brandCode,
+            disc_regular: parseFloat(document.getElementById('dReg').value) || 0,
+            disc_silver: parseFloat(document.getElementById('dSil').value) || 0,
+            disc_gold: parseFloat(document.getElementById('dGol').value) || 0,
+            disc_platinum: parseFloat(document.getElementById('dPla').value) || 0
+        });
+
+        alert(`Matrix values successfully compiled targeting brand index: ${brandCode}`);
+        loadBrandLedgers();
+    }
+
+    async function commitClientSpecificOverride() {
+        const mobile = document.getElementById('cMobile').value.trim();
+        const brand = document.getElementById('cBrand').value.trim();
+        const disc = parseFloat(document.getElementById('cDisc').value);
+
+        if(mobile.length !== 10 || !brand || isNaN(disc)) return alert("Check specific tracking parameters input fields.");
+
+        // Fetch client base profiles to update embedded tracking maps dynamically
+        const { data: cust } = await supabaseClient.from('customers').select('*').eq('mobile_number', mobile).single();
+        if(!cust) return alert("Unregistered base client index parameters.");
+
+        const mapPayload = cust.custom_brand_discounts || {};
+        mapPayload[brand] = disc;
+
+        await supabaseClient.from('customers').update({ custom_brand_discounts: mapPayload }).eq('mobile_number', mobile);
+        alert(`Fixed client override (${disc}%) successfully linked against brand code: ${brand}`);
+    }
+
+    async function loadBrandLedgers() {
+        const { data: matrix } = await supabaseClient.from('brand_master').select('*').order('brand_name');
+        const tbody = document.getElementById('brandMatrixBody'); tbody.innerHTML = '';
+        
+        matrix?.forEach(row => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${row.brand_name}</strong></td>
+                <td>${row.disc_regular}%</td>
+                <td>${row.disc_silver}%</td>
+                <td><strong>${row.disc_gold}%</strong></td>
+                <td><strong style="color:var(--info);">${row.disc_platinum}%</strong></td>
+            </tr>`;
+        });
+    }
+
+    loadBrandLedgers();
+</script>
+</body>
+</html>
