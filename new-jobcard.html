@@ -6,22 +6,13 @@
     <title>New Job Card - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f4f7f6; --border: #e2e8f0; }
-        body { font-family: system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: #1e293b; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
+        body { font-family: system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
         
-        .sticky-nav { 
-            max-width: 950px; 
-            margin: 0 auto; 
-            background: white; 
-            padding: 12px 20px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            box-sizing: border-box; 
-        }
+        /* Universal Formatting Rules #1 and #2: Bound header layout with centered Home target */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 6px 16px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
         .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
@@ -42,6 +33,7 @@
         .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); }
         
         .status-badge { background: #f0fdf4; padding: 12px; border-radius: 8px; font-weight: 700; color: #15803d; border: 1px solid #bbf7d0; margin-bottom: 20px; }
+        .warranty-alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; display: none; }
     </style>
 </head>
 <body>
@@ -57,7 +49,7 @@
         <div id="step1" class="active-step">
             <label>1. Customer Mobile</label>
             <div style="display:flex; gap:10px; margin-top: 4px;">
-                <input type="tel" id="mobile" placeholder="10 Digits" maxlength="10">
+                <input type="tel" id="mobile" placeholder="10 Digits" maxlength="10" autofocus>
                 <button class="btn btn-search" onclick="processStep1()">SEARCH</button>
             </div>
             <div id="step2" style="display:none; margin-top:20px; background: #fff9db; padding:16px; border-radius:8px;">
@@ -81,8 +73,23 @@
 
         <div id="step4" class="step-box">
             <div id="activeTargetBadge" class="status-badge">--</div>
-            <label>Complaint</label><textarea id="complaint" rows="3"></textarea>
-            <label>Advance Paid (₹)</label><input type="number" id="prepaidBuffer" value="0">
+            <div id="activeWarrantyAlert" class="warranty-alert">⚠️ CONDITIONAL ENGINE OVERHAUL WARRANTY ACTIVE ON TARGET CHASSIS</div>
+            
+            <label>Complaint Directives</label><textarea id="complaint" rows="3"></textarea>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px;">
+                <div><label>Budget Estimate (₹)</label><input type="number" id="estimate" value="0"></div>
+                <div><label>Upfront Deposit Buffer (₹)</label><input type="number" id="prepaidBuffer" value="0"></div>
+            </div>
+
+            <div style="margin-top:14px; padding:12px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
+                <label style="margin-top:0; color:var(--primary);">Operational Scope Parameter</label>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                    <input type="checkbox" id="isEngineOverhaul" style="width:auto; margin:0;">
+                    <span style="font-size:0.85rem; font-weight:700; color:#334155;">Flag as Full Engine Overhaul (Instantiates Conditional Coverage Loop)</span>
+                </div>
+            </div>
+
             <select id="mechSelect" style="margin-top:15px;"></select>
             <button class="btn btn-success" onclick="finalizeJobCardCreation()">OPEN JOB CARD</button>
         </div>
@@ -94,7 +101,7 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let activePhone = null, activeVehId = null;
+    let activePhone = null, activeVehId = null, targetVehObj = null;
 
     async function processStep1() {
         activePhone = document.getElementById('mobile').value;
@@ -113,7 +120,8 @@
         const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', activePhone);
         const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
         fleet?.forEach(v => {
-            grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model}')"><b>${v.reg_number}</b><small>${v.make_model}</small></div>`;
+            const encodedObj = encodeURIComponent(JSON.stringify(v));
+            grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model}', '${encodedObj}')"><b>${v.reg_number}</b><small>${v.make_model}</small></div>`;
         });
     }
 
@@ -124,25 +132,61 @@
         const { data: v } = await supabaseClient.from('vehicles').insert({
             customer_mobile: activePhone, brand: document.getElementById('vBrand').value, make_model: document.getElementById('vName').value, reg_number: reg
         }).select().single();
-        stageTargetVehicle(v.id, v.reg_number, v.make_model);
+        const encodedObj = encodeURIComponent(JSON.stringify(v));
+        stageTargetVehicle(v.id, v.reg_number, v.make_model, encodedObj);
     }
 
-    async function stageTargetVehicle(id, reg, model) {
+    async function stageTargetVehicle(id, reg, model, encodedContextData) {
         activeVehId = id;
+        targetVehObj = JSON.stringify(decodeURIComponent(encodedContextData));
+        
         document.getElementById('activeTargetBadge').innerText = reg + " (" + model + ")";
         document.getElementById('step3').classList.remove('active-step');
         document.getElementById('step4').classList.add('active-step');
+        
+        // Runtime evaluations parsing Point 8 active engine coverage flags
+        const parsedVeh = JSON.parse(decodeURIComponent(encodedContextData));
+        if(parsedVeh && parsedVeh.warranty_active) {
+            document.getElementById('activeWarrantyAlert').style.display = 'block';
+            
+            // Check delta schedule boundaries autonomously
+            if(parsedVeh.last_overhaul_date) {
+                const overhaulTime = new Date(parsedVeh.last_overhaul_date).getTime();
+                const timeDiffDays = (new Date().getTime() - overhaulTime) / (1000 * 60 * 60 * 24);
+                if(timeDiffDays > 120) { # e.g. target interval expiration boundary
+                    document.getElementById('activeWarrantyAlert').innerText = "⚠️ SYSTEM ALERT: TARGET CHASSIS EXCEEDED SERVICE INTERVAL TIMELINE. CONDITIONAL COVERAGE SUSPENDED.";
+                    document.getElementById('activeWarrantyAlert').style.backgroundColor = "#fee2e2";
+                    document.getElementById('activeWarrantyAlert').style.color = "#b91c1c";
+                    
+                    # Log runtime updates asynchronously
+                    supabaseClient.from('vehicles').update({ warranty_active: false, lifetime_breach_log: "Periodic validation breach parsed natively." }).eq('id', id).then();
+                }
+            }
+        }
+
         const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true);
         const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">Select Tech</option>';
         m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
     }
 
     async function finalizeJobCardCreation() {
-        await supabaseClient.from('job_cards').insert({
+        const isOverhaulFlagged = document.getElementById('isEngineOverhaul').checked;
+        
+        // Push primary database creation commands
+        const { data: newJc } = await supabaseClient.from('job_cards').insert({
             customer_mobile: activePhone, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value,
-            problem_mentioned: document.getElementById('complaint').value, advance_paid: document.getElementById('prepaidBuffer').value,
-            source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'service', status: 'Open'
-        });
+            problem_mentioned: document.getElementById('complaint').value, estimate_given: document.getElementById('estimate').value, 
+            advance_paid: document.getElementById('prepaidBuffer').value, source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'service', status: 'Open'
+        }).select().single();
+
+        // Autonomously update vehicle parameters if marked as Overhaul job origin
+        if(newJc && isOverhaulFlagged) {
+            await supabaseClient.from('vehicles').update({
+                last_overhaul_date: new Date().toISOString().split('T')[0],
+                warranty_active: true
+            }).eq('id', activeVehId);
+        }
+
         window.location.href = 'index.html';
     }
 </script>
