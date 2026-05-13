@@ -10,7 +10,7 @@
         :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
+        /* Universal Standards: Centered layouts bound to a strict 950px container */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
@@ -32,7 +32,6 @@
         .tag-work { background: #e0f2fe; color: #0369a1; }
         .tag-reg { background: #dcfce7; color: #15803d; }
         
-        /* Master Customer Tier Status Modulators */
         .tier-tag { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
         .tier-Regular { background: #e2e8f0; color: #475569; }
         .tier-Silver { background: #cbd5e1; color: #0f172a; }
@@ -47,7 +46,6 @@
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .clickable-ref { color: var(--primary); font-weight: 700; text-decoration: underline; cursor: pointer; }
         
-        /* Interactive Dropdown Core Layout Array */
         .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: none; }
         .autocomplete-item { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
         .autocomplete-item:hover { background: #f8fafc; color: var(--primary); font-weight: 700; }
@@ -68,7 +66,7 @@
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         
-        /* Monospaced 3-Inch Stacked Thermal Receipt Framework */
+        /* Monospaced 3-Inch Stacked Receipt Layout Core */
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -106,7 +104,7 @@
                 <input type="tel" id="terminalMobile" placeholder="Enter 10 Digits" maxlength="10" autofocus oninput="processAutonomousPhoneSearch(this.value)">
             </div>
             <div class="field-group">
-                <label>Mapped Profile Target</label>
+                <label>Customer Name</label>
                 <div style="display:flex; align-items:center;">
                     <input type="text" id="terminalName" placeholder="Awaiting Verification..." readonly style="background:#f1f5f9; flex:1;">
                     <span id="accountCategoryDisplay" class="tier-tag" style="display:none;"></span>
@@ -140,8 +138,8 @@
     <div id="profileSetupFlow" class="card-panel step-section" style="border-left:5px solid var(--warning);">
         <div class="block-title" style="color:var(--warning);">Profile Setup Interlock Required</div>
         <div class="inputs-grid">
-            <div class="field-group"><label>Target Account Name</label><input type="text" id="newAccName" placeholder="Full Registered Identity"></div>
-            <div class="field-group"><label>Registered Address Context</label><input type="text" id="newAccAddress" placeholder="Geographical target descriptor"></div>
+            <div class="field-group"><label>Customer Name</label><input type="text" id="newAccName" placeholder="Full Registered Identity"></div>
+            <div class="field-group"><label>Registered Address</label><input type="text" id="newAccAddress" placeholder="Geographical target descriptor"></div>
         </div>
         <div style="font-size:0.75rem; color:#64748b; margin-bottom:12px;">*Note: Account classification mapping parameter defaults directly to 'Regular' status automatically. Administrative credentials required for manual profile upgrades.</div>
         <button onclick="commitAccountProfile()" style="background:var(--warning); color:white; border:none; padding:12px 24px; border-radius:6px; font-weight:700; cursor:pointer;">CONFIRM MAPPING & DISPATCH SALE</button>
@@ -378,7 +376,6 @@
         document.getElementById(targetId).classList.add('active-step');
     }
 
-    // --- SECURE ANONYMOUS ACCOUNT PROFILE COMPILATION ---
     async function commitAccountProfile() {
         const rawName = document.getElementById('newAccName').value.trim();
         const rawAddress = document.getElementById('newAccAddress').value.trim();
@@ -386,12 +383,11 @@
         
         const formattedTitleName = enforceTitleCaseNomenclature(rawName);
         
-        // Execute direct database insert block natively bypassing protected tier assignments
         const { data: newCust, error } = await supabaseClient.from('customers').insert({ 
             mobile_number: evaluatedPhoneContext, 
             name: formattedTitleName,
             address: rawAddress || 'Retail Hub Client',
-            category: 'Regular' // Hardcodes initial tier assignments to prevent kernel access blocks
+            category: 'Regular'
         }).select().single();
         
         if(!error && newCust) {
@@ -405,10 +401,7 @@
             
             transitionFlowPanels('transactionInvoicerFlow');
             prefetchCentralCatalog();
-        } else {
-            // Instantly uncovers underlying connection rules rejections to operators
-            alert(`⚠️ PROFILE INSERTION REJECTED:\n${error?.message}`);
-        }
+        } else alert(`⚠️ PROFILE INSERTION REJECTED:\n${error?.message}`);
     }
 
     async function prefetchCentralCatalog() {
@@ -558,7 +551,7 @@
                         brand: cleanBrand, 
                         warehouse_type: 'Green',
                         default_price: rScalar
-                    }).then().catch(e => console.warn("Catalog map skip:", e));
+                    }).then().catch(e => console.warn("Catalog indexing fault:", e));
                     
                     const promiseWrite = supabaseClient.from('counter_sale_items').insert({ 
                         sale_id: finalRecord.id, 
@@ -749,7 +742,7 @@
                 const fileInst = new File([blob], `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`, { type: "image/jpeg" });
                 
                 if(navigator.canShare && navigator.canShare({ files: [fileInst] })) {
-                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share logic aborted:", e));
+                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share check skipped:", e));
                 } else {
                     window.open(targetBlobUrl, '_blank');
                     alert("Document rendered to Blob layout cleanly. Please download and upload the resulting receipt preview directly into WhatsApp.");
