@@ -38,6 +38,17 @@ To digitize the manual workflow of a multi-brand two-wheeler workshop. The syste
 ## System Infrastructure Strategy
 The Core ERP Application functions on a distributed model using high-efficiency **Client-Side Storage State Integration (LocalStorage)** running native **Row Level Dynamic Permissions via Role Access Controllers (RBAC)** linked to enterprise records on **Supabase PostgreSQL**.
 
+## Relational Mapping Guide (The Rosetta Stone)
+
+### Raw Table View vs. Resolved Application View
+To minimize cloud storage footprint, core transaction lines do not duplicate static string metadata. They store relational UUID indices mapping directly to primary source tables.
+
+| Target Table | Stored Relational Key | Foreign Key Target | Extracted Data Attributes |
+| :--- | :--- | :--- | :--- |
+| **`job_card_items`** | `product_id` (UUID) | `product_master(id)` | `item_name`, `brand`, `default_price` |
+| **`job_cards`** | `vehicle_id` (UUID) | `vehicles(id)` | `reg_number`, `make_model`, `category_group` |
+| **`counter_sale_items`**| `product_id` (UUID) | `product_master(id)` | `item_name`, `brand` |
+
 ---
 
 ## Technical Data Flow Pipeline
