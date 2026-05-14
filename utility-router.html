@@ -3,41 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Utility Access Gateway - My Care ERP</title>
+    <title>Utility Operations Gateway - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: system-ui, sans-serif; background: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .router-box { background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 400px; width: 100%; box-sizing: border-box; }
-        .loader { width: 40px; height: 40px; border: 4px solid #f1f5f9; border-top-color: #2980b9; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c;
+            --utility: #64748b; --purple: #8e44ad;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--utility); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Master Hub Actions Setup */
+        .utility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .u-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
+        .u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
+        .u-card.disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--border); transform: none; box-shadow: none; }
+        .u-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px; }
+        .u-desc { font-size: 0.8rem; color: #64748b; line-height: 1.3; margin: 0; }
+        .u-access-tag { font-size: 0.65rem; font-weight: 700; color: var(--utility); margin-top: 12px; align-self: flex-start; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+
+        /* General Field Layout Rules */
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-info { background: #2980b9; }
+
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 350px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .btn-del { color: var(--danger); background: none; border: none; font-weight: 700; cursor: pointer; font-size: 1.1rem; padding: 0 4px; }
+
+        /* Workspace Views Toggling */
+        .utility-workspace { display: none; animation: fadeIn 0.2s ease-out; }
+        .utility-workspace.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-<div class="router-box">
-    <div class="loader"></div>
-    <h3 style="margin:0 0 8px 0; color:#1e293b;">Evaluating Access Context...</h3>
-    <div style="font-size:0.85rem; color:#64748b;">Routing secure session state parameters directly to mapped target destination files.</div>
+<nav class="sticky-nav">
+    <div class="logo-matrix">
+        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care System">
+        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Scooter Hub">
+    </div>
+    <div class="nav-actions">
+        <button class="btn-header btn-back" onclick="closeActiveWorkspace()">← BACK</button>
+        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+        <span id="roleDisplay" class="badge-role">GUEST</span>
+    </div>
+</nav>
+
+<div class="wrapper">
+    <div id="hubGrid" class="utility-workspace active">
+        <div class="block-title" style="margin-bottom:20px;">Enterprise Management Utilities</div>
+        <div class="utility-grid">
+            <div class="u-card" onclick="window.location.href='reports.html'">
+                <div>
+                    <h4 class="u-title">📊 Enterprise Reports</h4>
+                    <p class="u-desc">Extract localized operational ledgers, product velocities, and technician yields dynamically.</p>
+                </div>
+                <span class="u-access-tag">Access: All Users (Role-Filtered)</span>
+            </div>
+
+            <div class="u-card" onclick="openWorkspaceTarget('wsPassword')">
+                <div>
+                    <h4 class="u-title">🔑 Password Manager</h4>
+                    <p class="u-desc">Modify persistent security login tokens. Administrators unlock master array key updates.</p>
+                </div>
+                <span class="u-access-tag">Access: All Users</span>
+            </div>
+
+            <div class="u-card" onclick="window.location.href='vehicle-manager.html'">
+                <div>
+                    <h4 class="u-title">🏍️ Vehicle Management</h4>
+                    <p class="u-desc">Manage standard fleet mapping logic, add global classifications, and index missing chassis variations.</p>
+                </div>
+                <span class="u-access-tag">Access: All Users (Append: Admin/Service)</span>
+            </div>
+
+            <div class="u-card" onclick="window.location.href='brand-manager.html'">
+                <div>
+                    <h4 class="u-title">🏷️ Product Configurator</h4>
+                    <p class="u-desc">Audit master component inventories alongside standardizing multi-tier discount calculation variables.</p>
+                </div>
+                <span class="u-access-tag">Access: All Users</span>
+            </div>
+
+            <div id="cardTech" class="u-card" onclick="openWorkspaceTarget('wsTech')">
+                <div>
+                    <h4 class="u-title">👨‍🔧 Technician Ledger</h4>
+                    <p class="u-desc">Instantiate professional crew profiles, update commission models, and compile staff statements.</p>
+                </div>
+                <span class="u-access-tag" style="background:#fef3c7; color:#b45309;">Access: Workshop & Admin Only</span>
+            </div>
+
+            <div id="cardAmc" class="u-card" onclick="openWorkspaceTarget('wsAmc')">
+                <div>
+                    <h4 class="u-title">📋 AMC & Service Matrix</h4>
+                    <p class="u-desc">Staging localized maintenance frameworks, mapping periodic rate models, and issuing customer arrays.</p>
+                </div>
+                <span class="u-access-tag" style="background:#fef3c7; color:#b45309;">Access: Workshop & Admin Only</span>
+            </div>
+
+            <div id="cardArchive" class="u-card" onclick="window.location.href='archive-manager.html'">
+                <div>
+                    <h4 class="u-title">📦 Data Archiver</h4>
+                    <p class="u-desc">Download cold storage packages and parse uncompressed historical JSON schemas directly in RAM.</p>
+                </div>
+                <span class="u-access-tag" style="background:#fee2e2; color:#b91c1c;">Access: Master Admin Only</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="wsPassword" class="card-panel utility-workspace">
+        <div class="block-title">System Key Management Engine</div>
+        
+        <div id="selfPasswordBlock" style="margin-bottom:24px;">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Update Local Profile Token</span>
+            <div class="inputs-grid">
+                <div class="field-group"><label>New PIN Identifier</label><input type="password" id="pNewSelf" placeholder="Enter 4 Digits" maxlength="4"></div>
+                <div class="field-group"><label>Confirm Identifier</label><input type="password" id="pConfirmSelf" placeholder="Repeat 4 Digits" maxlength="4"></div>
+            </div>
+            <button class="btn-action" onclick="commitSelfPasswordUpdate()">COMMIT PASSWORD REVISION</button>
+        </div>
+
+        <div id="adminPasswordBlock" style="display:none; border-top:2px solid var(--border); padding-top:20px;">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--danger); display:block; margin-bottom:12px;">Administrator Override Controls</span>
+            <div class="inputs-grid">
+                <div class="field-group">
+                    <label>Target Assignment Channel</label>
+                    <select id="pTargetRole">
+                        <option value="admin">Admin Gateway</option>
+                        <option value="service">Service Gateway</option>
+                        <option value="green">Green Gateway</option>
+                        <option value="moped">Moped Gateway</option>
+                    </select>
+                </div>
+                <div class="field-group"><label>Assigned PIN Hash</label><input type="text" id="pNewAdmin" placeholder="4 Digits" maxlength="4"></div>
+            </div>
+            <button class="btn-action btn-info" onclick="commitAdminPasswordOverride()">EXECUTE SECURITY KEY RESET</button>
+        </div>
+    </div>
+
+    <div id="wsTech" class="card-panel utility-workspace">
+        <div class="block-title">Technician Core Administration Ledgers</div>
+        
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Register Professional Profile</span>
+            <div class="inputs-grid">
+                <div class="field-group"><label>Technician Name</label><input type="text" id="tName" placeholder="Full Registered Descriptor"></div>
+                <div class="field-group"><label>Labor Scalar Commission (%)</label><input type="number" id="tComm" value="10" min="0" max="100"></div>
+            </div>
+            <button class="btn-action" onclick="upsertTechnicianProfileRecord()">SAVE TECHNICIAN PROFILE</button>
+        </div>
+
+        <div class="block-title" style="font-size:0.9rem; margin-top:24px;">Active Associated Directory</div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Crew Member</th><th>Base Commission Rate</th><th>Status Indicator</th><th>Ledger Output</th><th>Action</th></tr></thead>
+                <tbody id="techDirectoryTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="wsAmc" class="card-panel utility-workspace">
+        <div class="block-title">AMC Maintenance Contracts Configuration</div>
+        
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Define Master Contract Matrix Parameters</span>
+            <div class="inputs-grid">
+                <div class="field-group">
+                    <label>Maintenance Package Scope</label>
+                    <select id="amcPackageName">
+                        <option value="Quick Service Package">Quick Service Package</option>
+                        <option value="General / Full Service Scope">General / Full Service Scope</option>
+                        <option value="Premium Restoration Coverage">Premium Restoration Coverage</option>
+                        <option value="Jumbo Advanced Maintenance">Jumbo Advanced Maintenance</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label>Target Fleet Category</label>
+                    <select id="amcCategoryGroup">
+                        <option value="Commuter Bikes">Commuter Bikes (Groups A & B)</option>
+                        <option value="Premium Bikes">Premium Bikes (Groups C through F)</option>
+                        <option value="Lifestyle Bikes">Lifestyle Bikes (Groups G & H)</option>
+                        <option value="Scooterate Hub">Scooterate Core (Groups I & K)</option>
+                    </select>
+                </div>
+                <div class="field-group"><label>Stipulated Base Billing Cost (₹)</label><input type="number" id="amcBaseRate" value="0" min="0"></div>
+            </div>
+            <button class="btn-action btn-info" onclick="upsertServicePackageRecord()">SAVE MAINTENANCE MATRIX</button>
+        </div>
+
+        <div class="block-title" style="font-size:0.9rem; margin-top:24px;">Persistent AMC Configurations Directory</div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Service Package Scope</th><th>Assigned Fleet Tier</th><th>Base Charge</th><th>Operational Track</th><th>Action</th></tr></thead>
+                <tbody id="servicePackagesTableBody"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
-    setTimeout(() => {
-        const role = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    // System Connection Database Constants
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let isSubWorkspaceActive = false;
+
+    // Evaluates visual layout parameters based natively on session access token credentials
+    function enforceAccessControlPolicies() {
+        document.getElementById('roleDisplay').innerText = activeSessionRole;
         
-        // Evaluates target permission conditions defined across Section 2(v)
-        if(role === 'admin') {
-            // Unlocks master administrative tools, brand tables, password matrices, and historical archiver endpoints
-            window.location.href = 'admin-console.html';
-        } else if(role === 'service') {
-            // Unlocks localized staff commissions alongside workshop reporting maps
-            window.location.href = 'reports.html';
-        } else if(role === 'green' || role === 'moped') {
-            // Directs line staff securely to base analytics reports tabs
-            window.location.href = 'reports.html';
-        } else {
-            alert("Session validation checks failed tracking credentials authorization paths.");
-            window.location.href = 'login.html';
+        const cardTech = document.getElementById('cardTech');
+        const cardAmc = document.getElementById('cardAmc');
+        const cardArchive = document.getElementById('cardArchive');
+
+        // Apply access constraints defined in instructions
+        if(activeSessionRole !== 'service' && activeSessionRole !== 'admin') {
+            cardTech.classList.add('disabled'); cardTech.onclick = null;
+            cardAmc.classList.add('disabled'); cardAmc.onclick = null;
         }
-    }, 600);
+        if(activeSessionRole !== 'admin') {
+            cardArchive.classList.add('disabled'); cardArchive.onclick = null;
+        } else {
+            // Unlocks master administrative tools directly inside inline modules
+            document.getElementById('adminPasswordBlock').style.display = 'block';
+        }
+    }
+
+    function openWorkspaceTarget(targetDomId) {
+        document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active'));
+        document.getElementById(targetDomId).classList.add('active');
+        isSubWorkspaceActive = true;
+        
+        if(targetDomId === 'wsTech') loadTechniciansDirectoryLedgers();
+        if(targetDomId === 'wsAmc') loadAmcPackagesDirectory();
+    }
+
+    function closeActiveWorkspace() {
+        if(isSubWorkspaceActive) {
+            document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active'));
+            document.getElementById('hubGrid').classList.add('active');
+            isSubWorkspaceActive = false;
+        } else {
+            window.location.href = 'index.html';
+        }
+    }
+
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
+    }
+
+    // --- MODULE 2: PASSWORD MANAGEMENT ENGINE ---
+    async function commitSelfPasswordUpdate() {
+        const pin1 = document.getElementById('pNewSelf').value.trim();
+        const pin2 = document.getElementById('pConfirmSelf').value.trim();
+        if(pin1.length !== 4 || pin1 !== pin2) return alert("Validation Guard: Ensure input matches identical 4-digit verification strings.");
+
+        await supabaseClient.from('system_credentials').upsert({ role_key: activeSessionRole, pin_hash: pin1 });
+        alert("Personal profile identity key parameters updated securely.");
+        document.getElementById('pNewSelf').value = ''; document.getElementById('pConfirmSelf').value = '';
+    }
+
+    async function commitAdminPasswordOverride() {
+        const targetChan = document.getElementById('pTargetRole').value;
+        const newPin = document.getElementById('pNewAdmin').value.trim();
+        if(newPin.length !== 4) return alert("Specify valid 4-digit configuration key string.");
+
+        await supabaseClient.from('system_credentials').upsert({ role_key: targetChan, pin_hash: newPin });
+        alert(`Master authorization credential parameters saved to role identity hash: ${targetChan}`);
+        document.getElementById('pNewAdmin').value = '';
+    }
+
+    // --- MODULE 5: TECHNICIAN LEDGER ENGINE ---
+    async function upsertTechnicianProfileRecord() {
+        const nameStr = document.getElementById('tName').value.trim();
+        const commVal = parseFloat(document.getElementById('tComm').value) || 0;
+        if(!nameStr) return alert("System Flow: Specify absolute target operational technician strings.");
+
+        await supabaseClient.from('mechanics').insert({ name: nameStr, commission_rate: commVal });
+        alert("Profile operational values pushed successfully.");
+        document.getElementById('tName').value = '';
+        loadTechniciansDirectoryLedgers();
+    }
+
+    async function dropTechnicianRecord(recordIdHash) {
+        if(confirm("Confirm total unlinking drops of staff directory metrics?")) {
+            await supabaseClient.from('mechanics').update({ is_active: false }).eq('id', recordIdHash);
+            loadTechniciansDirectoryLedgers();
+        }
+    }
+
+    async function loadTechniciansDirectoryLedgers() {
+        const { data: list } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('name');
+        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
+        
+        list?.forEach(t => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${t.name}</strong></td>
+                <td>${t.commission_rate || 10}% Base</td>
+                <td><span style="color:var(--success); font-weight:700;">Active</span></td>
+                <td><button onclick="downloadTechnicianLedgerStatement('${t.id}', '${t.name.replace(/'/g,"\\'")}')" style="background:none; border:none; color:var(--info); font-weight:700; cursor:pointer; text-decoration:underline;">📥 Download Ledger</button></td>
+                <td style="text-align:center;"><button class="btn-del" onclick="dropTechnicianRecord('${t.id}')">×</button></td>
+            </tr>`;
+        });
+    }
+
+    // Direct string logic compile summary arrays directly for downloading
+    async function downloadTechnicianLedgerStatement(techId, techName) {
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, labour_charges, status').eq('mech_id', techId).eq('status', 'Closed');
+        
+        let outputContentStr = `MY CARE ERP - TECHNICIAN LEDGER STATEMENT\nCrew Member: ${techName}\nExtracted: ${new Date().toISOString().split('T')[0]}\n------------------------------------------------\n\n`;
+        let calculatedLaborSubtotal = 0;
+
+        if(jobs && jobs.length > 0) {
+            jobs.forEach(j => {
+                const laborScalar = parseFloat(j.labour_charges) || 0;
+                calculatedLaborSubtotal += laborScalar;
+                outputContentStr += `Reference: JC-${j.id.split('-')[0].toUpperCase()} | Date: ${j.jc_date || 'N/A'} | Settled Labor: Rs.${laborScalar}\n`;
+            });
+            outputContentStr += `\n------------------------------------------------\nTotal Labor Generated: Rs.${calculatedLaborSubtotal}\n`;
+        } else {
+            outputContentStr += "No closed historical labor items extractable across verified database configurations.\n";
+        }
+
+        const blobFile = new Blob([outputContentStr], { type: 'text/plain' });
+        const downloadElement = document.createElement('a');
+        downloadElement.href = URL.createObjectURL(blobFile);
+        downloadElement.download = `Ledger_Statement_${techName.replace(/\s+/g,'_')}.txt`;
+        downloadElement.click();
+        URL.revokeObjectURL(downloadElement.href);
+    }
+
+    // --- MODULE 6: AMC & SERVICE PACKAGES ENGINE ---
+    async function upsertServicePackageRecord() {
+        const pName = document.getElementById('amcPackageName').value;
+        const pCat = document.getElementById('amcCategoryGroup').value;
+        const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0;
+
+        await supabaseClient.from('service_packages').upsert({
+            package_name: pName, vehicle_category: pCat, base_rate: pRate
+        });
+
+        alert("AMC Package constraints map established securely.");
+        loadAmcPackagesDirectory();
+    }
+
+    async function dropServicePackageRecord(recordIdHash) {
+        if(confirm("Confirm dynamic state drop of target system operational service mapping?")) {
+            await supabaseClient.from('service_packages').delete().eq('id', recordIdHash);
+            loadAmcPackagesDirectory();
+        }
+    }
+
+    async function loadAmcPackagesDirectory() {
+        const { data: packages } = await supabaseClient.from('service_packages').select('*').order('vehicle_category').order('package_name');
+        const tbody = document.getElementById('servicePackagesTableBody'); tbody.innerHTML = '';
+        
+        packages?.forEach(pkg => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${pkg.package_name}</strong></td>
+                <td>${pkg.vehicle_category}</td>
+                <td><strong>₹${pkg.base_rate}</strong></td>
+                <td><span style="color:var(--service); font-weight:700;">Standard Integration</span></td>
+                <td style="text-align:center;"><button class="btn-del" onclick="dropServicePackageRecord('${pkg.id}')">×</button></td>
+            </tr>`;
+        });
+    }
+
+    enforceAccessControlPolicies();
 </script>
 </body>
 </html>
