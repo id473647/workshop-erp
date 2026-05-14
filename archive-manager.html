@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cold Storage Archival Engine - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --info: #2980b9; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c;
+            --admin: #34495e; --archive: #64748b;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 4px; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: var(--archive); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Interactive Tabs Interface */
+        .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
+        .tab-btn:hover:not(.active) { color: var(--primary); }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.15s; }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-danger { background: var(--danger); }
+        .btn-info { background: var(--info); }
+        
+        /* Drag and Drop Offline Target Box Rules */
+        .drop-zone { border: 2px dashed #cbd5e1; background: #f8fafc; border-radius: 10px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.15s; }
+        .drop-zone.dragover { border-color: var(--info); background: #f0f7ff; }
+        .drop-zone input[type="file"] { display: none; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 16px; max-height: 400px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        
+        .access-block-alert { background: #fee2e2; color: #b91c1c; padding: 20px; border-radius: 8px; border: 1px solid #fca5a5; font-weight: 700; text-align: center; margin-top: 40px; display: none; }
+        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .view-panel { display: none; }
+        .view-panel.active { display: block; }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">COLD STORAGE ARCHIVER</span>
+</nav>
+
+<div id="unauthorizedBlock" class="wrapper" style="display:none;">
+    <div class="access-block-alert" style="display:block;">
+        🔒 SYSTEM AUTHORIZATION FAULT: RESTRICTED ACCESS BOUNDARY<br><br>
+        <span style="font-size:0.85rem; font-weight:normal;">Your active local session credentials do not contain administrative root authority. Authenticate via master administrative verification parameters to unlock infrastructure management modules.</span>
+    </div>
+</div>
+
+<div id="authorizedConsole" class="wrapper" style="display:none;">
+    <div class="card-panel">
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchSystemPanel('panelExport')">Cloud Infrastructure Archiver</button>
+            <button class="tab-btn" onclick="switchSystemPanel('panelBrowser')">Offline Archive Terminal</button>
+        </div>
+
+        <div id="panelExport" class="view-panel active">
+            <div style="background:#fffbeb; border:1px solid #fde68a; padding:16px; border-radius:8px; margin-bottom:20px;">
+                <span style="font-size:0.85rem; font-weight:700; color:#d97706; display:block; margin-bottom:6px;">Automated Horizon Targeting</span>
+                <div style="font-size:0.85rem; color:#475569;">
+                    System calculations dynamically identify records aged past an absolute <strong>18-month historic boundary</strong>. Targeted operational transactions are extracted cleanly before manual storage release authorization.
+                </div>
+                <div style="margin-top:8px; font-weight:700; color:var(--primary); font-size:0.9rem;">
+                    Calculated Extraction Window: Records prior to <span id="calculatedHorizonDate" style="color:var(--info);">--</span>
+                </div>
+            </div>
+
+            <button id="btnTriggerExport" class="btn-action btn-info" style="width:100%; margin-bottom:24px;" onclick="executeCloudDataExport()">
+                <span>📦 DOWNLOAD AGED ARCHIVE (JSON)</span>
+                <div id="exportSpinner" class="loading-ring"></div>
+            </button>
+
+            <div style="border-top:2px solid var(--border); padding-top:20px;">
+                <span style="font-size:0.95rem; font-weight:700; color:var(--danger); display:block; margin-bottom:12px;">Stage 2: Local Purge Verification</span>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                    <input type="checkbox" id="chkVerifyPurge" onchange="togglePurgeSafetyInterlock(this.checked)" style="width:auto; margin:0;">
+                    <label for="chkVerifyPurge" style="font-size:0.85rem; color:var(--text); text-transform:none; cursor:pointer;">
+                        I verify the archive payload downloaded perfectly to local media storage. Authorize deletion drop command to release active cloud server metrics.
+                    </label>
+                </div>
+                <button id="btnTriggerPurge" class="btn-action btn-danger" style="width:100%; opacity:0.5;" disabled onclick="executeCloudDataPurge()">
+                    <span>⚠️ EXECUTE VERIFIED DATA DROP</span>
+                    <div id="purgeSpinner" class="loading-ring"></div>
+                </button>
+            </div>
+        </div>
+
+        <div id="panelBrowser" class="view-panel">
+            <div id="dropZoneContainer" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div style="font-size:1rem; font-weight:700; color:var(--primary);">Select Archive Target or Drag-and-Drop File</div>
+                <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">Parses uncompressed archive payloads locally directly into system RAM loops.</div>
+                <input type="file" id="fileInput" accept=".json" onchange="processLocalArchivePayload(this.files[0])">
+            </div>
+
+            <div id="parsedDataView" style="display:none; margin-top:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:12px; border-radius:8px; margin-bottom:16px;">
+                    <div>
+                        <span style="font-size:0.75rem; font-weight:700; color:#64748b; display:block;">Active Memory Mapping Cache</span>
+                        <strong id="loadedFileName" style="color:var(--primary); font-size:0.95rem;">--</strong>
+                    </div>
+                    <button class="btn-action btn-danger" style="padding:6px 12px; font-size:0.75rem;" onclick="clearActiveMemoryBuffers()">Close Document / Eject RAM</button>
+                </div>
+
+                <div class="inputs-grid">
+                    <div class="field-group"><label>Filter Identity Context</label><input type="text" id="sClient" placeholder="Type Mobile or Name..." oninput="renderMemoryDataArrays()"></div>
+                    <div class="field-group"><label>Filter Document Hash</label><input type="text" id="sHash" placeholder="e.g. JC- / POS-" oninput="renderMemoryDataArrays()"></div>
+                </div>
+
+                <div style="font-weight:700; font-size:0.85rem; color:var(--primary); margin-top:10px;">Workshop Services Archive</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Job Hash Reference</th><th>Client Contact</th><th>Compile Date</th><th>Net Valuation</th></tr></thead>
+                        <tbody id="memoryJcBody"></tbody>
+                    </table>
+                </div>
+
+                <div style="font-weight:700; font-size:0.85rem; color:var(--primary); margin-top:20px;">Retail Counters Archive</div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>POS Hash Reference</th><th>Client Contact</th><th>Compile Date</th><th>Net Valuation</th></tr></thead>
+                        <tbody id="memoryPosBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // System Cloud Access Setup
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let targetCutoffDateIso = null;
+    let localMemoryArchiveCache = { jc: [], pos: [] };
+
+    function initializeSecurityDirectives() {
+        if(activeSessionRole === 'admin') {
+            document.getElementById('authorizedConsole').style.display = 'block';
+            
+            // Calculate absolute 18-month historical cutoff horizons natively
+            const dt = new Date();
+            dt.setMonth(dt.getMonth() - 18);
+            targetCutoffDateIso = dt.toISOString();
+            document.getElementById('calculatedHorizonDate').innerText = dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            
+            initializeDragAndDropListeners();
+        } else {
+            document.getElementById('unauthorizedBlock').style.display = 'block';
+        }
+    }
+
+    function switchSystemPanel(targetPanelId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+        document.getElementById(targetPanelId).classList.add('active');
+    }
+
+    function toggleLoaderState(btnId, spinnerId, isRunning) {
+        const btn = document.getElementById(btnId);
+        const spin = document.getElementById(spinnerId);
+        if(!btn || !spin) return;
+        btn.disabled = isRunning;
+        spin.style.display = isRunning ? 'inline-block' : 'none';
+        btn.style.opacity = isRunning ? '0.7' : '1';
+    }
+
+    // --- STAGE 1: AUTOMATED EXPORT LOGIC ---
+    async function executeCloudDataExport() {
+        if(!targetCutoffDateIso) return alert("System Calibration Error: Awaiting target compilation timelines.");
+        toggleLoaderState('btnTriggerExport', 'exportSpinner', true);
+
+        try {
+            // Trigger server RPC functions pulling targeted compilation structures natively
+            const { data: archiveJson, error } = await supabaseClient.rpc('export_aged_archive', { archive_cutoff: targetCutoffDateIso });
+            
+            if(error) return alert("RPC Processing Failure:\n" + error.message);
+            if(!archiveJson || (!archiveJson.archived_jobs && !archiveJson.archived_pos)) {
+                return alert("Storage Audit Output: No completed operations record sets discovered prior to boundary target.");
+            }
+
+            // Convert server objects to static downloadable binary file elements
+            const dataStringPayload = JSON.stringify(archiveJson, null, 2);
+            const blobObj = new Blob([dataStringPayload], { type: 'application/json' });
+            const temporaryAnchor = document.createElement('a');
+            temporaryAnchor.href = URL.createObjectURL(blobObj);
+            temporaryAnchor.download = `MyCare_OfflineArchive_Pre_${targetCutoffDateIso.split('T')[0]}.json`;
+            temporaryAnchor.click();
+            URL.revokeObjectURL(temporaryAnchor.href);
+
+            alert("Payload generated successfully! Binary payload compiling to designated client browser file system paths.");
+        } catch(e) {
+            alert("Network compilation timeout during server array bundle execution routines.");
+        } finally {
+            toggleLoaderState('btnTriggerExport', 'exportSpinner', false);
+        }
+    }
+
+    // --- STAGE 2: LOCAL PURGE INTERLOCK CONTROLS ---
+    function togglePurgeSafetyInterlock(isVerified) {
+        const triggerBtn = document.getElementById('btnTriggerPurge');
+        triggerBtn.disabled = !isVerified;
+        triggerBtn.style.opacity = isVerified ? '1' : '0.5';
+    }
+
+    async function executeCloudDataPurge() {
+        if(!confirm("CRITICAL HORIZON BREACH: Directives target permanent database row deletion operations. Active records matching conditions will drop entirely. Have you securely backed up downloaded storage metrics?")) return;
+        
+        toggleLoaderState('btnTriggerPurge', 'purgeSpinner', true);
+
+        try {
+            const { data: isDropped, error } = await supabaseClient.rpc('purge_verified_aged_archive', { archive_cutoff: targetCutoffDateIso });
+            if(error) return alert("System Intercept Block:\n" + error.message);
+            
+            alert("Aged storage arrays unlinked completely. Live SQL storage maps purged securely.");
+            document.getElementById('chkVerifyPurge').checked = false;
+            togglePurgeSafetyInterlock(false);
+        } catch(e) {
+            alert("Server connection parameters failed processing target drop sequences.");
+        } finally {
+            toggleLoaderState('btnTriggerPurge', 'purgeSpinner', false);
+        }
+    }
+
+    // --- STAGE 3: OFFLINE ON-DEMAND LOCAL ACCESS ENGINE ---
+    function initializeDragAndDropListeners() {
+        const dropBox = document.getElementById('dropZoneContainer');
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropBox.addEventListener(eventName, e => { e.preventDefault(); dropBox.classList.add('dragover'); }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropBox.addEventListener(eventName, e => { e.preventDefault(); dropBox.classList.remove('dragover'); }, false);
+        });
+        dropBox.addEventListener('drop', e => {
+            const uploadedTarget = e.dataTransfer.files[0];
+            if(uploadedTarget && uploadedTarget.name.endsWith('.json')) processLocalArchivePayload(uploadedTarget);
+            else alert("Configuration parsing fault: Upload verification rules support strict JSON target extensions only.");
+        }, false);
+    }
+
+    function processLocalArchivePayload(fileObj) {
+        if(!fileObj) return;
+        const reader = new FileReader();
+        
+        reader.onload = function(evt) {
+            try {
+                const uncompressedJson = JSON.parse(evt.target.result);
+                localMemoryArchiveCache.jc = uncompressedJson.archived_jobs || [];
+                localMemoryArchiveCache.pos = uncompressedJson.archived_pos || [];
+                
+                document.getElementById('loadedFileName').innerText = fileObj.name;
+                document.getElementById('dropZoneContainer').style.display = 'none';
+                document.getElementById('parsedDataView').style.display = 'block';
+                
+                renderMemoryDataArrays();
+            } catch(e) {
+                alert("Decoupled format read abort: Target document structure failed memory JSON extraction checks.");
+            }
+        };
+        reader.readAsText(fileObj);
+    }
+
+    function renderMemoryDataArrays() {
+        const qClient = document.getElementById('sClient').value.trim().toLowerCase();
+        const qHash = document.getElementById('sHash').value.trim().toLowerCase();
+        
+        const jBody = document.getElementById('memoryJcBody');
+        const pBody = document.getElementById('memoryPosBody');
+        jBody.innerHTML = ''; pBody.innerHTML = '';
+
+        // Filter and compile Workshop arrays natively inside memory loops
+        const jcFiltered = localMemoryArchiveCache.jc.filter(j => {
+            if(!j) return false;
+            const matchClient = (j.customer_mobile && j.customer_mobile.toLowerCase().includes(qClient)) || (j.customer_name && j.customer_name.toLowerCase().includes(qClient));
+            const matchHash = j.id && j.id.toLowerCase().includes(qHash);
+            return (!qClient || matchClient) && (!qHash || matchHash);
+        }).slice(0, 50);
+
+        if(jcFiltered.length > 0) {
+            jcFiltered.forEach(j => {
+                const dStr = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : 'N/A';
+                jBody.innerHTML += `<tr><td><strong>JC-${j.id.split('-')[0].toUpperCase()}</strong></td><td>${j.customer_mobile || 'Walk-in'}</td><td>${dStr}</td><td><strong>₹${j.total_invoice_value || 0}</strong></td></tr>`;
+            });
+        } else jBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:#888;">No historical workshop elements map selection boundaries.</td></tr>';
+
+        // Filter and compile Counter POS arrays natively inside memory loops
+        const posFiltered = localMemoryArchiveCache.pos.filter(p => {
+            if(!p) return false;
+            const matchClient = (p.customer_mobile && p.customer_mobile.toLowerCase().includes(qClient)) || (p.customer_name && p.customer_name.toLowerCase().includes(qClient));
+            const matchHash = p.id && p.id.toLowerCase().includes(qHash);
+            return (!qClient || matchClient) && (!qHash || matchHash);
+        }).slice(0, 50);
+
+        if(posFiltered.length > 0) {
+            posFiltered.forEach(p => {
+                const dStr = p.created_at ? new Date(p.created_at).toLocaleDateString() : 'N/A';
+                pBody.innerHTML += `<tr><td><strong>POS-${p.id.split('-')[0].toUpperCase()}</strong></td><td>${p.customer_mobile || 'Walk-in'}</td><td>${dStr}</td><td><strong>₹${p.total_amount || 0}</strong></td></tr>`;
+            });
+        } else pBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:#888;">No counter records match parameters.</td></tr>';
+    }
+
+    function clearActiveMemoryBuffers() {
+        localMemoryArchiveCache = { jc: [], pos: [] };
+        document.getElementById('fileInput').value = '';
+        document.getElementById('sClient').value = ''; document.getElementById('sHash').value = '';
+        document.getElementById('parsedDataView').style.display = 'none';
+        document.getElementById('dropZoneContainer').style.display = 'block';
+    }
+
+    initializeSecurityDirectives();
+</script>
+</body>
+</html>
