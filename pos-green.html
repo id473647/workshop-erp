@@ -7,18 +7,23 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; }
+        :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; --info: #2980b9; --danger: #e74c3c; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* Universal Standards: Centered layouts bound to a strict 950px container */
+        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
-        .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
         .field-group { display: flex; flex-direction: column; gap: 4px; position: relative; }
@@ -40,11 +45,21 @@
 
         .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 8px; display: none; }
 
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+        /* Integrated Historical Management Layout Block */
+        .search-strip { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: flex-end; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .search-strip .field-group { flex: 1; min-width: 130px; }
+        .search-strip input { padding: 8px; font-size: 0.85rem; }
+        
+        .view-switcher-bar { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+        .switch-btn { padding: 8px 14px; border: none; background: none; font-size: 0.85rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 6px; white-space: nowrap; }
+        .switch-btn.active { background: var(--primary); color: white; }
+        .switch-btn:hover:not(.active) { background: #f1f5f9; color: var(--primary); }
+
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 10px; max-height: 400px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
-        .clickable-ref { color: var(--primary); font-weight: 700; text-decoration: underline; cursor: pointer; }
+        .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
         
         .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: none; }
         .autocomplete-item { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
@@ -53,7 +68,7 @@
         .inline-item-row { display: grid; grid-template-columns: 2fr 1.2fr 0.8fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 10px; position: relative; }
         .inline-num { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 700; color: var(--primary); text-align: center; box-sizing: border-box; }
         .btn-add-line { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
-        .btn-del-line { color: #ef4444; background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
+        .btn-del-line { color: var(--danger); background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
 
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -85,14 +100,24 @@
         .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
 
         @media print { body * { visibility: hidden; } #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; } }
+        
+        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
-    <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <span class="badge-role">RETAIL POS TERMINAL</span>
+    <div class="logo-matrix">
+        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care System">
+        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Center">
+    </div>
+    <div class="nav-actions">
+        <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+        <span id="roleDisplay" class="badge-role">POS ENGINE</span>
+    </div>
 </nav>
 
 <div class="wrapper">
@@ -124,12 +149,33 @@
             </div>
         </div>
 
-        <div id="masterRegisterBlock" style="margin-top:32px;">
-            <div class="block-title">Historical Terminal Register</div>
+        <div id="masterHistoryBlock" style="margin-top:32px;">
+            <div class="block-title">Retail POS Operational Registers</div>
+            
+            <div class="search-strip">
+                <div class="field-group"><label>Target Contact</label><input type="text" id="fPhone" placeholder="Mobile Index..." oninput="queryPosHistoryEngine()"></div>
+                <div class="field-group"><label>Min Value (₹)</label><input type="number" id="fMin" placeholder="0" min="0" oninput="queryPosHistoryEngine()"></div>
+                <div class="field-group"><label>Max Value (₹)</label><input type="number" id="fMax" placeholder="No Limit" min="0" oninput="queryPosHistoryEngine()"></div>
+                <div class="field-group"><label>Start Horizon</label><input type="date" id="fStart" onchange="queryPosHistoryEngine()"></div>
+                <div class="field-group"><label>End Horizon</label><input type="date" id="fEnd" onchange="queryPosHistoryEngine()"></div>
+                <button class="btn-header" style="background:var(--primary); color:white; padding:8px 12px; height:35px; border:none;" onclick="resetPosFilters()">RESET</button>
+            </div>
+
+            <div class="view-switcher-bar">
+                <button class="switch-btn active" onclick="switchPosHistoryTab('AgedCredit')">Aged Credit Bills</button>
+                <button class="switch-btn" onclick="switchPosHistoryTab('HistorySales')">History Sales</button>
+                <button class="switch-btn" onclick="switchPosHistoryTab('UpiCard')">UPI / Card Sales</button>
+                <button class="switch-btn" onclick="switchPosHistoryTab('Estimates')">Saved Estimates (Drafts)</button>
+            </div>
+
+            <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;">
+                *Note: Output renders top 10 bounds natively. Triggering specific numeric or date bounds parses deep matching sets entirely. Draft Estimates self-terminate automatically post-24 hours.
+            </div>
+
             <div class="table-wrapper">
                 <table>
-                    <thead><tr><th>Invoice Hash</th><th>Mobile Index</th><th>Valuation</th><th>Status</th></tr></thead>
-                    <tbody id="masterRegisterBody"></tbody>
+                    <thead><tr><th>Invoice Hash</th><th>Client Hash</th><th>Valuation</th><th>Status Flag</th><th>Compile Date</th></tr></thead>
+                    <tbody id="posHistoryTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Fetching operational transactions...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -153,7 +199,7 @@
                     <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, 0)" onblur="hideAutocomplete(0)">
                     <div id="autolist-0" class="autocomplete-container"></div>
                 </div>
-                <input type="text" placeholder="Brand Name" class="i-brand" oninput="enforceBrandCapitalization(this)" onblur="evaluateRuleDiscounts(0)">
+                <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(0)">
                 <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
                 <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
                 <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
@@ -277,16 +323,25 @@
 </div>
 
 <script>
+    // Primary API Driver Configuration
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     let evaluatedPhoneContext = null;
     let targetInspectionRecordId = null;
     let inspectedRecordObject = null;
     let targetCustomerProfile = null;
     let globalCatalogCache = [];
     let rowSequenceIndex = 1;
+    let currentPosTabMode = 'AgedCredit';
+
+    // Executes access isolation update loops directly
+    function evaluateInterfaceBranding() {
+        document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
+        queryPosHistoryEngine();
+    }
 
     function enforceTitleCaseNomenclature(str) {
         if(!str) return '';
@@ -311,10 +366,97 @@
         return helper(num) + ' Rupees Only';
     }
 
+    // --- INTEGRATED MULTIFUNCTIONAL POS HISTORY ENGINE ---
+    function switchPosHistoryTab(tabTargetStr) {
+        document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        currentPosTabMode = tabTargetStr;
+        queryPosHistoryEngine();
+    }
+
+    function resetPosFilters() {
+        document.getElementById('fPhone').value = '';
+        document.getElementById('fMin').value = '';
+        document.getElementById('fMax').value = '';
+        document.getElementById('fStart').value = '';
+        document.getElementById('fEnd').value = '';
+        queryPosHistoryEngine();
+    }
+
+    // Dynamic Filter Mapping Pipeline: Safely executes absolute parameters decoupling initial bounds conditionally
+    async function queryPosHistoryEngine() {
+        const phoneVal = document.getElementById('fPhone').value.trim().toLowerCase();
+        const minVal = parseFloat(document.getElementById('fMin').value);
+        const maxVal = parseFloat(document.getElementById('fMax').value);
+        const startVal = document.getElementById('fStart').value;
+        const endVal = document.getElementById('fEnd').value;
+        
+        // Failsafe cleanup hook drops older leftover stale draft estimate frameworks natively
+        if(currentPosTabMode === 'Estimates') {
+            const yesterdayString = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
+            supabaseClient.from('counter_sales').delete().eq('status', 'Open').lt('created_at', yesterdayString).then();
+        }
+
+        let baseQuery = supabaseClient.from('counter_sales').select('*');
+
+        // Condition evaluation block routing target structures safely
+        if(currentPosTabMode === 'AgedCredit') {
+            baseQuery = baseQuery.eq('payment_mode', 'Credit').eq('status', 'Closed').order('created_at', { ascending: true });
+        } else if(currentPosTabMode === 'HistorySales') {
+            baseQuery = baseQuery.eq('status', 'Closed').order('created_at', { ascending: false });
+        } else if(currentPosTabMode === 'UpiCard') {
+            baseQuery = baseQuery.eq('payment_mode', 'UPI').eq('status', 'Closed').order('created_at', { ascending: false });
+        } else if(currentPosTabMode === 'Estimates') {
+            baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false });
+        }
+
+        // Conditionally drops artificial limitations natively when custom constraints filter sets
+        const hasActiveFilters = phoneVal || !isNaN(minVal) || !isNaN(maxVal) || startVal || endVal;
+        if(!hasActiveFilters) baseQuery = baseQuery.limit(10);
+
+        if(!isNaN(minVal)) baseQuery = baseQuery.gte('total_amount', minVal);
+        if(!isNaN(maxVal)) baseQuery = baseQuery.lte('total_amount', maxVal);
+        if(startVal) baseQuery = baseQuery.gte('created_at', startVal);
+        if(endVal) baseQuery = baseQuery.lte('created_at', endVal + 'T23:59:59');
+
+        const { data: registers, error } = await baseQuery;
+        const tbody = document.getElementById('posHistoryTableBody');
+        tbody.innerHTML = '';
+
+        if(error) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center;">History Connection Fault: ${error.message}</td></tr>`;
+            return;
+        }
+
+        const resolvedOutput = (registers || []).filter(row => {
+            const matchPhone = row.customer_mobile && row.customer_mobile.toLowerCase().includes(phoneVal);
+            return (!phoneVal || matchPhone);
+        });
+
+        if(resolvedOutput.length > 0) {
+            resolvedOutput.forEach(sale => {
+                const stylePill = sale.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
+                const dateStr = sale.created_at ? new Date(sale.created_at).toLocaleDateString() : 'N/A';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><span class="clickable-ref" onclick="instantiateInspectionScope('${sale.id}')">POS-${sale.id.split('-')[0].toUpperCase()}</span></td>
+                        <td>${sale.customer_mobile || 'Walk-in'}<br><span style="font-size:0.7rem; color:#64748b;">${sale.customer_name || ''}</span></td>
+                        <td><strong>₹${sale.total_amount || 0}</strong></td>
+                        <td><span class="status-pill" style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${sale.status}</span></td>
+                        <td>${dateStr}</td>
+                    </tr>`;
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No checkout encounters matched requested parameters.</td></tr>`;
+        }
+    }
+
+    // --- POS ACCOUNT VERIFICATION ENGINE ---
     async function processAutonomousPhoneSearch(phoneStringVal) {
         const cleanStr = phoneStringVal.trim();
         if(cleanStr.length !== 10) {
-            document.getElementById('masterRegisterBlock').style.display = 'block';
+            document.getElementById('masterHistoryBlock').style.display = 'block';
             document.getElementById('recentSalesBlock').style.display = 'none';
             document.getElementById('creditAlertBox').style.display = 'none';
             document.getElementById('accountCategoryDisplay').style.display = 'none';
@@ -325,7 +467,7 @@
         }
         
         evaluatedPhoneContext = cleanStr;
-        document.getElementById('masterRegisterBlock').style.display = 'none';
+        document.getElementById('masterHistoryBlock').style.display = 'none'; // Hides master register natively during checkout sequences
 
         const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
         const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
@@ -414,10 +556,7 @@
         const listContainer = document.getElementById(`autolist-${targetIdx}`);
         listContainer.innerHTML = '';
         
-        if(searchVal.length < 2) {
-            listContainer.style.display = 'none';
-            return;
-        }
+        if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
 
         const filtered = globalCatalogCache.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 15);
         
@@ -430,9 +569,7 @@
                     </div>`;
             });
             listContainer.style.display = 'block';
-        } else {
-            listContainer.style.display = 'none';
-        }
+        } else listContainer.style.display = 'none';
     }
 
     function hideAutocomplete(targetIdx) {
@@ -488,7 +625,7 @@
                 <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})">
                 <div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div>
             </div>
-            <input type="text" placeholder="Brand Name" class="i-brand" oninput="enforceBrandCapitalization(this)" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
+            <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
             <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
             <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
             <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
@@ -517,6 +654,7 @@
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
+        // Stage primary checkout record wrapping parallel promises array
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
             customer_mobile: evaluatedPhoneContext, 
             customer_name: enforceTitleCaseNomenclature(mappedClientName), 
@@ -547,18 +685,13 @@
                     const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
                     
                     supabaseClient.from('product_master').upsert({ 
-                        item_name: cleanSpec, 
-                        brand: cleanBrand, 
-                        warehouse_type: 'Green',
-                        default_price: rScalar
-                    }).then().catch(e => console.warn("Catalog indexing fault:", e));
+                        item_name: cleanSpec, brand: cleanBrand, warehouse_type: 'Green', default_price: rScalar
+                    }).then().catch(e => console.warn("Catalog indexing line pass:", e));
                     
                     const promiseWrite = supabaseClient.from('counter_sale_items').insert({ 
                         sale_id: finalRecord.id, 
                         item_name: `${cleanSpec} (${cleanBrand})`, 
-                        qty: qScalar, 
-                        unit_price: rScalar, 
-                        total_price: finalNetTotal 
+                        qty: qScalar, unit_price: rScalar, total_price: finalNetTotal 
                     });
                     itemPromises.push(promiseWrite);
                 }
@@ -573,20 +706,7 @@
         }
     }
 
-    async function loadTerminalRegister() {
-        const { data: fullRegister } = await supabaseClient.from('counter_sales').select('*').order('created_at', { ascending: false }).limit(20);
-        const tbody = document.getElementById('masterRegisterBody'); tbody.innerHTML = '';
-        fullRegister?.forEach(inst => {
-            const stylePill = inst.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
-            tbody.innerHTML += `<tr>
-                <td><span class="clickable-ref" onclick="instantiateInspectionScope('${inst.id}')">POS-${inst.id.split('-')[0].toUpperCase()}</span></td>
-                <td>${inst.customer_mobile || 'Unmapped'}</td>
-                <td><strong>₹${inst.total_amount}</strong></td>
-                <td><span style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${inst.status || 'Closed'}</span></td>
-            </tr>`;
-        });
-    }
-
+    // --- POPULATING 3-INCH STACKED THERMAL DOCUMENT MATRIX ---
     async function instantiateInspectionScope(id) {
         targetInspectionRecordId = id;
         
@@ -686,9 +806,7 @@
         await supabaseClient.from('counter_sale_items').insert({ 
             sale_id: targetInspectionRecordId, 
             item_name: `${cleanPartStr} (Appended)`, 
-            qty: qVal, 
-            unit_price: rVal, 
-            total_price: newScalarNet 
+            qty: qVal, unit_price: rVal, total_price: newScalarNet 
         });
 
         const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0;
@@ -701,7 +819,7 @@
         document.getElementById('thWords').innerText = convertNumberToWords(compiledUpdatedNet);
         
         document.getElementById('revPart').value = ''; document.getElementById('revQty').value = ''; document.getElementById('revRate').value = '';
-        refreshInspectionLineItems(true); loadTerminalRegister();
+        refreshInspectionLineItems(true); queryPosHistoryEngine();
     }
 
     async function executeLineDeletion(lineId, lineAmount) {
@@ -715,7 +833,7 @@
             
             document.getElementById('thNet').innerText = `₹${adjustedNet}`;
             document.getElementById('thWords').innerText = convertNumberToWords(adjustedNet);
-            refreshInspectionLineItems(true); loadTerminalRegister();
+            refreshInspectionLineItems(true); queryPosHistoryEngine();
         }
     }
 
@@ -726,7 +844,7 @@
         document.getElementById('thMode').innerText = nextMode;
         document.getElementById('creditModifierInterface').style.display = 'none';
         alert(`Record cleanly converted to settlement method: ${nextMode}`);
-        loadTerminalRegister();
+        queryPosHistoryEngine();
     }
 
     function closeInspectionModal() { document.getElementById('modalInspectInvoice').style.display = 'none'; }
@@ -742,7 +860,7 @@
                 const fileInst = new File([blob], `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`, { type: "image/jpeg" });
                 
                 if(navigator.canShare && navigator.canShare({ files: [fileInst] })) {
-                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share check skipped:", e));
+                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share logic aborted:", e));
                 } else {
                     window.open(targetBlobUrl, '_blank');
                     alert("Document rendered to Blob layout cleanly. Please download and upload the resulting receipt preview directly into WhatsApp.");
@@ -751,7 +869,13 @@
         });
     }
 
-    loadTerminalRegister();
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
+    }
+
+    // Auto-launch interface processing sequence instantly
+    evaluateInterfaceBranding();
 </script>
 </body>
 </html>
