@@ -3,189 +3,410 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floor Command - My Care ERP</title>
+    <title>Command Center Dashboard - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
-            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f1c40f; 
-            --light: #f4f7f6; --border: #e2e8f0; --text-main: #1e293b;
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c;
+            --purple: #8e44ad; --utility: #64748b;
         }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding: 0; color: var(--text-main); }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* Master Layout Constraint: Centered Navigation Box */
-        .top-nav { 
-            max-width: 950px; 
-            margin: 0 auto; 
-            background: white; 
-            padding: 12px 20px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            border-bottom: 2px solid var(--border); 
-            box-sizing: border-box; 
-        }
-        .nav-brand { display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--primary); }
-        .nav-brand img { height: 32px; }
-        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 6px 16px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
-        .user-console { display: flex; align-items: center; gap: 12px; }
-        .role-pill { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-        .logout-btn { color: #ef4444; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: none; }
+        /* Universal Standards: Header arrays enforcing persistent functional anchors */
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Dashboard Container Block: Formats continuous metrics rows */
+        .dashboard-matrix-strip { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-behavior: smooth; margin-bottom: 20px; }
+        .matrix-card { min-width: 210px; flex: 1; background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+        .matrix-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .card-meta-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .card-big-num { font-size: 1.4rem; font-weight: 700; color: var(--primary); margin: 2px 0; }
+        .card-sub-metric { font-size: 0.75rem; color: #64748b; display: block; margin-top: 4px; }
+        
+        /* Card Specific Identification Accents */
+        .border-green { border-left: 4px solid var(--success); }
+        .border-moped { border-left: 4px solid var(--moped); }
+        .border-lube { border-left: 4px solid var(--purple); }
+        .border-staff { border-left: 4px solid var(--service); }
+        .border-pos { border-left: 4px solid var(--danger); }
 
-        /* Metrics Display */
-        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .metric-card { background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); border-top: 4px solid var(--primary); }
-        .metric-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        .metric-value { font-size: 1.25rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
-
-        /* Action Nav Matrix */
-        .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .action-btn { padding: 12px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 700; color: white; cursor: pointer; text-align: center; text-decoration: none; display: none; }
+        /* Scoped Action Navigation Blocks */
+        .navigation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .action-btn { padding: 14px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; text-decoration: none; color: white; text-align: center; display: block; transition: opacity 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .action-btn:hover { opacity: 0.9; }
         .bg-green { background: var(--success); }
         .bg-moped { background: var(--moped); }
-        .bg-service { background: var(--primary); }
-        .bg-console { background: #475569; }
+        .bg-service { background: var(--service); }
+        .bg-retail { background: var(--danger); }
+        .bg-utility { background: var(--utility); }
 
-        /* Execution Pipeline Stack */
-        .section-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-        .section-bar h2 { font-size: 1.1rem; margin: 0; color: var(--primary); }
-        .refresh-trigger { border: none; background: none; color: var(--primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; }
-
-        .pipeline-stack { display: flex; flex-direction: column; gap: 12px; }
-        .dispatch-card { background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        /* Integrated Historical Management Layout Block */
+        .search-strip { display: flex; gap: 8px; margin-bottom: 16px; }
+        .search-strip input, .search-strip select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; box-sizing: border-box; }
+        .search-strip input { flex: 1; }
         
-        /* Persistent Visual Edge Rules */
-        .source-edge-green { border-left: 6px solid var(--success); }
-        .source-edge-moped { border-left: 6px solid var(--moped); }
-        .source-edge-service { border-left: 6px solid var(--service); }
-
-        .card-primary { font-size: 1.1rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; }
-        .card-meta { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
-        .prepaid-badge { background: #f1f5f9; color: #0f766e; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        .card-valuation { font-size: 1.2rem; font-weight: 700; color: var(--success); }
+        .view-switcher-bar { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+        .switch-btn { padding: 6px 12px; border: none; background: none; font-size: 0.8rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 4px; white-space: nowrap; }
+        .switch-btn.active { background: var(--primary); color: white; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; max-height: 400px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
+        
+        /* Modal Framework */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        
+        .status-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
     </style>
 </head>
 <body>
 
-<nav class="top-nav">
-    <div class="nav-brand">
-        <img src="logo-main.jpg" onerror="this.style.display='none'">
-        <span>MY CARE</span>
+<nav class="sticky-nav">
+    <div class="logo-matrix">
+        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care">
+        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Scooter">
     </div>
-    <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <div class="user-console">
-        <span id="roleIndicator" class="role-pill">GUEST</span>
-        <a href="login.html" class="logout-btn" onclick="flushSession()">LOGOUT</a>
+    <div class="nav-actions">
+        <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+        <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
 </nav>
 
 <div class="wrapper">
-    <div class="metrics-grid">
-        <div class="metric-card"><div class="metric-label">Green Spares Flow</div><div id="mGreen" class="metric-value">₹0</div></div>
-        <div class="metric-card"><div class="metric-label">Moped Warehouse Net</div><div id="mMoped" class="metric-value">₹0</div></div>
-        <div class="metric-card"><div class="metric-label">Lubricants Allocation</div><div id="mLube" class="metric-value">₹0</div></div>
-        <div class="metric-card"><div class="metric-label">Net Staff Payable</div><div id="mStaff" class="metric-value">₹0</div></div>
+    <div class="dashboard-matrix-strip">
+        <div id="cardGreenFlow" class="matrix-card border-green" style="display:none;" onclick="instantiateMetricDetailsModal('GreenFlow')">
+            <span class="card-meta-label">Green Spares Flow</span>
+            <div id="mGreenFlow" class="card-big-num">₹0</div>
+            <span id="mGreenPaid" class="card-sub-metric">Paid in Workshop: ₹0</span>
+        </div>
+
+        <div id="cardMopedFlow" class="matrix-card border-moped" style="display:none;" onclick="instantiateMetricDetailsModal('MopedFlow')">
+            <span class="card-meta-label">Moped Warehouse Net</span>
+            <div id="mMopedFlow" class="card-big-num">₹0</div>
+            <span id="mMopedPaid" class="card-sub-metric">Paid in Workshop: ₹0</span>
+        </div>
+
+        <div id="cardLubeFlow" class="matrix-card border-lube" onclick="instantiateMetricDetailsModal('LubeFlow')">
+            <span class="card-meta-label">Lube Allocation (Liters)</span>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin:4px 0;">
+                <span id="mLubeGreen" style="font-size:1.1rem; font-weight:700; color:#15803d; display:none;">Grn: 0 L</span>
+                <span id="mLubeMoped" style="font-size:1.1rem; font-weight:700; color:#b91c1c; display:none;">Mop: 0 L</span>
+            </div>
+            <span class="card-sub-metric">Total dynamic capacity issued</span>
+        </div>
+
+        <div id="cardStaffFlow" class="matrix-card border-staff" style="display:none;" onclick="instantiateMetricDetailsModal('StaffFlow')">
+            <span class="card-meta-label">Net Staff Payable</span>
+            <div id="mStaffPaid" class="card-big-num" style="color:#0284c7;">₹0</div>
+            <span id="mStaffTotal" class="card-sub-metric">Overall Invoices: ₹0</span>
+        </div>
+
+        <div id="cardPosFlow" class="matrix-card border-pos" style="display:none;" onclick="window.location.href='reports.html'">
+            <span class="card-meta-label">Retail POS Sales</span>
+            <div style="font-size:0.8rem; font-weight:700; color:var(--text); margin-top:4px;">
+                <div style="display:flex; justify-content:space-between;"><span>Cash:</span><span id="mPosCash">₹0</span></div>
+                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span>UPI/Card:</span><span id="mPosUpi">₹0</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mPosCredit">₹0</span></div>
+            </div>
+            <span class="card-sub-metric" style="color:var(--info); font-weight:700; margin-top:6px;">Click to Open Reports →</span>
+        </div>
     </div>
 
-    <div class="controls-grid">
-        <a href="new-jobcard.html" id="btnJcGreen" class="action-btn bg-green">+ GREEN JOB CARD</a>
-        <a href="pos-green.html" id="btnPosGreen" class="action-btn bg-green">🛒 RETAIL POS</a>
-        <a href="ledger.html?scope=credit" id="btnLedgerGreen" class="action-btn bg-green">👥 CREDIT LEDGER</a>
-
-        <a href="new-jobcard.html" id="btnJcMoped" class="action-btn bg-moped">+ MOPED JOB CARD</a>
-        <a href="new-jobcard.html" id="btnJcService" class="action-btn bg-service">+ SERVICE DISPATCH</a>
-        <a href="admin-console.html" id="btnConsole" class="action-btn bg-console">⚙️ MASTER ADMIN</a>
+    <div class="navigation-grid">
+        <a href="billing.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
+        <a href="billing.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
+        <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
+        <a href="pos-green.html" id="navGreenPos" class="action-btn bg-retail" style="display:none;">Green POS</a>
+        <a href="utility-router.html" id="navUtility" class="action-btn bg-utility">Utility</a>
     </div>
 
-    <div class="section-bar">
-        <h2>Active Floor Dispatch List</h2>
-        <button class="refresh-trigger" onclick="syncFloorState()">↻ REFRESH DATA</button>
+    <div class="card-panel">
+        <div class="block-title">Master Workflow Registers</div>
+        
+        <div class="search-strip">
+            <input type="text" id="sQuery" placeholder="Search by Contact, Identity, or Document Hash..." oninput="queryMasterJobRegisters()">
+            <select id="sMode" onchange="queryMasterJobRegisters()">
+                <option value="ALL">All Modes</option>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="Credit">Credit</option>
+            </select>
+            <input type="date" id="sDate" onchange="queryMasterJobRegisters()" style="flex:none;">
+        </div>
+
+        <div class="view-switcher-bar">
+            <button class="switch-btn active" onclick="switchListCategory('Running')">Active Running (Top 7)</button>
+            <button class="switch-btn" onclick="switchListCategory('AgedOpen')">Aged Open Bays</button>
+            <button class="switch-btn" onclick="switchListCategory('PendingDelivery')">Pending Checkouts</button>
+            <button class="switch-btn" onclick="switchListCategory('Historical')">Historical Registers</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Document Hash</th><th>Identity / Chassis</th><th>Valuation</th><th>Status Flag</th><th>Assigned Tech</th></tr></thead>
+                <tbody id="masterJobsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Fetching operational ledgers...</td></tr></tbody>
+            </table>
+        </div>
     </div>
-    
-    <div id="floorStack" class="pipeline-stack">
-        <div style="text-align:center; padding:32px; color:#94a3b8; font-size:0.9rem;">Querying instances from central cloud...</div>
+</div>
+
+<div id="modalMetricDetails" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+            <h3 style="margin:0; color:var(--primary);" id="modalMetricTitle">Dynamic Metric Evaluation Scope</h3>
+            <button onclick="document.getElementById('modalMetricDetails').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        
+        <div id="modalMetricTablesContainer"></div>
     </div>
 </div>
 
 <script>
+    // Supabase Core Network Integration Engine
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    let currentListCategory = 'Running';
+    let cachedMechanicsMap = {};
 
-    function compileRbacRules() {
-        if(sessionRole === 'guest') {
-            window.location.href = 'login.html';
+    function enforceRbacVisibilityConstraints() {
+        document.getElementById('roleDisplay').innerText = sessionRole;
+        
+        // Block 1 Visibility Routing
+        if(sessionRole !== 'moped') document.getElementById('cardGreenFlow').style.display = 'block';
+        if(sessionRole !== 'green') document.getElementById('cardMopedFlow').style.display = 'block';
+        
+        const lubeGrn = document.getElementById('mLubeGreen');
+        const lubeMop = document.getElementById('mLubeMoped');
+        if(sessionRole !== 'moped') lubeGrn.style.display = 'inline-block';
+        if(sessionRole !== 'green') lubeMop.style.display = 'inline-block';
+
+        if(sessionRole !== 'green' && sessionRole !== 'moped') {
+            document.getElementById('cardStaffFlow').style.display = 'block';
+        }
+        if(sessionRole === 'green' || sessionRole === 'admin') {
+            document.getElementById('cardPosFlow').style.display = 'block';
+        }
+
+        // Block 2 Button Visibility Routing
+        if(sessionRole === 'green') document.getElementById('navGreenJc').style.display = 'block';
+        if(sessionRole === 'moped') document.getElementById('navMopedJc').style.display = 'block';
+        if(sessionRole === 'service' || sessionRole === 'admin') document.getElementById('navNewJc').style.display = 'block';
+        if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('navGreenPos').style.display = 'block';
+
+        prefetchSystemMechanics();
+        triggerDashboardDataAggregators();
+    }
+
+    async function prefetchSystemMechanics() {
+        const { data: crew } = await supabaseClient.from('mechanics').select('*');
+        crew?.forEach(m => { cachedMechanicsMap[m.id] = m.name; });
+        queryMasterJobRegisters();
+    }
+
+    // --- BLOCK 1: ASYNCHRONOUS INITIAL COMPUTATIONS ENGINE ---
+    async function triggerDashboardDataAggregators() {
+        const dateStringToday = new Date().toISOString().split('T')[0];
+
+        // i) Green Flow Fetch
+        if(sessionRole !== 'moped') {
+            supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Green', target_date: dateStringToday }).then(({ data }) => {
+                if(data) {
+                    document.getElementById('mGreenFlow').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mGreenPaid').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
+                }
+            });
+        }
+
+        // ii) Moped Flow Fetch
+        if(sessionRole !== 'green') {
+            supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Moped', target_date: dateStringToday }).then(({ data }) => {
+                if(data) {
+                    document.getElementById('mMopedFlow').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mMopedPaid').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
+                }
+            });
+        }
+
+        // iii) Lube Flow Fetch
+        supabaseClient.rpc('get_daily_lube_flow', { target_date: dateStringToday }).then(({ data }) => {
+            if(data) {
+                document.getElementById('mLubeGreen').innerText = `Grn: ${data.green_liters.toFixed(2)} L`;
+                document.getElementById('mLubeMoped').innerText = `Mop: ${data.moped_liters.toFixed(2)} L`;
+            }
+        });
+
+        // iv) Staff Payable Fetch
+        if(sessionRole !== 'green' && sessionRole !== 'moped') {
+            supabaseClient.rpc('get_daily_staff_payable', { target_date: dateStringToday }).then(({ data }) => {
+                if(data) {
+                    document.getElementById('mStaffPaid').innerText = `₹${Math.round(data.paid_labor)}`;
+                    document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(data.total_labor)}`;
+                }
+            });
+        }
+
+        // v) POS Sales Fetch
+        if(sessionRole === 'green' || sessionRole === 'admin') {
+            supabaseClient.rpc('get_daily_pos_sales', { target_date: dateStringToday }).then(({ data }) => {
+                if(data) {
+                    document.getElementById('mPosCash').innerText = `₹${Math.round(data.cash_total)}`;
+                    document.getElementById('mPosUpi').innerText = `₹${Math.round(data.upi_total)}`;
+                    document.getElementById('mPosCredit').innerText = `₹${Math.round(data.credit_total)}`;
+                }
+            });
+        }
+    }
+
+    // --- BLOCK 3: INTEGRATED MASTER JOB REGISTERS FUNCTION ---
+    function switchListCategory(categoryStr) {
+        document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        currentListCategory = categoryStr;
+        queryMasterJobRegisters();
+    }
+
+    async function queryMasterJobRegisters() {
+        const queryVal = document.getElementById('sQuery').value.trim().toLowerCase();
+        const modeVal = document.getElementById('sMode').value;
+        const dateVal = document.getElementById('sDate').value;
+        const todayString = new Date().toISOString().split('T')[0];
+
+        let baseQuery = supabaseClient.from('job_cards').select('*, vehicles(reg_number, make_model)');
+
+        // Integrate logic filtering based on targeted switch criteria natively
+        if(currentListCategory === 'Running') {
+            baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false }).limit(7);
+        } else if(currentListCategory === 'AgedOpen') {
+            baseQuery = baseQuery.eq('status', 'Open').lt('created_at', todayString).order('created_at', { ascending: true });
+        } else if(currentListCategory === 'PendingDelivery') {
+            // Target elements matching criteria where tasks are mechanically closed but uncollected
+            baseQuery = baseQuery.not('mech_completion_time', 'is', null).eq('status', 'Open');
+        } else if(currentListCategory === 'Historical') {
+            baseQuery = baseQuery.eq('status', 'Closed').order('closed_at', { ascending: false }).limit(40);
+        }
+
+        if(dateVal) baseQuery = baseQuery.gte('created_at', dateVal).lte('created_at', dateVal + 'T23:59:59');
+
+        const { data: records, error } = await baseQuery;
+        const tbody = document.getElementById('masterJobsTableBody');
+        tbody.innerHTML = '';
+
+        if(error) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center;">Ledger Retrieval Fault: ${error.message}</td></tr>`;
             return;
         }
 
-        document.getElementById('roleIndicator').innerText = sessionRole;
-
-        const permissions = {
-            green: ['btnJcGreen', 'btnPosGreen', 'btnLedgerGreen'],
-            moped: ['btnJcMoped'],
-            service: ['btnJcService', 'btnConsole'],
-            admin: ['btnJcGreen', 'btnPosGreen', 'btnLedgerGreen', 'btnJcMoped', 'btnJcService', 'btnConsole']
-        };
-
-        permissions[sessionRole]?.forEach(id => {
-            const node = document.getElementById(id);
-            if(node) node.style.display = 'block';
+        // Apply background memory filters mapped to input query attributes
+        const filteredArray = (records || []).filter(row => {
+            const matchClient = (row.customer_mobile && row.customer_mobile.includes(queryVal)) || 
+                                (row.vehicles?.reg_number && row.vehicles.reg_number.toLowerCase().includes(queryVal));
+            const matchHash = row.id && row.id.toLowerCase().includes(queryVal);
+            return (!queryVal || matchClient || matchHash);
         });
 
-        compileDashboardMetrics();
-        syncFloorState();
-    }
-
-    async function compileDashboardMetrics() {
-        const { data: records } = await supabaseClient.from('job_cards').select('green_total, moped_total, lubricant_total').eq('status', 'Closed');
-        let gSum = 0, mSum = 0, lSum = 0;
-        records?.forEach(r => {
-            gSum += parseFloat(r.green_total) || 0;
-            mSum += parseFloat(r.moped_total) || 0;
-            lSum += parseFloat(r.lubricant_total) || 0;
-        });
-
-        document.getElementById('mGreen').innerText = "₹" + gSum;
-        document.getElementById('mMoped').innerText = "₹" + mSum;
-        document.getElementById('mLube').innerText = "₹" + lSum;
-    }
-
-    async function syncFloorState() {
-        const { data: instances } = await supabaseClient.from('job_cards')
-            .select('id, total_invoice_value, advance_paid, source_role, customer_mobile, vehicles(reg_number, make_model), mechanics(name)')
-            .eq('status', 'Open').order('jc_date', { ascending: false });
-
-        const container = document.getElementById('floorStack');
-        container.innerHTML = '';
-
-        if(instances && instances.length > 0) {
-            instances.forEach(j => {
-                const plate = j.vehicles?.reg_number || 'UNREGISTERED';
-                const baseModel = j.vehicles?.make_model || 'Direct Line Processing';
-                const creator = j.source_role || 'service';
-                const prepay = parseFloat(j.advance_paid) || 0;
-                const prepayIndicator = prepay > 0 ? `<span class="prepaid-badge">Prepaid Buffer: ₹${prepay}</span>` : '';
-
-                container.innerHTML += `
-                    <div class="dispatch-card source-edge-${creator}" onclick="window.location.href='billing.html?id=${j.id}'">
-                        <div>
-                            <div class="card-primary">${plate} ${prepayIndicator}</div>
-                            <div class="card-meta">${baseModel} | Mobile: ${j.customer_mobile}</div>
-                            <div class="card-meta" style="color:var(--primary); font-weight:700;">Floor Technician: ${j.mechanics?.name || 'Unassigned'}</div>
-                        </div>
-                        <div class="card-valuation">₹${Math.round(j.total_invoice_value || 0)}</div>
-                    </div>`;
+        if(filteredArray.length > 0) {
+            filteredArray.forEach(job => {
+                const assignedName = cachedMechanicsMap[job.mech_id] || 'Unassigned';
+                const stylePill = job.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><span class="clickable-ref" onclick="window.location.href='billing.html?id=${job.id}'">JC-${job.id.split('-')[0].toUpperCase()}</span></td>
+                        <td><strong>${job.vehicles?.reg_number || 'UNMAPPED'}</strong><br><span style="font-size:0.75rem; color:#64748b;">${job.customer_mobile || ''}</span></td>
+                        <td><strong>₹${job.total_invoice_value || 0}</strong></td>
+                        <td><span class="status-pill" style="${stylePill}">${job.status}</span></td>
+                        <td>${assignedName}</td>
+                    </tr>`;
             });
         } else {
-            container.innerHTML = '<div style="text-align:center; padding:24px; color:#94a3b8;">Floor view is clear. No unclosed service tasks pending.</div>';
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No records match selected parameters.</td></tr>`;
         }
     }
 
-    function flushSession() { localStorage.removeItem('ERP_ACTIVE_ROLE'); }
-    compileRbacRules();
+    // --- MODAL ENGINE EVALUATOR HOOKS ---
+    async function instantiateMetricDetailsModal(metricType) {
+        const container = document.getElementById('modalMetricTablesContainer');
+        container.innerHTML = '<div style="text-align:center; padding:20px;">Compiling array details...</div>';
+        const dateTarget = new Date().toISOString().split('T')[0];
+        
+        let titleDisplayStr = "Metric Details";
+
+        if(metricType === 'GreenFlow' || metricType === 'MopedFlow') {
+            const wareTarget = metricType === 'GreenFlow' ? 'Green' : 'Moped';
+            titleDisplayStr = `Allocated Lines: ${wareTarget} Warehouse`;
+            
+            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, vehicles(reg_number))')
+                .eq('warehouse_type', wareTarget).gte('created_at', dateTarget);
+            
+            container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Hash Ref</th><th>Chassis Specifics</th><th>Component Identity</th><th>Valuation</th></tr></thead>
+                        <tbody>
+                            ${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        } else if(metricType === 'LubeFlow') {
+            titleDisplayStr = "Volumetric Fluid Dispatches (Liters)";
+            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, vehicles(reg_number))')
+                .eq('unit_metric', 'ML').gte('created_at', dateTarget);
+            
+            container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Hash Ref</th><th>Depot</th><th>Fluid Parameters</th><th>Dispatched Volume</th></tr></thead>
+                        <tbody>
+                            ${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${l.qty} ML</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        } else if(metricType === 'StaffFlow') {
+            titleDisplayStr = "Technician Payable Assignments";
+            const { data: jobs } = await supabaseClient.from('job_cards').select('id, mech_id, labour_charges, status').gte('created_at', dateTarget);
+            
+            container.innerHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead>
+                        <tbody>
+                            ${(jobs || []).map(j => `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        document.getElementById('modalMetricTitle').innerText = titleDisplayStr;
+        document.getElementById('modalMetricDetails').style.display = 'flex';
+    }
+
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
+    }
+
+    enforceRbacVisibilityConstraints();
 </script>
 </body>
 </html>
