@@ -516,15 +516,23 @@
     }
 
     async function downloadTechnicianLedgerStatement(techId, techName) {
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, labour_charges, status').eq('mech_id', techId).eq('status', 'Closed');
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, closed_at, labour_charges, status, job_card_items(warehouse_type, total_price)').eq('mech_id', techId).eq('status', 'Closed');
         
         let outputContentStr = `MY CARE ERP - TECHNICIAN LEDGER STATEMENT\nCrew Member: ${techName}\nExtracted: ${new Date().toISOString().split('T')[0]}\n------------------------------------------------\n\n`;
         let calculatedLaborSubtotal = 0;
 
         if(jobs && jobs.length > 0) {
             jobs.forEach(j => {
-                const laborScalar = parseFloat(j.labour_charges) || 0; calculatedLaborSubtotal += laborScalar;
-                outputContentStr += `Reference: JC-${j.id.split('-')[0].toUpperCase()} | Date: ${j.jc_date || 'N/A'} | Settled Labor: Rs.${laborScalar}\n`;
+                let pkgLabor = 0;
+                if(j.job_card_items) {
+                    j.job_card_items.forEach(item => {
+                        if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0;
+                    });
+                }
+                const laborScalar = (parseFloat(j.labour_charges) || 0) + pkgLabor;
+                calculatedLaborSubtotal += laborScalar;
+                const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : (j.jc_date || 'N/A');
+                outputContentStr += `Reference: JC-${j.id.split('-')[0].toUpperCase()} | Settled: ${d} | Net Labor: Rs.${laborScalar}\n`;
             });
             outputContentStr += `\n------------------------------------------------\nTotal Labor Generated: Rs.${calculatedLaborSubtotal}\n`;
         } else { outputContentStr += "No closed historical labor items extractable across verified database configurations.\n"; }
