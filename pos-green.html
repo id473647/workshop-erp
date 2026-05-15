@@ -10,7 +10,6 @@
         :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; --info: #2980b9; --danger: #e74c3c; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .logo-matrix { display: flex; align-items: center; gap: 8px; }
         .logo-matrix img { height: 32px; object-fit: contain; }
@@ -45,7 +44,6 @@
 
         .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 8px; display: none; }
 
-        /* Integrated Historical Management Layout Block */
         .search-strip { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: flex-end; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
         .search-strip .field-group { flex: 1; min-width: 130px; }
         .search-strip input { padding: 8px; font-size: 0.85rem; }
@@ -81,7 +79,6 @@
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         
-        /* Monospaced 3-Inch Stacked Receipt Layout Core */
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -101,8 +98,7 @@
 
         @media print { body * { visibility: hidden; } #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; } }
         
-        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
     </style>
 </head>
 <body>
@@ -168,13 +164,9 @@
                 <button class="switch-btn" onclick="switchPosHistoryTab('Estimates')">Saved Estimates (Drafts)</button>
             </div>
 
-            <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;">
-                *Note: Output renders top 10 bounds natively. Triggering specific numeric or date bounds parses deep matching sets entirely. Draft Estimates self-terminate automatically post-24 hours.
-            </div>
-
             <div class="table-wrapper">
                 <table>
-                    <thead><tr><th>Invoice Hash</th><th>Client Hash</th><th>Valuation</th><th>Status Flag</th><th>Compile Date</th></tr></thead>
+                    <thead><tr><th>Invoice Hash</th><th>Client Hash</th><th>Valuation</th><th>Status Flag</th><th>Ledger Date</th></tr></thead>
                     <tbody id="posHistoryTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Fetching operational transactions...</td></tr></tbody>
                 </table>
             </div>
@@ -187,7 +179,7 @@
             <div class="field-group"><label>Customer Name</label><input type="text" id="newAccName" placeholder="Full Registered Identity"></div>
             <div class="field-group"><label>Registered Address</label><input type="text" id="newAccAddress" placeholder="Geographical target descriptor"></div>
         </div>
-        <div style="font-size:0.75rem; color:#64748b; margin-bottom:12px;">*Note: Account classification mapping parameter defaults directly to 'Regular' status automatically. Administrative credentials required for manual profile upgrades.</div>
+        <div style="font-size:0.75rem; color:#64748b; margin-bottom:12px;">*Note: Account classification mapping parameter defaults directly to 'Regular' status automatically.</div>
         <button onclick="commitAccountProfile()" style="background:var(--warning); color:white; border:none; padding:12px 24px; border-radius:6px; font-weight:700; cursor:pointer;">CONFIRM MAPPING & DISPATCH SALE</button>
     </div>
 
@@ -242,25 +234,20 @@
                 <div id="thermalGst" class="receipt-meta">GSTIN: 23BCVPB4126J1ZM</div>
                 <div class="receipt-meta">Gurudwara Road, Ganj Betul</div>
                 <div class="receipt-meta">PH: 9425002214, 8989171751, 9691600001</div>
-                <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">WhatsApp Comp: 07141-230214</div>
             </div>
             
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <div>Date: <span id="thDate">--</span></div>
                 <div>Time: <span id="thTime">--</span></div>
             </div>
-            <div class="receipt-meta" style="margin-top:2px;">
-                Bill Hash: <strong id="thBillNo">--</strong>
-            </div>
+            <div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div>
             <div class="receipt-divider"></div>
             
-            <div class="receipt-meta">
-                Client Contact: <strong id="thClientInfo">--</strong>
-            </div>
+            <div class="receipt-meta">Client Contact: <strong id="thClientInfo">--</strong></div>
             <div class="receipt-divider"></div>
             
             <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; text-transform:uppercase;">
-                Items Rendered Array
+                ITEMS
             </div>
             <div id="thStackedItemsContainer"></div>
             
@@ -268,7 +255,8 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <span>Subtotal Gross:</span><strong id="thSub">₹0</strong>
             </div>
-            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+            
+            <div class="receipt-meta" id="thDiscRow" style="display:flex; justify-content:space-between;">
                 <span>Concession Rebate:</span><strong id="thDisc">₹0</strong>
             </div>
             <div class="receipt-divider"></div>
@@ -276,28 +264,21 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;">
                 <span>NET TOTAL:</span><span id="thNet">₹0</span>
             </div>
-            
             <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">
                 Amount in words:<br><strong id="thWords">--</strong>
             </div>
             
-            <div class="receipt-meta" style="margin-top:6px; font-size:0.65rem;">
-                *Note: Valuation includes 18% standard integrated native tax arrays.
-            </div>
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
                 Settlement Route: <span id="thMode">--</span>
             </div>
-            
-            <div class="receipt-footer">
-                Computer Generated Document.<br>No Physical Signature Needed.
-            </div>
+            <div class="receipt-footer">Computer Generated Document.<br>Thank You.</div>
         </div>
 
-        <div id="creditModifierInterface" style="display:none; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:12px;">
-            <div style="font-size:0.75rem; font-weight:bold; color:var(--warning); margin-bottom:6px;">Credit Payment Conversion Loop</div>
+        <div id="settlementModifierInterface" style="display:none; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:12px;">
+            <div style="font-size:0.75rem; font-weight:bold; color:var(--success); margin-bottom:6px;">Execute Final Ledger Settlement</div>
             <div style="display:flex; gap:8px;">
-                <select id="thConvertMode" style="flex:1; padding:6px; font-size:0.8rem;"><option value="Cash">Convert to Cash</option><option value="UPI">Convert to UPI</option></select>
-                <button onclick="commitCreditConversion()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">SETTLE NOW</button>
+                <select id="thConvertMode" style="flex:1; padding:6px; font-size:0.8rem;"><option value="Cash">Settle via Cash</option><option value="UPI">Settle via UPI</option></select>
+                <button onclick="commitPosSettlement()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">AUTHORIZE PAYMENT</button>
             </div>
         </div>
 
@@ -323,34 +304,18 @@
 </div>
 
 <script>
-    // Primary API Driver Configuration
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    let evaluatedPhoneContext = null;
-    let targetInspectionRecordId = null;
-    let inspectedRecordObject = null;
-    let targetCustomerProfile = null;
-    let globalCatalogCache = [];
-    let rowSequenceIndex = 1;
+    let evaluatedPhoneContext = null; let targetInspectionRecordId = null; let inspectedRecordObject = null;
+    let targetCustomerProfile = null; let globalCatalogCache = []; let rowSequenceIndex = 1;
     let currentPosTabMode = 'AgedCredit';
+    
+    document.getElementById('roleDisplay').innerText = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'GUEST').toUpperCase();
 
-    // Executes access isolation update loops directly
-    function evaluateInterfaceBranding() {
-        document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
-        queryPosHistoryEngine();
-    }
-
-    function enforceTitleCaseNomenclature(str) {
-        if(!str) return '';
-        return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    }
-
-    function enforceBrandCapitalization(inputRef) {
-        inputRef.value = inputRef.value.toUpperCase();
-    }
+    function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
+    function enforceBrandCapitalization(inputRef) { inputRef.value = inputRef.value.toUpperCase(); }
 
     function convertNumberToWords(amount) {
         const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
@@ -369,21 +334,14 @@
     // --- INTEGRATED MULTIFUNCTIONAL POS HISTORY ENGINE ---
     function switchPosHistoryTab(tabTargetStr) {
         document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        currentPosTabMode = tabTargetStr;
-        queryPosHistoryEngine();
+        event.target.classList.add('active'); currentPosTabMode = tabTargetStr; queryPosHistoryEngine();
     }
 
     function resetPosFilters() {
-        document.getElementById('fPhone').value = '';
-        document.getElementById('fMin').value = '';
-        document.getElementById('fMax').value = '';
-        document.getElementById('fStart').value = '';
-        document.getElementById('fEnd').value = '';
-        queryPosHistoryEngine();
+        document.getElementById('fPhone').value = ''; document.getElementById('fMin').value = ''; document.getElementById('fMax').value = '';
+        document.getElementById('fStart').value = ''; document.getElementById('fEnd').value = ''; queryPosHistoryEngine();
     }
 
-    // Dynamic Filter Mapping Pipeline: Safely executes absolute parameters decoupling initial bounds conditionally
     async function queryPosHistoryEngine() {
         const phoneVal = document.getElementById('fPhone').value.trim().toLowerCase();
         const minVal = parseFloat(document.getElementById('fMin').value);
@@ -391,100 +349,73 @@
         const startVal = document.getElementById('fStart').value;
         const endVal = document.getElementById('fEnd').value;
         
-        // Failsafe cleanup hook drops older leftover stale draft estimate frameworks natively
+        // Failsafe auto-terminate aged drafts
         if(currentPosTabMode === 'Estimates') {
             const yesterdayString = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
             supabaseClient.from('counter_sales').delete().eq('status', 'Open').lt('created_at', yesterdayString).then();
         }
 
         let baseQuery = supabaseClient.from('counter_sales').select('*');
+        const dateTargetColumn = currentPosTabMode === 'Estimates' ? 'created_at' : 'closed_at';
 
-        // Condition evaluation block routing target structures safely
-        if(currentPosTabMode === 'AgedCredit') {
-            baseQuery = baseQuery.eq('payment_mode', 'Credit').eq('status', 'Closed').order('created_at', { ascending: true });
-        } else if(currentPosTabMode === 'HistorySales') {
-            baseQuery = baseQuery.eq('status', 'Closed').order('created_at', { ascending: false });
-        } else if(currentPosTabMode === 'UpiCard') {
-            baseQuery = baseQuery.eq('payment_mode', 'UPI').eq('status', 'Closed').order('created_at', { ascending: false });
-        } else if(currentPosTabMode === 'Estimates') {
-            baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false });
-        }
+        if(currentPosTabMode === 'AgedCredit') { baseQuery = baseQuery.eq('payment_mode', 'Credit').eq('status', 'Closed').order('closed_at', { ascending: true }); } 
+        else if(currentPosTabMode === 'HistorySales') { baseQuery = baseQuery.eq('status', 'Closed').order('closed_at', { ascending: false }); } 
+        else if(currentPosTabMode === 'UpiCard') { baseQuery = baseQuery.eq('payment_mode', 'UPI').eq('status', 'Closed').order('closed_at', { ascending: false }); } 
+        else if(currentPosTabMode === 'Estimates') { baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false }); }
 
-        // Conditionally drops artificial limitations natively when custom constraints filter sets
         const hasActiveFilters = phoneVal || !isNaN(minVal) || !isNaN(maxVal) || startVal || endVal;
         if(!hasActiveFilters) baseQuery = baseQuery.limit(10);
 
         if(!isNaN(minVal)) baseQuery = baseQuery.gte('total_amount', minVal);
         if(!isNaN(maxVal)) baseQuery = baseQuery.lte('total_amount', maxVal);
-        if(startVal) baseQuery = baseQuery.gte('created_at', startVal);
-        if(endVal) baseQuery = baseQuery.lte('created_at', endVal + 'T23:59:59');
+        if(startVal) baseQuery = baseQuery.gte(dateTargetColumn, startVal);
+        if(endVal) baseQuery = baseQuery.lte(dateTargetColumn, endVal + 'T23:59:59');
 
         const { data: registers, error } = await baseQuery;
-        const tbody = document.getElementById('posHistoryTableBody');
-        tbody.innerHTML = '';
+        const tbody = document.getElementById('posHistoryTableBody'); tbody.innerHTML = '';
+        if(error) return;
 
-        if(error) {
-            tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center;">History Connection Fault: ${error.message}</td></tr>`;
-            return;
-        }
-
-        const resolvedOutput = (registers || []).filter(row => {
-            const matchPhone = row.customer_mobile && row.customer_mobile.toLowerCase().includes(phoneVal);
-            return (!phoneVal || matchPhone);
-        });
+        const resolvedOutput = (registers || []).filter(row => { return (!phoneVal || (row.customer_mobile && row.customer_mobile.toLowerCase().includes(phoneVal))); });
 
         if(resolvedOutput.length > 0) {
             resolvedOutput.forEach(sale => {
                 const stylePill = sale.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
-                const dateStr = sale.created_at ? new Date(sale.created_at).toLocaleDateString() : 'N/A';
+                const dateSource = sale.status === 'Closed' && sale.closed_at ? sale.closed_at : sale.created_at;
+                const dateStr = dateSource ? new Date(dateSource).toLocaleDateString('en-IN') : 'N/A';
                 
                 tbody.innerHTML += `
                     <tr>
                         <td><span class="clickable-ref" onclick="instantiateInspectionScope('${sale.id}')">POS-${sale.id.split('-')[0].toUpperCase()}</span></td>
                         <td>${sale.customer_mobile || 'Walk-in'}<br><span style="font-size:0.7rem; color:#64748b;">${sale.customer_name || ''}</span></td>
                         <td><strong>₹${sale.total_amount || 0}</strong></td>
-                        <td><span class="status-pill" style="padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; ${stylePill}">${sale.status}</span></td>
+                        <td><span class="status-pill" style="${stylePill}">${sale.status}</span></td>
                         <td>${dateStr}</td>
                     </tr>`;
             });
-        } else {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No checkout encounters matched requested parameters.</td></tr>`;
-        }
+        } else { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No checkout encounters matched requested parameters.</td></tr>`; }
     }
 
-    // --- POS ACCOUNT VERIFICATION ENGINE ---
     async function processAutonomousPhoneSearch(phoneStringVal) {
         const cleanStr = phoneStringVal.trim();
         if(cleanStr.length !== 10) {
-            document.getElementById('masterHistoryBlock').style.display = 'block';
-            document.getElementById('recentSalesBlock').style.display = 'none';
-            document.getElementById('creditAlertBox').style.display = 'none';
-            document.getElementById('accountCategoryDisplay').style.display = 'none';
-            document.getElementById('terminalName').value = '';
-            document.getElementById('terminalTagsWrapper').innerHTML = '';
-            targetCustomerProfile = null;
-            return;
+            document.getElementById('masterHistoryBlock').style.display = 'block'; document.getElementById('recentSalesBlock').style.display = 'none';
+            document.getElementById('creditAlertBox').style.display = 'none'; document.getElementById('accountCategoryDisplay').style.display = 'none';
+            document.getElementById('terminalName').value = ''; document.getElementById('terminalTagsWrapper').innerHTML = ''; targetCustomerProfile = null; return;
         }
         
-        evaluatedPhoneContext = cleanStr;
-        document.getElementById('masterHistoryBlock').style.display = 'none'; // Hides master register natively during checkout sequences
+        evaluatedPhoneContext = cleanStr; document.getElementById('masterHistoryBlock').style.display = 'none';
 
         const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
         const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
         const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
 
-        const hasJc = jcList && jcList.length > 0;
-        const hasPos = posList && posList.length > 0;
+        const hasJc = jcList && jcList.length > 0; const hasPos = posList && posList.length > 0;
         const wrapper = document.getElementById('terminalTagsWrapper'); wrapper.innerHTML = '';
 
         if(cData) {
-            targetCustomerProfile = cData;
-            document.getElementById('terminalName').value = cData.name;
-            
+            targetCustomerProfile = cData; document.getElementById('terminalName').value = cData.name;
             const tierBadge = document.getElementById('accountCategoryDisplay');
-            tierBadge.innerText = `Category: ${cData.category || 'Regular'}`;
-            tierBadge.className = `tier-tag tier-${cData.category || 'Regular'}`;
-            tierBadge.style.display = 'inline-block';
+            tierBadge.innerText = `Category: ${cData.category || 'Regular'}`; tierBadge.className = `tier-tag tier-${cData.category || 'Regular'}`; tierBadge.style.display = 'inline-block';
 
             if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">Customer for both</span>';
             else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Already a workshop customer</span>';
@@ -506,133 +437,71 @@
                     </tr>`;
                 });
             }
-            transitionFlowPanels('transactionInvoicerFlow');
-            prefetchCentralCatalog();
-        } else {
-            transitionFlowPanels('profileSetupFlow'); document.getElementById('newAccName').focus();
-        }
+            transitionFlowPanels('transactionInvoicerFlow'); prefetchCentralCatalog();
+        } else { transitionFlowPanels('profileSetupFlow'); document.getElementById('newAccName').focus(); }
     }
 
-    function transitionFlowPanels(targetId) {
-        document.querySelectorAll('.card-panel').forEach(p => p.classList.remove('active-step'));
-        document.getElementById(targetId).classList.add('active-step');
-    }
+    function transitionFlowPanels(targetId) { document.querySelectorAll('.card-panel').forEach(p => p.classList.remove('active-step')); document.getElementById(targetId).classList.add('active-step'); }
 
     async function commitAccountProfile() {
         const rawName = document.getElementById('newAccName').value.trim();
         const rawAddress = document.getElementById('newAccAddress').value.trim();
         if(!rawName) return alert("Provide valid target Identity context.");
-        
         const formattedTitleName = enforceTitleCaseNomenclature(rawName);
         
-        const { data: newCust, error } = await supabaseClient.from('customers').insert({ 
-            mobile_number: evaluatedPhoneContext, 
-            name: formattedTitleName,
-            address: rawAddress || 'Retail Hub Client',
-            category: 'Regular'
-        }).select().single();
-        
+        const { data: newCust, error } = await supabaseClient.from('customers').insert({ mobile_number: evaluatedPhoneContext, name: formattedTitleName, address: rawAddress || 'Retail Hub Client', category: 'Regular' }).select().single();
         if(!error && newCust) {
-            targetCustomerProfile = newCust;
-            document.getElementById('terminalName').value = formattedTitleName; 
-            
-            const tierBadge = document.getElementById('accountCategoryDisplay');
-            tierBadge.innerText = "Category: Regular";
-            tierBadge.className = "tier-tag tier-Regular";
-            tierBadge.style.display = 'inline-block';
-            
-            transitionFlowPanels('transactionInvoicerFlow');
-            prefetchCentralCatalog();
-        } else alert(`⚠️ PROFILE INSERTION REJECTED:\n${error?.message}`);
+            targetCustomerProfile = newCust; document.getElementById('terminalName').value = formattedTitleName; 
+            const tierBadge = document.getElementById('accountCategoryDisplay'); tierBadge.innerText = "Category: Regular"; tierBadge.className = "tier-tag tier-Regular"; tierBadge.style.display = 'inline-block';
+            transitionFlowPanels('transactionInvoicerFlow'); prefetchCentralCatalog();
+        }
     }
 
-    async function prefetchCentralCatalog() {
-        const { data: master } = await supabaseClient.from('product_master').select('*');
-        globalCatalogCache = master || [];
-    }
+    async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
     function queryCatalogAutocomplete(inputRef, targetIdx) {
         const searchVal = inputRef.value.trim().toLowerCase();
-        const listContainer = document.getElementById(`autolist-${targetIdx}`);
-        listContainer.innerHTML = '';
-        
+        const listContainer = document.getElementById(`autolist-${targetIdx}`); listContainer.innerHTML = '';
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
-
         const filtered = globalCatalogCache.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 15);
-        
         if(filtered.length > 0) {
             filtered.forEach(p => {
-                listContainer.innerHTML += `
-                    <div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx}, '${p.item_name.replace(/'/g,"\\'")}', '${p.brand.replace(/'/g,"\\'")}', ${p.default_price || 0})">
-                        <span><strong>${p.item_name}</strong></span>
-                        <span style="color:#888; font-size:0.75rem;">${p.brand} | ₹${p.default_price || 0}</span>
-                    </div>`;
+                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx}, '${p.item_name.replace(/'/g,"\\'")}', '${p.brand.replace(/'/g,"\\'")}', ${p.default_price || 0})"><span><strong>${p.item_name}</strong></span><span style="color:#888; font-size:0.75rem;">${p.brand} | ₹${p.default_price || 0}</span></div>`;
             });
             listContainer.style.display = 'block';
         } else listContainer.style.display = 'none';
     }
 
-    function hideAutocomplete(targetIdx) {
-        setTimeout(() => {
-            const list = document.getElementById(`autolist-${targetIdx}`);
-            if(list) list.style.display = 'none';
-        }, 200);
-    }
+    function hideAutocomplete(targetIdx) { setTimeout(() => { const list = document.getElementById(`autolist-${targetIdx}`); if(list) list.style.display = 'none'; }, 200); }
 
     function applySelectedCatalogItem(targetIdx, nameStr, brandStr, defaultRate) {
-        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`);
-        if(!rowNode) return;
-        
-        rowNode.querySelector('.i-name').value = nameStr;
-        rowNode.querySelector('.i-brand').value = brandStr;
-        rowNode.querySelector('.i-rate').value = defaultRate;
-        
-        document.getElementById(`autolist-${targetIdx}`).style.display = 'none';
-        evaluateRuleDiscounts(targetIdx);
-        compileDynamicInvoicerSums();
+        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`); if(!rowNode) return;
+        rowNode.querySelector('.i-name').value = nameStr; rowNode.querySelector('.i-brand').value = brandStr; rowNode.querySelector('.i-rate').value = defaultRate;
+        document.getElementById(`autolist-${targetIdx}`).style.display = 'none'; evaluateRuleDiscounts(targetIdx); compileDynamicInvoicerSums();
     }
 
     async function evaluateRuleDiscounts(targetIdx) {
-        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`);
-        if(!rowNode || !targetCustomerProfile) return;
-        
-        const brandCode = rowNode.querySelector('.i-brand').value.trim().toUpperCase();
-        if(!brandCode) return;
-
-        const customOverrides = targetCustomerProfile.custom_brand_discounts || {};
-        if(customOverrides[brandCode] !== undefined) {
-            rowNode.querySelector('.i-disc').value = customOverrides[brandCode];
-            compileDynamicInvoicerSums();
-            return;
-        }
-
+        const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`); if(!rowNode || !targetCustomerProfile) return;
+        const brandCode = rowNode.querySelector('.i-brand').value.trim().toUpperCase(); if(!brandCode) return;
+        const customOverrides = targetCustomerProfile.custom_brand_discounts_green || {};
+        if(customOverrides[brandCode] !== undefined) { rowNode.querySelector('.i-disc').value = customOverrides[brandCode]; compileDynamicInvoicerSums(); return; }
         const { data: bMaster } = await supabaseClient.from('brand_master').select('*').eq('brand_name', brandCode).single();
         if(bMaster) {
             const catTarget = targetCustomerProfile.category ? `disc_${targetCustomerProfile.category.toLowerCase()}` : 'disc_regular';
-            rowNode.querySelector('.i-disc').value = parseFloat(bMaster[catTarget]) || 0;
-            compileDynamicInvoicerSums();
+            rowNode.querySelector('.i-disc').value = parseFloat(bMaster[catTarget]) || 0; compileDynamicInvoicerSums();
         }
     }
 
     function pushRuntimeStackRow() {
-        const stack = document.getElementById('dynamicRowsContainer'); 
-        const node = document.createElement('div'); 
-        node.className = 'inline-item-row';
-        node.setAttribute('data-index', rowSequenceIndex);
-        
+        const stack = document.getElementById('dynamicRowsContainer'); const node = document.createElement('div'); node.className = 'inline-item-row'; node.setAttribute('data-index', rowSequenceIndex);
         node.innerHTML = `
-            <div style="position:relative;">
-                <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})">
-                <div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div>
-            </div>
+            <div style="position:relative;"><input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})"><div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div></div>
             <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
             <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
             <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
             <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
             <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
-            
-        stack.appendChild(node);
-        rowSequenceIndex++;
+        stack.appendChild(node); rowSequenceIndex++;
     }
 
     function dropActiveInlineRow(btnTrigger) { btnTrigger.parentElement.remove(); compileDynamicInvoicerSums(); }
@@ -640,9 +509,7 @@
     function compileDynamicInvoicerSums() {
         let itemsGrossAggregate = 0;
         document.querySelectorAll('.inline-item-row').forEach(row => {
-            const q = parseFloat(row.querySelector('.i-qty').value) || 0;
-            const r = parseFloat(row.querySelector('.i-rate').value) || 0;
-            const dPerc = parseFloat(row.querySelector('.i-disc').value) || 0;
+            const q = parseFloat(row.querySelector('.i-qty').value) || 0; const r = parseFloat(row.querySelector('.i-rate').value) || 0; const dPerc = parseFloat(row.querySelector('.i-disc').value) || 0;
             const rawLineVal = q * r; itemsGrossAggregate += (rawLineVal - (rawLineVal * (dPerc / 100)));
         });
         const globalDeduction = parseFloat(document.getElementById('globalDeductionRupees').value) || 0;
@@ -654,86 +521,57 @@
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
-        // Stage primary checkout record wrapping parallel promises array
+        // Add explicit closed_at insertion logic
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
-            customer_mobile: evaluatedPhoneContext, 
-            customer_name: enforceTitleCaseNomenclature(mappedClientName), 
-            total_amount: finalNetValuation, 
-            payment_mode: modeTarget, 
-            status: statusTarget, 
-            source_role: activeRole
+            customer_mobile: evaluatedPhoneContext, customer_name: enforceTitleCaseNomenclature(mappedClientName), 
+            total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole,
+            closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null
         }).select().single();
 
         if(error) return alert("System Commitment Error:\n" + error.message);
         
         if(finalRecord) {
-            const itemPromises = [];
-            const rowNodes = document.querySelectorAll('.inline-item-row');
-            
+            const itemPromises = []; const rowNodes = document.querySelectorAll('.inline-item-row');
             for(let i = 0; i < rowNodes.length; i++) {
                 const row = rowNodes[i];
-                const rawSpec = row.querySelector('.i-name').value.trim(); 
-                const rawBrand = row.querySelector('.i-brand').value.trim() || 'STANDARD';
-                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; 
-                const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; 
-                const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
-                
+                const rawSpec = row.querySelector('.i-name').value.trim(); const rawBrand = row.querySelector('.i-brand').value.trim() || 'STANDARD';
+                const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1; const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
                 if(rawSpec) {
-                    const cleanSpec = enforceTitleCaseNomenclature(rawSpec);
-                    const cleanBrand = rawBrand.toUpperCase();
-                    const rawLineTotal = qScalar * rScalar; 
-                    const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
-                    
-                    supabaseClient.from('product_master').upsert({ 
-                        item_name: cleanSpec, brand: cleanBrand, warehouse_type: 'Green', default_price: rScalar
-                    }).then().catch(e => console.warn("Catalog indexing line pass:", e));
-                    
-                    const promiseWrite = supabaseClient.from('counter_sale_items').insert({ 
-                        sale_id: finalRecord.id, 
-                        item_name: `${cleanSpec} (${cleanBrand})`, 
-                        qty: qScalar, unit_price: rScalar, total_price: finalNetTotal 
-                    });
-                    itemPromises.push(promiseWrite);
+                    const cleanSpec = enforceTitleCaseNomenclature(rawSpec); const cleanBrand = rawBrand.toUpperCase();
+                    const rawLineTotal = qScalar * rScalar; const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
+                    supabaseClient.from('product_master').upsert({ item_name: cleanSpec, brand: cleanBrand, warehouse_type: 'Green', default_price: rScalar }).then();
+                    itemPromises.push(supabaseClient.from('counter_sale_items').insert({ sale_id: finalRecord.id, item_name: `${cleanSpec} (${cleanBrand})`, qty: qScalar, unit_price: rScalar, total_price: finalNetTotal }));
                 }
             }
-            
-            if(itemPromises.length > 0) {
-                await Promise.all(itemPromises);
-            }
-            
-            alert(`Task closed successfully via routing: ${modeTarget}`); 
-            window.location.href = 'index.html';
+            if(itemPromises.length > 0) await Promise.all(itemPromises);
+            alert(`Task closed successfully via routing: ${modeTarget}`); window.location.href = 'index.html';
         }
     }
 
-    // --- POPULATING 3-INCH STACKED THERMAL DOCUMENT MATRIX ---
     async function instantiateInspectionScope(id) {
         targetInspectionRecordId = id;
-        
-        const { data: record, error: recError } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
-        if(recError) return alert("Retrieval Check Error:\n" + recError.message);
-        
+        const { data: record } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
         if(record) {
             inspectedRecordObject = record;
             
             const isWorkshopSource = record.source_role === 'service' || record.source_role === 'moped';
             document.getElementById('thermalShopName').innerText = isWorkshopSource ? "My Care Service" : "Green Scooter Center";
-            document.getElementById('thermalGst').innerText = isWorkshopSource ? "GSTIN: 23ANAPB4613K1ZJ" : "GSTIN: 23BCVPB4126J1ZM";
             
-            const compileDateObj = new Date(record.created_at);
-            document.getElementById('thDate').innerText = compileDateObj.toLocaleDateString();
-            document.getElementById('thTime').innerText = compileDateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const dateSource = record.status === 'Closed' && record.closed_at ? new Date(record.closed_at) : new Date(record.created_at);
+            document.getElementById('thDate').innerText = dateSource.toLocaleDateString('en-IN');
+            document.getElementById('thTime').innerText = dateSource.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+            
             document.getElementById('thBillNo').innerText = `POS-${record.id.split('-')[0].toUpperCase()}`;
             document.getElementById('thClientInfo').innerText = `${record.customer_mobile || ''} | ${record.customer_name || 'Walk-in'}`;
-            
             document.getElementById('thNet').innerText = `₹${record.total_amount}`;
             document.getElementById('thWords').innerText = convertNumberToWords(record.total_amount);
             document.getElementById('thMode').innerText = record.payment_mode || 'Cash';
 
-            const isCreditAccount = record.payment_mode === 'Credit';
-            document.getElementById('creditModifierInterface').style.display = isCreditAccount ? 'block' : 'none';
+            // Unified Settlement Interface (Both Credit & Drafts)
+            const isUnsettled = record.status === 'Open' || record.payment_mode === 'Credit';
+            document.getElementById('settlementModifierInterface').style.display = isUnsettled ? 'block' : 'none';
 
-            const daysSinceCompile = (new Date().getTime() - compileDateObj.getTime()) / (1000 * 60 * 60 * 24);
+            const daysSinceCompile = (new Date().getTime() - new Date(record.created_at).getTime()) / (1000 * 60 * 60 * 24);
             const isWithinEditWindow = daysSinceCompile <= 7;
             document.getElementById('btnToggleEditStack').style.display = isWithinEditWindow ? 'block' : 'none';
             document.getElementById('revisionLockAlert').style.display = isWithinEditWindow ? 'none' : 'block';
@@ -745,79 +583,51 @@
     }
 
     async function refreshInspectionLineItems(isEditable) {
-        const { data: lines, error: lineErr } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
-        if(lineErr) console.error("Line fetch failed:", lineErr);
-        
-        const container = document.getElementById('thStackedItemsContainer'); 
-        container.innerHTML = '';
+        const { data: lines } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
+        const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = '';
         let calcGrossSubtotal = 0;
 
         if(lines && lines.length > 0) {
             lines.forEach(line => {
                 calcGrossSubtotal += parseFloat(line.total_price) || 0;
-                
-                let parsedName = line.item_name || 'Asset Spec';
-                let parsedBrand = "Standard";
-                if(line.item_name && line.item_name.includes('(')) {
-                    const parts = line.item_name.split('(');
-                    parsedName = parts[0].trim();
-                    parsedBrand = parts[1].replace(')','').trim();
-                }
-                
+                let parsedName = line.item_name || 'Asset Spec'; let parsedBrand = "Standard";
+                if(line.item_name && line.item_name.includes('(')) { const parts = line.item_name.split('('); parsedName = parts[0].trim(); parsedBrand = parts[1].replace(')','').trim(); }
                 const safeNameTruncated = parsedName.length > 24 ? parsedName.substring(0, 22) + '..' : parsedName;
-                const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? 
-                    `<span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer; margin-left:6px;">[Drop]</span>` : '';
+                const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? `<span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer; margin-left:6px;">[Drop]</span>` : '';
+                
+                let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price;
+                displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2);
 
                 container.innerHTML += `
                     <div style="border-bottom:1px dotted #ccc; padding-bottom:4px; margin-bottom:4px;">
-                        <div class="receipt-item-row">
-                            <span class="receipt-item-desc"><strong>${safeNameTruncated}</strong>${delCell}</span>
-                            <span class="receipt-item-val">₹${line.total_price}</span>
-                        </div>
-                        <div class="receipt-item-sub">
-                            <span>Brand: ${parsedBrand} | Qty: ${line.qty}</span>
-                            <span>Rate: ₹${line.unit_price}</span>
-                        </div>
+                        <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${safeNameTruncated}</strong>${delCell}</span><span class="receipt-item-val">₹${line.total_price}</span></div>
+                        <div class="receipt-item-sub"><span>Qty: ${line.qty}</span><span>Rate: ₹${displayRate}</span></div>
                     </div>`;
             });
-        } else {
-            container.innerHTML = '<div style="text-align:center; padding:8px; font-size:0.7rem; color:#888;">No product rows extracted for target record.</div>';
         }
         
         document.getElementById('thSub').innerText = `₹${calcGrossSubtotal}`;
         const finalNet = parseFloat(inspectedRecordObject.total_amount) || 0;
-        document.getElementById('thDisc').innerText = `₹${Math.max(0, calcGrossSubtotal - finalNet)}`;
+        const computedDisc = Math.max(0, calcGrossSubtotal - finalNet);
+        
+        const discRow = document.getElementById('thDiscRow');
+        if(computedDisc > 0) { discRow.style.display = 'flex'; document.getElementById('thDisc').innerText = `₹${computedDisc}`; } else { discRow.style.display = 'none'; }
     }
 
-    function toggleRevisionInterface() {
-        const block = document.getElementById('revisionStackBlock');
-        block.style.display = block.style.display === 'none' ? 'block' : 'none';
-        refreshInspectionLineItems(true);
-    }
+    function toggleRevisionInterface() { const block = document.getElementById('revisionStackBlock'); block.style.display = block.style.display === 'none' ? 'block' : 'none'; refreshInspectionLineItems(true); }
 
     async function commitRuntimeItemRevision() {
-        const partString = document.getElementById('revPart').value.trim();
-        const qVal = parseFloat(document.getElementById('revQty').value) || 1;
-        const rVal = parseFloat(document.getElementById('revRate').value) || 0;
+        const partString = document.getElementById('revPart').value.trim(); const qVal = parseFloat(document.getElementById('revQty').value) || 1; const rVal = parseFloat(document.getElementById('revRate').value) || 0;
         if(!partString) return;
         
-        const cleanPartStr = enforceTitleCaseNomenclature(partString);
-        const newScalarNet = qVal * rVal;
-        await supabaseClient.from('counter_sale_items').insert({ 
-            sale_id: targetInspectionRecordId, 
-            item_name: `${cleanPartStr} (Appended)`, 
-            qty: qVal, unit_price: rVal, total_price: newScalarNet 
-        });
+        const cleanPartStr = enforceTitleCaseNomenclature(partString); const newScalarNet = qVal * rVal;
+        await supabaseClient.from('counter_sale_items').insert({ sale_id: targetInspectionRecordId, item_name: `${cleanPartStr} (Appended)`, qty: qVal, unit_price: rVal, total_price: newScalarNet });
 
-        const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0;
-        const compiledUpdatedNet = prevTotal + newScalarNet;
-
+        const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0; const compiledUpdatedNet = prevTotal + newScalarNet;
         await supabaseClient.from('counter_sales').update({ total_amount: compiledUpdatedNet }).eq('id', targetInspectionRecordId);
         inspectedRecordObject.total_amount = compiledUpdatedNet;
         
-        document.getElementById('thNet').innerText = `₹${compiledUpdatedNet}`;
-        document.getElementById('thWords').innerText = convertNumberToWords(compiledUpdatedNet);
-        
+        document.getElementById('thNet').innerText = `₹${compiledUpdatedNet}`; document.getElementById('thWords').innerText = convertNumberToWords(compiledUpdatedNet);
         document.getElementById('revPart').value = ''; document.getElementById('revQty').value = ''; document.getElementById('revRate').value = '';
         refreshInspectionLineItems(true); queryPosHistoryEngine();
     }
@@ -825,25 +635,27 @@
     async function executeLineDeletion(lineId, lineAmount) {
         if(confirm("Confirm dropping item? Total amount drops proportionally.")) {
             await supabaseClient.from('counter_sale_items').delete().eq('id', lineId);
-            const oldNet = parseFloat(inspectedRecordObject.total_amount) || 0;
-            const adjustedNet = Math.max(0, oldNet - lineAmount);
-            
+            const oldNet = parseFloat(inspectedRecordObject.total_amount) || 0; const adjustedNet = Math.max(0, oldNet - lineAmount);
             await supabaseClient.from('counter_sales').update({ total_amount: adjustedNet }).eq('id', targetInspectionRecordId);
             inspectedRecordObject.total_amount = adjustedNet;
-            
-            document.getElementById('thNet').innerText = `₹${adjustedNet}`;
-            document.getElementById('thWords').innerText = convertNumberToWords(adjustedNet);
+            document.getElementById('thNet').innerText = `₹${adjustedNet}`; document.getElementById('thWords').innerText = convertNumberToWords(adjustedNet);
             refreshInspectionLineItems(true); queryPosHistoryEngine();
         }
     }
 
-    async function commitCreditConversion() {
+    // Unified Settle Drafts & Credits mechanism writing closed_at accurately
+    async function commitPosSettlement() {
         const nextMode = document.getElementById('thConvertMode').value;
-        await supabaseClient.from('counter_sales').update({ payment_mode: nextMode, status: 'Closed' }).eq('id', targetInspectionRecordId);
-        inspectedRecordObject.payment_mode = nextMode;
+        const currentIsoDate = new Date().toISOString();
+        await supabaseClient.from('counter_sales').update({ payment_mode: nextMode, status: 'Closed', closed_at: currentIsoDate }).eq('id', targetInspectionRecordId);
+        inspectedRecordObject.payment_mode = nextMode; inspectedRecordObject.status = 'Closed'; inspectedRecordObject.closed_at = currentIsoDate;
+        
         document.getElementById('thMode').innerText = nextMode;
-        document.getElementById('creditModifierInterface').style.display = 'none';
-        alert(`Record cleanly converted to settlement method: ${nextMode}`);
+        document.getElementById('thDate').innerText = new Date().toLocaleDateString('en-IN');
+        document.getElementById('thTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('settlementModifierInterface').style.display = 'none';
+        
+        alert(`Record cleanly settled inside today's ledger via: ${nextMode}`);
         queryPosHistoryEngine();
     }
 
@@ -852,30 +664,18 @@
     function dispatchWhatsAppImageReceipt() {
         const layoutTarget = document.getElementById('renderThermalReceiptTarget');
         const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none';
-        
         html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
             layoutTarget.style.border = origBorder;
             canvas.toBlob(blob => {
                 const targetBlobUrl = URL.createObjectURL(blob);
-                const fileInst = new File([blob], `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`, { type: "image/jpeg" });
-                
-                if(navigator.canShare && navigator.canShare({ files: [fileInst] })) {
-                    navigator.share({ files: [fileInst], title: 'My Care Document Receipt', text: 'Attached document details your complete certified invoice items.' }).catch(e => console.warn("Share logic aborted:", e));
-                } else {
-                    window.open(targetBlobUrl, '_blank');
-                    alert("Document rendered to Blob layout cleanly. Please download and upload the resulting receipt preview directly into WhatsApp.");
-                }
+                const a = document.createElement('a');
+                a.href = targetBlobUrl; a.download = `Receipt_POS_${targetInspectionRecordId.split('-')[0].toUpperCase()}.jpg`;
+                a.click(); URL.revokeObjectURL(targetBlobUrl);
             }, 'image/jpeg', 0.95);
         });
     }
 
-    function executeSessionTermination() {
-        localStorage.removeItem('ERP_ACTIVE_ROLE');
-        window.location.href = 'login.html';
-    }
-
-    // Auto-launch interface processing sequence instantly
-    evaluateInterfaceBranding();
+    queryPosHistoryEngine();
 </script>
 </body>
 </html>
