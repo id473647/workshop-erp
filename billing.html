@@ -10,6 +10,7 @@
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
         
+        /* Universal Boundary Law Enforced Natively */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
@@ -61,6 +62,8 @@
         
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
+        .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .receipt-logo-container img { height: 30px; filter: grayscale(100%); }
         .receipt-shop-title { font-size: 1.1rem; font-weight: bold; margin: 2px 0; }
         .receipt-meta { font-size: 0.75rem; margin: 1px 0; }
         .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
@@ -149,6 +152,10 @@
         
         <div id="renderThermalReceiptTarget" class="receipt-container">
             <div class="receipt-header">
+                <div class="receipt-logo-container">
+                    <img src="logo-main.jpg" onerror="this.style.display='none'">
+                    <img src="logo-green.png" onerror="this.style.display='none'">
+                </div>
                 <div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div>
                 <div class="receipt-meta">GSTIN: 23ANAPB4613K1ZJ</div>
                 <div class="receipt-meta">Gurudwara Road, Ganj Betul</div>
@@ -160,11 +167,12 @@
                 <div>Time: <span id="thTime">--</span></div>
             </div>
             <div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div>
+            <div class="receipt-meta" style="margin-top:2px;">Client: <strong id="thClientInfo">--</strong></div>
             <div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div>
             <div class="receipt-divider"></div>
             
             <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; text-transform:uppercase;">
-                Items Rendered Array
+                ITEMS
             </div>
             <div id="thStackedItemsContainer"></div>
             
@@ -175,20 +183,26 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <span>Mechanical Labor:</span><strong id="thLaborSum">₹0</strong>
             </div>
-            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+            
+            <div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;">
                 <span>Lathe / Subcontract:</span><strong id="thLatheSum">₹0</strong>
             </div>
-            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+            <div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;">
                 <span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong>
             </div>
-            <div class="receipt-meta" style="display:flex; justify-content:space-between; color:red;">
+            <div class="receipt-meta" id="rowAdvanceSum" style="display:flex; justify-content:space-between; color:red;">
                 <span>Less Advance/Prepaid:</span><strong id="thAdvanceSum">₹0</strong>
             </div>
-            <div class="receipt-divider"></div>
             
+            <div class="receipt-divider"></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;">
                 <span>NET PAYABLE:</span><span id="thNet">₹0</span>
             </div>
+            
+            <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">
+                Amount in words:<br><strong id="thWords">--</strong>
+            </div>
+            
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
                 Settlement Route: <span id="thMode">--</span>
             </div>
@@ -217,7 +231,24 @@
     let lineItemsLocalMemory = [];
     let globalCatalogCache = [];
     let activeJobContext = null;
+    let activeCustomerName = 'Walk-in';
     let partsGrossTotal = 0;
+
+    // Advanced numeral to string converter
+    function convertNumberToWords(amount) {
+        const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
+        let num = Math.floor(amount); 
+        if (num === 0) return 'Zero Rupees Only';
+        function helper(n) {
+            if (n < 20) return words[n];
+            if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
+            if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : '');
+            if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : '');
+            if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : '');
+            return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : '');
+        }
+        return helper(num) + ' Rupees Only';
+    }
 
     async function initializeJobContext() {
         document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
@@ -238,6 +269,12 @@
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
+
+            // Fetch absolute client details bypassing strict postgrest nested requirements
+            if (job.customer_mobile) {
+                const { data: custData } = await supabaseClient.from('customers').select('name').eq('mobile_number', job.customer_mobile).single();
+                if (custData) activeCustomerName = custData.name;
+            }
 
             loadInventoryLedgers();
         }
@@ -378,33 +415,51 @@
         }
     }
 
-    // UPDATED: Dynamically uses the exact closed_at property generated by the payload wrapper to mark exact payment times
     function populateReceiptDocument(paymentMode, finalNet, scopeVals) {
         const dateSource = scopeVals.closed_at ? new Date(scopeVals.closed_at) : new Date();
         document.getElementById('thDate').innerText = dateSource.toLocaleDateString('en-IN');
         document.getElementById('thTime').innerText = dateSource.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
         
         document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
-        document.getElementById('thAssetInfo').innerText = `${activeJobContext.vehicles?.reg_number || ''} | ${activeJobContext.customer_mobile || ''}`;
+        document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`;
+        
+        const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown';
+        const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED';
+        document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`;
         
         const container = document.getElementById('thStackedItemsContainer'); 
         container.innerHTML = '';
         lineItemsLocalMemory.forEach(line => {
             const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name;
+            
+            // Mathematically exact calculation translating bulk user inputs into per-unit values
+            let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price;
+            displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2);
+
             container.innerHTML += `
                 <div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;">
                     <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
-                    <div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${line.unit_price}</span></div>
+                    <div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>
                 </div>`;
         });
 
         document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`;
         document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges}`;
-        document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`;
-        document.getElementById('thDiscSum').innerText = `₹${document.getElementById('vFlatDisc').value || 0}`;
-        document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`;
+        
+        // Conditional Rendering for Zero-Value Rows
+        const dLathe = document.getElementById('rowLatheSum');
+        if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; }
+        
+        const dDisc = document.getElementById('rowDiscSum');
+        const vDisc = parseFloat(document.getElementById('vFlatDisc').value) || 0;
+        if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; }
+        
+        const dAdv = document.getElementById('rowAdvanceSum');
+        if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; }
+
         document.getElementById('thNet').innerText = `₹${finalNet}`;
         document.getElementById('thMode').innerText = paymentMode;
+        document.getElementById('thWords').innerText = convertNumberToWords(finalNet);
     }
 
     function dispatchWhatsAppImageReceipt() {
