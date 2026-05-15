@@ -167,15 +167,13 @@
         const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
         const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
 
-        const hasJc = jcList && jcList.length > 0; const hasPos = posList && posList.length > 0;
-
         if(cData) {
             targetCustomerProfile = cData;
             document.getElementById('dispVerifiedName').innerText = `${cData.name} | ${cData.address || 'Retail'}`;
             const wrapper = document.getElementById('clientClassificationWrapper');
-            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">(c) Regular Customer</span>';
-            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">(b) Workshop Customer</span>';
-            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Cash Customer</span>';
+            if(jcList?.length && posList?.length) wrapper.innerHTML = '<span class="c-tag tag-reg">(c) Regular Customer</span>';
+            else if(jcList?.length) wrapper.innerHTML = '<span class="c-tag tag-work">(b) Workshop Customer</span>';
+            else if(posList?.length) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Cash Customer</span>';
             document.getElementById('verifiedProfileContainer').style.display = 'block';
             prefetchVehicleMasterCatalog();
         } else {
@@ -263,7 +261,6 @@
         activeVehId = id; document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
         document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
         
-        // Dynamically populate the Service Package Dropdown based on the specific vehicle classification
         const selProtocol = document.getElementById('serviceProtocolSelect');
         selProtocol.innerHTML = '<option value="" data-rate="0">-- Standard / Custom Scope --</option>';
         if(catGroup) {
@@ -292,12 +289,27 @@
 
     async function finalizeJobCardCreation() {
         const mechIdValue = (activeRole === 'green' || activeRole === 'moped') ? null : (document.getElementById('mechSelect').value || null);
+        
+        // 1. Create the Job Card Record
         const { data: newJc } = await supabaseClient.from('job_cards').insert({
             customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue,
             problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
             advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
         }).select().single();
-        if(newJc) window.location.href = 'index.html';
+
+        if(newJc) {
+            // 2. Automatically inject the Fixed Protocol as an editable 'Service' line item
+            const selProtocol = document.getElementById('serviceProtocolSelect');
+            const pkgName = selProtocol.value;
+            const pkgRate = parseFloat(selProtocol.options[selProtocol.selectedIndex].getAttribute('data-rate')) || 0;
+
+            if (pkgName && pkgRate > 0) {
+                await supabaseClient.from('job_card_items').insert({
+                    job_card_id: newJc.id, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate
+                });
+            }
+            window.location.href = 'index.html';
+        }
     }
 </script>
 </body>
