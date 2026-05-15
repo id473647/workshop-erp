@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Master Ledger - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
+        .badge-role { background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+
+        .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
+        .tab-btn:hover:not(.active) { color: var(--primary); }
+
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        input, select, textarea { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; width: 100%; }
+
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.15s; }
+        .btn-action:hover { opacity: 0.9; }
+        .btn-info { background: var(--info); }
+        .btn-danger { background: var(--danger); }
+
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 16px; background: white; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+
+        .summary-banner { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .summary-box { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; text-align: center; }
+        .summary-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .summary-val { font-size: 1.4rem; font-weight: 700; }
+
+        .view-panel { display: none; } .view-panel.active { display: block; }
+        .floating-action { position: fixed; bottom: 30px; right: 30px; background: var(--danger); color: white; border: none; border-radius: 50px; padding: 16px 24px; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 12px rgba(231,76,60,0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; }
+        .floating-action:hover { transform: scale(1.05); }
+
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; }
+        
+        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">WORKSHOP LEDGER</span>
+</nav>
+
+<div class="wrapper">
+    <div class="card-panel">
+        <div class="tabs-header">
+            <button class="tab-btn active" onclick="switchSystemPanel('panelDaily')">Periodic Job Card Ledger</button>
+            <button class="tab-btn" onclick="switchSystemPanel('panelCross')">Stakeholder Cross Ledger</button>
+        </div>
+
+        <div id="panelDaily" class="view-panel active">
+            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
+                <div class="field-group"><label>Start Horizon</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
+                <div class="field-group"><label>End Horizon</label><input type="date" id="dlEnd" onchange="generateDailyLedger()"></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-action btn-info" onclick="exportViewToJpg('exportDailyTarget', 'Periodic_Ledger')">📤 EXPORT JPG</button>
+                    <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
+            </div>
+
+            <div id="exportDailyTarget" style="padding:10px; background:white;">
+                <div class="summary-banner">
+                    <div class="summary-box"><span class="summary-title">Total Cash Income</span><span class="summary-val" id="dlCash" style="color:var(--success);">₹0</span></div>
+                    <div class="summary-box"><span class="summary-title">Total UPI Income</span><span class="summary-val" id="dlUpi" style="color:var(--info);">₹0</span></div>
+                    <div class="summary-box"><span class="summary-title">Total Operational Expenses</span><span class="summary-val" id="dlExp" style="color:var(--danger);">₹0</span></div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div>
+                        <h4 style="margin:0 0 8px 0; color:var(--success);">Inbound Job Card Settlements</h4>
+                        <div class="table-wrapper"><table id="tbDailyIncome"><thead><tr><th>Ref</th><th>Mode</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+                    </div>
+                    <div>
+                        <h4 style="margin:0 0 8px 0; color:var(--danger);">Outbound Operational Expenses</h4>
+                        <div class="table-wrapper"><table id="tbDailyExpense"><thead><tr><th>Category</th><th>Note</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panelCross" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
+                <div class="field-group"><label>Target Stakeholder</label><select id="clStakeholder" onchange="generateCrossLedger()"><option value="">-- Select Target --</option></select></div>
+                <div class="field-group"><label>Start Horizon</label><input type="date" id="clStart" onchange="generateCrossLedger()"></div>
+                <div class="field-group"><label>End Horizon</label><input type="date" id="clEnd" onchange="generateCrossLedger()"></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-action btn-info" onclick="exportViewToJpg('exportCrossTarget', 'Cross_Ledger')">📤 EXPORT JPG</button>
+                    <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
+            </div>
+
+            <div id="exportCrossTarget" style="padding:10px; background:white;">
+                <div class="summary-banner" style="grid-template-columns:1fr 1fr;">
+                    <div class="summary-box"><span class="summary-title">Generated Payable Value (Credit)</span><span class="summary-val" id="clCredit" style="color:var(--info);">₹0</span></div>
+                    <div class="summary-box"><span class="summary-title">Disbursed Payments (Debit)</span><span class="summary-val" id="clDebit" style="color:var(--danger);">₹0</span></div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="tbCrossLedger">
+                        <thead><tr><th>Date</th><th>Reference Context</th><th>Credit (Generated)</th><th>Debit (Paid)</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div style="text-align:right; font-size:1.2rem; font-weight:700; margin-top:12px;">Net Outstanding Balance: <span id="clNetBalance">₹0</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button class="floating-action" onclick="document.getElementById('modalExpense').style.display='flex'">+ CREATE EXPENSE / PAYOUT</button>
+
+<div id="modalExpense" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
+            <h3 style="margin:0; color:var(--primary);">Log Outbound Payout</h3>
+            <button onclick="document.getElementById('modalExpense').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        
+        <div class="field-group" style="margin-bottom:12px;">
+            <label>Expense Category Type</label>
+            <select id="exCat" onchange="toggleExpenseSubTargets()">
+                <option value="Mechanic Payout">Mechanic / Labour Payout</option>
+                <option value="Lathe/Welding">Lathe & Welding Contract</option>
+                <option value="Green Spares">Green Warehouse Transfer</option>
+                <option value="Moped Spares">Moped Warehouse Transfer</option>
+                <option value="Other">Other Operational</option>
+            </select>
+        </div>
+
+        <div class="field-group" id="exStakeholderBlock" style="margin-bottom:12px;">
+            <label>Specific Target Entity</label>
+            <select id="exTarget"><option value="">-- Select --</option></select>
+        </div>
+
+        <div class="field-group" style="margin-bottom:12px;">
+            <label>Disbursement Amount (₹)</label>
+            <input type="number" id="exAmount" value="0" min="1">
+        </div>
+
+        <div class="field-group" style="margin-bottom:20px;">
+            <label>Contextual Note / Reference</label>
+            <textarea id="exNote" rows="2" placeholder="Document exact payment reason..."></textarea>
+        </div>
+
+        <button class="btn-action" style="width:100%;" onclick="commitWorkshopExpense()">
+            <span>COMMIT EXPENSE RECORD</span><div id="expSpinner" class="loading-ring"></div>
+        </button>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+    const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+
+    let globalMechanics = [];
+
+    function switchSystemPanel(targetPanelId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+        document.getElementById(targetPanelId).classList.add('active');
+        if(targetPanelId === 'panelDaily') generateDailyLedger();
+        if(targetPanelId === 'panelCross') generateCrossLedger();
+    }
+
+    async function initializeLedgerEnvironment() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dlStart').value = today; document.getElementById('dlEnd').value = today;
+        document.getElementById('clStart').value = today; document.getElementById('clEnd').value = today;
+
+        const { data: m } = await supabaseClient.from('mechanics').select('id, name');
+        globalMechanics = m || [];
+        
+        const cTarget = document.getElementById('clStakeholder');
+        cTarget.innerHTML = `<option value="">-- Select Target --</option><option value="Lathe/Welding">Lathe & Welding Contract</option><option value="Green">Green Spares Link</option><option value="Moped">Moped Spares Link</option>`;
+        globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Tech: ${mech.name}</option>`; });
+
+        toggleExpenseSubTargets();
+        generateDailyLedger();
+    }
+
+    function toggleExpenseSubTargets() {
+        const cat = document.getElementById('exCat').value;
+        const targetSel = document.getElementById('exTarget');
+        targetSel.innerHTML = '<option value="">-- Select / N/A --</option>';
+
+        if(cat === 'Mechanic Payout') {
+            globalMechanics.forEach(m => { targetSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
+            document.getElementById('exStakeholderBlock').style.display = 'flex';
+        } else if (cat === 'Lathe/Welding') {
+            targetSel.innerHTML += `<option value="Lathe/Welding" selected>Master Lathe Account</option>`;
+            document.getElementById('exStakeholderBlock').style.display = 'flex';
+        } else {
+            document.getElementById('exStakeholderBlock').style.display = 'none';
+        }
+    }
+
+    async function commitWorkshopExpense() {
+        const cat = document.getElementById('exCat').value;
+        const target = document.getElementById('exTarget').value;
+        const amt = parseFloat(document.getElementById('exAmount').value) || 0;
+        const note = document.getElementById('exNote').value.trim();
+
+        if(amt <= 0) return alert("Validation Guard: Expense value must exceed absolute zero.");
+        
+        document.getElementById('expSpinner').style.display = 'inline-block';
+        
+        await supabaseClient.from('workshop_expenses').insert({
+            expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: activeRole
+        });
+
+        document.getElementById('expSpinner').style.display = 'none';
+        document.getElementById('modalExpense').style.display = 'none';
+        document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = '';
+        
+        generateDailyLedger();
+        generateCrossLedger();
+    }
+
+    async function generateDailyLedger() {
+        const startStr = document.getElementById('dlStart').value;
+        const endStr = document.getElementById('dlEnd').value;
+
+        // Fetch Inbound Job Cards
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value').eq('status', 'Closed')
+            .gte('jc_date', startStr).lte('jc_date', endStr + 'T23:59:59');
+
+        // Fetch Outbound Expenses
+        const { data: exp } = await supabaseClient.from('workshop_expenses').select('*')
+            .gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+
+        let sumCash = 0, sumUpi = 0, sumExp = 0;
+        const tbInc = document.getElementById('tbDailyIncome').querySelector('tbody'); tbInc.innerHTML = '';
+        const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
+
+        (jobs || []).forEach(j => {
+            const v = parseFloat(j.total_invoice_value) || 0;
+            if(j.payment_mode === 'Cash') sumCash += v;
+            if(j.payment_mode === 'UPI') sumUpi += v;
+            tbInc.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode || 'Cash'}</td><td>₹${v}</td></tr>`;
+        });
+
+        (exp || []).forEach(e => {
+            const v = parseFloat(e.amount) || 0; sumExp += v;
+            tbExp.innerHTML += `<tr><td>${e.expense_category}</td><td>${e.note || ''}</td><td>₹${v}</td></tr>`;
+        });
+
+        document.getElementById('dlCash').innerText = `₹${sumCash}`;
+        document.getElementById('dlUpi').innerText = `₹${sumUpi}`;
+        document.getElementById('dlExp').innerText = `₹${sumExp}`;
+    }
+
+    async function generateCrossLedger() {
+        const target = document.getElementById('clStakeholder').value;
+        const startStr = document.getElementById('clStart').value;
+        const endStr = document.getElementById('clEnd').value;
+
+        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); tbody.innerHTML = '';
+        if(!target) return;
+
+        let totalCredit = 0; let totalDebit = 0;
+
+        // Condition 1: Target is a Mechanic (UUID)
+        if(target.includes('-')) {
+            const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, labour_charges').eq('mech_id', target).eq('status', 'Closed').gte('jc_date', startStr).lte('jc_date', endStr + 'T23:59:59');
+            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+            
+            (jobs || []).forEach(j => {
+                const v = parseFloat(j.labour_charges) || 0; totalCredit += v;
+                tbody.innerHTML += `<tr><td>${j.jc_date || ''}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`;
+            });
+            (exp || []).forEach(e => {
+                const v = parseFloat(e.amount) || 0; totalDebit += v;
+                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
+                tbody.innerHTML += `<tr><td>${d}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
+            });
+        } 
+        // Condition 2: Target is Lathe/Welding
+        else if (target === 'Lathe/Welding') {
+            const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('jc_date', startStr).lte('jc_date', endStr + 'T23:59:59');
+            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+            
+            (jobs || []).forEach(j => {
+                const v = parseFloat(j.lathe_welding) || 0; totalCredit += v;
+                tbody.innerHTML += `<tr><td>${j.jc_date || ''}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Charge)</td><td>₹${v}</td><td>--</td></tr>`;
+            });
+            (exp || []).forEach(e => {
+                const v = parseFloat(e.amount) || 0; totalDebit += v;
+                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
+                tbody.innerHTML += `<tr><td>${d}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
+            });
+        }
+
+        document.getElementById('clCredit').innerText = `₹${totalCredit}`;
+        document.getElementById('clDebit').innerText = `₹${totalDebit}`;
+        const net = totalCredit - totalDebit;
+        const netNode = document.getElementById('clNetBalance');
+        netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`;
+        netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
+    }
+
+    function exportViewToJpg(targetContainerId, fileNamePrefix) {
+        const layoutTarget = document.getElementById(targetContainerId);
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.jpg`;
+                a.click(); URL.revokeObjectURL(url);
+            }, 'image/jpeg', 0.95);
+        });
+    }
+
+    initializeLedgerEnvironment();
+</script>
+</body>
+</html>
