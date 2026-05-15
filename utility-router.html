@@ -345,7 +345,6 @@
 
     function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
 
-    // --- MODULE 1: CUSTOMER MANAGEMENT SYSTEM ---
     async function prefetchClientContextForEditor(mobileVal) {
         const str = mobileVal.trim();
         if(str.length !== 10) { document.getElementById('cEditName').value = ''; targetCustomerProfileObj = null; return; }
@@ -461,7 +460,6 @@
         }
     }
 
-    // --- MODULE 2: PASSWORD MANAGEMENT ENGINE ---
     async function commitSelfPasswordUpdate() {
         const pin1 = document.getElementById('pNewSelf').value.trim();
         const pin2 = document.getElementById('pConfirmSelf').value.trim();
@@ -482,7 +480,6 @@
         document.getElementById('pNewAdmin').value = '';
     }
 
-    // --- MODULE 5: TECHNICIAN LEDGER ENGINE ---
     async function upsertTechnicianProfileRecord() {
         const nameStr = document.getElementById('tName').value.trim();
         const commVal = parseFloat(document.getElementById('tComm').value) || 0;
@@ -515,6 +512,7 @@
         });
     }
 
+    // FIXED: Dynamically compiles Service Package components nested in job_card_items alongside standard labor charges
     async function downloadTechnicianLedgerStatement(techId, techName) {
         const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, closed_at, labour_charges, status, job_card_items(warehouse_type, total_price)').eq('mech_id', techId).eq('status', 'Closed');
         
@@ -543,7 +541,6 @@
         downloadElement.click(); URL.revokeObjectURL(downloadElement.href);
     }
 
-    // --- MODULE 6: AMC & SERVICE PACKAGES ENGINE ---
     async function upsertServicePackageRecord() {
         const pName = document.getElementById('amcPackageName').value;
         const pCat = document.getElementById('amcCategoryGroup').value;
