@@ -117,10 +117,14 @@
             <textarea id="complaint" rows="3" placeholder="Outline active client intake statements explicitly"></textarea>
             <div class="inputs-grid" style="margin-top:12px;">
                 <div class="field-group"><label style="margin-top:0;">Authorized Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
-                <div class="field-group"><label style="margin-top:0;">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
+                <div class="field-group"><label style="margin-top:0;" id="lblAdvance">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
-            <label style="margin-top:16px;">Assign Workshop Technician</label>
-            <select id="mechSelect" style="margin-top:4px;"></select>
+            
+            <div id="mechAssignmentBlock">
+                <label style="margin-top:16px;">Assign Workshop Technician</label>
+                <select id="mechSelect" style="margin-top:4px;"></select>
+            </div>
+            
             <button class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">COMMIT JOB CARD & DISPATCH</button>
         </div>
     </div>
@@ -130,6 +134,15 @@
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'service';
+    document.querySelector('.badge-role').innerText = activeRole.toUpperCase() + ' INTAKE';
+
+    // Role-based visibility logic
+    if (activeRole === 'green' || activeRole === 'moped') {
+        document.getElementById('mechAssignmentBlock').style.display = 'none';
+        document.getElementById('lblAdvance').innerText = `Upfront Prepaid Advance (${activeRole.charAt(0).toUpperCase() + activeRole.slice(1)} Ledger) (₹)`;
+    }
 
     let evaluatedPhoneContext = null; let targetCustomerProfile = null; let activeVehId = null; let globalVehicleDirectory = []; let isCustomChassisMode = false;
 
@@ -243,16 +256,21 @@
     async function stageTargetVehicle(id, reg, model) {
         activeVehId = id; document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
         document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
-        const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
-        const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
-        m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
+        
+        if(activeRole !== 'green' && activeRole !== 'moped') {
+            const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
+            const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
+            m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
+        }
     }
 
     async function finalizeJobCardCreation() {
+        const mechIdValue = (activeRole === 'green' || activeRole === 'moped') ? null : (document.getElementById('mechSelect').value || null);
+        
         const { data: newJc } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
+            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue,
             problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
-            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'service', status: 'Open'
+            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
         }).select().single();
         if(newJc) window.location.href = 'index.html';
     }
