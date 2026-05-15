@@ -9,6 +9,7 @@
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
@@ -21,6 +22,7 @@
         .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
         .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
+        .tab-btn:hover:not(.active) { color: var(--primary); }
 
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
         .field-group { display: flex; flex-direction: column; gap: 4px; }
@@ -51,7 +53,10 @@
         .floating-action:hover { transform: scale(1.05); }
 
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;}
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; }
+        
+        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -310,8 +315,6 @@
 
         (exp || []).forEach(e => {
             const v = parseFloat(e.amount) || 0; sumExp += v;
-            
-            // Map the UUID to a readable name if it's a known stakeholder
             let targetName = e.stakeholder_id;
             const mech = globalMechanics.find(m => m.id === targetName);
             const vend = globalVendors.find(v => v.id === targetName);
@@ -336,7 +339,6 @@
 
         let totalCredit = 0; let totalDebit = 0;
 
-        // Condition: Target is Master Lathe Aggregate
         if (target === 'MasterLathe') {
             const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
             const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
@@ -354,13 +356,18 @@
                 tbody.innerHTML += `<tr><td>${d}</td><td>Paid to: ${vendName} - ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
             });
         }
-        // Condition: Target is a specific UUID (Mechanic or Custom Vendor)
         else {
             const isMechanic = globalMechanics.some(m => m.id === target);
             if(isMechanic) {
-                const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
+                // FIXED: Now queries job_card_items to explicitly sum Fixed Services into mechanic labor payouts
+                const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
                 (jobs || []).forEach(j => {
-                    const v = parseFloat(j.labour_charges) || 0; totalCredit += v;
+                    let pkgLabor = 0;
+                    if(j.job_card_items) {
+                        j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; });
+                    }
+                    const v = (parseFloat(j.labour_charges) || 0) + pkgLabor; 
+                    totalCredit += v;
                     const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : '';
                     tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`;
                 });
