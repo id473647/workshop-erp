@@ -17,13 +17,15 @@
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; }
         .meta-text { font-size: 0.85rem; color: #64748b; }
         .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; }
+        
         .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 24px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; border-bottom: 1px solid var(--border); }
         td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         
-        /* Interactive Inline Addition Bar aligned with POS style */
-        .inline-add-strip { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr auto; gap: 8px; background: #f8fafc; padding: 12px; border-bottom: 2px solid var(--border); position: relative; align-items: center; }
+        /* Ensure the input bar scrolls on mobile screens natively without clipping */
+        .inline-add-strip-wrapper { overflow-x: auto; margin-bottom: 10px; padding-bottom: 5px; }
+        .inline-add-strip { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr auto; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; min-width: 700px; }
         .inline-add-strip input, .inline-add-strip select { padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
         .btn-add-line { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; }
         
@@ -66,19 +68,21 @@
     </div>
 
     <div class="table-wrapper">
-        <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
-            <div style="position:relative;">
-                <input type="text" id="nPart" placeholder="Part Description" oninput="queryCatalogAutocomplete(this)" autocomplete="off">
-                <div id="autolist-n" class="autocomplete-container"></div>
+        <div class="inline-add-strip-wrapper">
+            <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
+                <div style="position:relative;">
+                    <input type="text" id="nPart" placeholder="Part Description" oninput="queryCatalogAutocomplete(this)" autocomplete="off">
+                    <div id="autolist-n" class="autocomplete-container"></div>
+                </div>
+                <input type="text" id="nBrand" placeholder="BRAND" oninput="this.value=this.value.toUpperCase()">
+                <select id="nType">
+                    <option value="Spare">Spare (Pcs)</option>
+                    <option value="Lube">Lube (ML)</option>
+                </select>
+                <input type="number" id="nQty" placeholder="Qty / ML" value="1" min="1">
+                <input type="number" id="nRate" placeholder="Rate (₹)" value="0" min="0">
+                <button class="btn-add-line" onclick="pushItemToJobCard()">+</button>
             </div>
-            <input type="text" id="nBrand" placeholder="BRAND" oninput="this.value=this.value.toUpperCase()">
-            <select id="nType">
-                <option value="Spare">Spare (Pcs)</option>
-                <option value="Lube">Lube (ML)</option>
-            </select>
-            <input type="number" id="nQty" placeholder="Qty / ML" value="1" min="1">
-            <input type="number" id="nRate" placeholder="Rate (₹)" value="0" min="0">
-            <button class="btn-add-line" onclick="pushItemToJobCard()">+</button>
         </div>
 
         <table>
@@ -173,7 +177,6 @@
         compileDynamicSums();
     }
 
-    // Interactive Auto-Complete Arrays natively mapping into inline layout bounds
     async function prefetchCentralCatalog() {
         const { data: master } = await supabaseClient.from('product_master').select('*');
         globalCatalogCache = master || [];
@@ -200,7 +203,6 @@
         document.getElementById('autolist-n').style.display = 'none';
     }
 
-    // Native inline insertion replacing legacy prompt boxes directly
     async function pushItemToJobCard() {
         const partStr = document.getElementById('nPart').value.trim();
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD';
