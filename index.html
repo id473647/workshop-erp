@@ -14,10 +14,13 @@
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
-        .btn-back { background: white; color: var(--primary); } .btn-home { background: #f1f5f9; color: var(--primary); } .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
         .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
@@ -40,7 +43,11 @@
         .navigation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
         .action-btn { padding: 14px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; text-decoration: none; color: white; text-align: center; display: block; transition: opacity 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .action-btn:hover { opacity: 0.9; }
-        .bg-green { background: var(--success); } .bg-moped { background: var(--moped); } .bg-service { background: var(--service); } .bg-retail { background: var(--danger); } .bg-utility { background: var(--utility); }
+        .bg-green { background: var(--success); }
+        .bg-moped { background: var(--moped); }
+        .bg-service { background: var(--service); }
+        .bg-retail { background: var(--danger); }
+        .bg-utility { background: var(--utility); }
 
         .search-strip { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
         .search-strip input, .search-strip select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; box-sizing: border-box; }
@@ -182,7 +189,6 @@
     function enforceRbacVisibilityConstraints() {
         document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
         
-        // Setup Unified Flow Card and New Ledger Card
         document.getElementById('cardCombinedFlow').style.display = 'block';
         if(sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('cardStaffFlow').style.display = 'block';
@@ -215,7 +221,6 @@
     async function triggerDashboardDataAggregators() {
         const dateStringToday = new Date().toISOString().split('T')[0];
 
-        // Fetch Both Warehouse Flows for the Combined Card
         supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Green', target_date: dateStringToday }).then(({ data }) => {
             if(data) {
                 document.getElementById('mGrnNet').innerText = `₹${Math.round(data.total_flow)}`;
@@ -229,7 +234,6 @@
             }
         });
 
-        // Fetch JC Payments for new Ledger Card
         if(sessionRole === 'service' || sessionRole === 'admin') {
             supabaseClient.rpc('get_daily_jc_payments', { target_date: dateStringToday }).then(({ data }) => {
                 if(data) {
@@ -272,16 +276,15 @@
 
     async function queryMasterJobRegisters() {
         const queryVal = document.getElementById('sQuery').value.trim().toLowerCase();
-        const modeVal = document.getElementById('sMode').value;
         const dateVal = document.getElementById('sDate').value;
         const todayString = new Date().toISOString().split('T')[0];
 
         let baseQuery = supabaseClient.from('job_cards').select('*, vehicles(reg_number, make_model, color)');
 
         if(currentListCategory === 'Running') {
-            baseQuery = baseQuery.eq('status', 'Open').order('jc_date', { ascending: false }).limit(7);
+            baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false }).limit(7);
         } else if(currentListCategory === 'AgedOpen') {
-            baseQuery = baseQuery.eq('status', 'Open').lt('jc_date', todayString).order('jc_date', { ascending: true });
+            baseQuery = baseQuery.eq('status', 'Open').lt('created_at', todayString).order('created_at', { ascending: true });
         } else if(currentListCategory === 'PendingDelivery') {
             baseQuery = baseQuery.not('mech_completion_time', 'is', null).eq('status', 'Open');
         } else if(currentListCategory === 'Historical') {
@@ -289,14 +292,14 @@
         }
 
         if(dateVal) {
-            baseQuery = baseQuery.gte('jc_date', dateVal).lte('jc_date', dateVal + 'T23:59:59');
+            baseQuery = baseQuery.gte('created_at', dateVal).lte('created_at', dateVal + 'T23:59:59');
         }
 
         const { data: records, error } = await baseQuery;
         const tbody = document.getElementById('masterJobsTableBody');
         tbody.innerHTML = '';
 
-        if(error) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center; padding:16px;">Ledger Retrieval Fault: ${error.message}</td></tr>`; return; }
+        if(error) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center; padding:16px;">Ledger Fault: ${error.message}</td></tr>`; return; }
 
         const filteredArray = (records || []).filter(row => {
             const matchClient = (row.customer_mobile && row.customer_mobile.includes(queryVal)) || 
@@ -309,15 +312,29 @@
             filteredArray.forEach(job => {
                 const assignedName = cachedMechanicsMap[job.mech_id] || 'Unassigned';
                 const stylePill = job.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;';
-                
                 const colorStr = job.vehicles?.color ? ` - ${job.vehicles.color}` : '';
                 const modelDisplay = job.vehicles?.make_model ? `${job.vehicles.make_model}${colorStr}` : 'Unknown Asset';
                 
+                // Formats the exact opening time natively
+                const openDateObj = new Date(job.created_at);
+                const openDateStr = openDateObj.toLocaleDateString('en-IN') + ' ' + openDateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+                
+                // Dynamic html construction handling the new Paid timestamp rules
+                let timeDisplayHtml = `<span style="font-size:0.7rem; color:var(--info); font-weight:bold;">Opened: ${openDateStr}</span>`;
+                
+                // If closed, append the actual settlement time natively
+                if (job.status === 'Closed' && job.closed_at) {
+                    const closeDateObj = new Date(job.closed_at);
+                    const closeDateStr = closeDateObj.toLocaleDateString('en-IN') + ' ' + closeDateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+                    timeDisplayHtml += `<br><span style="font-size:0.7rem; color:var(--success); font-weight:bold;">Settled: ${closeDateStr}</span>`;
+                }
+
                 tbody.innerHTML += `
                     <tr>
                         <td>
                             <a class="clickable-ref" href="billing.html?id=${job.id}">${modelDisplay}</a>
-                            <span style="font-size:0.7rem; color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span>
+                            <span style="font-size:0.7rem; color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span><br>
+                            ${timeDisplayHtml}
                         </td>
                         <td><strong>${job.vehicles?.reg_number || 'UNMAPPED'}</strong><br><span style="font-size:0.75rem; color:#64748b;">${job.customer_mobile || ''}</span></td>
                         <td><strong>₹${job.total_invoice_value || 0}</strong></td>
@@ -370,7 +387,7 @@
             container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Depot</th><th>Fluid Parameters</th><th>Dispatched Volume</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${l.qty} ML</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'StaffFlow') {
             titleDisplayStr = "Technician Payable Assignments";
-            const { data: jobs } = await supabaseClient.from('job_cards').select('id, mech_id, labour_charges, status').gte('created_at', dateTarget);
+            const { data: jobs } = await supabaseClient.from('job_cards').select('id, mech_id, labour_charges, status').gte('closed_at', dateTarget);
             container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead><tbody>${(jobs || []).map(j => `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}</tbody></table></div>`;
         }
 
