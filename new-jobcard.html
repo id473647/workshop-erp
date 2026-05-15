@@ -3,69 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Card Creator Engine - My Care ERP</title>
+    <title>Job Card Creator - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { 
-            --primary: #2c3e50; --success: #27ae60; --info: #2980b9; 
-            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; 
-            --amber: #f59e0b;
-        }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
-        
-        /* Universal Formatting Rules #1 and #2: Bound layout with centered Home action */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
         .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-
         .wrapper { max-width: 950px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
         .container { background: white; padding: 28px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        
         .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
-        
-        .step-box { display: none; animation: fadeIn 0.2s ease-out; }
-        .active-step { display: block; }
+        .step-box { display: none; animation: fadeIn 0.2s ease-out; } .active-step { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-
         label { display: block; margin-top: 14px; font-weight: 700; font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--info); box-shadow: 0 0 0 3px rgba(41,128,185,0.1); }
-
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
         .field-group { display: flex; flex-direction: column; position: relative; }
-
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; font-size: 0.95rem; transition: opacity 0.15s; }
-        .btn:hover { opacity: 0.9; }
-        .btn-search { background: var(--primary); color: white; width: auto; margin: 0; padding: 0 24px; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 16px; font-size: 0.95rem; }
         .btn-success { background: var(--success); color: white; }
         .btn-link { background: none; border: 2px dashed var(--info); color: var(--info); margin-top: 12px; padding: 10px; }
-        
-        /* Classification Badges */
         .c-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; margin-top: 6px; }
-        .tag-cash { background: #fef3c7; color: #b45309; }
-        .tag-work { background: #e0f2fe; color: #0369a1; }
-        .tag-reg { background: #dcfce7; color: #15803d; }
-        
-        /* Fleet Display Matrix */
+        .tag-cash { background: #fef3c7; color: #b45309; } .tag-work { background: #e0f2fe; color: #0369a1; } .tag-reg { background: #dcfce7; color: #15803d; }
         .veh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
-        .veh-rect { border: 2px solid var(--border); padding: 16px; border-radius: 8px; cursor: pointer; background: #f8fafc; text-align: center; transition: all 0.15s; }
-        .veh-rect:hover { border-color: var(--info); background: #f0f7ff; transform: translateY(-2px); }
-        .veh-rect b { font-size: 1.1rem; color: var(--primary); display: block; }
-        .veh-rect small { color: #64748b; font-size: 0.8rem; margin-top: 4px; display: block; }
-
+        .veh-rect { border: 2px solid var(--border); padding: 16px; border-radius: 8px; cursor: pointer; background: #f8fafc; text-align: center; }
+        .veh-rect:hover { border-color: var(--info); background: #f0f7ff; }
         .status-badge { background: #f0fdf4; padding: 14px; border-radius: 8px; font-weight: 700; color: #15803d; border: 1px solid #bbf7d0; margin-bottom: 20px; font-size: 1rem; }
-        .warranty-alert { background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px; border: 1px solid #fca5a5; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px; display: none; }
-        
-        /* Interactive Scrolling List Containers */
         .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
-        .autocomplete-item { padding: 10px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-        .autocomplete-item:hover { background: #f8fafc; color: var(--primary); font-weight: 700; }
-        .item-add-trigger { background: #fef3c7; color: #b45309; text-align: center; font-weight: 700; justify-content: center; }
-        .item-add-trigger:hover { background: #fde68a; color: #92400e; }
-
-        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .autocomplete-item { padding: 10px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .item-add-trigger { background: #fef3c7; color: #b45309; text-align: center; font-weight: 700; }
+        .tier-tag { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 6px; background: #e2e8f0; color: #475569; }
     </style>
 </head>
 <body>
@@ -73,7 +41,7 @@
 <nav class="sticky-nav">
     <a href="index.html" class="nav-anchor">← DASHBOARD</a>
     <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <span class="badge-role">JOB CARD CREATOR</span>
+    <span class="badge-role">JOB CARD INTAKE</span>
 </nav>
 
 <div class="wrapper">
@@ -81,13 +49,7 @@
         <div id="step1" class="active-step">
             <div class="block-title">Customer Account Verification</div>
             <label style="margin-top:0;">1. Customer Mobile Number</label>
-            <div style="display:flex; gap:10px; margin-top: 4px;">
-                <input type="tel" id="mobile" placeholder="Enter 10 Digits" maxlength="10" autofocus>
-                <button id="btnVerifyClient" class="btn btn-search" onclick="processClientAccountSearch()" style="display:flex; align-items:center; gap:8px;">
-                    <span>SEARCH</span>
-                    <div id="searchSpinner" class="loading-ring"></div>
-                </button>
-            </div>
+            <input type="tel" id="mobile" placeholder="Enter 10 Digits" maxlength="10" autofocus oninput="processAutonomousPhoneSearch(this.value)">
             
             <div id="verifiedProfileContainer" style="display:none; margin-top:16px; padding:16px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
                 <span style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; display:block;">Verified Account Owner</span>
@@ -102,11 +64,7 @@
                     <div class="field-group"><label style="margin-top:0;">Customer Name</label><input type="text" id="intakeName" placeholder="Full Client Identity"></div>
                     <div class="field-group"><label style="margin-top:0;">Registered Address</label><input type="text" id="intakeAddress" placeholder="Physical location specifics"></div>
                 </div>
-                <div style="font-size:0.7rem; color:#64748b; margin-top:10px;">*Account category assigns automatically to 'Regular' target access boundaries.</div>
-                <button id="btnSaveNewClient" class="btn btn-success" onclick="commitCustomerProfileRegistration()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                    <span>SAVE PROFILE & PROCEED</span>
-                    <div id="saveClientSpinner" class="loading-ring"></div>
-                </button>
+                <button class="btn btn-success" onclick="commitCustomerProfileRegistration()">SAVE PROFILE & PROCEED</button>
             </div>
         </div>
 
@@ -121,8 +79,6 @@
             <button class="btn btn-link" onclick="toggleNewVehicleForm()">+ REGISTER NEW VEHICLE CHASSIS</button>
             
             <div id="newVehicleForm" style="display:none; margin-top:16px; background:#f8fafc; padding:20px; border-radius:8px; border:1px solid var(--border);">
-                <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Register Component Specifications</span>
-                
                 <div class="inputs-grid">
                     <div class="field-group">
                         <label style="margin-top:0;">Search Model Variant</label>
@@ -131,17 +87,14 @@
                     </div>
                     <div class="field-group"><label style="margin-top:0;">Manufacturer Brand</label><input type="text" id="vBrand" placeholder="e.g. HONDA" readonly style="background:#f1f5f9;"></div>
                 </div>
-
                 <div class="inputs-grid" style="margin-top:12px;">
                     <div class="field-group"><label style="margin-top:0;">Registration Plate</label><input type="text" id="vNumber" placeholder="e.g. MP-04-XX-0000" oninput="this.value=this.value.toUpperCase()"></div>
                     <div class="field-group"><label style="margin-top:0;">Paint Color</label><input type="text" id="vColor" placeholder="e.g. RED" oninput="this.value=this.value.toUpperCase()"></div>
                 </div>
-                
                 <input type="hidden" id="vHiddenCategory" value="Unclassified">
-
+                
                 <div id="customCategorySubForm" style="display:none; margin-top:16px; padding:12px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px;">
-                    <span style="font-size:0.75rem; font-weight:700; color:#d97706; display:block;">⚠️ Unmapped Catalog Asset: Assign Target Category Group</span>
-                    <select id="vCustomCategorySelect" style="margin-top:6px;">
+                    <select id="vCustomCategorySelect">
                         <option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option>
                         <option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option>
                         <option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option>
@@ -154,113 +107,60 @@
                         <option value="(K) Elec Scooterate">(K) Elec Scooterate</option>
                     </select>
                 </div>
-
-                <button id="btnCommitChassis" class="btn btn-success" onclick="executeVehicleLink()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-                    <span>LINK & PROCEED</span>
-                    <div id="linkChassisSpinner" class="loading-ring"></div>
-                </button>
+                <button class="btn btn-success" onclick="executeVehicleLink()">LINK & PROCEED</button>
             </div>
         </div>
 
         <div id="step4" class="step-box">
             <div id="activeTargetBadge" class="status-badge">--</div>
-            <div id="activeWarrantyAlert" class="warranty-alert">⚠️ CONDITIONAL ENGINE OVERHAUL WARRANTY ACTIVE ON TARGET CHASSIS</div>
-            
             <div class="block-title">Operational Directive Parameters</div>
-            <label style="margin-top:0;">Stated Repair Complaints / Scope</label>
-            <textarea id="complaint" rows="3" placeholder="Document requested work operations cleanly"></textarea>
-            
+            <textarea id="complaint" rows="3" placeholder="Outline active client intake statements explicitly"></textarea>
             <div class="inputs-grid" style="margin-top:12px;">
                 <div class="field-group"><label style="margin-top:0;">Authorized Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
                 <div class="field-group"><label style="margin-top:0;">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
-
-            <div style="margin-top:16px; padding:14px; background:#f1f5f9; border-radius:8px; border:1px solid var(--border);">
-                <label style="margin-top:0; color:var(--primary);">Coverage Extension Trigger</label>
-                <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
-                    <input type="checkbox" id="isEngineOverhaul" style="width:auto; margin:0;">
-                    <span style="font-size:0.85rem; font-weight:700; color:#334155;">Flag as Full Engine Overhaul (Instantiates Conditional Coverage Tracking)</span>
-                </div>
-            </div>
-
             <label style="margin-top:16px;">Assign Workshop Technician</label>
             <select id="mechSelect" style="margin-top:4px;"></select>
-            
-            <button id="btnCommitFinalJob" class="btn btn-success" style="margin-top:24px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="finalizeJobCardCreation()">
-                <span>COMMIT JOB CARD & DISPATCH</span>
-                <div id="commitJobSpinner" class="loading-ring"></div>
-            </button>
+            <button class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">COMMIT JOB CARD & DISPATCH</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Core Engine Cloud Connectivity Layer
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    let evaluatedPhoneContext = null;
-    let targetCustomerProfile = null;
-    let activeVehId = null;
-    let globalVehicleDirectory = [];
-    let isCustomChassisMode = false;
+    let evaluatedPhoneContext = null; let targetCustomerProfile = null; let activeVehId = null; let globalVehicleDirectory = []; let isCustomChassisMode = false;
 
-    function enforceTitleCaseNomenclature(str) {
-        if(!str) return '';
-        return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    }
+    function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
 
-    function toggleLoaderSpinner(buttonId, spinnerId, isExecuting) {
-        const btn = document.getElementById(buttonId);
-        const spin = document.getElementById(spinnerId);
-        if(!btn || !spin) return;
-        btn.disabled = isExecuting;
-        spin.style.display = isExecuting ? 'inline-block' : 'none';
-        btn.style.opacity = isExecuting ? '0.7' : '1';
-    }
-
-    // --- CLIENT VERIFICATION PROCESS ---
-    async function processClientAccountSearch() {
-        const inputStr = document.getElementById('mobile').value.trim();
-        if(inputStr.length !== 10) return alert("System Verification: Provide explicit 10-digit primary account string key.");
+    async function processAutonomousPhoneSearch(phoneStringVal) {
+        const cleanStr = phoneStringVal.trim();
+        if(cleanStr.length !== 10) {
+            document.getElementById('verifiedProfileContainer').style.display = 'none';
+            document.getElementById('unmappedProfileSetup').style.display = 'none';
+            return;
+        }
         
-        evaluatedPhoneContext = inputStr;
-        toggleLoaderSpinner('btnVerifyClient', 'searchSpinner', true);
-        
-        document.getElementById('verifiedProfileContainer').style.display = 'none';
-        document.getElementById('unmappedProfileSetup').style.display = 'none';
-        document.getElementById('clientClassificationWrapper').innerHTML = '';
-        targetCustomerProfile = null;
+        evaluatedPhoneContext = cleanStr;
+        const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
+        const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
+        const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
 
-        try {
-            const { data: cData } = await supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).single();
-            const { data: jcList } = await supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
-            const { data: posList } = await supabaseClient.from('counter_sales').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1);
+        const hasJc = jcList && jcList.length > 0; const hasPos = posList && posList.length > 0;
 
-            const hasJcHistory = jcList && jcList.length > 0;
-            const hasPosHistory = posList && posList.length > 0;
-
-            if(cData) {
-                targetCustomerProfile = cData;
-                document.getElementById('dispVerifiedName').innerText = cData.name || 'Unnamed Client';
-                
-                const wrapper = document.getElementById('clientClassificationWrapper');
-                if(hasJcHistory && hasPosHistory) wrapper.innerHTML = '<span class="c-tag tag-reg">(c) Regular Customer</span>';
-                else if(hasJcHistory) wrapper.innerHTML = '<span class="c-tag tag-work">(b) Already a workshop Customer</span>';
-                else if(hasPosHistory) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Already a cash customer</span>';
-                else wrapper.innerHTML = '<span class="c-tag" style="background:#f1f5f9; color:#475569;">Registered Master Index</span>';
-
-                document.getElementById('verifiedProfileContainer').style.display = 'block';
-                prefetchVehicleMasterCatalog();
-            } else {
-                document.getElementById('unmappedProfileSetup').style.display = 'block';
-                document.getElementById('intakeName').focus();
-            }
-        } catch(e) {
-            alert("Database Network Evaluation Exception. Please test connection structures.");
-        } finally {
-            toggleLoaderSpinner('btnVerifyClient', 'searchSpinner', false);
+        if(cData) {
+            targetCustomerProfile = cData;
+            document.getElementById('dispVerifiedName').innerText = `${cData.name} | ${cData.address || 'Retail'}`;
+            const wrapper = document.getElementById('clientClassificationWrapper');
+            if(hasJc && hasPos) wrapper.innerHTML = '<span class="c-tag tag-reg">(c) Regular Customer</span>';
+            else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">(b) Workshop Customer</span>';
+            else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Cash Customer</span>';
+            document.getElementById('verifiedProfileContainer').style.display = 'block';
+            prefetchVehicleMasterCatalog();
+        } else {
+            document.getElementById('unmappedProfileSetup').style.display = 'block';
         }
     }
 
@@ -268,226 +168,94 @@
         const rawName = document.getElementById('intakeName').value.trim();
         const rawAddress = document.getElementById('intakeAddress').value.trim();
         if(!rawName) return alert("System Guard: Specify explicit client identity descriptor.");
-
-        toggleLoaderSpinner('btnSaveNewClient', 'saveClientSpinner', true);
         const compiledName = enforceTitleCaseNomenclature(rawName);
 
-        try {
-            const { data: cData, error } = await supabaseClient.from('customers').insert({
-                mobile_number: evaluatedPhoneContext,
-                name: compiledName,
-                address: rawAddress || 'Workshop Hub Account',
-                category: 'Regular'
-            }).select().single();
+        const { data: cData } = await supabaseClient.from('customers').insert({
+            mobile_number: evaluatedPhoneContext, name: compiledName, address: rawAddress || 'Workshop Hub', category: 'Regular'
+        }).select().single();
 
-            if(!error && cData) {
-                targetCustomerProfile = cData;
-                document.getElementById('dispVerifiedName').innerText = compiledName;
-                document.getElementById('clientClassificationWrapper').innerHTML = '<span class="c-tag tag-work">Newly Registered Account</span>';
-                
-                document.getElementById('unmappedProfileSetup').style.display = 'none';
-                document.getElementById('verifiedProfileContainer').style.display = 'block';
-                prefetchVehicleMasterCatalog();
-                initializeStep3();
-            } else alert(`⚠️ REGISTRATION ABORTED:\n${error?.message}`);
-        } catch(e) {
-            alert("Network connection failure during insertion lifecycle loops.");
-        } finally {
-            toggleLoaderSpinner('btnSaveNewClient', 'saveClientSpinner', false);
+        if(cData) {
+            targetCustomerProfile = cData;
+            document.getElementById('dispVerifiedName').innerText = compiledName;
+            document.getElementById('clientClassificationWrapper').innerHTML = '<span class="c-tag tag-work">Newly Registered</span>';
+            document.getElementById('unmappedProfileSetup').style.display = 'none';
+            document.getElementById('verifiedProfileContainer').style.display = 'block';
+            prefetchVehicleMasterCatalog(); initializeStep3();
         }
     }
 
-    // --- VEHICLE SEARCH DIRECTORIES PREFETCHING ---
     async function prefetchVehicleMasterCatalog() {
-        const { data: master } = await supabaseClient.from('vehicle_master').select('*').order('model_name');
+        const { data: master } = await supabaseClient.from('vehicle_master').select('*');
         globalVehicleDirectory = master || [];
     }
 
     function triggerVehicleCatalogSearch(searchString) {
-        const container = document.getElementById('modelAutocompleteList');
-        container.innerHTML = '';
-        const rawVal = searchString.trim();
-        
-        if(rawVal.length < 2) { container.style.display = 'none'; return; }
-
-        const filtered = globalVehicleDirectory.filter(v => v.model_name.includes(rawVal) || v.brand.includes(rawVal)).slice(0, 10);
+        const container = document.getElementById('modelAutocompleteList'); container.innerHTML = '';
+        if(searchString.length < 2) { container.style.display = 'none'; return; }
+        const filtered = globalVehicleDirectory.filter(v => v.model_name.includes(searchString) || v.brand.includes(searchString)).slice(0, 8);
         
         if(filtered.length > 0) {
-            filtered.forEach(v => {
-                container.innerHTML += `
-                    <div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${v.category_group.replace(/'/g,"\\'")}')">
-                        <span><strong>${v.model_name}</strong></span>
-                        <span style="color:#888; font-size:0.75rem;">${v.brand} | <small style="color:var(--success);">${v.category_group.split(' ')[0]}</small></span>
-                    </div>`;
-            });
-            // Point (ii) Add custom entry configuration trigger at trailing list edge
-            container.innerHTML += `
-                <div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${rawVal.replace(/'/g,"\\'")}')">
-                    + Model Variant Absent: Define Target Category Group Now
-                </div>`;
-            container.style.display = 'block';
-        } else {
-            container.innerHTML = `
-                <div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${rawVal.replace(/'/g,"\\'")}')">
-                    + Asset Completely Unmapped: Click to Add & Define Category
-                </div>`;
-            container.style.display = 'block';
+            filtered.forEach(v => { container.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${v.category_group.replace(/'/g,"\\'")}')"><span><strong>${v.model_name}</strong></span></div>`; });
         }
+        container.innerHTML += `<div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${searchString.replace(/'/g,"\\'")}')">+ Model Variant Absent: Define Target Category</div>`;
+        container.style.display = 'block';
     }
 
     function applySelectedVehicleCatalog(brandStr, modelStr, catGroupStr) {
-        document.getElementById('vBrand').value = brandStr;
-        document.getElementById('vBrand').readOnly = true;
-        document.getElementById('vSearchInput').value = modelStr;
-        document.getElementById('vHiddenCategory').value = catGroupStr;
-        
-        document.getElementById('customCategorySubForm').style.display = 'none';
-        document.getElementById('modelAutocompleteList').style.display = 'none';
-        isCustomChassisMode = false;
+        document.getElementById('vBrand').value = brandStr; document.getElementById('vSearchInput').value = modelStr;
+        document.getElementById('vHiddenCategory').value = catGroupStr; document.getElementById('customCategorySubForm').style.display = 'none';
+        document.getElementById('modelAutocompleteList').style.display = 'none'; isCustomChassisMode = false;
     }
 
     function enableCustomChassisIngestion(rawModelInput) {
-        document.getElementById('vSearchInput').value = rawModelInput;
-        document.getElementById('vBrand').value = '';
-        document.getElementById('vBrand').readOnly = false; // Opens parent brand input box targeting custom inputs
-        document.getElementById('vBrand').focus();
-        
-        document.getElementById('customCategorySubForm').style.display = 'block';
-        document.getElementById('modelAutocompleteList').style.display = 'none';
+        document.getElementById('vSearchInput').value = rawModelInput; document.getElementById('vBrand').readOnly = false;
+        document.getElementById('customCategorySubForm').style.display = 'block'; document.getElementById('modelAutocompleteList').style.display = 'none';
         isCustomChassisMode = true;
     }
 
     async function initializeStep3() {
-        if(!targetCustomerProfile) return alert("System Flow Blocked: Validate owner identity before linking assets.");
-        
-        document.getElementById('step1').classList.remove('active-step');
-        document.getElementById('step3').classList.add('active-step');
+        document.getElementById('step1').classList.remove('active-step'); document.getElementById('step3').classList.add('active-step');
         document.getElementById('headerClientMeta').innerText = `Owner: ${targetCustomerProfile.name}`;
         
         const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', evaluatedPhoneContext);
-        const grid = document.getElementById('vehicleGrid'); 
-        grid.innerHTML = '';
-        
+        const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
         if(fleet && fleet.length > 0) {
-            fleet.forEach(v => {
-                const encodedContext = encodeURIComponent(JSON.stringify(v));
-                grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${encodedContext}')"><b>${v.reg_number}</b><small>${v.make_model}</small></div>`;
-            });
-        } else {
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:16px; font-size:0.85rem; color:#888;">No attached chassis assets extracted. Please register new unit.</div>';
-            toggleNewVehicleForm();
-        }
+            fleet.forEach(v => { grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}')"><b>${v.reg_number}</b><small>${v.make_model} (${v.color||''})</small></div>`; });
+        } else { toggleNewVehicleForm(); }
     }
 
     function toggleNewVehicleForm() { document.getElementById('newVehicleForm').style.display = 'block'; }
 
     async function executeVehicleLink() {
-        const regPlate = document.getElementById('vNumber').value.trim() || "ACC-" + Math.floor(Math.random()*900000);
-        const modelVariant = document.getElementById('vSearchInput').value.trim() || 'GENERIC ASSET';
-        const vBrand = document.getElementById('vBrand').value.trim() || 'OEM';
-        const vColor = document.getElementById('vColor').value.trim() || 'STANDARD';
-        
-        let targetCategoryString = document.getElementById('vHiddenCategory').value;
+        const regPlate = document.getElementById('vNumber').value.trim();
+        const modelVariant = document.getElementById('vSearchInput').value.trim();
+        let catStr = document.getElementById('vHiddenCategory').value;
         if(isCustomChassisMode) {
-            targetCategoryString = document.getElementById('vCustomCategorySelect').value;
-            // Write unmapped custom asset variants dynamically back to parent directory structures
-            supabaseClient.from('vehicle_master').insert({
-                brand: vBrand.toUpperCase(), model_name: modelVariant.toUpperCase(), category_group: targetCategoryString
-            }).then().catch(e => console.warn("Catalog index pass:", e));
+            catStr = document.getElementById('vCustomCategorySelect').value;
+            supabaseClient.from('vehicle_master').insert({ brand: document.getElementById('vBrand').value.toUpperCase(), model_name: modelVariant.toUpperCase(), category_group: catStr }).then();
         }
-
-        toggleLoaderSpinner('btnCommitChassis', 'linkChassisSpinner', true);
-
-        try {
-            const { data: v, error } = await supabaseClient.from('vehicles').insert({
-                customer_mobile: evaluatedPhoneContext, 
-                brand: vBrand.toUpperCase(), 
-                make_model: modelVariant.toUpperCase(), 
-                reg_number: regPlate.toUpperCase(),
-                color: vColor.toUpperCase(),
-                category_group: targetCategoryString
-            }).select().single();
-
-            if(!error && v) {
-                const encodedContext = encodeURIComponent(JSON.stringify(v));
-                stageTargetVehicle(v.id, v.reg_number, v.make_model, encodedContext);
-            } else alert("Chassis Insertion Exception:\n" + error?.message);
-        } catch(e) {
-            alert("Database processing fault during vehicle linkage execution.");
-        } finally {
-            toggleLoaderSpinner('btnCommitChassis', 'linkChassisSpinner', false);
-        }
+        const { data: v } = await supabaseClient.from('vehicles').insert({
+            customer_mobile: evaluatedPhoneContext, brand: document.getElementById('vBrand').value.toUpperCase(), make_model: modelVariant.toUpperCase(), reg_number: regPlate.toUpperCase(), color: document.getElementById('vColor').value.toUpperCase(), category_group: catStr
+        }).select().single();
+        if(v) stageTargetVehicle(v.id, v.reg_number, v.make_model);
     }
 
-    async function stageTargetVehicle(id, reg, model, encodedContextData) {
-        activeVehId = id;
-        document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
-        document.getElementById('step3').classList.remove('active-step');
-        document.getElementById('step4').classList.add('active-step');
-        
-        const parsedVeh = JSON.parse(decodeURIComponent(encodedContextData));
-        if(parsedVeh && parsedVeh.warranty_active) {
-            document.getElementById('activeWarrantyAlert').style.display = 'block';
-            
-            if(parsedVeh.last_overhaul_date) {
-                const overhaulTime = new Date(parsedVeh.last_overhaul_date).getTime();
-                const timeDiffDays = (new Date().getTime() - overhaulTime) / (1000 * 60 * 60 * 24);
-                if(timeDiffDays > 120) { 
-                    document.getElementById('activeWarrantyAlert').innerText = "⚠️ SYSTEM ALERT: TARGET CHASSIS EXCEEDED SERVICE INTERVAL TIMELINE. CONDITIONAL COVERAGE SUSPENDED.";
-                    document.getElementById('activeWarrantyAlert').style.backgroundColor = "#fee2e2";
-                    document.getElementById('activeWarrantyAlert').style.color = "#b91c1c";
-                    
-                    supabaseClient.from('vehicles').update({ warranty_active: false, lifetime_breach_log: "Periodic validation breach parsed natively." }).eq('id', id).then();
-                }
-            }
-        }
-
+    async function stageTargetVehicle(id, reg, model) {
+        activeVehId = id; document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
+        document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
         const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
-        const sel = document.getElementById('mechSelect'); 
-        sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
+        const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
         m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
     }
 
     async function finalizeJobCardCreation() {
-        const isOverhaulFlagged = document.getElementById('isEngineOverhaul').checked;
-        const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'service';
-        
-        toggleLoaderSpinner('btnCommitFinalJob', 'commitJobSpinner', true);
-        
-        try {
-            const { data: newJc, error: jcError } = await supabaseClient.from('job_cards').insert({
-                customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
-                problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
-                advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
-            }).select().single();
-
-            if(jcError) return alert("System Job Initialization Abort:\n" + jcError.message);
-
-            if(newJc) {
-                if(isOverhaulFlagged) {
-                    await supabaseClient.from('vehicles').update({
-                        last_overhaul_date: new Date().toISOString().split('T')[0],
-                        warranty_active: true
-                    }).eq('id', activeVehId);
-                }
-
-                alert("Job Card closed successfully. Vehicle staged securely into workshop queues.");
-                window.location.href = 'index.html';
-            }
-        } catch(e) {
-            alert("Execution network disconnect during transaction compilation cycles.");
-        } finally {
-            toggleLoaderSpinner('btnCommitFinalJob', 'commitJobSpinner', false);
-        }
+        const { data: newJc } = await supabaseClient.from('job_cards').insert({
+            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: document.getElementById('mechSelect').value || null,
+            problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
+            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'service', status: 'Open'
+        }).select().single();
+        if(newJc) window.location.href = 'index.html';
     }
-
-    // Close autocompletion lists safely when clicking outside active modal containers
-    document.addEventListener('click', function(e) {
-        if(!e.target.closest('.autocomplete-container') && !e.target.closest('#vSearchInput')) {
-            const list = document.getElementById('modelAutocompleteList');
-            if(list) list.style.display = 'none';
-        }
-    });
 </script>
 </body>
 </html>
