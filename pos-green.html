@@ -59,14 +59,19 @@
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
         
-        .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: none; }
-        .autocomplete-item { padding: 8px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
-        .autocomplete-item:hover { background: #f8fafc; color: var(--primary); font-weight: 700; }
-
-        .inline-item-row { display: grid; grid-template-columns: 2fr 1.2fr 0.8fr 0.8fr 0.8fr auto; gap: 8px; align-items: center; margin-bottom: 10px; position: relative; }
-        .inline-num { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; font-weight: 700; color: var(--primary); text-align: center; box-sizing: border-box; }
-        .btn-add-line { background: var(--success); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
-        .btn-del-line { color: var(--danger); background: none; border: none; font-size: 1.2rem; font-weight: 700; cursor: pointer; padding: 0 4px; }
+        /* Flex Wrap applied to inline addition bar */
+        .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
+        .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
+        .inline-add-strip > div:nth-child(1) { flex: 3 1 200px; position: relative; } 
+        .inline-add-strip > input:nth-child(2) { flex: 2 1 120px; }
+        .inline-add-strip > input:nth-child(3) { flex: 1 1 80px; }
+        .inline-add-strip > input:nth-child(4) { flex: 1 1 80px; }
+        .inline-add-strip > input:nth-child(5) { flex: 1 1 80px; }
+        .btn-add-line { background: var(--success); color: white; border: none; width: 40px; height: 40px; border-radius: 6px; font-weight: 700; font-size: 1.3rem; cursor: pointer; flex: none; display: flex; align-items: center; justify-content: center; }
+        
+        .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; min-width: 250px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
+        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+        .autocomplete-item:hover { background: #f0f7ff; }
 
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -147,7 +152,6 @@
 
         <div id="masterHistoryBlock" style="margin-top:32px;">
             <div class="block-title">Retail POS Operational Registers</div>
-            
             <div class="search-strip">
                 <div class="field-group"><label>Target Contact</label><input type="text" id="fPhone" placeholder="Mobile Index..." oninput="queryPosHistoryEngine()"></div>
                 <div class="field-group"><label>Min Value (₹)</label><input type="number" id="fMin" placeholder="0" min="0" oninput="queryPosHistoryEngine()"></div>
@@ -185,20 +189,21 @@
 
     <div id="transactionInvoicerFlow" class="card-panel step-section">
         <div class="block-title">Direct Operational Stack Compilation</div>
-        <div id="dynamicRowsContainer">
-            <div class="inline-item-row" data-index="0">
+        
+        <div class="inline-add-strip-wrapper">
+            <div id="dynamicRowsContainer" class="inline-add-strip">
                 <div style="position:relative;">
                     <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, 0)" onblur="hideAutocomplete(0)">
                     <div id="autolist-0" class="autocomplete-container"></div>
                 </div>
                 <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(0)">
-                <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
-                <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
-                <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
-                <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>
+                <input type="number" class="i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+                <input type="number" class="i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+                <input type="number" class="i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+                <button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none; border:none; color:var(--danger); font-size:1.2rem; cursor:pointer; font-weight:bold;">×</button>
             </div>
         </div>
-        <button class="btn-add-line" onclick="pushRuntimeStackRow()">+</button>
+        <button class="btn-add-line" onclick="pushRuntimeStackRow()" style="margin-bottom:16px;">+</button>
 
         <div class="block-title" style="margin-top:16px;">Concession Adjusters</div>
         <div class="inputs-grid">
@@ -282,23 +287,9 @@
             </div>
         </div>
 
-        <div id="revisionStackBlock" style="margin-bottom:12px; display:none; border-top:1px solid var(--border); padding-top:10px;">
-            <div style="font-size:0.75rem; font-weight:bold; color:var(--primary); margin-bottom:6px;">Append Array Items</div>
-            <div style="display:flex; gap:6px;">
-                <input type="text" id="revPart" placeholder="Part Context" style="flex:2; padding:6px; font-size:0.8rem;">
-                <input type="number" id="revQty" placeholder="Qty" style="flex:1; padding:6px; font-size:0.8rem;">
-                <input type="number" id="revRate" placeholder="Rate" style="flex:1; padding:6px; font-size:0.8rem;">
-                <button onclick="commitRuntimeItemRevision()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
-            </div>
-        </div>
-
         <div class="action-strip-bar">
-            <button id="btnToggleEditStack" class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="toggleRevisionInterface()">✏️ REVISE BILL</button>
             <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="window.print()">🖨️ PRINT</button>
             <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WHATSAPP</button>
-        </div>
-        <div id="revisionLockAlert" style="font-size:0.75rem; color:#ef4444; font-weight:bold; text-align:center; margin-top:10px; display:none;">
-            🔒 REVISION PROHIBITED: INVOICE WINDOW PASSED 7-DAY THRESHOLD
         </div>
     </div>
 </div>
@@ -331,7 +322,6 @@
         return helper(num) + ' Rupees Only';
     }
 
-    // --- INTEGRATED MULTIFUNCTIONAL POS HISTORY ENGINE ---
     function switchPosHistoryTab(tabTargetStr) {
         document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
         event.target.classList.add('active'); currentPosTabMode = tabTargetStr; queryPosHistoryEngine();
@@ -349,7 +339,6 @@
         const startVal = document.getElementById('fStart').value;
         const endVal = document.getElementById('fEnd').value;
         
-        // Failsafe auto-terminate aged drafts
         if(currentPosTabMode === 'Estimates') {
             const yesterdayString = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
             supabaseClient.from('counter_sales').delete().eq('status', 'Open').lt('created_at', yesterdayString).then();
@@ -493,14 +482,14 @@
     }
 
     function pushRuntimeStackRow() {
-        const stack = document.getElementById('dynamicRowsContainer'); const node = document.createElement('div'); node.className = 'inline-item-row'; node.setAttribute('data-index', rowSequenceIndex);
+        const stack = document.getElementById('dynamicRowsContainer'); const node = document.createElement('div'); node.className = 'inline-add-strip inline-item-row'; node.setAttribute('data-index', rowSequenceIndex);
         node.innerHTML = `
             <div style="position:relative;"><input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})"><div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div></div>
             <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
-            <input type="number" class="inline-num i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
-            <input type="number" class="inline-num i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
-            <input type="number" class="inline-num i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
-            <button class="btn-del-line" onclick="dropActiveInlineRow(this)">×</button>`;
+            <input type="number" class="i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="i-rate" value="0" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+            <button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none; border:none; color:var(--danger); font-size:1.2rem; cursor:pointer; font-weight:bold;">×</button>`;
         stack.appendChild(node); rowSequenceIndex++;
     }
 
@@ -521,7 +510,6 @@
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
 
-        // Add explicit closed_at insertion logic
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
             customer_mobile: evaluatedPhoneContext, customer_name: enforceTitleCaseNomenclature(mappedClientName), 
             total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole,
@@ -567,17 +555,10 @@
             document.getElementById('thWords').innerText = convertNumberToWords(record.total_amount);
             document.getElementById('thMode').innerText = record.payment_mode || 'Cash';
 
-            // Unified Settlement Interface (Both Credit & Drafts)
             const isUnsettled = record.status === 'Open' || record.payment_mode === 'Credit';
             document.getElementById('settlementModifierInterface').style.display = isUnsettled ? 'block' : 'none';
 
-            const daysSinceCompile = (new Date().getTime() - new Date(record.created_at).getTime()) / (1000 * 60 * 60 * 24);
-            const isWithinEditWindow = daysSinceCompile <= 7;
-            document.getElementById('btnToggleEditStack').style.display = isWithinEditWindow ? 'block' : 'none';
-            document.getElementById('revisionLockAlert').style.display = isWithinEditWindow ? 'none' : 'block';
-            document.getElementById('revisionStackBlock').style.display = 'none';
-
-            await refreshInspectionLineItems(isWithinEditWindow);
+            await refreshInspectionLineItems(false);
             document.getElementById('modalInspectInvoice').style.display = 'flex';
         }
     }
@@ -593,14 +574,13 @@
                 let parsedName = line.item_name || 'Asset Spec'; let parsedBrand = "Standard";
                 if(line.item_name && line.item_name.includes('(')) { const parts = line.item_name.split('('); parsedName = parts[0].trim(); parsedBrand = parts[1].replace(')','').trim(); }
                 const safeNameTruncated = parsedName.length > 24 ? parsedName.substring(0, 22) + '..' : parsedName;
-                const delCell = (isEditable && document.getElementById('revisionStackBlock').style.display === 'block') ? `<span onclick="executeLineDeletion('${line.id}', ${line.total_price})" style="color:red; font-weight:bold; cursor:pointer; margin-left:6px;">[Drop]</span>` : '';
                 
                 let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price;
                 displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2);
 
                 container.innerHTML += `
                     <div style="border-bottom:1px dotted #ccc; padding-bottom:4px; margin-bottom:4px;">
-                        <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${safeNameTruncated}</strong>${delCell}</span><span class="receipt-item-val">₹${line.total_price}</span></div>
+                        <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${safeNameTruncated}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
                         <div class="receipt-item-sub"><span>Qty: ${line.qty}</span><span>Rate: ₹${displayRate}</span></div>
                     </div>`;
             });
@@ -614,36 +594,6 @@
         if(computedDisc > 0) { discRow.style.display = 'flex'; document.getElementById('thDisc').innerText = `₹${computedDisc}`; } else { discRow.style.display = 'none'; }
     }
 
-    function toggleRevisionInterface() { const block = document.getElementById('revisionStackBlock'); block.style.display = block.style.display === 'none' ? 'block' : 'none'; refreshInspectionLineItems(true); }
-
-    async function commitRuntimeItemRevision() {
-        const partString = document.getElementById('revPart').value.trim(); const qVal = parseFloat(document.getElementById('revQty').value) || 1; const rVal = parseFloat(document.getElementById('revRate').value) || 0;
-        if(!partString) return;
-        
-        const cleanPartStr = enforceTitleCaseNomenclature(partString); const newScalarNet = qVal * rVal;
-        await supabaseClient.from('counter_sale_items').insert({ sale_id: targetInspectionRecordId, item_name: `${cleanPartStr} (Appended)`, qty: qVal, unit_price: rVal, total_price: newScalarNet });
-
-        const prevTotal = parseFloat(inspectedRecordObject.total_amount) || 0; const compiledUpdatedNet = prevTotal + newScalarNet;
-        await supabaseClient.from('counter_sales').update({ total_amount: compiledUpdatedNet }).eq('id', targetInspectionRecordId);
-        inspectedRecordObject.total_amount = compiledUpdatedNet;
-        
-        document.getElementById('thNet').innerText = `₹${compiledUpdatedNet}`; document.getElementById('thWords').innerText = convertNumberToWords(compiledUpdatedNet);
-        document.getElementById('revPart').value = ''; document.getElementById('revQty').value = ''; document.getElementById('revRate').value = '';
-        refreshInspectionLineItems(true); queryPosHistoryEngine();
-    }
-
-    async function executeLineDeletion(lineId, lineAmount) {
-        if(confirm("Confirm dropping item? Total amount drops proportionally.")) {
-            await supabaseClient.from('counter_sale_items').delete().eq('id', lineId);
-            const oldNet = parseFloat(inspectedRecordObject.total_amount) || 0; const adjustedNet = Math.max(0, oldNet - lineAmount);
-            await supabaseClient.from('counter_sales').update({ total_amount: adjustedNet }).eq('id', targetInspectionRecordId);
-            inspectedRecordObject.total_amount = adjustedNet;
-            document.getElementById('thNet').innerText = `₹${adjustedNet}`; document.getElementById('thWords').innerText = convertNumberToWords(adjustedNet);
-            refreshInspectionLineItems(true); queryPosHistoryEngine();
-        }
-    }
-
-    // Unified Settle Drafts & Credits mechanism writing closed_at accurately
     async function commitPosSettlement() {
         const nextMode = document.getElementById('thConvertMode').value;
         const currentIsoDate = new Date().toISOString();
