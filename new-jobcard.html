@@ -115,7 +115,14 @@
             <div id="activeTargetBadge" class="status-badge">--</div>
             <div class="block-title">Operational Directive Parameters</div>
             <textarea id="complaint" rows="3" placeholder="Outline active client intake statements explicitly"></textarea>
+            
             <div class="inputs-grid" style="margin-top:12px;">
+                <div class="field-group">
+                    <label style="margin-top:0;">Fixed Service Protocol</label>
+                    <select id="serviceProtocolSelect" onchange="applyServiceProtocolRate()" style="color:var(--primary); font-weight:bold;">
+                        <option value="" data-rate="0">-- Standard / Custom Scope --</option>
+                    </select>
+                </div>
                 <div class="field-group"><label style="margin-top:0;">Authorized Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
                 <div class="field-group"><label style="margin-top:0;" id="lblAdvance">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
@@ -138,7 +145,6 @@
     const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'service';
     document.querySelector('.badge-role').innerText = activeRole.toUpperCase() + ' INTAKE';
 
-    // Role-based visibility logic
     if (activeRole === 'green' || activeRole === 'moped') {
         document.getElementById('mechAssignmentBlock').style.display = 'none';
         document.getElementById('lblAdvance').innerText = `Upfront Prepaid Advance (${activeRole.charAt(0).toUpperCase() + activeRole.slice(1)} Ledger) (₹)`;
@@ -208,7 +214,7 @@
         const filtered = globalVehicleDirectory.filter(v => v.model_name.includes(searchString) || v.brand.includes(searchString)).slice(0, 8);
         
         if(filtered.length > 0) {
-            filtered.forEach(v => { container.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${v.category_group.replace(/'/g,"\\'")}')"><span><strong>${v.model_name}</strong></span></div>`; });
+            filtered.forEach(v => { container.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><span><strong>${v.model_name}</strong></span></div>`; });
         }
         container.innerHTML += `<div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${searchString.replace(/'/g,"\\'")}')">+ Model Variant Absent: Define Target Category</div>`;
         container.style.display = 'block';
@@ -233,7 +239,7 @@
         const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', evaluatedPhoneContext);
         const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
         if(fleet && fleet.length > 0) {
-            fleet.forEach(v => { grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}')"><b>${v.reg_number}</b><small>${v.make_model} (${v.color||''})</small></div>`; });
+            fleet.forEach(v => { grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><b>${v.reg_number}</b><small>${v.make_model} (${v.color||''})</small></div>`; });
         } else { toggleNewVehicleForm(); }
     }
 
@@ -250,13 +256,23 @@
         const { data: v } = await supabaseClient.from('vehicles').insert({
             customer_mobile: evaluatedPhoneContext, brand: document.getElementById('vBrand').value.toUpperCase(), make_model: modelVariant.toUpperCase(), reg_number: regPlate.toUpperCase(), color: document.getElementById('vColor').value.toUpperCase(), category_group: catStr
         }).select().single();
-        if(v) stageTargetVehicle(v.id, v.reg_number, v.make_model);
+        if(v) stageTargetVehicle(v.id, v.reg_number, v.make_model, v.category_group);
     }
 
-    async function stageTargetVehicle(id, reg, model) {
+    async function stageTargetVehicle(id, reg, model, catGroup) {
         activeVehId = id; document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
         document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
         
+        // Dynamically populate the Service Package Dropdown based on the specific vehicle classification
+        const selProtocol = document.getElementById('serviceProtocolSelect');
+        selProtocol.innerHTML = '<option value="" data-rate="0">-- Standard / Custom Scope --</option>';
+        if(catGroup) {
+            const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true });
+            if(pkgs && pkgs.length > 0) {
+                pkgs.forEach(p => { selProtocol.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; });
+            }
+        }
+
         if(activeRole !== 'green' && activeRole !== 'moped') {
             const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
             const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
@@ -264,9 +280,18 @@
         }
     }
 
+    function applyServiceProtocolRate() {
+        const sel = document.getElementById('serviceProtocolSelect');
+        const rate = sel.options[sel.selectedIndex].getAttribute('data-rate');
+        if(rate > 0) {
+            document.getElementById('estimate').value = rate;
+            const comp = document.getElementById('complaint');
+            if(!comp.value.includes(sel.value)) { comp.value = comp.value ? comp.value + '\n+ ' + sel.value : sel.value; }
+        }
+    }
+
     async function finalizeJobCardCreation() {
         const mechIdValue = (activeRole === 'green' || activeRole === 'moped') ? null : (document.getElementById('mechSelect').value || null);
-        
         const { data: newJc } = await supabaseClient.from('job_cards').insert({
             customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue,
             problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
