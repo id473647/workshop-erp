@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Floor Billing Console - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
@@ -47,7 +48,6 @@
         .field-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; }
         .field-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; color: var(--primary); }
 
-        /* Integrated Settlement Block safely contained within the max-width bounds */
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin-bottom: 16px; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; }
@@ -56,6 +56,24 @@
         .btn-upi { background: #2563eb; }
         .btn-credit { background: #d97706; }
         .btn-save { background: #475569; }
+
+        /* Document Modal Overlays */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
+        .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
+        .receipt-shop-title { font-size: 1.1rem; font-weight: bold; margin: 2px 0; }
+        .receipt-meta { font-size: 0.75rem; margin: 1px 0; }
+        .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
+        .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; }
+        .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; }
+        .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; }
+        .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; }
+        .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
+        
+        .action-strip-bar { display: flex; gap: 8px; margin-top: auto; }
+        .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -110,7 +128,7 @@
             <div class="field-group"><label>Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" oninput="compileDynamicSums()"></div>
             <div class="field-group"><label>Lathe Contract Work (₹)</label><input type="number" id="vLathe" value="0" oninput="compileDynamicSums()"></div>
             <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Prepaid Deposit (Green Ledger)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
+            <div class="field-group"><label>Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
         </div>
     </div>
 
@@ -120,7 +138,73 @@
         <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">CASH SETTLEMENT</button>
         <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPI / CARD TRANSFER</button>
         <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT EXTENSION</button>
-        <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">HOLD ACTIVE DRAFT</button>
+        <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD ACTIVE DRAFT</button>
+    </div>
+</div>
+
+<div id="modalReceipt" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+            <h3 style="margin:0; color:var(--primary);">Job Card Document Execution</h3>
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        
+        <div id="renderThermalReceiptTarget" class="receipt-container">
+            <div class="receipt-header">
+                <div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div>
+                <div class="receipt-meta">GSTIN: 23ANAPB4613K1ZJ</div>
+                <div class="receipt-meta">Gurudwara Road, Ganj Betul</div>
+                <div class="receipt-meta">PH: 9425002214, 8989171751</div>
+            </div>
+            
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <div>Date: <span id="thDate">--</span></div>
+                <div>Time: <span id="thTime">--</span></div>
+            </div>
+            <div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div>
+            <div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div>
+            <div class="receipt-divider"></div>
+            
+            <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; text-transform:uppercase;">
+                Items Rendered Array
+            </div>
+            <div id="thStackedItemsContainer"></div>
+            
+            <div class="receipt-divider"></div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Total Spares & Lube:</span><strong id="thPartsSum">₹0</strong>
+            </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Mechanical Labor:</span><strong id="thLaborSum">₹0</strong>
+            </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Lathe / Subcontract:</span><strong id="thLatheSum">₹0</strong>
+            </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;">
+                <span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong>
+            </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between; color:red;">
+                <span>Less Advance/Prepaid:</span><strong id="thAdvanceSum">₹0</strong>
+            </div>
+            <div class="receipt-divider"></div>
+            
+            <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;">
+                <span>NET PAYABLE:</span><span id="thNet">₹0</span>
+            </div>
+            <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
+                Settlement Route: <span id="thMode">--</span>
+            </div>
+            
+            <div class="receipt-footer">
+                Computer Generated Document.<br>Drive Safe. Thank You.
+            </div>
+        </div>
+
+        <div class="action-strip-bar">
+            <button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN HOME</button>
+            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="window.print()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WHATSAPP</button>
+        </div>
     </div>
 </div>
 
@@ -134,6 +218,8 @@
     const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     let lineItemsLocalMemory = [];
     let globalCatalogCache = [];
+    let activeJobContext = null;
+    let partsGrossTotal = 0;
 
     async function initializeJobContext() {
         document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
@@ -145,10 +231,11 @@
 
         const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', targetJobId).single();
         if(job) {
+            activeJobContext = job;
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET";
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`;
-            document.getElementById('prepaidPill').innerText = `Green Advance: ₹${parseFloat(job.advance_paid) || 0}`;
+            document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`;
 
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
@@ -253,23 +340,22 @@
     }
 
     function compileDynamicSums() {
-        let cumulativeItemsValuation = 0;
+        partsGrossTotal = 0;
         lineItemsLocalMemory.forEach(line => {
             let rowNet = parseFloat(line.total_price);
             if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
-            cumulativeItemsValuation += rowNet;
+            partsGrossTotal += rowNet;
         });
         const l = parseFloat(document.getElementById('vLabour').value) || 0; const t = parseFloat(document.getElementById('vLathe').value) || 0;
         const d = parseFloat(document.getElementById('vFlatDisc').value) || 0; const a = parseFloat(document.getElementById('vAdvance').value) || 0;
 
-        document.getElementById('netValuationDisplay').innerText = Math.round((cumulativeItemsValuation + l + t - d) - a);
+        document.getElementById('netValuationDisplay').innerText = Math.round((partsGrossTotal + l + t - d) - a);
     }
 
-    // Unified Submission Engine supporting standard checkout routing targets
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
         
-        const { error } = await supabaseClient.from('job_cards').update({
+        const updates = {
             total_invoice_value: netVal,
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
             lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, 
@@ -277,14 +363,63 @@
             payment_mode: modeTarget,
             status: statusTarget,
             closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null
-        }).eq('id', targetJobId);
+        };
+
+        const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
         if(!error) {
-            alert(statusTarget === 'Closed' ? `Job Card settled successfully via routing: ${modeTarget}` : "Operational draft saved safely.");
-            window.location.href = 'index.html';
+            if(statusTarget === 'Closed') {
+                populateReceiptDocument(modeTarget, netVal, updates);
+                document.getElementById('modalReceipt').style.display = 'flex';
+            } else {
+                alert("Operational draft saved safely.");
+                window.location.href = 'index.html';
+            }
         } else {
             alert("Database Error:\n" + error.message);
         }
+    }
+
+    function populateReceiptDocument(paymentMode, finalNet, scopeVals) {
+        const now = new Date();
+        document.getElementById('thDate').innerText = now.toLocaleDateString();
+        document.getElementById('thTime').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+        document.getElementById('thAssetInfo').innerText = `${activeJobContext.vehicles?.reg_number || ''} | ${activeJobContext.customer_mobile || ''}`;
+        
+        const container = document.getElementById('thStackedItemsContainer'); 
+        container.innerHTML = '';
+        lineItemsLocalMemory.forEach(line => {
+            const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name;
+            container.innerHTML += `
+                <div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;">
+                    <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
+                    <div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${line.unit_price}</span></div>
+                </div>`;
+        });
+
+        document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`;
+        document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges}`;
+        document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`;
+        document.getElementById('thDiscSum').innerText = `₹${document.getElementById('vFlatDisc').value || 0}`;
+        document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`;
+        document.getElementById('thNet').innerText = `₹${finalNet}`;
+        document.getElementById('thMode').innerText = paymentMode;
+    }
+
+    function dispatchWhatsAppImageReceipt() {
+        const layoutTarget = document.getElementById('renderThermalReceiptTarget');
+        const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none';
+        
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            layoutTarget.style.border = origBorder;
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`;
+                a.click(); URL.revokeObjectURL(url);
+            }, 'image/jpeg', 0.95);
+        });
     }
 
     initializeJobContext();
