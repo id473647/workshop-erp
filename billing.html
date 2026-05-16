@@ -17,10 +17,10 @@
         
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         
-        .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; }
         .meta-text { font-size: 0.85rem; color: #64748b; }
-        .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; }
+        .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; display: inline-block; }
         
         .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
@@ -35,7 +35,7 @@
         .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
         .autocomplete-item:hover { background: #f0f7ff; }
 
-        .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 24px; }
+        .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; border-bottom: 1px solid var(--border); }
         td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
@@ -45,13 +45,13 @@
         .ware-green { background: var(--success); } .ware-moped { background: var(--moped); } .ware-service { background: var(--service); }
         .row-destroyer { color: var(--danger); font-weight: 700; cursor: pointer; border: none; background: none; font-size: 1.2rem; }
         
-        .parameter-matrix { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px; }
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+        .parameter-matrix { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box; }
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
         .field-group { display: flex; flex-direction: column; gap: 4px; }
         .field-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; }
         .field-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; color: var(--primary); }
 
-        .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin-bottom: 16px; }
+        .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0 16px 0; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; }
         .btn-action:hover { opacity: 0.9; }
@@ -92,10 +92,14 @@
     <div id="bannerAsset" class="context-banner">
         <div>
             <div class="plate-header" id="regPlate">Loading active instance...</div>
-            <span id="modelLabel" class="meta-text">Syncing pipeline maps...</span>
+            <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-top: 6px;">Problem: --</div>
+            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--info); margin-bottom: 4px; margin-top: 2px;">Protocols: Standard Variable Labor</div>
+            <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
             <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Assigned Tech: --</span>
         </div>
-        <div id="prepaidPill" class="prepaid-badge">Paid Advance: ₹0</div>
+        <div style="text-align: right;">
+            <div id="prepaidPill" class="prepaid-badge">Paid Advance: ₹0</div>
+        </div>
     </div>
 
     <div class="inline-add-strip-wrapper">
@@ -119,20 +123,33 @@
         <table>
             <thead>
                 <tr>
-                    <th>Line Type</th><th>Product Context</th><th>Scalar Unit</th><th>Unit Rate</th><th>Valuation</th><th id="columnDestroyer" style="display:none;"></th>
+                    <th>Warehouse</th><th>Product Context</th><th>Scalar Unit</th><th>Unit Rate</th><th>Valuation</th><th id="columnDestroyer" style="display:none;"></th>
                 </tr>
             </thead>
             <tbody id="lineItemsContainer"></tbody>
         </table>
     </div>
 
-    <div class="parameter-matrix">
-        <h4 style="margin:0 0 16px 0; color:var(--primary);">Overarching Service Scope</h4>
-        <div class="inputs-grid">
-            <div class="field-group"><label>Variable Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Lathe Contract Work (₹)</label><input type="number" id="vLathe" value="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
-            <div class="field-group"><label>Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        <div class="parameter-matrix">
+            <h4 style="margin:0 0 16px 0; color:var(--primary);">Fixed Service Protocols</h4>
+            <div id="activeProtocolsList" style="margin-bottom:12px; display:flex; flex-direction:column; gap:8px;"></div>
+            
+            <div style="margin-top: auto;">
+                <select id="serviceProtocolSelect" onchange="addFixedProtocol()" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; font-weight:bold; color:var(--info); cursor:pointer;">
+                    <option value="">+ Inject Fixed Protocol Module...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="parameter-matrix">
+            <h4 style="margin:0 0 16px 0; color:var(--primary);">Overarching Service Scope</h4>
+            <div class="inputs-grid">
+                <div class="field-group"><label>Variable Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" oninput="compileDynamicSums()"></div>
+                <div class="field-group"><label>Lathe Contract Work (₹)</label><input type="number" id="vLathe" value="0" oninput="compileDynamicSums()"></div>
+                <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
+                <div class="field-group"><label id="lblAdvance">Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
+            </div>
         </div>
     </div>
 
@@ -178,8 +195,12 @@
             <div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div>
             <div class="receipt-divider"></div>
             
+            <div class="receipt-meta" style="margin-top:2px;">Problem: <strong id="thProblem">--</strong></div>
+            <div class="receipt-meta" style="margin-top:2px; display:none;" id="thProtocolRow">Protocols: <strong id="thProtocol">--</strong></div>
+            <div class="receipt-divider"></div>
+            
             <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; text-transform:uppercase;">
-                ITEMS
+                ITEMS & SERVICES
             </div>
             <div id="thStackedItemsContainer"></div>
             
@@ -259,8 +280,10 @@
     async function initializeJobContext() {
         document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
         
+        // Security Rule: Only Workshop Login can Finalize/Close the Cash/UPI Ledgers
         if (sessionRole === 'green' || sessionRole === 'moped') {
             document.getElementById('draftActionBlock').style.display = 'block';
+            document.getElementById('lblAdvance').innerText = `Prepaid Advance (${sessionRole.charAt(0).toUpperCase() + sessionRole.slice(1)} Ledger) (₹)`;
         } else {
             document.getElementById('settlementActionBlock').style.display = 'grid';
         }
@@ -278,6 +301,7 @@
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`;
             document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`;
+            document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Service / Unspecified'}`;
 
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
@@ -288,8 +312,32 @@
                 if (custData) activeCustomerName = custData.name;
             }
 
+            fetchApplicableProtocols(job.vehicles?.category_group);
             loadInventoryLedgers();
         }
+    }
+
+    async function fetchApplicableProtocols(catGroup) {
+        const sel = document.getElementById('serviceProtocolSelect');
+        sel.innerHTML = '<option value="">+ Inject Fixed Protocol Module...</option>';
+        if(catGroup) {
+            const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true });
+            if(pkgs && pkgs.length > 0) {
+                pkgs.forEach(p => { sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; });
+            }
+        }
+    }
+
+    async function addFixedProtocol() {
+        const sel = document.getElementById('serviceProtocolSelect');
+        if(!sel.value) return;
+        const pkgName = sel.value;
+        const pkgRate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0;
+        
+        await supabaseClient.from('job_card_items').insert({
+            job_card_id: targetJobId, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate
+        });
+        sel.value = ''; loadInventoryLedgers();
     }
 
     async function loadInventoryLedgers() {
@@ -300,22 +348,34 @@
 
     function renderDynamicTable() {
         const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = '';
-        lineItemsLocalMemory.forEach((line, idx) => {
-            const isServicePkg = line.warehouse_type === 'Service';
-            const dropAuth = sessionRole === 'admin' || sessionRole === 'service' || sessionRole === line.warehouse_type.toLowerCase();
-            const actionNode = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : '';
-            let evaluatedLineTotal = parseFloat(line.total_price);
-            if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
+        const pList = document.getElementById('activeProtocolsList'); pList.innerHTML = '';
+        let appliedProtocols = [];
 
-            tbody.innerHTML += `<tr>
-                <td><span class="pill-warehouse ware-${line.warehouse_type.toLowerCase()}">${isServicePkg ? 'Service Pkg' : line.warehouse_type}</span></td>
-                <td><strong>${line.item_name}</strong></td>
-                <td><input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)"> ${line.unit_metric||''}</td>
-                <td><input type="number" class="inline-input" value="${line.unit_price}" onchange="updateInlineScalar(${idx}, 'unit_price', this.value)"></td>
-                <td>₹${evaluatedLineTotal}</td>
-                <td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${actionNode}</td>
-            </tr>`;
+        lineItemsLocalMemory.forEach((line, idx) => {
+            const dropAuth = sessionRole === 'admin' || sessionRole === 'service' || sessionRole === line.warehouse_type.toLowerCase();
+            const dropBtn = dropAuth ? `<button onclick="dropActiveRow('${line.id}')" style="background:none;border:none;color:red;font-weight:bold;cursor:pointer;font-size:1.1rem;padding:0 4px;">×</button>` : '';
+            
+            if(line.warehouse_type === 'Service') {
+                appliedProtocols.push(line.item_name);
+                pList.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:8px 12px; border-radius:6px; font-size:0.85rem;">
+                    <span><b>${line.item_name}</b> (₹${line.total_price})</span>${dropBtn}
+                </div>`;
+            } else {
+                let evaluatedLineTotal = parseFloat(line.total_price);
+                if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
+
+                tbody.innerHTML += `<tr>
+                    <td><span class="pill-warehouse ware-${line.warehouse_type.toLowerCase()}">${line.warehouse_type}</span></td>
+                    <td><strong>${line.item_name}</strong></td>
+                    <td><input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)"> ${line.unit_metric||''}</td>
+                    <td><input type="number" class="inline-input" value="${line.unit_price}" onchange="updateInlineScalar(${idx}, 'unit_price', this.value)"></td>
+                    <td>₹${evaluatedLineTotal}</td>
+                    <td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td>
+                </tr>`;
+            }
         });
+        
+        document.getElementById('protocolLabel').innerText = appliedProtocols.length > 0 ? `Protocols: ${appliedProtocols.join(', ')}` : `Protocols: Standard Variable Labor`;
         compileDynamicSums();
     }
 
@@ -382,7 +442,7 @@
     }
 
     async function dropActiveRow(nodeIdHash) {
-        if(confirm("Confirm dropping inventory array line?")) {
+        if(confirm("Confirm dropping item tracking line?")) {
             await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers();
         }
     }
@@ -444,19 +504,38 @@
         const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED';
         document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`;
         
+        document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance';
+
         const container = document.getElementById('thStackedItemsContainer'); 
         container.innerHTML = '';
-        lineItemsLocalMemory.forEach(line => {
-            const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name;
-            let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price;
-            displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2);
+        let protocolNames = [];
 
-            container.innerHTML += `
-                <div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;">
-                    <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
-                    <div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>
-                </div>`;
+        lineItemsLocalMemory.forEach(line => {
+            if(line.warehouse_type === 'Service') {
+                protocolNames.push(line.item_name);
+                container.innerHTML += `
+                    <div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;">
+                        <div class="receipt-item-row"><span class="receipt-item-desc"><strong>[Service] ${line.item_name}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
+                    </div>`;
+            } else {
+                const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name;
+                let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price;
+                displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2);
+
+                container.innerHTML += `
+                    <div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;">
+                        <div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div>
+                        <div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>
+                    </div>`;
+            }
         });
+
+        if(protocolNames.length > 0) {
+            document.getElementById('thProtocolRow').style.display = 'block';
+            document.getElementById('thProtocol').innerText = protocolNames.join(', ');
+        } else {
+            document.getElementById('thProtocolRow').style.display = 'none';
+        }
 
         document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`;
         document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`;
