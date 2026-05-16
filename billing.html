@@ -17,7 +17,8 @@
         
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         
-        .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        /* Redesigned 3-Column Context Banner */
+        .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; }
         .meta-text { font-size: 0.85rem; color: #64748b; }
         .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; display: inline-block; }
@@ -90,14 +91,18 @@
 
 <div class="container">
     <div id="bannerAsset" class="context-banner">
-        <div>
+        <div style="flex: 1;">
             <div class="plate-header" id="regPlate">Loading active instance...</div>
-            <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-top: 6px;">Problem: --</div>
-            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--info); margin-bottom: 4px; margin-top: 2px;">Protocols: Standard Variable Labor</div>
             <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
             <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Assigned Tech: --</span>
         </div>
-        <div style="text-align: right;">
+        
+        <div style="flex: 1.5; text-align: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0 15px;">
+            <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-bottom: 6px;">Problem: --</div>
+            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--info);">Protocols: Standard Variable Labor</div>
+        </div>
+        
+        <div style="flex: 1; text-align: right;">
             <div id="prepaidPill" class="prepaid-badge">Paid Advance: ₹0</div>
         </div>
     </div>
@@ -280,7 +285,7 @@
     async function initializeJobContext() {
         document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
         
-        // Check-Out Lockdown execution
+        // Security Check: Only Workshop Login can Finalize/Close the Ledgers
         if (sessionRole === 'green' || sessionRole === 'moped') {
             document.getElementById('draftActionBlock').style.display = 'block';
             document.getElementById('lblAdvance').innerText = `Prepaid Advance (${sessionRole.charAt(0).toUpperCase() + sessionRole.slice(1)} Ledger) (₹)`;
@@ -301,6 +306,8 @@
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`;
             document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`;
+            
+            // Render the extracted Problem
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Service / Unspecified'}`;
 
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
@@ -350,20 +357,25 @@
         const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = '';
         const pList = document.getElementById('activeProtocolsList'); pList.innerHTML = '';
         let appliedProtocols = [];
+        let protocolCounter = 1;
 
         lineItemsLocalMemory.forEach((line, idx) => {
-            const dropAuth = sessionRole === 'admin' || sessionRole === 'service' || sessionRole === line.warehouse_type.toLowerCase();
-            const dropBtn = dropAuth ? `<button onclick="dropActiveRow('${line.id}')" style="background:none;border:none;color:red;font-weight:bold;cursor:pointer;font-size:1.1rem;padding:0 4px;">×</button>` : '';
+            const dropAuth = sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase();
+            const dropBtn = dropAuth ? `<button onclick="dropActiveRow('${line.id}')" style="background:none;border:none;color:var(--danger);font-weight:bold;cursor:pointer;font-size:1.1rem;padding:0 4px;">(X)</button>` : '';
             
+            let evaluatedLineTotal = parseFloat(line.total_price);
+            if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
+
+            // Renders Fixed Packages inside the dedicated red box
             if(line.warehouse_type === 'Service') {
                 appliedProtocols.push(line.item_name);
-                pList.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:8px 12px; border-radius:6px; font-size:0.85rem;">
-                    <span><b>${line.item_name}</b> (₹${line.total_price})</span>${dropBtn}
-                </div>`;
+                pList.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid var(--danger); color:var(--danger); padding:8px 12px; border-radius:6px; font-size:0.85rem; font-weight:bold;">
+                        <span>${protocolCounter}. ${line.item_name}</span>
+                        <span>Rs.${evaluatedLineTotal.toFixed(2)} ${dropBtn}</span>
+                    </div>`;
+                protocolCounter++;
             } else {
-                let evaluatedLineTotal = parseFloat(line.total_price);
-                if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
-
                 tbody.innerHTML += `<tr>
                     <td><span class="pill-warehouse ware-${line.warehouse_type.toLowerCase()}">${line.warehouse_type}</span></td>
                     <td><strong>${line.item_name}</strong></td>
@@ -456,6 +468,7 @@
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet;
             else partsGrossTotal += rowNet;
         });
+        
         const l = parseFloat(document.getElementById('vLabour').value) || 0; 
         const t = parseFloat(document.getElementById('vLathe').value) || 0;
         const d = parseFloat(document.getElementById('vFlatDisc').value) || 0; 
