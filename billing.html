@@ -17,7 +17,7 @@
         
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         
-        /* Redesigned 3-Column Context Banner */
+        /* Centered 3-Column Context Banner */
         .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; }
         .meta-text { font-size: 0.85rem; color: #64748b; }
@@ -97,9 +97,9 @@
             <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Assigned Tech: --</span>
         </div>
         
-        <div style="flex: 1.5; text-align: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0 15px;">
-            <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-bottom: 6px;">Problem: --</div>
-            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--info);">Protocols: Standard Variable Labor</div>
+        <div style="flex: 1; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-bottom: 4px;">Problem: --</div>
+            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--primary);">Protocols: Standard Variable Labor</div>
         </div>
         
         <div style="flex: 1; text-align: right;">
@@ -285,7 +285,6 @@
     async function initializeJobContext() {
         document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
         
-        // Security Check: Only Workshop Login can Finalize/Close the Ledgers
         if (sessionRole === 'green' || sessionRole === 'moped') {
             document.getElementById('draftActionBlock').style.display = 'block';
             document.getElementById('lblAdvance').innerText = `Prepaid Advance (${sessionRole.charAt(0).toUpperCase() + sessionRole.slice(1)} Ledger) (₹)`;
@@ -306,9 +305,7 @@
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`;
             document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`;
-            
-            // Render the extracted Problem
-            document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Service / Unspecified'}`;
+            document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
 
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0;
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
@@ -366,13 +363,16 @@
             let evaluatedLineTotal = parseFloat(line.total_price);
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
 
-            // Renders Fixed Packages inside the dedicated red box
+            // Redesigned Red Border Protocol Boxes
             if(line.warehouse_type === 'Service') {
                 appliedProtocols.push(line.item_name);
                 pList.innerHTML += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid var(--danger); color:var(--danger); padding:8px 12px; border-radius:6px; font-size:0.85rem; font-weight:bold;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:white; border:1px solid var(--danger); color:var(--danger); padding:10px 14px; border-radius:4px; font-size:0.9rem; font-weight:700;">
                         <span>${protocolCounter}. ${line.item_name}</span>
-                        <span>Rs.${evaluatedLineTotal.toFixed(2)} ${dropBtn}</span>
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <span>Rs.${evaluatedLineTotal.toFixed(2)}</span>
+                            ${dropBtn}
+                        </div>
                     </div>`;
                 protocolCounter++;
             } else {
