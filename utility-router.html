@@ -6,7 +6,7 @@
     <title>Utility Operations Gateway - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --purple: #8e44ad; --amber: #f59e0b; }
+        :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --gold: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
@@ -15,42 +15,20 @@
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-        
         .utility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
         .u-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
         .u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
-        .u-card.disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--border); transform: none; box-shadow: none; }
         .u-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px; }
         .u-desc { font-size: 0.8rem; color: #64748b; line-height: 1.3; margin: 0; }
-        .u-access-tag { font-size: 0.65rem; font-weight: 700; color: var(--utility); margin-top: 12px; align-self: flex-start; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
-
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
-        
-        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; }
-        .btn-action:hover { opacity: 0.9; } .btn-info { background: #2980b9; } .btn-danger { background: var(--danger); }
-
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 350px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
-        .btn-del { color: var(--danger); background: none; border: none; font-weight: 700; cursor: pointer; font-size: 1.1rem; padding: 0 4px; }
-
-        .utility-workspace { display: none; animation: fadeIn 0.2s ease-out; } .utility-workspace.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-
-        .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; } .btn-info { background: #2980b9; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 350px; } table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .utility-workspace { display: none; } .utility-workspace.active { display: block; }
         .editable-select { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border); font-weight: bold; cursor: pointer; }
-
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 700px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
-        .rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-        .rep-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-        .rep-val { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
-        .tier-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
         .amc-highlight { background: #fefce8; border-left: 4px solid var(--service); }
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        .rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; } .rep-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px; } .rep-val { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -68,91 +46,46 @@
         <div class="block-title" style="margin-bottom:20px;">Enterprise CRM & Logic Configuration</div>
         <div class="utility-grid">
             <div class="u-card" style="border-left:4px solid var(--success);" onclick="openWorkspaceTarget('wsCustomers')">
-                <h4 class="u-title">👥 CRM Master & AMC Vouchers</h4>
-                <p class="u-desc">View absolute client identity lists, issue AMC subscriptions, track loyalty matrices, and analyze Engine Warranty tracking.</p>
+                <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">View absolute client identity lists, issue AMC subscriptions, and analyze tracking.</p>
             </div>
             <div class="u-card" onclick="window.location.href='reports.html'">
-                <h4 class="u-title">📊 Enterprise Reports</h4>
-                <p class="u-desc">Extract Promotional Leads, Analyze New Customer Conversions, and export dynamic operations data.</p>
+                <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">Extract Promotional Leads, Analyze New Customer Conversions, and Wallet Ledgers.</p>
             </div>
             <div class="u-card" onclick="openWorkspaceTarget('wsAmc')">
-                <h4 class="u-title">📋 Static Service Matrices</h4>
-                <p class="u-desc">Define standard base-rate models for periodic protocols (Quick, Jumbo, Premium) across all chassis groups.</p>
+                <h4 class="u-title">📋 Static Service Matrices</h4><p class="u-desc">Define standard base-rate models for periodic protocols.</p>
             </div>
             <div class="u-card" onclick="window.location.href='vehicle-manager.html'">
-                <h4 class="u-title">🏍️ Vehicle Management</h4><p class="u-desc">Manage standard fleet mapping logic, add global classifications, and index missing chassis variations.</p>
+                <h4 class="u-title">🏍️ Vehicle Management</h4><p class="u-desc">Manage standard fleet mapping logic and add global classifications.</p>
             </div>
             <div class="u-card" onclick="openWorkspaceTarget('wsPassword')">
-                <h4 class="u-title">🔑 Password Manager</h4><p class="u-desc">Modify persistent security login tokens. Administrators unlock master array key updates.</p>
+                <h4 class="u-title">🔑 Password Manager</h4><p class="u-desc">Modify persistent security login tokens.</p>
             </div>
             <div id="cardTech" class="u-card" onclick="openWorkspaceTarget('wsTech')">
-                <h4 class="u-title">👨‍🔧 Technician Ledger</h4><p class="u-desc">Instantiate professional crew profiles, update commission models, and compile staff statements.</p>
+                <h4 class="u-title">👨‍🔧 Technician Ledger</h4><p class="u-desc">Instantiate profiles, log attendance, and Cash Out earned points.</p>
             </div>
         </div>
     </div>
 
     <div id="wsCustomers" class="card-panel utility-workspace">
         <div class="block-title">Customer Portfolio & AMC Contract Execution</div>
-        
         <div style="background:#fffbeb; padding:16px; border-radius:8px; border:1px solid #fde68a; margin-bottom:20px;">
             <span style="font-size:0.85rem; font-weight:700; color:#b45309; display:block; margin-bottom:12px;">Sell AMC Subscriptions & Promos</span>
-            <div class="inputs-grid">
-                <div class="field-group"><label>Customer Mobile</label><input type="tel" id="cAmcMobile" placeholder="10 Digits" maxlength="10" oninput="prefetchClientContextForAmc(this.value)"></div>
-                <div class="field-group"><label>Verified Client</label><input type="text" id="cAmcName" readonly style="background:#f1f5f9;" placeholder="..."></div>
-            </div>
-            
+            <div class="inputs-grid"><div class="field-group"><label>Customer Mobile</label><input type="tel" id="cAmcMobile" placeholder="10 Digits" maxlength="10" oninput="prefetchClientContextForAmc(this.value)"></div><div class="field-group"><label>Verified Client</label><input type="text" id="cAmcName" readonly style="background:#f1f5f9;" placeholder="..."></div></div>
             <div id="amcConfigBlock" style="display:none; margin-top:12px; border-top:1px dashed #fcd34d; padding-top:12px;">
                 <div class="inputs-grid">
-                    <div class="field-group">
-                        <label>Contract Type</label>
-                        <select id="amcTypeSelect" onchange="toggleAmcInputs()">
-                            <option value="LOYALTY">Panch par ek Free (Fleet Loyalty)</option>
-                            <option value="PREPAID">Prepaid AMC (4x Premium Services)</option>
-                        </select>
-                    </div>
+                    <div class="field-group"><label>Contract Type</label><select id="amcTypeSelect" onchange="toggleAmcInputs()"><option value="LOYALTY">Panch par ek Free (Fleet Loyalty)</option><option value="PREPAID">Prepaid AMC (4x Premium Services)</option></select></div>
                     <div class="field-group" id="amcPriceBlock"><label>Collection Amount (₹)</label><input type="number" id="amcPrice" value="10" min="10"></div>
                     <div class="field-group" id="amcVehBlock" style="display:none;"><label>Lock to Specific Chassis</label><select id="amcVehicleSelect"></select></div>
                 </div>
                 <button class="btn-action" style="background:#f59e0b;" onclick="commitAmcSale()">AUTHORIZE AMC SUBSCRIPTION & COLLECT FUNDS</button>
             </div>
         </div>
-
-        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
-            <span style="font-size:0.85rem; font-weight:700; color:var(--primary); display:block; margin-bottom:12px;">Issue Generic Promo Coupons</span>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <select id="promoType" style="flex:1; max-width:200px; padding:8px;">
-                    <option value="FREE_SERVICE">Complimentary Free Service</option>
-                    <option value="COUPON">Invoice Discount Coupon (%)</option>
-                </select>
-                <input type="number" id="promoValue" placeholder="Value (if Coupon %)" style="flex:1; max-width:150px; padding:8px;" min="1" max="100">
-                <button class="btn-action" style="background:var(--service); width:auto; padding:8px 16px; font-size:0.8rem; margin:0;" onclick="stagePromotionalIssuance()">SUBMIT PERK APPROVAL</button>
-            </div>
-        </div>
-
-        <div id="adminApprovalQueuePane" style="display:none; margin-bottom:24px; border:1px solid #fde047; background:#fff9db; padding:16px; border-radius:8px;">
-            <span style="font-size:0.85rem; font-weight:700; color:#854d0e; display:block; margin-bottom:10px;">⚠️ Master Administrator Oversight: Pending Line Requests</span>
-            <div class="table-wrapper" style="margin:0; max-height:200px;">
-                <table>
-                    <thead><tr><th>Client Index</th><th>Role Trigger</th><th>Request Action</th><th>Payload Spec</th><th>Action</th></tr></thead>
-                    <tbody id="approvalQueueTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-
         <div class="block-title" style="font-size:0.9rem; display:flex; justify-content:space-between; align-items:flex-end;">
             Absolute Associated Customer Ledgers
-            <div style="display:flex; gap:8px;">
-                <input type="text" id="filterPhone" placeholder="Search Mobile..." style="padding:6px; font-size:0.75rem;" oninput="compileCustomerManagementLedgers()">
-                <select id="filterTier" style="padding:6px; font-size:0.75rem;" onchange="compileCustomerManagementLedgers()">
-                    <option value="">All Tiers</option><option value="Regular">Regular</option><option value="Silver">Silver</option><option value="Gold">Gold</option><option value="Platinum">Platinum</option>
-                </select>
-            </div>
+            <div style="display:flex; gap:8px;"><input type="text" id="filterPhone" placeholder="Search Mobile..." style="padding:6px; font-size:0.75rem;" oninput="compileCustomerManagementLedgers()"></div>
         </div>
         <div class="table-wrapper">
-            <table>
-                <thead><tr><th>Mobile Key</th><th>Client Identity</th><th>Assigned Tier (Editable)</th><th>Active Contracts & Vouchers</th></tr></thead>
-                <tbody id="customerLedgerTableBody"></tbody>
-            </table>
+            <table><thead><tr><th>Mobile Key</th><th>Client Identity</th><th>Assigned Tier (Editable)</th><th>Active Contracts & Vouchers</th></tr></thead><tbody id="customerLedgerTableBody"></tbody></table>
         </div>
     </div>
 
@@ -163,6 +96,23 @@
             <div class="field-group"><label>Assigned PIN Hash</label><input type="text" id="pNewAdmin" placeholder="4 Digits" maxlength="4"></div>
         </div>
         <button class="btn-action btn-info" onclick="commitAdminPasswordOverride()" style="margin-top:12px;">EXECUTE SECURITY KEY RESET</button>
+    </div>
+
+    <div id="wsTech" class="card-panel utility-workspace">
+        <div class="block-title">Technician Core Administration Ledgers</div>
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Technician Name</label><input type="text" id="tName" placeholder="Full Registered Descriptor"></div>
+                <div class="field-group"><label>Labor Scalar Commission (%)</label><input type="number" id="tComm" value="10" min="0" max="100"></div>
+            </div>
+            <button class="btn-action" onclick="upsertTechnicianProfileRecord()" style="margin-top:12px;">SAVE TECHNICIAN PROFILE</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Crew Member</th><th>Status Indicator</th><th>Earned Points</th><th>Action</th></tr></thead>
+                <tbody id="techDirectoryTableBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="wsAmc" class="card-panel utility-workspace">
@@ -194,125 +144,49 @@
         <h4 style="margin:0 0 8px 0; color:var(--primary); font-size:0.9rem;">Operational Perks</h4>
         <div class="rep-grid" style="grid-template-columns:1fr 1fr;">
             <div style="background:#dcfce7; padding:12px; border-radius:6px; border:1px solid #bbf7d0;"><label style="color:#15803d;">Free Services Remaining</label><div style="font-size:1.2rem; font-weight:bold; color:#15803d;" id="repFree">0</div></div>
-            <div style="background:#e0f2fe; padding:12px; border-radius:6px; border:1px solid #bae6fd;"><label style="color:#0369a1;">Global Discount Coupon</label><div style="font-size:1.2rem; font-weight:bold; color:#0369a1;" id="repCoup">0%</div></div>
+            <div style="background:#e0f2fe; padding:12px; border-radius:6px; border:1px solid #bae6fd;"><label style="color:#0369a1;">Wallet Balance</label><div style="font-size:1.2rem; font-weight:bold; color:#0369a1;" id="repCoup">₹0</div></div>
         </div>
-        <h4 style="margin:16px 0 8px 0; color:var(--primary); font-size:0.9rem;">Fixed Service Protocols Availed</h4>
-        <div id="repProtocols" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:8px; font-size:0.85rem; min-height:50px;">Loading protocols...</div>
         <h4 style="margin:16px 0 8px 0; color:var(--primary); font-size:0.9rem;">Chassis / Asset Directory</h4>
         <div id="repVehicles" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:8px; font-size:0.85rem; min-height:50px;">Loading vehicles...</div>
     </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    
     document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
     let targetCustomerProfileObj = null;
 
-    if(activeSessionRole === 'admin') document.getElementById('adminApprovalQueuePane').style.display = 'block';
-
-    function openWorkspaceTarget(targetDomId) {
-        document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active'));
-        document.getElementById(targetDomId).classList.add('active');
-        if(targetDomId === 'wsCustomers') compileCustomerManagementLedgers();
-        if(targetDomId === 'wsAmc') loadAmcPackagesDirectory();
-    }
+    function openWorkspaceTarget(targetDomId) { document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); document.getElementById(targetDomId).classList.add('active'); if(targetDomId === 'wsCustomers') compileCustomerManagementLedgers(); if(targetDomId === 'wsAmc') loadAmcPackagesDirectory(); if(targetDomId === 'wsTech') loadTechniciansDirectoryLedgers(); }
     function closeActiveWorkspace() { document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); document.getElementById('hubGrid').classList.add('active'); }
 
-    // --- AMC CRM LOGIC ---
     async function prefetchClientContextForAmc(mobileVal) {
-        const str = mobileVal.trim();
-        if(str.length !== 10) { document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; targetCustomerProfileObj = null; return; }
-        
+        const str = mobileVal.trim(); if(str.length !== 10) { document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; targetCustomerProfileObj = null; return; }
         const { data: cust } = await supabaseClient.from('customers').select('*, vehicles(id, reg_number, make_model)').eq('mobile_number', str).single();
-        if(cust) {
-            targetCustomerProfileObj = cust; document.getElementById('cAmcName').value = cust.name;
-            document.getElementById('amcConfigBlock').style.display = 'block';
-            const sel = document.getElementById('amcVehicleSelect'); sel.innerHTML = '';
-            (cust.vehicles || []).forEach(v => sel.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`);
-            toggleAmcInputs();
-        }
+        if(cust) { targetCustomerProfileObj = cust; document.getElementById('cAmcName').value = cust.name; document.getElementById('amcConfigBlock').style.display = 'block'; const sel = document.getElementById('amcVehicleSelect'); sel.innerHTML = ''; (cust.vehicles || []).forEach(v => sel.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`); toggleAmcInputs(); }
     }
-
-    function toggleAmcInputs() {
-        const type = document.getElementById('amcTypeSelect').value;
-        if(type === 'PREPAID') { document.getElementById('amcVehBlock').style.display = 'flex'; document.getElementById('amcPrice').value = '999'; } 
-        else { document.getElementById('amcVehBlock').style.display = 'none'; document.getElementById('amcPrice').value = '10'; }
-    }
+    function toggleAmcInputs() { const type = document.getElementById('amcTypeSelect').value; if(type === 'PREPAID') { document.getElementById('amcVehBlock').style.display = 'flex'; document.getElementById('amcPrice').value = '999'; } else { document.getElementById('amcVehBlock').style.display = 'none'; document.getElementById('amcPrice').value = '10'; } }
 
     async function commitAmcSale() {
         const mobile = document.getElementById('cAmcMobile').value.trim(); const type = document.getElementById('amcTypeSelect').value; const price = parseFloat(document.getElementById('amcPrice').value) || 0; const vehId = type === 'PREPAID' ? document.getElementById('amcVehicleSelect').value : null;
         if(!targetCustomerProfileObj) return;
-
-        const expireDate = new Date();
-        if(type === 'LOYALTY') expireDate.setFullYear(expireDate.getFullYear() + 2); else expireDate.setFullYear(expireDate.getFullYear() + 1);
-
-        const { data: sub } = await supabaseClient.from('amc_subscriptions').insert({
-            customer_mobile: mobile, vehicle_id: vehId, plan_type: type === 'PREPAID' ? 'Prepaid AMC' : 'Panch Par Ek', amount_paid: price, expires_at: expireDate.toISOString(), services_logged: 0
-        }).select().single();
-
+        const expireDate = new Date(); if(type === 'LOYALTY') expireDate.setFullYear(expireDate.getFullYear() + 2); else expireDate.setFullYear(expireDate.getFullYear() + 1);
+        const { data: sub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: type === 'PREPAID' ? 'Prepaid AMC' : 'Panch Par Ek', amount_paid: price, expires_at: expireDate.toISOString(), services_logged: 0 }).select().single();
         if(sub) {
             if(type === 'PREPAID') {
-                const voucherPromises = [];
-                for(let i=0; i<4; i++) {
-                    voucherPromises.push(supabaseClient.from('amc_vouchers').insert({
-                        subscription_id: sub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `AMC-${sub.id.substring(0,4).toUpperCase()}-P${i+1}`, voucher_type: 'PREPAID_PREMIUM', valid_from: new Date(), expires_at: expireDate, mechanic_payout_eligible: true
-                    }));
-                }
-                await Promise.all(voucherPromises);
-                await supabaseClient.from('customers').update({ global_discount_coupon: 5 }).eq('mobile_number', mobile);
+                const voucherPromises = []; for(let i=0; i<4; i++) { voucherPromises.push(supabaseClient.from('amc_vouchers').insert({ subscription_id: sub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `AMC-${sub.id.substring(0,4).toUpperCase()}-P${i+1}`, voucher_type: 'PREPAID_PREMIUM', valid_from: new Date(), expires_at: expireDate, mechanic_payout_eligible: true })); }
+                await Promise.all(voucherPromises); await supabaseClient.from('customers').update({ global_discount_coupon: 5 }).eq('mobile_number', mobile);
             }
             await supabaseClient.from('workshop_expenses').insert({ expense_category: 'AMC Collection', stakeholder_id: 'Master Ledger', amount: -Math.abs(price), note: `AMC Sale: ${type}`, recorded_by: activeSessionRole });
-            alert(`AMC Contract Generated! Expires strictly on: ${expireDate.toLocaleDateString()}`);
-            document.getElementById('cAmcMobile').value = ''; document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; compileCustomerManagementLedgers();
+            alert(`AMC Contract Generated! Expires strictly on: ${expireDate.toLocaleDateString()}`); document.getElementById('cAmcMobile').value = ''; document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; compileCustomerManagementLedgers();
         }
-    }
-
-    async function stagePromotionalIssuance() {
-        const mobile = document.getElementById('cEditMobile').value.trim(); const promoType = document.getElementById('promoType').value; const promoVal = parseFloat(document.getElementById('promoValue').value) || 0;
-        if(!targetCustomerProfileObj) return alert("Verify target client parameters beforehand.");
-
-        if(activeSessionRole === 'admin') {
-            if(promoType === 'FREE_SERVICE') {
-                const prevCount = parseInt(targetCustomerProfileObj.free_services_issued) || 0; await supabaseClient.from('customers').update({ free_services_issued: prevCount + 1 }).eq('mobile_number', mobile);
-            } else if (promoType === 'COUPON') {
-                await supabaseClient.from('customers').update({ global_discount_coupon: promoVal }).eq('mobile_number', mobile);
-            }
-            alert("Promotional allocation processed straight onto active database records."); compileCustomerManagementLedgers();
-        } else {
-            await supabaseClient.from('approval_requests').insert({ customer_mobile: mobile, requested_by_role: activeSessionRole, request_type: 'COUPON_ISSUE', payload: { type: promoType, value: promoVal } });
-            alert("Promotional perk generation requested. Queue passed to authorization log.");
-        }
-    }
-
-    async function processStagedApprovalRequest(reqId, isAuthorized) {
-        if(!isAuthorized) { await supabaseClient.from('approval_requests').update({ status: 'Rejected' }).eq('id', reqId); compileCustomerManagementLedgers(); return; }
-        const { data: req } = await supabaseClient.from('approval_requests').select('*').eq('id', reqId).single();
-        const { data: cust } = await supabaseClient.from('customers').select('*').eq('mobile_number', req.customer_mobile).single();
-        if(!cust) return;
-
-        if(req.request_type === 'COUPON_ISSUE') {
-            if(req.payload.type === 'FREE_SERVICE') { const liveCount = parseInt(cust.free_services_issued) || 0; await supabaseClient.from('customers').update({ free_services_issued: liveCount + 1 }).eq('mobile_number', req.customer_mobile); } 
-            else { await supabaseClient.from('customers').update({ global_discount_coupon: req.payload.value }).eq('mobile_number', req.customer_mobile); }
-        } else if(req.request_type === 'TIER_UPDATE') {
-            await supabaseClient.from('customers').update({ category: req.payload.new_tier }).eq('mobile_number', req.customer_mobile);
-        }
-        await supabaseClient.from('approval_requests').update({ status: 'Approved' }).eq('id', reqId); compileCustomerManagementLedgers();
-    }
-
-    async function stageTierUpdate(mobile, newTier) {
-        if(activeSessionRole === 'admin') { await supabaseClient.from('customers').update({ category: newTier }).eq('mobile_number', mobile); compileCustomerManagementLedgers(); } 
-        else { await supabaseClient.from('approval_requests').insert({ customer_mobile: mobile, requested_by_role: activeSessionRole, request_type: 'TIER_UPDATE', payload: { new_tier: newTier } }); alert(`Tier update requested.`); compileCustomerManagementLedgers(); }
     }
 
     async function compileCustomerManagementLedgers() {
-        const searchVal = document.getElementById('filterPhone').value.trim(); const tierFilter = document.getElementById('filterTier').value;
+        const searchVal = document.getElementById('filterPhone').value.trim();
         let query = supabaseClient.from('customers').select('*, vehicles(reg_number, make_model)').order('created_at', { ascending: false });
-        if(searchVal) query = query.ilike('mobile_number', `%${searchVal}%`); if(tierFilter) query = query.eq('category', tierFilter);
-
+        if(searchVal) query = query.ilike('mobile_number', `%${searchVal}%`);
         const { data: clientList } = await query.limit(50);
         const cBody = document.getElementById('customerLedgerTableBody'); cBody.innerHTML = '';
         const { data: subs } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').gt('expires_at', new Date().toISOString());
@@ -320,75 +194,61 @@
         clientList?.forEach(c => {
             const mySubs = (subs || []).filter(s => s.customer_mobile === c.mobile_number);
             let amcHtml = '<span style="color:#94a3b8; font-size:0.75rem;">No Active AMC</span>';
-            
-            if(mySubs && mySubs.length > 0) {
-                amcHtml = '';
-                mySubs.forEach(mySub => {
-                    const expStr = new Date(mySub.expires_at).toLocaleDateString('en-IN');
-                    if(mySub.plan_type === 'Panch Par Ek') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--success); font-weight:bold; font-size:0.75rem;">Loyalty: ${mySub.services_logged||0}/5 Done</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } 
-                    else if (mySub.plan_type === 'Engine Restoration') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--primary); font-weight:bold; font-size:0.75rem;">Engine Guar: Active</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } 
-                    else { const openVouchers = mySub.amc_vouchers ? mySub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--info); font-weight:bold; font-size:0.75rem;">Prepaid AMC: ${openVouchers} Left</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; }
-                });
-            }
-
-            const tierOptions = ['Regular', 'Silver', 'Gold', 'Platinum'].map(t => `<option value="${t}" ${c.category === t ? 'selected' : ''}>${t}</option>`).join('');
-            const tierSelectHtml = `<select class="editable-select" onchange="stageTierUpdate('${c.mobile_number}', this.value)">${tierOptions}</select>`;
-
-            cBody.innerHTML += `<tr class="${mySubs.length > 0 ? 'amc-highlight' : ''}">
-                <td><span class="clickable-ref" onclick="openCustomerReportModal('${c.mobile_number}')">${c.mobile_number}</span></td>
-                <td>${c.name || 'Unnamed'}<br>${c.global_discount_coupon ? `<b><small style="color:var(--info);">${c.global_discount_coupon}% Global Spares Disc.</small></b>` : ''}</td>
-                <td>${tierSelectHtml}</td>
-                <td>${amcHtml}</td>
-            </tr>`;
+            if(mySubs && mySubs.length > 0) { amcHtml = ''; mySubs.forEach(mySub => { const expStr = new Date(mySub.expires_at).toLocaleDateString('en-IN'); if(mySub.plan_type === 'Panch Par Ek') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--success); font-weight:bold; font-size:0.75rem;">Loyalty: ${mySub.services_logged||0}/5 Done</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } else if (mySub.plan_type === 'Engine Restoration') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--primary); font-weight:bold; font-size:0.75rem;">Engine Guar: Active</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } else { const openVouchers = mySub.amc_vouchers ? mySub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--info); font-weight:bold; font-size:0.75rem;">Prepaid AMC: ${openVouchers} Left</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } }); }
+            const tierOptions = ['Regular', 'Silver', 'Gold', 'Platinum'].map(t => `<option value="${t}" ${c.category === t ? 'selected' : ''}>${t}</option>`).join(''); const tierSelectHtml = `<select class="editable-select" onchange="stageTierUpdate('${c.mobile_number}', this.value)">${tierOptions}</select>`;
+            cBody.innerHTML += `<tr class="${mySubs.length > 0 ? 'amc-highlight' : ''}"><td><span class="clickable-ref" onclick="openCustomerReportModal('${c.mobile_number}')">${c.mobile_number}</span></td><td>${c.name || 'Unnamed'}</td><td>${tierSelectHtml}</td><td>${amcHtml}</td></tr>`;
         });
-
-        if(activeSessionRole === 'admin') {
-            const { data: queue } = await supabaseClient.from('approval_requests').select('*').eq('status', 'Pending').order('created_at', { ascending: true });
-            const qBody = document.getElementById('approvalQueueTableBody'); qBody.innerHTML = '';
-            if(queue && queue.length > 0) {
-                queue.forEach(q => {
-                    qBody.innerHTML += `<tr><td><strong>${q.customer_mobile}</strong></td><td><span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">${q.requested_by_role.toUpperCase()}</span></td><td><strong>${q.request_type}</strong></td><td style="font-size:0.75rem;">${JSON.stringify(q.payload)}</td><td style="white-space:nowrap;"><button class="btn-action" style="padding:4px 8px; font-size:0.75rem; width:auto; margin:0;" onclick="processStagedApprovalRequest('${q.id}', true)">✓</button><button class="btn-action btn-danger" style="padding:4px 8px; font-size:0.75rem; width:auto; margin:0;" onclick="processStagedApprovalRequest('${q.id}', false)">×</button></td></tr>`;
-                });
-            } else { qBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:12px; color:#94a3b8;">No unapproved field updates inside tracking buffers.</td></tr>`; }
-        }
     }
+
+    async function stageTierUpdate(mobile, newTier) { await supabaseClient.from('customers').update({ category: newTier }).eq('mobile_number', mobile); compileCustomerManagementLedgers(); }
 
     async function openCustomerReportModal(mobile) {
         const { data: cust } = await supabaseClient.from('customers').select('*, vehicles(reg_number, make_model)').eq('mobile_number', mobile).single();
         if(!cust) return;
-        document.getElementById('repClientName').innerText = `${cust.name} | ${cust.mobile_number} | Tier: ${cust.category}`;
-        document.getElementById('repFree').innerText = cust.free_services_issued || 0;
-        document.getElementById('repCoup').innerText = `${cust.global_discount_coupon || 0}%`;
-
+        document.getElementById('repClientName').innerText = `${cust.name} | ${cust.mobile_number} | Tier: ${cust.category}`; document.getElementById('repFree').innerText = cust.free_services_issued || 0; document.getElementById('repCoup').innerText = `₹${Math.floor(cust.loyalty_points || 0)}`;
         const vehDiv = document.getElementById('repVehicles'); vehDiv.innerHTML = (cust.vehicles || []).map(v => `<b>${v.reg_number}</b> - ${v.make_model}`).join('<br>') || 'No assets mapped.';
-        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('customer_mobile', mobile).eq('status', 'Closed');
-        let posSum = 0; (pos || []).forEach(p => posSum += parseFloat(p.total_amount) || 0); document.getElementById('repPosVal').innerText = `₹${posSum.toFixed(2)}`;
-
-        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('status', 'Closed');
-        let jcSum = 0; let jcIds = []; (jc || []).forEach(j => { jcSum += parseFloat(j.total_invoice_value) || 0; jcIds.push(j.id); }); document.getElementById('repWkVal').innerText = `₹${jcSum.toFixed(2)}`;
-
-        const protDiv = document.getElementById('repProtocols'); protDiv.innerHTML = 'None recorded.';
-        if(jcIds.length > 0) {
-            const { data: items } = await supabaseClient.from('job_card_items').select('item_name').in('job_card_id', jcIds).eq('warehouse_type', 'Service');
-            if(items && items.length > 0) { const uniqueProtocols = [...new Set(items.map(i => i.item_name))]; protDiv.innerHTML = uniqueProtocols.map(p => `• ${p}`).join('<br>'); }
-        }
+        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('customer_mobile', mobile).eq('status', 'Closed'); let posSum = 0; (pos || []).forEach(p => posSum += parseFloat(p.total_amount) || 0); document.getElementById('repPosVal').innerText = `₹${posSum.toFixed(2)}`;
+        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('status', 'Closed'); let jcSum = 0; (jc || []).forEach(j => { jcSum += parseFloat(j.total_invoice_value) || 0; }); document.getElementById('repWkVal').innerText = `₹${jcSum.toFixed(2)}`;
         document.getElementById('modalCustomerReport').style.display = 'flex';
     }
 
-    async function upsertServicePackageRecord() {
-        const pName = document.getElementById('amcPackageName').value; const pCat = document.getElementById('amcCategoryGroup').value; const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0;
-        await supabaseClient.from('service_packages').upsert({ package_name: pName, vehicle_category: pCat, base_rate: pRate }); loadAmcPackagesDirectory();
+    // --- TECHNICIAN LEDGER, ATTENDANCE & CASHOUT ---
+    async function upsertTechnicianProfileRecord() { const nameStr = document.getElementById('tName').value.trim(); const commVal = parseFloat(document.getElementById('tComm').value) || 0; if(!nameStr) return; await supabaseClient.from('mechanics').insert({ name: nameStr, commission_rate: commVal }); document.getElementById('tName').value = ''; loadTechniciansDirectoryLedgers(); }
+    
+    async function loadTechniciansDirectoryLedgers() {
+        const { data: list } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('name');
+        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
+        list?.forEach(t => {
+            const pts = parseFloat(t.earned_points) || 0;
+            const cashBtn = pts >= 100 ? `<button onclick="cashOutMechanic('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Cash Out ₹${Math.floor(pts)}</button>` : '';
+            tbody.innerHTML += `<tr><td><strong>${t.name}</strong><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="color:var(--success); font-weight:700;">Active</span></td><td><strong style="color:var(--gold);">${Math.floor(pts)} Pts</strong></td><td style="display:flex; gap:8px;">${cashBtn}<button onclick="downloadTechnicianLedgerStatement('${t.id}', '${t.name}')" style="background:none; border:1px solid var(--info); color:var(--info); font-weight:700; cursor:pointer; padding:4px 8px; border-radius:4px;">Ledger</button></td></tr>`;
+        });
     }
-    async function loadAmcPackagesDirectory() {
-        const { data: packages } = await supabaseClient.from('service_packages').select('*').order('vehicle_category').order('base_rate');
-        const tbody = document.getElementById('servicePackagesTableBody'); tbody.innerHTML = '';
-        packages?.forEach(pkg => { tbody.innerHTML += `<tr><td><strong>${pkg.package_name}</strong></td><td>${pkg.vehicle_category}</td><td><strong>₹${pkg.base_rate}</strong></td><td style="text-align:center;"><button style="color:red; font-weight:bold; cursor:pointer; background:none; border:none;" onclick="dropServicePackageRecord('${pkg.id}')">×</button></td></tr>`; });
+
+    async function markAttendance(mechId) {
+        const { error } = await supabaseClient.from('mechanic_attendance').insert({ mech_id: mechId, date: new Date().toISOString().split('T')[0], status: 'Present' });
+        if(error) alert("Already marked present for today!"); else alert("Attendance Logged.");
     }
-    async function commitAdminPasswordOverride() {
-        const targetChan = document.getElementById('pTargetRole').value; const newPin = document.getElementById('pNewAdmin').value.trim();
-        if(newPin.length !== 4) return alert("Specify 4-digit string.");
-        await supabaseClient.from('system_credentials').upsert({ role_key: targetChan, pin_hash: newPin }); alert(`Updated: ${targetChan}`); document.getElementById('pNewAdmin').value = '';
+
+    async function cashOutMechanic(mechId, points) {
+        if(confirm(`Convert ${Math.floor(points)} points to ₹${Math.floor(points)} cash payout?`)) {
+            await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', mechId);
+            await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Mechanic Payout', stakeholder_id: mechId, amount: Math.floor(points), note: '5-Star Incentive Cash Out', recorded_by: activeSessionRole });
+            loadTechniciansDirectoryLedgers(); alert("Points converted! Added to today's Workshop Expenses.");
+        }
     }
+
+    async function downloadTechnicianLedgerStatement(techId, techName) {
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, closed_at, labour_charges, status, job_card_items(warehouse_type, total_price)').eq('mech_id', techId).eq('status', 'Closed');
+        let outputContentStr = `MY CARE ERP - TECHNICIAN LEDGER STATEMENT\nCrew Member: ${techName}\nExtracted: ${new Date().toISOString().split('T')[0]}\n------------------------------------------------\n\n`;
+        let calculatedLaborSubtotal = 0;
+        if(jobs && jobs.length > 0) { jobs.forEach(j => { let pkgLabor = 0; if(j.job_card_items) { j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); } const laborScalar = (parseFloat(j.labour_charges) || 0) + pkgLabor; calculatedLaborSubtotal += laborScalar; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : (j.jc_date || 'N/A'); outputContentStr += `Reference: JC-${j.id.split('-')[0].toUpperCase()} | Settled: ${d} | Net Labor: Rs.${laborScalar}\n`; }); outputContentStr += `\n------------------------------------------------\nTotal Labor Generated: Rs.${calculatedLaborSubtotal}\n`; } else { outputContentStr += "No closed historical labor items.\n"; }
+        const blobFile = new Blob([outputContentStr], { type: 'text/plain' }); const downloadElement = document.createElement('a'); downloadElement.href = URL.createObjectURL(blobFile); downloadElement.download = `Ledger_Statement_${techName.replace(/\s+/g,'_')}.txt`; downloadElement.click(); URL.revokeObjectURL(downloadElement.href);
+    }
+
+    async function upsertServicePackageRecord() { const pName = document.getElementById('amcPackageName').value; const pCat = document.getElementById('amcCategoryGroup').value; const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0; await supabaseClient.from('service_packages').upsert({ package_name: pName, vehicle_category: pCat, base_rate: pRate }); loadAmcPackagesDirectory(); }
+    async function loadAmcPackagesDirectory() { const { data: packages } = await supabaseClient.from('service_packages').select('*').order('vehicle_category').order('base_rate'); const tbody = document.getElementById('servicePackagesTableBody'); tbody.innerHTML = ''; packages?.forEach(pkg => { tbody.innerHTML += `<tr><td><strong>${pkg.package_name}</strong></td><td>${pkg.vehicle_category}</td><td><strong>₹${pkg.base_rate}</strong></td><td style="text-align:center;"></td></tr>`; }); }
+    async function commitAdminPasswordOverride() { const targetChan = document.getElementById('pTargetRole').value; const newPin = document.getElementById('pNewAdmin').value.trim(); if(newPin.length !== 4) return alert("Specify 4-digit string."); await supabaseClient.from('system_credentials').upsert({ role_key: targetChan, pin_hash: newPin }); alert(`Updated: ${targetChan}`); document.getElementById('pNewAdmin').value = ''; }
 </script>
 </body>
 </html>
