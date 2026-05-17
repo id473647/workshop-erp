@@ -13,7 +13,7 @@
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
         
         .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
         .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; }
@@ -21,12 +21,8 @@
         .view-panel { display: none; } .view-panel.active { display: block; }
 
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
-        
-        .btn-action { background: var(--info); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: opacity 0.15s; }
-        .btn-action:hover { opacity: 0.9; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
+        .btn-action { background: var(--info); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
 
         .summary-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .summary-box { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; text-align: center; }
@@ -51,62 +47,49 @@
         <div class="tabs-header">
             <button class="tab-btn active" onclick="switchTab('tabAnalytics')">New Customer Analytics</button>
             <button class="tab-btn" onclick="switchTab('tabPromos')">Promotional Lead Extraction</button>
+            <button class="tab-btn" onclick="switchTab('tabWallets')">Loyalty & Wallets Ledger</button>
         </div>
 
         <div id="tabAnalytics" class="view-panel active">
             <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Date Range Selector</label>
-                    <select id="dateRange" onchange="runNewCustomerReport()">
-                        <option value="today">Today</option>
-                        <option value="week">This Week (Last 7 Days)</option>
-                        <option value="month">This Month (Last 30 Days)</option>
-                        <option value="all">All Time History</option>
-                    </select>
-                </div>
+                <div class="field-group"><label>Date Range Selector</label><select id="dateRange" onchange="runNewCustomerReport()"><option value="today">Today</option><option value="week">This Week (Last 7 Days)</option><option value="month">This Month (Last 30 Days)</option><option value="all">All Time History</option></select></div>
                 <button class="btn-action" style="background:var(--primary);" onclick="runNewCustomerReport()">RUN REPORT</button>
             </div>
-
             <div class="summary-banner">
-                <div class="summary-box">
-                    <span class="summary-title">Total New Customers</span>
-                    <span class="summary-val" id="kpiTotal">0</span>
-                </div>
-                <div class="summary-box">
-                    <span class="summary-title">Day-1 AMC Sales</span>
-                    <span class="summary-val" id="kpiAmc" style="color:var(--success);">0</span>
-                </div>
-                <div class="summary-box">
-                    <span class="summary-title">AMC Conversion Rate</span>
-                    <span class="summary-val" id="kpiConv" style="color:var(--info);">0%</span>
-                </div>
+                <div class="summary-box"><span class="summary-title">Total New Customers</span><span class="summary-val" id="kpiTotal">0</span></div>
+                <div class="summary-box"><span class="summary-title">Day-1 AMC Sales</span><span class="summary-val" id="kpiAmc" style="color:var(--success);">0</span></div>
+                <div class="summary-box"><span class="summary-title">AMC Conversion Rate</span><span class="summary-val" id="kpiConv" style="color:var(--info);">0%</span></div>
             </div>
-
             <div class="table-wrapper">
-                <table>
-                    <thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC Purchased?</th></tr></thead>
-                    <tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Run a report to compile data.</td></tr></tbody>
-                </table>
+                <table><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC Purchased?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Scanning...</td></tr></tbody></table>
             </div>
         </div>
 
         <div id="tabPromos" class="view-panel">
             <div class="block-title">Bulk SMS & WhatsApp Marketing Extractors</div>
-            <p style="font-size:0.85rem; color:#64748b; line-height:1.4; margin-bottom:20px;">
-                These automated tools scan your entire database to find customers who own specific vehicle types but <strong>do not</strong> have an active AMC subscription. Download the CSV and upload it to your bulk SMS provider to run targeted retention campaigns.
-            </p>
-
+            <p style="font-size:0.85rem; color:#64748b; line-height:1.4; margin-bottom:20px;">These automated tools scan your database to find customers who own specific vehicle types but <strong>do not</strong> have an active AMC subscription. Download the CSV and upload it to your bulk SMS provider.</p>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                 <div style="border:1px solid #bae6fd; background:#f0f9ff; padding:20px; border-radius:8px; text-align:center;">
                     <h3 style="color:#0369a1; margin:0 0 10px 0;">Motorcycle Owners</h3>
-                    <p style="font-size:0.8rem; color:#0c4a6e; margin-bottom:16px;">Targets Splendor, Pulsar, Apache, and Bullet owners who have not locked in a Prepaid AMC.</p>
-                    <button class="btn-action" style="background:#0284c7; width:100%;" onclick="exportLeads('Motorcycle')">📥 DOWNLOAD MOTORCYCLE LEADS (CSV)</button>
+                    <p style="font-size:0.8rem; color:#0c4a6e; margin-bottom:16px;">Targets Splendor, Pulsar, Apache, and Bullet owners missing Prepaid AMC.</p>
+                    <button class="btn-action" style="background:#0284c7; width:100%;" onclick="exportLeads('Motorcycle')">📥 DOWNLOAD MOTORCYCLE LEADS</button>
                 </div>
-
                 <div style="border:1px solid #bbf7d0; background:#f0fdf4; padding:20px; border-radius:8px; text-align:center;">
                     <h3 style="color:#15803d; margin:0 0 10px 0;">Scooter Owners</h3>
-                    <p style="font-size:0.8rem; color:#166534; margin-bottom:16px;">Targets Activa, Jupiter, and Access owners missing from the "Panch Par Ek" Loyalty plan.</p>
-                    <button class="btn-action" style="background:#16a34a; width:100%;" onclick="exportLeads('Scooter')">📥 DOWNLOAD SCOOTER LEADS (CSV)</button>
+                    <p style="font-size:0.8rem; color:#166534; margin-bottom:16px;">Targets Activa, Jupiter, and Access owners missing Loyalty Plan.</p>
+                    <button class="btn-action" style="background:#16a34a; width:100%;" onclick="exportLeads('Scooter')">📥 DOWNLOAD SCOOTER LEADS</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="tabWallets" class="view-panel">
+            <div class="block-title">Master Digital Currency Liabilities</div>
+            <div class="summary-banner">
+                <div class="summary-box"><span class="summary-title">Customer Wallet Liability</span><span class="summary-val" id="repCustWallet" style="color:var(--info);">₹0</span></div>
+                <div class="summary-box"><span class="summary-title">Mechanic Points Pending</span><span class="summary-val" id="repMechWallet" style="color:var(--success);">0 Pts</span></div>
+            </div>
+            <div class="table-wrapper">
+                <table><thead><tr><th>Mobile Key</th><th>Customer Name</th><th>Wallet Balance</th><th>Referral Code</th></tr></thead><tbody id="walletTableBody"></tbody></table>
             </div>
         </div>
 
@@ -114,121 +97,58 @@
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-        event.target.classList.add('active');
-        document.getElementById(tabId).classList.add('active');
-    }
+    function switchTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active')); event.target.classList.add('active'); document.getElementById(tabId).classList.add('active'); if(tabId === 'tabWallets') loadWalletReport(); }
 
     async function runNewCustomerReport() {
-        const range = document.getElementById('dateRange').value;
-        const tbody = document.getElementById('analyticsTableBody');
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Scanning database...</td></tr>';
-
-        let startDate = new Date();
-        if(range === 'today') { startDate.setHours(0,0,0,0); }
-        else if(range === 'week') { startDate.setDate(startDate.getDate() - 7); }
-        else if(range === 'month') { startDate.setDate(startDate.getDate() - 30); }
-        else if(range === 'all') { startDate = new Date(2020, 0, 1); }
-
-        const isoStart = startDate.toISOString();
-
-        // 1. Fetch New Customers in range
-        const { data: newCusts } = await supabaseClient.from('customers').select('*').gte('created_at', isoStart).order('created_at', {ascending: false});
-        if(!newCusts || newCusts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No new customers registered in this timeframe.</td></tr>';
-            document.getElementById('kpiTotal').innerText = '0'; document.getElementById('kpiAmc').innerText = '0'; document.getElementById('kpiConv').innerText = '0%';
-            return;
-        }
+        const range = document.getElementById('dateRange').value; const tbody = document.getElementById('analyticsTableBody'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Scanning database...</td></tr>';
+        let startDate = new Date(); if(range === 'today') { startDate.setHours(0,0,0,0); } else if(range === 'week') { startDate.setDate(startDate.getDate() - 7); } else if(range === 'month') { startDate.setDate(startDate.getDate() - 30); } else if(range === 'all') { startDate = new Date(2020, 0, 1); }
+        
+        const { data: newCusts } = await supabaseClient.from('customers').select('*').gte('created_at', startDate.toISOString()).order('created_at', {ascending: false});
+        if(!newCusts || newCusts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No new customers registered in this timeframe.</td></tr>'; document.getElementById('kpiTotal').innerText = '0'; document.getElementById('kpiAmc').innerText = '0'; document.getElementById('kpiConv').innerText = '0%'; return; }
 
         const phoneList = newCusts.map(c => c.mobile_number);
-
-        // 2. Fetch their vehicles
         const { data: vehicles } = await supabaseClient.from('vehicles').select('customer_mobile, category_group').in('customer_mobile', phoneList);
-
-        // 3. Fetch AMCs bought on their FIRST day
         const { data: amcs } = await supabaseClient.from('amc_subscriptions').select('customer_mobile, created_at').in('customer_mobile', phoneList);
 
-        let amcCount = 0;
-        tbody.innerHTML = '';
-
+        let amcCount = 0; tbody.innerHTML = '';
         newCusts.forEach(cust => {
-            const custDate = new Date(cust.created_at);
-            const myVeh = (vehicles || []).find(v => v.customer_mobile === cust.mobile_number);
-            const vehType = myVeh ? myVeh.category_group : 'Unknown';
-            
-            // Did they buy an AMC on the same day they were registered?
-            const myAmc = (amcs || []).find(a => {
-                if(a.customer_mobile !== cust.mobile_number) return false;
-                const amcDate = new Date(a.created_at);
-                const diffTime = Math.abs(amcDate - custDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                return diffDays <= 1; // Bought within 24 hours of profile creation
-            });
-
+            const custDate = new Date(cust.created_at); const myVeh = (vehicles || []).find(v => v.customer_mobile === cust.mobile_number); const vehType = myVeh ? myVeh.category_group : 'Unknown';
+            const myAmc = (amcs || []).find(a => { if(a.customer_mobile !== cust.mobile_number) return false; const diffDays = Math.ceil(Math.abs(new Date(a.created_at) - custDate) / (1000 * 60 * 60 * 24)); return diffDays <= 1; });
             if(myAmc) amcCount++;
-
-            tbody.innerHTML += `<tr>
-                <td>${custDate.toLocaleDateString('en-IN')}</td>
-                <td><strong>${cust.mobile_number}</strong></td>
-                <td>${cust.name}</td>
-                <td>${vehType}</td>
-                <td>${myAmc ? '<span style="color:var(--success); font-weight:bold;">YES</span>' : '<span style="color:#94a3b8;">No</span>'}</td>
-            </tr>`;
+            tbody.innerHTML += `<tr><td>${custDate.toLocaleDateString('en-IN')}</td><td><strong>${cust.mobile_number}</strong></td><td>${cust.name}</td><td>${vehType}</td><td>${myAmc ? '<span style="color:var(--success); font-weight:bold;">YES</span>' : '<span style="color:#94a3b8;">No</span>'}</td></tr>`;
         });
 
-        const convRate = ((amcCount / newCusts.length) * 100).toFixed(1);
-        document.getElementById('kpiTotal').innerText = newCusts.length;
-        document.getElementById('kpiAmc').innerText = amcCount;
-        document.getElementById('kpiConv').innerText = `${convRate}%`;
+        document.getElementById('kpiTotal').innerText = newCusts.length; document.getElementById('kpiAmc').innerText = amcCount; document.getElementById('kpiConv').innerText = `${((amcCount / newCusts.length) * 100).toFixed(1)}%`;
     }
 
     async function exportLeads(targetType) {
-        // 1. Get all active AMCs
         const { data: activeSubs } = await supabaseClient.from('amc_subscriptions').select('customer_mobile').gt('expires_at', new Date().toISOString());
         const activeMobiles = (activeSubs || []).map(s => s.customer_mobile);
-
-        // 2. Get all vehicles
         const { data: allVehicles } = await supabaseClient.from('vehicles').select('customer_mobile, make_model, category_group');
         
         let leadMap = {}; 
-        (allVehicles || []).forEach(v => {
-            const isScooter = (v.category_group || '').toLowerCase().includes('scooterate');
-            const qualifies = targetType === 'Scooter' ? isScooter : !isScooter;
+        (allVehicles || []).forEach(v => { const isScooter = (v.category_group || '').toLowerCase().includes('scooterate'); const qualifies = targetType === 'Scooter' ? isScooter : !isScooter; if(qualifies && v.customer_mobile && !activeMobiles.includes(v.customer_mobile)) { leadMap[v.customer_mobile] = v.make_model; } });
 
-            // If they match target and DON'T have an AMC
-            if(qualifies && v.customer_mobile && !activeMobiles.includes(v.customer_mobile)) {
-                leadMap[v.customer_mobile] = v.make_model;
-            }
-        });
-
-        const targetPhones = Object.keys(leadMap);
-        if(targetPhones.length === 0) return alert(`No ${targetType} leads found without an active AMC.`);
-
-        // 3. Get Names for those leads
+        const targetPhones = Object.keys(leadMap); if(targetPhones.length === 0) return alert(`No ${targetType} leads found without an active AMC.`);
         const { data: targetClients } = await supabaseClient.from('customers').select('mobile_number, name').in('mobile_number', targetPhones);
         
-        // 4. Build CSV
         let csvContent = "data:text/csv;charset=utf-8,Name,Mobile,Primary Vehicle\n";
-        (targetClients || []).forEach(c => {
-            csvContent += `"${c.name}","${c.mobile_number}","${leadMap[c.mobile_number]}"\n`;
-        });
-
-        // 5. Download
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Promo_Leads_${targetType}_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click(); document.body.removeChild(link);
+        (targetClients || []).forEach(c => { csvContent += `"${c.name}","${c.mobile_number}","${leadMap[c.mobile_number]}"\n`; });
+        const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `Promo_Leads_${targetType}_${new Date().toISOString().split('T')[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
-    // Auto-run on load
+    async function loadWalletReport() {
+        const { data: custs } = await supabaseClient.from('customers').select('mobile_number, name, loyalty_points, referral_code').gt('loyalty_points', 0).order('loyalty_points', {ascending: false});
+        const { data: mechs } = await supabaseClient.from('mechanics').select('earned_points').gt('earned_points', 0);
+        let cSum = 0; let mSum = 0; const tbody = document.getElementById('walletTableBody'); tbody.innerHTML = '';
+        (custs || []).forEach(c => { cSum += parseFloat(c.loyalty_points) || 0; tbody.innerHTML += `<tr><td>${c.mobile_number}</td><td>${c.name}</td><td><strong>₹${Math.floor(c.loyalty_points)}</strong></td><td>${c.referral_code || 'N/A'}</td></tr>`; });
+        (mechs || []).forEach(m => { mSum += parseFloat(m.earned_points) || 0; });
+        document.getElementById('repCustWallet').innerText = `₹${Math.floor(cSum)}`; document.getElementById('repMechWallet').innerText = `${Math.floor(mSum)} Pts`;
+    }
+
     runNewCustomerReport();
 </script>
 </body>
