@@ -142,14 +142,13 @@
         const r = parseInt(document.getElementById('revRating').value); if(r === 0) return alert("Please provide a star rating.");
         await supabaseClient.from('job_cards').update({ review_rating: r, is_reviewed: true, review_mech_feedback: document.getElementById('revMech').value, review_spares_feedback: document.getElementById('revSpares').value, review_lube_feedback: document.getElementById('revLube').value, review_advice: document.getElementById('revAdvice').value }).eq('id', pendingReviewJobId);
         
-        // --- 10% MECHANIC INCENTIVE ENGINE W/ LOCKOUT ---
         const { data: jc } = await supabaseClient.from('job_cards').select('mech_id, labour_charges, job_card_items(warehouse_type, total_price)').eq('id', pendingReviewJobId).single();
         if (jc && jc.mech_id) {
             const today = new Date(); const day = today.getDay() || 7; if (day !== 1) today.setHours(-24 * (day - 1)); today.setHours(0,0,0,0); const startOfWeek = today.toISOString();
             const { count: negativeCount } = await supabaseClient.from('job_cards').select('*', { count: 'exact', head: true }).eq('mech_id', jc.mech_id).eq('is_reviewed', true).lt('review_rating', 3).gte('closed_at', startOfWeek);
             let pkgLabor = 0; if(jc.job_card_items) { jc.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
             const totalLaborForJob = (parseFloat(jc.labour_charges) || 0) + pkgLabor;
-            const dynamicPointsReward = totalLaborForJob * 0.10; // 10% of labor
+            const dynamicPointsReward = totalLaborForJob * 0.10;
 
             if (r === 5 && negativeCount <= 2) {
                 const { data: mech } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.mech_id).single();
