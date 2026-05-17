@@ -7,13 +7,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        /* ... [Keep all your existing CSS from the previous prompt here. It is perfectly formatted.] ... */
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
+        
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
         .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         
         .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -57,6 +58,7 @@
 
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+        
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -69,6 +71,7 @@
         .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; }
         .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; }
         .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
+        
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; }
         .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
     </style>
@@ -105,7 +108,7 @@
             <select id="activeVoucherSelect" style="flex:1; padding:10px; border-radius:6px; border:1px solid #34d399; font-weight:bold;" onchange="compileDynamicSums()">
                 <option value="">-- Do Not Apply Voucher --</option>
             </select>
-            <span style="font-size:0.75rem; color:#065f46;">*Applying a voucher automatically waives fixed service labor costs for the customer, but tracks value for mechanic payouts.</span>
+            <span style="font-size:0.75rem; color:#065f46;">*Applying a voucher waives fixed service labor costs for the customer automatically.</span>
         </div>
     </div>
 
@@ -213,6 +216,9 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <span>Total Spares & Lube:</span><strong id="thPartsSum">₹0</strong>
             </div>
+            <div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow">
+                <span>Auto Spares Discount (AMC):</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong>
+            </div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <span>Total Mechanical Labor:</span><strong id="thLaborSum">₹0</strong>
             </div>
@@ -238,11 +244,9 @@
             <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">
                 Amount in words:<br><strong id="thWords">--</strong>
             </div>
-            
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
                 Settlement Route: <span id="thMode">--</span>
             </div>
-            
             <div class="receipt-footer">
                 Computer Generated Document.<br>Drive Safe. Thank You.
             </div>
@@ -270,8 +274,11 @@
     let activeCustomerName = 'Walk-in';
     let partsGrossTotal = 0;
     let servicePkgGrossTotal = 0;
+    
+    // Core AMC Variables
     let activeVoucherWaiverValue = 0;
-    let appliedProtocolNamesForTracking = []; // Needed to track Scheme A increments
+    let activeGlobalDiscountPercent = 0; 
+    let appliedProtocolNamesForTracking = []; 
 
     function convertNumberToWords(amount) {
         const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
@@ -317,10 +324,14 @@
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
             if (job.customer_mobile) {
-                const { data: custData } = await supabaseClient.from('customers').select('name').eq('mobile_number', job.customer_mobile).single();
-                if (custData) activeCustomerName = custData.name;
+                const { data: custData } = await supabaseClient.from('customers')
+                    .select('name, global_discount_coupon').eq('mobile_number', job.customer_mobile).single();
                 
-                // Fetch Active AMC Vouchers for Redemption
+                if (custData) {
+                    activeCustomerName = custData.name;
+                    activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0;
+                }
+                
                 const { data: vouchers } = await supabaseClient.from('amc_vouchers')
                     .select('*').eq('customer_mobile', job.customer_mobile).eq('is_redeemed', false).gt('expires_at', new Date().toISOString());
                 
@@ -328,8 +339,8 @@
                     const sel = document.getElementById('activeVoucherSelect');
                     let hasMatch = false;
                     vouchers.forEach(v => {
-                        // If it's a prepaid voucher, it must match the specific vehicle
                         if(v.voucher_type === 'PREPAID_PREMIUM' && v.vehicle_id !== job.vehicle_id) return;
+                        if(v.voucher_type === 'ENGINE_FREE' && v.vehicle_id !== job.vehicle_id) return;
                         hasMatch = true;
                         sel.innerHTML += `<option value="${v.id}">${v.voucher_type.replace('_', ' ')} [Exp: ${new Date(v.expires_at).toLocaleDateString()}]</option>`;
                     });
@@ -379,7 +390,6 @@
 
         lineItemsLocalMemory.forEach((line, idx) => {
             const dropAuth = sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase();
-            
             let evaluatedLineTotal = parseFloat(line.total_price);
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
 
@@ -413,7 +423,6 @@
         compileDynamicSums();
     }
 
-    // ... [Catalog Autocomplete Functions Remain Identical] ...
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
     function queryCatalogAutocomplete(inputRef) {
         const searchVal = inputRef.value.trim().toLowerCase(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
@@ -448,12 +457,17 @@
             if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet;
         });
+
+        // 1. Calculate Scheme B Spares Auto-Discount
+        let autoPartsDiscountValue = 0;
+        if(activeGlobalDiscountPercent > 0) {
+            autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100);
+        }
         
-        // --- AMC Voucher Waiver Logic ---
+        // 2. Handle Labor Voucher Waiver
         activeVoucherWaiverValue = 0;
         const vDrop = document.getElementById('activeVoucherSelect');
         if(vDrop && vDrop.value !== "") {
-            // Waive the Fixed Service Cost completely if a voucher is applied
             activeVoucherWaiverValue = servicePkgGrossTotal;
         }
 
@@ -462,8 +476,8 @@
         const d = parseFloat(document.getElementById('vFlatDisc').value) || 0; 
         const a = parseFloat(document.getElementById('vAdvance').value) || 0;
 
-        // Apply waiver to the Net
-        const netBeforeAdv = (partsGrossTotal + servicePkgGrossTotal + l + t) - d - activeVoucherWaiverValue;
+        // Apply BOTH the parts discount and the labor waiver to the final net
+        const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + l + t - d - activeVoucherWaiverValue;
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a);
     }
 
@@ -485,15 +499,12 @@
         if(!error) {
             if(statusTarget === 'Closed') {
                 
-                // Handle AMC Voucher Redemption AND Scheme A Tracking Triggers
+                // --- SCHEME A & B: VOUCHER REDEMPTION & LOYALTY TRACKING ---
                 if(activeJobContext.customer_mobile) {
                     const vDrop = document.getElementById('activeVoucherSelect');
-                    
                     if(vDrop && vDrop.value !== "") {
-                        // Redeem the active voucher
                         await supabaseClient.from('amc_vouchers').update({ is_redeemed: true, redeemed_on: new Date().toISOString() }).eq('id', vDrop.value);
                     } else {
-                        // Check if they are on "Panch Par Ek" and just did a Premium/Jumbo without a voucher
                         const isQualifyingService = appliedProtocolNamesForTracking.some(p => p.includes("Premium") || p.includes("Jumbo"));
                         if(isQualifyingService) {
                             const { data: subs } = await supabaseClient.from('amc_subscriptions')
@@ -503,8 +514,6 @@
                                 const sub = subs[0];
                                 const newCount = (sub.services_logged || 0) + 1;
                                 await supabaseClient.from('amc_subscriptions').update({ services_logged: newCount }).eq('id', sub.id);
-                                
-                                // Generate Free Reward if hit 5
                                 if(newCount === 5) {
                                     const code = `AMC-FREE-${sub.id.substring(0,4).toUpperCase()}`;
                                     await supabaseClient.from('amc_vouchers').insert({
@@ -515,6 +524,46 @@
                                 }
                             }
                         }
+                    }
+                }
+
+                // --- SCHEME C: FULL ENGINE RESTORATION CALENDAR GENERATOR ---
+                const isEngineRestored = appliedProtocolNamesForTracking.some(p => p === 'Full Engine Restoration');
+                if (isEngineRestored) {
+                    const mobile = activeJobContext.customer_mobile; const vehId = activeJobContext.vehicle_id;
+                    function addDaysSkipSunday(startDate, daysToAdd) {
+                        let date = new Date(startDate); date.setDate(date.getDate() + daysToAdd);
+                        if (date.getDay() === 0) date.setDate(date.getDate() + 1); // Skip Sunday
+                        return date;
+                    }
+                    const d0 = new Date();
+                    const d1 = addDaysSkipSunday(d0, 21);
+                    const d2 = addDaysSkipSunday(d1, 40);
+                    const d3 = addDaysSkipSunday(d2, 76);
+                    const d4 = addDaysSkipSunday(d3, 76);
+                    const d5 = addDaysSkipSunday(d4, 76);
+                    const d6 = addDaysSkipSunday(d5, 76);
+
+                    const schedule = [
+                        { exp: d1, type: 'ENGINE_FREE' }, { exp: d2, type: 'ENGINE_FREE' }, { exp: d3, type: 'ENGINE_PAID' }, 
+                        { exp: d4, type: 'ENGINE_FREE' }, { exp: d5, type: 'ENGINE_PAID' }, { exp: d6, type: 'ENGINE_FREE' }
+                    ];
+
+                    const { data: engSub } = await supabaseClient.from('amc_subscriptions').insert({
+                        customer_mobile: mobile, vehicle_id: vehId, plan_type: 'Engine Restoration', amount_paid: 0, expires_at: d6.toISOString(), services_logged: 0
+                    }).select().single();
+
+                    if (engSub) {
+                        const engPromises = schedule.map((svc, index) => {
+                            return supabaseClient.from('amc_vouchers').insert({
+                                subscription_id: engSub.id, customer_mobile: mobile, vehicle_id: vehId, 
+                                voucher_code: `ENG-${engSub.id.substring(0,4).toUpperCase()}-S${index+1}`,
+                                voucher_type: svc.type, valid_from: new Date(), expires_at: svc.exp, 
+                                mechanic_payout_eligible: svc.type === 'ENGINE_PAID' 
+                            });
+                        });
+                        await Promise.all(engPromises);
+                        alert(`Engine Guarantee Activated! 6 scheduled service tracking vouchers generated successfully.`);
                     }
                 }
 
@@ -573,6 +622,17 @@
         }
 
         document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`;
+        
+        // AMC 5% Parts Discount Render
+        let autoPartsDiscountValue = 0;
+        if(activeGlobalDiscountPercent > 0) {
+            autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100);
+            document.getElementById('thPartsDiscRow').style.display = 'flex';
+            document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`;
+        } else {
+            document.getElementById('thPartsDiscRow').style.display = 'none';
+        }
+
         document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`;
         
         const dLathe = document.getElementById('rowLatheSum');
