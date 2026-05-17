@@ -33,7 +33,10 @@
         .autocomplete-container { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 50; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: none; }
         .autocomplete-item { padding: 10px 12px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
         .item-add-trigger { background: #fef3c7; color: #b45309; text-align: center; font-weight: 700; }
-        .tier-tag { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 6px; background: #e2e8f0; color: #475569; }
+        
+        /* Tactic 1 Sales Banner CSS */
+        .sales-pitch-banner { display: none; padding: 14px 20px; font-weight: bold; text-align: center; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; animation: pulseBanner 2s infinite; }
+        @keyframes pulseBanner { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
     </style>
 </head>
 <body>
@@ -45,6 +48,8 @@
 </nav>
 
 <div class="wrapper">
+    <div id="salesPitch" class="sales-pitch-banner"></div>
+
     <div class="container">
         <div id="step1" class="active-step">
             <div class="block-title">Customer Account Verification</div>
@@ -151,11 +156,15 @@
     }
 
     let evaluatedPhoneContext = null; let targetCustomerProfile = null; let activeVehId = null; let globalVehicleDirectory = []; let isCustomChassisMode = false;
+    let hasActiveSubscription = false;
 
     function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
 
     async function processAutonomousPhoneSearch(phoneStringVal) {
         const cleanStr = phoneStringVal.trim();
+        const pitchBanner = document.getElementById('salesPitch');
+        pitchBanner.style.display = 'none'; hasActiveSubscription = false;
+
         if(cleanStr.length !== 10) {
             document.getElementById('verifiedProfileContainer').style.display = 'none';
             document.getElementById('unmappedProfileSetup').style.display = 'none';
@@ -176,8 +185,17 @@
             else if(posList?.length) wrapper.innerHTML = '<span class="c-tag tag-cash">(a) Cash Customer</span>';
             document.getElementById('verifiedProfileContainer').style.display = 'block';
             prefetchVehicleMasterCatalog();
+
+            // Check if they already have an AMC to suppress pitches
+            const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', evaluatedPhoneContext).gt('expires_at', new Date().toISOString());
+            if(subs && subs.length > 0) hasActiveSubscription = true;
+
         } else {
             document.getElementById('unmappedProfileSetup').style.display = 'block';
+            // TACTIC 1: Pitch "5-for-1" to New Customers
+            pitchBanner.innerHTML = `🌟 <b>NEW CUSTOMER DETECTED:</b> Pitch the "Panch Par Ek" (5-for-1) Loyalty Program for just Rs.10!`;
+            pitchBanner.style.background = '#fef3c7'; pitchBanner.style.color = '#b45309'; pitchBanner.style.border = '1px solid #fde68a';
+            pitchBanner.style.display = 'block';
         }
     }
 
@@ -192,11 +210,9 @@
         }).select().single();
 
         if(cData) {
-            targetCustomerProfile = cData;
-            document.getElementById('dispVerifiedName').innerText = compiledName;
+            targetCustomerProfile = cData; document.getElementById('dispVerifiedName').innerText = compiledName;
             document.getElementById('clientClassificationWrapper').innerHTML = '<span class="c-tag tag-work">Newly Registered</span>';
-            document.getElementById('unmappedProfileSetup').style.display = 'none';
-            document.getElementById('verifiedProfileContainer').style.display = 'block';
+            document.getElementById('unmappedProfileSetup').style.display = 'none'; document.getElementById('verifiedProfileContainer').style.display = 'block';
             prefetchVehicleMasterCatalog(); initializeStep3();
         }
     }
@@ -210,12 +226,8 @@
         const container = document.getElementById('modelAutocompleteList'); container.innerHTML = '';
         if(searchString.length < 2) { container.style.display = 'none'; return; }
         const filtered = globalVehicleDirectory.filter(v => v.model_name.includes(searchString) || v.brand.includes(searchString)).slice(0, 8);
-        
-        if(filtered.length > 0) {
-            filtered.forEach(v => { container.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><span><strong>${v.model_name}</strong></span></div>`; });
-        }
-        container.innerHTML += `<div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${searchString.replace(/'/g,"\\'")}')">+ Model Variant Absent: Define Target Category</div>`;
-        container.style.display = 'block';
+        if(filtered.length > 0) { filtered.forEach(v => { container.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedVehicleCatalog('${v.brand.replace(/'/g,"\\'")}', '${v.model_name.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><span><strong>${v.model_name}</strong></span></div>`; }); }
+        container.innerHTML += `<div class="autocomplete-item item-add-trigger" onmousedown="enableCustomChassisIngestion('${searchString.replace(/'/g,"\\'")}')">+ Model Variant Absent: Define Target Category</div>`; container.style.display = 'block';
     }
 
     function applySelectedVehicleCatalog(brandStr, modelStr, catGroupStr) {
@@ -226,87 +238,73 @@
 
     function enableCustomChassisIngestion(rawModelInput) {
         document.getElementById('vSearchInput').value = rawModelInput; document.getElementById('vBrand').readOnly = false;
-        document.getElementById('customCategorySubForm').style.display = 'block'; document.getElementById('modelAutocompleteList').style.display = 'none';
-        isCustomChassisMode = true;
+        document.getElementById('customCategorySubForm').style.display = 'block'; document.getElementById('modelAutocompleteList').style.display = 'none'; isCustomChassisMode = true;
     }
 
     async function initializeStep3() {
         document.getElementById('step1').classList.remove('active-step'); document.getElementById('step3').classList.add('active-step');
         document.getElementById('headerClientMeta').innerText = `Owner: ${targetCustomerProfile.name}`;
-        
         const { data: fleet } = await supabaseClient.from('vehicles').select('*').eq('customer_mobile', evaluatedPhoneContext);
         const grid = document.getElementById('vehicleGrid'); grid.innerHTML = '';
-        if(fleet && fleet.length > 0) {
-            fleet.forEach(v => { grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><b>${v.reg_number}</b><small>${v.make_model} (${v.color||''})</small></div>`; });
-        } else { toggleNewVehicleForm(); }
+        if(fleet && fleet.length > 0) { fleet.forEach(v => { grid.innerHTML += `<div class="veh-rect" onclick="stageTargetVehicle('${v.id}', '${v.reg_number}', '${v.make_model.replace(/'/g,"\\'")}', '${(v.category_group||'').replace(/'/g,"\\'")}')"><b>${v.reg_number}</b><small>${v.make_model} (${v.color||''})</small></div>`; }); } 
+        else { toggleNewVehicleForm(); }
     }
 
     function toggleNewVehicleForm() { document.getElementById('newVehicleForm').style.display = 'block'; }
 
     async function executeVehicleLink() {
-        const regPlate = document.getElementById('vNumber').value.trim();
-        const modelVariant = document.getElementById('vSearchInput').value.trim();
-        let catStr = document.getElementById('vHiddenCategory').value;
-        if(isCustomChassisMode) {
-            catStr = document.getElementById('vCustomCategorySelect').value;
-            supabaseClient.from('vehicle_master').insert({ brand: document.getElementById('vBrand').value.toUpperCase(), model_name: modelVariant.toUpperCase(), category_group: catStr }).then();
-        }
-        const { data: v } = await supabaseClient.from('vehicles').insert({
-            customer_mobile: evaluatedPhoneContext, brand: document.getElementById('vBrand').value.toUpperCase(), make_model: modelVariant.toUpperCase(), reg_number: regPlate.toUpperCase(), color: document.getElementById('vColor').value.toUpperCase(), category_group: catStr
-        }).select().single();
+        const regPlate = document.getElementById('vNumber').value.trim(); const modelVariant = document.getElementById('vSearchInput').value.trim(); let catStr = document.getElementById('vHiddenCategory').value;
+        if(isCustomChassisMode) { catStr = document.getElementById('vCustomCategorySelect').value; supabaseClient.from('vehicle_master').insert({ brand: document.getElementById('vBrand').value.toUpperCase(), model_name: modelVariant.toUpperCase(), category_group: catStr }).then(); }
+        const { data: v } = await supabaseClient.from('vehicles').insert({ customer_mobile: evaluatedPhoneContext, brand: document.getElementById('vBrand').value.toUpperCase(), make_model: modelVariant.toUpperCase(), reg_number: regPlate.toUpperCase(), color: document.getElementById('vColor').value.toUpperCase(), category_group: catStr }).select().single();
         if(v) stageTargetVehicle(v.id, v.reg_number, v.make_model, v.category_group);
     }
 
     async function stageTargetVehicle(id, reg, model, catGroup) {
-        activeVehId = id; document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`;
-        document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
+        activeVehId = id; document.getElementById('step3').classList.remove('active-step'); document.getElementById('step4').classList.add('active-step');
         
-        const selProtocol = document.getElementById('serviceProtocolSelect');
-        selProtocol.innerHTML = '<option value="" data-rate="0">-- Standard / Custom Scope --</option>';
-        if(catGroup) {
-            const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true });
-            if(pkgs && pkgs.length > 0) {
-                pkgs.forEach(p => { selProtocol.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; });
-            }
+        // --- TACTIC 1: MOTORCYCLE PITCH & STATUS CHECK ---
+        const pitchBanner = document.getElementById('salesPitch');
+        if(!hasActiveSubscription && catGroup && !catGroup.includes('Scooterate')) {
+            pitchBanner.innerHTML = `🏍️ <b>MOTORCYCLE DETECTED:</b> Pitch the "Prepaid AMC" to lock in their next 4 services with a 5% spares discount!`;
+            pitchBanner.style.background = '#e0f2fe'; pitchBanner.style.color = '#0369a1'; pitchBanner.style.border = '1px solid #bae6fd';
+            pitchBanner.style.display = 'block';
+        } else if (hasActiveSubscription) {
+            pitchBanner.style.display = 'none'; // Hide pitches if already subscribed
         }
 
-        if(activeRole !== 'green' && activeRole !== 'moped') {
-            const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
-            const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>';
-            m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`);
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('*').eq('customer_mobile', evaluatedPhoneContext).gt('expires_at', new Date().toISOString());
+        let alertMsg = '';
+        if(subs && subs.length > 0) {
+            subs.forEach(sub => {
+                if(sub.plan_type === 'Panch Par Ek') { alertMsg += `★ LOYALTY PROGRAM ACTIVE: Customer has completed ${sub.services_logged || 0}/5 qualifying services.<br>`; } 
+                else if (sub.plan_type === 'Prepaid AMC' && sub.vehicle_id === activeVehId) { alertMsg += `💳 PREPAID AMC ACTIVE: This vehicle has prepaid services available.<br>`; }
+                else if (sub.plan_type === 'Engine Restoration' && sub.vehicle_id === activeVehId) { alertMsg += `⚙️ ENGINE GUARANTEE ACTIVE: Check schedule timeline.<br>`; }
+            });
         }
+        
+        if(alertMsg) { document.getElementById('activeTargetBadge').innerHTML = `${reg} (${model})<div style="margin-top:10px; font-size:0.85rem; color:#b45309; background:#fef3c7; padding:8px; border-radius:6px; text-align:left;">${alertMsg}</div>`; } 
+        else { document.getElementById('activeTargetBadge').innerText = `${reg} (${model})`; }
+
+        // Load Protocols
+        const selProtocol = document.getElementById('serviceProtocolSelect'); selProtocol.innerHTML = '<option value="" data-rate="0">-- Standard / Custom Scope --</option>';
+        if(catGroup) { const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true }); if(pkgs && pkgs.length > 0) { pkgs.forEach(p => { selProtocol.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; }); } }
+        if(activeRole !== 'green' && activeRole !== 'moped') { const { data: m } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name'); const sel = document.getElementById('mechSelect'); sel.innerHTML = '<option value="">-- Direct Technician Assignment --</option>'; m?.forEach(t => sel.innerHTML += `<option value="${t.id}">${t.name}</option>`); }
     }
 
     function applyServiceProtocolRate() {
-        const sel = document.getElementById('serviceProtocolSelect');
-        const rate = sel.options[sel.selectedIndex].getAttribute('data-rate');
-        if(rate > 0) {
-            document.getElementById('estimate').value = rate;
-            // Removed text-appending hack to keep the Problem field clean!
-        }
+        const sel = document.getElementById('serviceProtocolSelect'); const rate = sel.options[sel.selectedIndex].getAttribute('data-rate');
+        if(rate > 0) document.getElementById('estimate').value = rate;
     }
 
     async function finalizeJobCardCreation() {
         const mechIdValue = (activeRole === 'green' || activeRole === 'moped') ? null : (document.getElementById('mechSelect').value || null);
-        
-        // 1. Create the Job Card Record
         const { data: newJc } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue,
-            problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
-            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
+            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue, problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open'
         }).select().single();
 
         if(newJc) {
-            // 2. Automatically inject the Fixed Protocol as a true database 'Service' line item
-            const selProtocol = document.getElementById('serviceProtocolSelect');
-            const pkgName = selProtocol.value;
-            const pkgRate = parseFloat(selProtocol.options[selProtocol.selectedIndex].getAttribute('data-rate')) || 0;
-
-            if (pkgName && pkgRate > 0) {
-                await supabaseClient.from('job_card_items').insert({
-                    job_card_id: newJc.id, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate
-                });
-            }
+            const selProtocol = document.getElementById('serviceProtocolSelect'); const pkgName = selProtocol.value; const pkgRate = parseFloat(selProtocol.options[selProtocol.selectedIndex].getAttribute('data-rate')) || 0;
+            if (pkgName && pkgRate > 0) { await supabaseClient.from('job_card_items').insert({ job_card_id: newJc.id, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate }); }
             window.location.href = 'index.html';
         }
     }
