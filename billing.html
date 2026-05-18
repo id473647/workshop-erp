@@ -126,13 +126,15 @@
             <h4 style="margin:0 0 16px 0; color:var(--primary);">Overarching Service Scope</h4>
             <div class="inputs-grid">
                 <div class="field-group"><label>Variable Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" oninput="compileDynamicSums()"></div>
+                
                 <div class="field-group">
-    <label>Lathe & External Work (₹)</label>
-    <div style="display:flex; gap:8px;">
-        <input type="number" id="vLathe" value="0" style="width:35%;" oninput="compileDynamicSums()">
-        <input type="text" id="vLatheNotes" placeholder="Breakdown: WELDING 100, DRILL 50" style="width:65%;" oninput="this.value=this.value.toUpperCase()">
-    </div>
-</div>
+                    <label>Lathe & External Work (₹)</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="number" id="vLathe" value="0" style="width:35%;" oninput="compileDynamicSums()">
+                        <input type="text" id="vLatheNotes" placeholder="Breakdown: WELDING 100, DRILL 50" style="width:65%;" oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                </div>
+
                 <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label id="lblAdvance">Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;">
@@ -224,7 +226,12 @@
         const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', targetJobId).single();
         if(job) {
             activeJobContext = job; document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`; document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`; document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
-            document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
+            
+            // LOAD SAVED VALUES
+            document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; 
+            document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; 
+            document.getElementById('vLatheNotes').value = job.external_work_notes || ''; // NEW LATHE NOTES CHECK
+            document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
 
@@ -291,6 +298,7 @@
 
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
     
+    // SMART TOKEN SEARCH IMPLEMENTED HERE
     function queryCatalogAutocomplete(inputRef) {
         const searchVal = inputRef.value.trim().toLowerCase(); 
         const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
@@ -316,6 +324,7 @@
     function hideAutocomplete() { setTimeout(() => { document.getElementById('autolist-n').style.display = 'none'; }, 200); }
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate) { document.getElementById('nPart').value = nameStr; document.getElementById('nBrand').value = brandStr; document.getElementById('nRate').value = defaultRate; document.getElementById('autolist-n').style.display = 'none'; }
     
+    // ALL CAPS FORCING IMPLEMENTED HERE
     async function pushItemToJobCard() {
         const partStr = document.getElementById('nPart').value.trim(); 
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
@@ -359,9 +368,19 @@
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - pUsed);
     }
 
+    // SAVING LATHE NOTES INCORPORATED HERE
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
-        const updates = { total_invoice_value: netVal, labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, payment_mode: modeTarget, status: statusTarget, closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null };
+        const updates = { 
+            total_invoice_value: netVal, 
+            labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
+            lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, 
+            external_work_notes: document.getElementById('vLatheNotes').value.trim(),
+            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
+            payment_mode: modeTarget, 
+            status: statusTarget, 
+            closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null 
+        };
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
         if(!error) {
