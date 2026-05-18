@@ -101,8 +101,8 @@
             <div class="inputs-grid"><div class="field-group"><label>Customer Mobile</label><input type="tel" id="cAmcMobile" placeholder="10 Digits" maxlength="10" oninput="prefetchClientContextForAmc(this.value)"></div><div class="field-group"><label>Verified Client</label><input type="text" id="cAmcName" readonly style="background:#f1f5f9;" placeholder="..."></div></div>
             <div id="amcConfigBlock" style="display:none; margin-top:12px; border-top:1px dashed #fcd34d; padding-top:12px;">
                 <div class="inputs-grid">
-                    <div class="field-group"><label>Contract Type</label><select id="amcTypeSelect" onchange="toggleAmcInputs()"><option value="LOYALTY">Panch par ek Free (Fleet Loyalty)</option><option value="PREPAID">Prepaid AMC (4x Premium Services)</option></select></div>
-                    <div class="field-group" id="amcPriceBlock"><label>Collection Amount (₹)</label><input type="number" id="amcPrice" value="10" min="10"></div>
+                    <div class="field-group"><label>Contract Type</label><select id="amcTypeSelect" onchange="toggleAmcInputs()"><option value="LOYALTY">Panch par ek Free (Fleet Loyalty)</option><option value="PREPAID">Prepaid AMC (4x Premium Services)</option><option value="ENGINE">Engine Warranty Contract</option></select></div>
+                    <div class="field-group" id="amcPriceBlock"><label>Collection Amount (₹)</label><input type="number" id="amcPrice" value="10" min="0"></div>
                     <div class="field-group" id="amcVehBlock" style="display:none;"><label>Lock to Specific Chassis</label><select id="amcVehicleSelect"></select></div>
                 </div>
                 <button class="btn-action" style="background:#f59e0b;" onclick="commitAmcSale()">AUTHORIZE AMC SUBSCRIPTION & COLLECT FUNDS</button>
@@ -123,8 +123,8 @@
             <p style="font-size:0.8rem; color:var(--danger); margin-bottom:16px;">*Mobile number cannot be edited as it securely links to all historical job cards and AMC subscriptions.</p>
             <div class="inputs-grid">
                 <div class="field-group"><label>Mobile Number (Read-Only)</label><input type="text" id="ecMobile" readonly style="background:#f1f5f9;"></div>
-                <div class="field-group"><label>Customer Name</label><input type="text" id="ecName"></div>
-                <div class="field-group" style="grid-column: 1 / -1;"><label>Registered Address</label><input type="text" id="ecAddress"></div>
+                <div class="field-group"><label>Customer Name</label><input type="text" id="ecName" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group" style="grid-column: 1 / -1;"><label>Registered Address</label><input type="text" id="ecAddress" oninput="this.value=this.value.toUpperCase()"></div>
             </div>
             <button class="btn-action" onclick="saveCustomerEdits()" style="margin-top:16px;">SAVE CHANGES</button>
             <button class="btn-action" style="background:#e2e8f0; color:#1e293b; margin-top:8px;" onclick="document.getElementById('modalEditCustomer').style.display='none'">CANCEL</button>
@@ -144,7 +144,7 @@
         <div class="block-title">Technician Core Administration Ledgers</div>
         <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <div class="inputs-grid">
-                <div class="field-group"><label>Technician Name</label><input type="text" id="tName" placeholder="Full Registered Descriptor"></div>
+                <div class="field-group"><label>Technician Name</label><input type="text" id="tName" placeholder="Full Registered Descriptor" oninput="this.value=this.value.toUpperCase()"></div>
                 <div class="field-group"><label>Mobile Number (For Login)</label><input type="tel" id="tMobile" placeholder="10 Digits" maxlength="10"></div>
                 <div class="field-group"><label>Labor Scalar Commission (%)</label><input type="number" id="tComm" value="10" min="0" max="100"></div>
             </div>
@@ -163,7 +163,7 @@
         <div class="block-title">Fixed Service Configurations</div>
         <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <div class="inputs-grid">
-                <div class="field-group"><label>Package Scope</label><select id="amcPackageName"><option value="Quick Service">Quick Service</option><option value="General Service">General Service</option><option value="Premium Service">Premium Service</option><option value="Jumbo Service">Jumbo Service</option><option value="Head/Block Work">Head/Block Work</option><option value="Full Engine Restoration">Full Engine Restoration</option></select></div>
+                <div class="field-group"><label>Package Scope</label><input type="text" id="amcPackageName" placeholder="e.g. QUICK SERVICE" oninput="this.value=this.value.toUpperCase()"></div>
                 <div class="field-group"><label>Target Fleet Category</label><select id="amcCategoryGroup"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option><option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
                 <div class="field-group"><label>Stipulated Base Cost (₹)</label><input type="number" id="amcBaseRate" value="0" min="0"></div>
             </div>
@@ -203,28 +203,40 @@
     let targetCustomerProfileObj = null;
 
     function openWorkspaceTarget(targetDomId) { document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); document.getElementById(targetDomId).classList.add('active'); if(targetDomId === 'wsCustomers') compileCustomerManagementLedgers(); if(targetDomId === 'wsAmc') loadAmcPackagesDirectory(); if(targetDomId === 'wsTech') loadTechniciansDirectoryLedgers(); }
-    function closeActiveWorkspace() { document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); document.getElementById('hubGrid').classList.add('active'); }
-
+    
     async function prefetchClientContextForAmc(mobileVal) {
         const str = mobileVal.trim(); if(str.length !== 10) { document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; targetCustomerProfileObj = null; return; }
         const { data: cust } = await supabaseClient.from('customers').select('*, vehicles(id, reg_number, make_model)').eq('mobile_number', str).single();
         if(cust) { targetCustomerProfileObj = cust; document.getElementById('cAmcName').value = cust.name; document.getElementById('amcConfigBlock').style.display = 'block'; const sel = document.getElementById('amcVehicleSelect'); sel.innerHTML = ''; (cust.vehicles || []).forEach(v => sel.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`); toggleAmcInputs(); }
     }
-    function toggleAmcInputs() { const type = document.getElementById('amcTypeSelect').value; if(type === 'PREPAID') { document.getElementById('amcVehBlock').style.display = 'flex'; document.getElementById('amcPrice').value = '999'; } else { document.getElementById('amcVehBlock').style.display = 'none'; document.getElementById('amcPrice').value = '10'; } }
+    function toggleAmcInputs() { const type = document.getElementById('amcTypeSelect').value; if(type === 'PREPAID' || type === 'ENGINE') { document.getElementById('amcVehBlock').style.display = 'flex'; document.getElementById('amcPrice').value = type === 'PREPAID' ? '999' : '0'; } else { document.getElementById('amcVehBlock').style.display = 'none'; document.getElementById('amcPrice').value = '10'; } }
 
     async function commitAmcSale() {
-        const mobile = document.getElementById('cAmcMobile').value.trim(); const type = document.getElementById('amcTypeSelect').value; const price = parseFloat(document.getElementById('amcPrice').value) || 0; const vehId = type === 'PREPAID' ? document.getElementById('amcVehicleSelect').value : null;
+        const mobile = document.getElementById('cAmcMobile').value.trim(); const type = document.getElementById('amcTypeSelect').value; const price = parseFloat(document.getElementById('amcPrice').value) || 0; const vehId = (type === 'PREPAID' || type === 'ENGINE') ? document.getElementById('amcVehicleSelect').value : null;
         if(!targetCustomerProfileObj) return;
-        const expireDate = new Date(); if(type === 'LOYALTY') expireDate.setFullYear(expireDate.getFullYear() + 2); else expireDate.setFullYear(expireDate.getFullYear() + 1);
-        const { data: sub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: type === 'PREPAID' ? 'Prepaid AMC' : 'Panch Par Ek', amount_paid: price, expires_at: expireDate.toISOString(), services_logged: 0 }).select().single();
-        if(sub) {
-            if(type === 'PREPAID') {
-                const voucherPromises = []; for(let i=0; i<4; i++) { voucherPromises.push(supabaseClient.from('amc_vouchers').insert({ subscription_id: sub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `AMC-${sub.id.substring(0,4).toUpperCase()}-P${i+1}`, voucher_type: 'PREPAID_PREMIUM', valid_from: new Date(), expires_at: expireDate, mechanic_payout_eligible: true })); }
-                await Promise.all(voucherPromises); await supabaseClient.from('customers').update({ global_discount_coupon: 5 }).eq('mobile_number', mobile);
+        
+        if (type === 'ENGINE') {
+            function addDaysSkipSunday(startDate, daysToAdd) { let date = new Date(startDate); date.setDate(date.getDate() + daysToAdd); if (date.getDay() === 0) date.setDate(date.getDate() + 1); return date; }
+            const d0 = new Date(); const d1 = addDaysSkipSunday(d0, 21); const d2 = addDaysSkipSunday(d1, 40); const d3 = addDaysSkipSunday(d2, 76); const d4 = addDaysSkipSunday(d3, 76); const d5 = addDaysSkipSunday(d4, 76); const d6 = addDaysSkipSunday(d5, 76);
+            const schedule = [ { exp: d1, type: 'ENGINE_FREE' }, { exp: d2, type: 'ENGINE_FREE' }, { exp: d3, type: 'ENGINE_PAID' }, { exp: d4, type: 'ENGINE_FREE' }, { exp: d5, type: 'ENGINE_PAID' }, { exp: d6, type: 'ENGINE_FREE' } ];
+            const { data: engSub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: 'Engine Restoration', amount_paid: price, expires_at: d6.toISOString(), services_logged: 0 }).select().single();
+            if (engSub) {
+                const engPromises = schedule.map((svc, index) => { return supabaseClient.from('amc_vouchers').insert({ subscription_id: engSub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `ENG-${engSub.id.substring(0,4).toUpperCase()}-S${index+1}`, voucher_type: svc.type, valid_from: new Date(), expires_at: svc.exp, mechanic_payout_eligible: svc.type === 'ENGINE_PAID' }); });
+                await Promise.all(engPromises); alert(`Engine Guarantee Activated! 6 scheduled tracking vouchers generated.`);
             }
-            await supabaseClient.from('workshop_expenses').insert({ expense_category: 'AMC Collection', stakeholder_id: 'Master Ledger', amount: -Math.abs(price), note: `AMC Sale: ${type}`, recorded_by: activeSessionRole });
-            alert(`AMC Contract Generated! Expires strictly on: ${expireDate.toLocaleDateString()}`); document.getElementById('cAmcMobile').value = ''; document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; compileCustomerManagementLedgers();
+        } else {
+            const expireDate = new Date(); if(type === 'LOYALTY') expireDate.setFullYear(expireDate.getFullYear() + 2); else expireDate.setFullYear(expireDate.getFullYear() + 1);
+            const { data: sub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: type === 'PREPAID' ? 'Prepaid AMC' : 'Panch Par Ek', amount_paid: price, expires_at: expireDate.toISOString(), services_logged: 0 }).select().single();
+            if(sub) {
+                if(type === 'PREPAID') {
+                    const voucherPromises = []; for(let i=0; i<4; i++) { voucherPromises.push(supabaseClient.from('amc_vouchers').insert({ subscription_id: sub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `AMC-${sub.id.substring(0,4).toUpperCase()}-P${i+1}`, voucher_type: 'PREPAID_PREMIUM', valid_from: new Date(), expires_at: expireDate, mechanic_payout_eligible: true })); }
+                    await Promise.all(voucherPromises); await supabaseClient.from('customers').update({ global_discount_coupon: 5 }).eq('mobile_number', mobile);
+                }
+            }
         }
+        
+        await supabaseClient.from('workshop_expenses').insert({ expense_category: 'AMC Collection', stakeholder_id: 'Master Ledger', amount: -Math.abs(price), note: `AMC Sale: ${type}`, recorded_by: activeSessionRole });
+        alert(`Contract Generated!`); document.getElementById('cAmcMobile').value = ''; document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; compileCustomerManagementLedgers();
     }
 
     async function compileCustomerManagementLedgers() {
@@ -257,18 +269,12 @@
         });
     }
 
-    // --- CUSTOMER EDIT LOGIC ---
-    function openEditCustomerModal(mobile, name, address) {
-        document.getElementById('ecMobile').value = mobile;
-        document.getElementById('ecName').value = name;
-        document.getElementById('ecAddress').value = address;
-        document.getElementById('modalEditCustomer').style.display = 'flex';
-    }
+    function openEditCustomerModal(mobile, name, address) { document.getElementById('ecMobile').value = mobile; document.getElementById('ecName').value = name; document.getElementById('ecAddress').value = address; document.getElementById('modalEditCustomer').style.display = 'flex'; }
 
     async function saveCustomerEdits() {
         const mobile = document.getElementById('ecMobile').value;
-        const nameStr = document.getElementById('ecName').value.trim();
-        const addressStr = document.getElementById('ecAddress').value.trim();
+        const nameStr = document.getElementById('ecName').value.trim().toUpperCase(); 
+        const addressStr = document.getElementById('ecAddress').value.trim().toUpperCase(); 
         await supabaseClient.from('customers').update({ name: nameStr, address: addressStr }).eq('mobile_number', mobile);
         document.getElementById('modalEditCustomer').style.display = 'none';
         compileCustomerManagementLedgers();
@@ -315,29 +321,12 @@
         document.getElementById('modalCustomerReport').style.display = 'flex';
     }
 
-    // --- TECHNICIAN LEDGER & EDITING LOGIC ---
     let activeEditMechId = null;
-
-    function editMechanic(id, name, mobile, comm) {
-        activeEditMechId = id;
-        document.getElementById('tName').value = name;
-        document.getElementById('tMobile').value = mobile || '';
-        document.getElementById('tComm').value = comm;
-        document.getElementById('btnSaveTech').innerText = "UPDATE TECHNICIAN PROFILE";
-        document.getElementById('btnCancelTechEdit').style.display = "inline-block";
-    }
-
-    function cancelTechEdit() {
-        activeEditMechId = null;
-        document.getElementById('tName').value = '';
-        document.getElementById('tMobile').value = '';
-        document.getElementById('tComm').value = '10';
-        document.getElementById('btnSaveTech').innerText = "SAVE TECHNICIAN PROFILE";
-        document.getElementById('btnCancelTechEdit').style.display = "none";
-    }
+    function editMechanic(id, name, mobile, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE TECHNICIAN PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
+    function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tComm').value = '10'; document.getElementById('btnSaveTech').innerText = "SAVE TECHNICIAN PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
 
     async function upsertTechnicianProfileRecord() { 
-        const nameStr = document.getElementById('tName').value.trim(); 
+        const nameStr = document.getElementById('tName').value.trim().toUpperCase(); 
         const mobStr = document.getElementById('tMobile').value.trim();
         const commVal = parseFloat(document.getElementById('tComm').value) || 0; 
         if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); 
@@ -349,9 +338,7 @@
             const { error } = await supabaseClient.from('mechanics').insert({ mobile_number: mobStr, name: nameStr, commission_rate: commVal });
             if(error) return alert("Database Error: Mobile number may already exist.");
         }
-        
-        cancelTechEdit();
-        loadTechniciansDirectoryLedgers(); 
+        cancelTechEdit(); loadTechniciansDirectoryLedgers(); 
     }
     
     async function loadTechniciansDirectoryLedgers() {
@@ -361,20 +348,11 @@
             const pts = parseFloat(t.earned_points) || 0;
             const cashBtn = pts >= 100 ? `<button onclick="cashOutMechanic('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Cash Out ₹${Math.floor(pts)}</button>` : '';
             const safeName = t.name.replace(/'/g, "\\'");
-            
-            tbody.innerHTML += `<tr>
-                <td><strong>${t.name}</strong> <span class="edit-icon" onclick="editMechanic('${t.id}', '${safeName}', '${t.mobile_number}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td>
-                <td><span style="color:var(--success); font-weight:700;">Active</span></td>
-                <td><strong style="color:var(--gold);">${Math.floor(pts)} Pts</strong></td>
-                <td style="display:flex; gap:8px;">${cashBtn}<button onclick="downloadTechnicianLedgerStatement('${t.id}', '${t.name}')" style="background:none; border:1px solid var(--info); color:var(--info); font-weight:700; cursor:pointer; padding:4px 8px; border-radius:4px;">Ledger</button></td>
-            </tr>`;
+            tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editMechanic('${t.id}', '${safeName}', '${t.mobile_number}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="color:var(--success); font-weight:700;">Active</span></td><td><strong style="color:var(--gold);">${Math.floor(pts)} Pts</strong></td><td style="display:flex; gap:8px;">${cashBtn}<button onclick="downloadTechnicianLedgerStatement('${t.id}', '${t.name}')" style="background:none; border:1px solid var(--info); color:var(--info); font-weight:700; cursor:pointer; padding:4px 8px; border-radius:4px;">Ledger</button></td></tr>`;
         });
     }
 
-    async function markAttendance(mechId) {
-        const { error } = await supabaseClient.from('mechanic_attendance').insert({ mech_id: mechId, date: new Date().toISOString().split('T')[0], status: 'Present' });
-        if(error) alert("Already marked present for today!"); else alert("Attendance Logged.");
-    }
+    async function markAttendance(mechId) { const { error } = await supabaseClient.from('mechanic_attendance').insert({ mech_id: mechId, date: new Date().toISOString().split('T')[0], status: 'Present' }); if(error) alert("Already marked present for today!"); else alert("Attendance Logged."); }
 
     async function cashOutMechanic(mechId, points) {
         if(confirm(`Convert ${Math.floor(points)} points to ₹${Math.floor(points)} cash payout?`)) {
@@ -392,7 +370,7 @@
         const blobFile = new Blob([outputContentStr], { type: 'text/plain' }); const downloadElement = document.createElement('a'); downloadElement.href = URL.createObjectURL(blobFile); downloadElement.download = `Ledger_Statement_${techName.replace(/\s+/g,'_')}.txt`; downloadElement.click(); URL.revokeObjectURL(downloadElement.href);
     }
 
-    async function upsertServicePackageRecord() { const pName = document.getElementById('amcPackageName').value; const pCat = document.getElementById('amcCategoryGroup').value; const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0; await supabaseClient.from('service_packages').upsert({ package_name: pName, vehicle_category: pCat, base_rate: pRate }); loadAmcPackagesDirectory(); }
+    async function upsertServicePackageRecord() { const pName = document.getElementById('amcPackageName').value.toUpperCase(); const pCat = document.getElementById('amcCategoryGroup').value; const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0; await supabaseClient.from('service_packages').upsert({ package_name: pName, vehicle_category: pCat, base_rate: pRate }); loadAmcPackagesDirectory(); }
     async function loadAmcPackagesDirectory() { const { data: packages } = await supabaseClient.from('service_packages').select('*').order('vehicle_category').order('base_rate'); const tbody = document.getElementById('servicePackagesTableBody'); tbody.innerHTML = ''; packages?.forEach(pkg => { tbody.innerHTML += `<tr><td><strong>${pkg.package_name}</strong></td><td>${pkg.vehicle_category}</td><td><strong>₹${pkg.base_rate}</strong></td><td style="text-align:center;"></td></tr>`; }); }
     async function commitAdminPasswordOverride() { const targetChan = document.getElementById('pTargetRole').value; const newPin = document.getElementById('pNewAdmin').value.trim(); if(newPin.length !== 4) return alert("Specify 4-digit string."); await supabaseClient.from('system_credentials').upsert({ role_key: targetChan, pin_hash: newPin }); alert(`Updated: ${targetChan}`); document.getElementById('pNewAdmin').value = ''; }
 </script>
