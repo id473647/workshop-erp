@@ -1,181 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Care - Customer Portal</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
-        .header { background: var(--primary); color: white; padding: 16px 20px; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header h1 { margin: 0; font-size: 1.2rem; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border); }
-        .card-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 0 0 12px 0; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-        input[type="tel"], input[type="text"], textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; font-family: inherit; }
-        .btn { width: 100%; background: var(--success); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
-        .wallet-card { background: linear-gradient(135deg, #2c3e50, #3498db); color: white; text-align: center; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
-        .wallet-val { font-size: 2.5rem; font-weight: bold; margin: 10px 0; color: #f1f5f9; }
-        .status-pill { font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 12px; display: inline-block; }
-        .bg-open { background: #fef3c7; color: #b45309; } .bg-closed { background: #dcfce7; color: #15803d; }
-        .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; } .list-item:last-child { border-bottom: none; }
-        .hindi-rules { background: #fffbeb; border: 1px solid #fde68a; padding: 16px; border-radius: 8px; font-size: 0.85rem; color: #92400e; line-height: 1.5; }
-        .star-rating { display: flex; gap: 8px; justify-content: center; font-size: 2rem; color: #cbd5e1; cursor: pointer; margin-bottom: 16px; }
-        .star-rating span.active { color: var(--gold); }
-        #viewLogin { display: block; } #viewDashboard { display: none; }
-    </style>
-</head>
-<body>
-
-<div class="header"><h1>My Care Portal</h1></div>
-
-<div class="container">
-    <div id="viewLogin" class="card">
-        <h2 style="margin-top:0; color:var(--primary); text-align:center;">Welcome / स्वागत है</h2>
-        <p style="text-align:center; color:#64748b; font-size:0.9rem;">अपना पंजीकृत मोबाइल नंबर दर्ज करें।</p>
-        <input type="tel" id="loginMobile" placeholder="10 Digits Mobile Number" maxlength="10">
-        <button class="btn" onclick="authenticateCustomer()">LOGIN</button>
-    </div>
-
-    <div id="viewDashboard">
-        <div class="wallet-card">
-            <div style="font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">My Care Points Wallet</div>
-            <div class="wallet-val" id="dispPoints">0</div>
-            <div style="font-size:0.8rem; opacity:0.8;">1 Point = ₹1 | Valid for 1 Year</div>
-        </div>
-
-        <div class="card">
-            <h3 class="card-title">Refer & Earn / रेफर करें और कमाएं</h3>
-            <p style="font-size:0.85rem; color:#475569; margin-bottom:12px;">Share your code with friends. They get 5% off, you get 3% of their bill as points!</p>
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="dispRefCode" readonly style="background:#f1f5f9; font-weight:bold; color:var(--info); text-align:center; margin:0;">
-                <button class="btn" style="width:auto; padding:0 20px;" onclick="copyRefCode()">COPY</button>
-            </div>
-            <div class="hindi-rules" style="margin-top:16px;">
-                <h4>📜 रेफरल नियम (Rules):</h4>
-                1. अपने दोस्तों को अपना रेफरल कोड दें।<br>2. जब वे हमारी सर्विस लेंगे, तो उन्हें <b>5% की छूट</b> मिलेगी।<br>3. उनके बिल का <b>3% हिस्सा</b> आपको पॉइंट्स के रूप में मिलेगा।<br>4. आप इन पॉइंट्स का उपयोग अपने अगले बिल में कर सकते हैं (बिल के 20% तक)।
-            </div>
-        </div>
-
-        <div class="card">
-            <h3 class="card-title">My Vehicles & Service History</h3>
-            <div id="historyList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading records...</p></div>
-        </div>
-
-        <div class="card">
-            <h3 class="card-title">Active Packages & AMC</h3>
-            <div id="amcList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No active packages.</p></div>
-            <div id="engineWarrantyTerms" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:16px; border-radius:8px; font-size:0.85rem; color:#166534; line-height:1.5; margin-top:16px;">
-                <h4 style="margin:0 0 8px 0; font-size:0.95rem;">⚙️ इंजन वारंटी नियम व शर्तें:</h4>
-                1. ये वारंटी 1 साल या 35000 किमी (जो पहले हो) तक मान्य है।<br>
-                2. यह वारंटी केवल निर्धारित समय पर माय केयर सर्विस सेंटर में सर्विस कराने पर ही मान्य है।<br>
-                3. यह गारंटी रिपेयर (लेबर) के लिए है। स्पेयर पार्ट रिप्लेसमेंट 50-50 (आधा खर्च ग्राहक का) के हिसाब से किया जाएगा। लेबर निःशुल्क रहेगा।<br>
-                4. आपके सभी सर्विस कूपन आपके मोबाइल नंबर पर डिजिटल रूप से लिंक हैं।<br>
-                5. अन्य खामियों (फ्यूचर एडवाइस में लिखित) के कारण इंजन में शिकायत आती है, तो सेंटर की जवाबदेही नहीं होगी।
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="modalReview" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; display:none; justify-content:center; align-items:center; padding:20px; box-sizing:border-box;">
-    <div style="background:white; border-radius:12px; padding:24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto;">
-        <h3 style="margin-top:0; color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:10px;">Service Feedback / प्रतिक्रिया</h3>
-        <p style="font-size:0.85rem; color:#64748b;">कृपया अपनी हालिया सर्विस का अनुभव साझा करें।</p>
-        
-        <div class="star-rating" id="starContainer">
-            <span onclick="setRating(1)">★</span><span onclick="setRating(2)">★</span><span onclick="setRating(3)">★</span><span onclick="setRating(4)">★</span><span onclick="setRating(5)">★</span>
-        </div>
-        <input type="hidden" id="revRating" value="0">
-        <label>1. Mechanic Feedback (मैकेनिक का काम कैसा था?)</label><textarea id="revMech" rows="2"></textarea>
-        <label>2. Spares Feedback (पार्ट्स के बारे में)</label><textarea id="revSpares" rows="2"></textarea>
-        <label>3. Lubricant Feedback (इंजन ऑयल के बारे में)</label><textarea id="revLube" rows="2"></textarea>
-        <label>4. Any other advice? (कोई अन्य सुझाव?)</label><textarea id="revAdvice" rows="2"></textarea>
-
-        <button class="btn" style="background:var(--info);" onclick="submitReview()">SUBMIT REVIEW</button>
-        <button class="btn" style="background:none; color:#64748b; margin-top:8px;" onclick="closeReview()">SKIP / LATER</button>
-    </div>
-</div>
-
-<script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    let activeCustomer = null; let pendingReviewJobId = null;
-
-    async function authenticateCustomer() {
-        const mobile = document.getElementById('loginMobile').value.trim();
-        if(mobile.length !== 10) return alert("Please enter valid 10 digit number.");
-        const { data: cust } = await supabaseClient.from('customers').select('*').eq('mobile_number', mobile).single();
-        if(cust) {
-            activeCustomer = cust;
-            if(!cust.referral_code) {
-                const newCode = `MC-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${mobile.substring(6)}`;
-                await supabaseClient.from('customers').update({ referral_code: newCode }).eq('mobile_number', mobile);
-                activeCustomer.referral_code = newCode;
-            }
-            document.getElementById('viewLogin').style.display = 'none'; document.getElementById('viewDashboard').style.display = 'block';
-            document.getElementById('dispPoints').innerText = Math.floor(cust.loyalty_points || 0); document.getElementById('dispRefCode').value = activeCustomer.referral_code;
-            loadDashboardData();
-        } else { alert("Number not found. Please visit the workshop to register."); }
-    }
-
-    async function loadDashboardData() {
-        const fourMonthsAgo = new Date(); fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
-        const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number, make_model)').eq('customer_mobile', activeCustomer.mobile_number).gte('created_at', fourMonthsAgo.toISOString()).order('created_at', { ascending: false });
-        
-        const hList = document.getElementById('historyList'); hList.innerHTML = '';
-        if(jobs && jobs.length > 0) {
-            jobs.forEach(job => {
-                const date = new Date(job.created_at).toLocaleDateString(); const statClass = job.status === 'Open' ? 'bg-open' : 'bg-closed';
-                hList.innerHTML += `<div class="list-item"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong>${job.vehicles?.reg_number || 'Vehicle'}</strong><span class="status-pill ${statClass}">${job.status}</span></div><div style="font-size:0.85rem; color:#64748b; margin-bottom:4px;">Date: ${date} | Bill: ₹${job.total_invoice_value || 0}</div><div style="font-size:0.85rem; font-style:italic;">Issue: ${job.problem_mentioned || 'Routine Service'}</div></div>`;
-                if(job.status === 'Closed' && !job.is_reviewed) { pendingReviewJobId = job.id; document.getElementById('modalReview').style.display = 'flex'; }
-            });
-        } else { hList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No recent history found.</p>'; }
-
-        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').eq('customer_mobile', activeCustomer.mobile_number).gt('expires_at', new Date().toISOString());
-        const aList = document.getElementById('amcList'); aList.innerHTML = '';
-        let hasEngineWarranty = false;
-
-        if(subs && subs.length > 0) {
-            subs.forEach(sub => {
-                const expDate = new Date(sub.expires_at).toLocaleDateString();
-                if(sub.plan_type === 'Panch Par Ek') aList.innerHTML += `<div class="list-item"><strong>Loyalty Program (5-for-1)</strong><br><span style="font-size:0.85rem; color:#15803d;">Services Completed: ${sub.services_logged}/5</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`;
-                else if(sub.plan_type === 'Engine Restoration') {
-                    hasEngineWarranty = true;
-                    aList.innerHTML += `<div class="list-item"><strong>Engine Guarantee Activated</strong><br><span style="font-size:0.85rem; color:#0369a1;">Check Workshop for Schedule</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`;
-                }
-                else { const remaining = sub.amc_vouchers ? sub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; aList.innerHTML += `<div class="list-item"><strong>Prepaid AMC</strong><br><span style="font-size:0.85rem; color:#b45309;">Vouchers Left: ${remaining}</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`; }
-            });
-        } else { aList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No active packages.</p>'; }
-
-        // Unhides the Engine Rules box if they own the package
-        if(hasEngineWarranty) { document.getElementById('engineWarrantyTerms').style.display = 'block'; }
-    }
-
-    function setRating(val) { document.getElementById('revRating').value = val; const stars = document.getElementById('starContainer').children; for(let i=0; i<5; i++) { stars[i].className = i < val ? 'active' : ''; } }
-
-    async function submitReview() {
+async function submitReview() {
         const r = parseInt(document.getElementById('revRating').value); if(r === 0) return alert("Please provide a star rating.");
         await supabaseClient.from('job_cards').update({ review_rating: r, is_reviewed: true, review_mech_feedback: document.getElementById('revMech').value, review_spares_feedback: document.getElementById('revSpares').value, review_lube_feedback: document.getElementById('revLube').value, review_advice: document.getElementById('revAdvice').value }).eq('id', pendingReviewJobId);
         
-        const { data: jc } = await supabaseClient.from('job_cards').select('mech_id, labour_charges, job_card_items(warehouse_type, total_price)').eq('id', pendingReviewJobId).single();
-        if (jc && jc.mech_id) {
+        // NOW FETCHES CO-MECHANIC DATA AS WELL
+        const { data: jc } = await supabaseClient.from('job_cards').select('mech_id, co_mech_id, labour_charges, job_card_items(warehouse_type, total_price)').eq('id', pendingReviewJobId).single();
+        
+        if (jc && (jc.mech_id || jc.co_mech_id)) {
+            const searchId = jc.mech_id || jc.co_mech_id; // Check penalty against primary tech
             const today = new Date(); const day = today.getDay() || 7; if (day !== 1) today.setHours(-24 * (day - 1)); today.setHours(0,0,0,0); const startOfWeek = today.toISOString();
-            const { count: negativeCount } = await supabaseClient.from('job_cards').select('*', { count: 'exact', head: true }).eq('mech_id', jc.mech_id).eq('is_reviewed', true).lt('review_rating', 3).gte('closed_at', startOfWeek);
+            const { count: negativeCount } = await supabaseClient.from('job_cards').select('*', { count: 'exact', head: true }).eq('mech_id', searchId).eq('is_reviewed', true).lt('review_rating', 3).gte('closed_at', startOfWeek);
+            
             let pkgLabor = 0; if(jc.job_card_items) { jc.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
             const totalLaborForJob = (parseFloat(jc.labour_charges) || 0) + pkgLabor;
-            const dynamicPointsReward = totalLaborForJob * 0.10;
+            const baseRewardPoints = totalLaborForJob * 0.10;
+            
+            // 50/50 SPLIT LOGIC
+            let actualReward = baseRewardPoints;
+            if (jc.mech_id && jc.co_mech_id) { actualReward = baseRewardPoints / 2; }
 
             if (r === 5 && negativeCount <= 2) {
-                const { data: mech } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.mech_id).single();
-                const newWalletBalance = (parseFloat(mech.earned_points) || 0) + dynamicPointsReward;
-                await supabaseClient.from('mechanics').update({ earned_points: newWalletBalance }).eq('id', jc.mech_id);
+                if (jc.mech_id) {
+                    const { data: mech1 } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.mech_id).single();
+                    await supabaseClient.from('mechanics').update({ earned_points: (parseFloat(mech1.earned_points) || 0) + actualReward }).eq('id', jc.mech_id);
+                }
+                if (jc.co_mech_id) {
+                    const { data: mech2 } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.co_mech_id).single();
+                    await supabaseClient.from('mechanics').update({ earned_points: (parseFloat(mech2.earned_points) || 0) + actualReward }).eq('id', jc.co_mech_id);
+                }
             }
         }
         alert("Thank you for your feedback! / आपकी प्रतिक्रिया के लिए धन्यवाद!"); closeReview(); loadDashboardData();
     }
-    function closeReview() { document.getElementById('modalReview').style.display = 'none'; }
-    function copyRefCode() { const copyText = document.getElementById("dispRefCode"); copyText.select(); document.execCommand("copy"); alert("Copied!"); }
-</script>
-</body>
-</html>
