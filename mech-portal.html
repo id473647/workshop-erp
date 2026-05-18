@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanic Portal - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
+        .header { background: var(--primary); color: white; padding: 16px 20px; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0; font-size: 1.2rem; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border); }
+        input[type="tel"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; }
+        .btn { width: 100%; background: var(--info); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        
+        /* Dashboard Stats */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .stat-box { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+        .stat-val { font-size: 1.8rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
+        .stat-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: bold; }
+        
+        .points-card { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
+        .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-weight: bold; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; }
+        .tab-btn.active { color: var(--info); border-bottom-color: var(--info); }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        
+        /* Lists */
+        .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
+        .list-item:last-child { border-bottom: none; }
+        .pill { font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 12px; background: #e2e8f0; color: #475569; }
+        .pill.open { background: #fef3c7; color: #b45309; }
+        .pill.closed { background: #dcfce7; color: #15803d; }
+        .stars { color: var(--gold); font-size: 1.1rem; letter-spacing: 2px; }
+        
+        #viewLogin { display: block; } #viewDashboard { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="header"><h1>My Care - Crew Portal</h1></div>
+
+<div class="container">
+    <div id="viewLogin" class="card">
+        <h2 style="margin-top:0; color:var(--primary); text-align:center;">Technician Login</h2>
+        <p style="text-align:center; color:#64748b; font-size:0.9rem;">Enter your registered mobile number.</p>
+        <input type="tel" id="loginMobile" placeholder="10 Digits Mobile Number" maxlength="10">
+        <button class="btn" onclick="authenticateMechanic()">LOGIN</button>
+    </div>
+
+    <div id="viewDashboard">
+        <div class="points-card">
+            <div style="font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Earned Reward Points</div>
+            <div style="font-size:3rem; font-weight:bold; margin:4px 0;" id="dispPoints">0</div>
+            <div style="font-size:0.8rem; opacity:0.9;">Cashable at Workshop Counter</div>
+        </div>
+
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-title">Base Commission</div>
+                <div class="stat-val" id="dispComm">0%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-title">Total Earned Labor</div>
+                <div class="stat-val" id="dispTotalLabor">₹0</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tabJobs')">Allotted Jobs</button>
+            <button class="tab-btn" onclick="switchTab('tabReviews')">Customer Reviews</button>
+            <button class="tab-btn" onclick="switchTab('tabLedger')">Financial Ledger</button>
+        </div>
+
+        <div id="tabJobs" class="tab-content active card">
+            <div id="jobsList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading jobs...</p></div>
+        </div>
+
+        <div id="tabReviews" class="tab-content card">
+            <div id="reviewsList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading reviews...</p></div>
+        </div>
+
+        <div id="tabLedger" class="tab-content card">
+            <h3 style="margin-top:0; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Payout History</h3>
+            <div id="payoutList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading payouts...</p></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+    let activeMech = null;
+
+    function switchTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); event.target.classList.add('active'); document.getElementById(tabId).classList.add('active'); }
+
+    async function authenticateMechanic() {
+        const mobile = document.getElementById('loginMobile').value.trim();
+        if(mobile.length !== 10) return alert("Enter valid 10-digit number.");
+        const { data: mech } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', mobile).single();
+        if(mech) {
+            activeMech = mech;
+            document.getElementById('viewLogin').style.display = 'none'; document.getElementById('viewDashboard').style.display = 'block';
+            document.getElementById('dispPoints').innerText = Math.floor(mech.earned_points || 0);
+            document.getElementById('dispComm').innerText = `${mech.commission_rate || 0}%`;
+            loadMechanicData();
+        } else { alert("Mobile number not found in Technician Registry."); }
+    }
+
+    async function loadMechanicData() {
+        // 1. Fetch Job Cards
+        const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number), job_card_items(warehouse_type, total_price)').eq('mech_id', activeMech.id).order('created_at', { ascending: false });
+        
+        let totalLaborEarned = 0;
+        const jList = document.getElementById('jobsList'); jList.innerHTML = '';
+        const rList = document.getElementById('reviewsList'); rList.innerHTML = '';
+
+        if(jobs && jobs.length > 0) {
+            jobs.forEach(job => {
+                // Calculate Job Labor
+                let pkgLabor = 0; if(job.job_card_items) { job.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
+                const jobLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor;
+                if(job.status === 'Closed') totalLaborEarned += jobLabor;
+
+                // Render Job Card
+                const statClass = job.status === 'Open' ? 'open' : 'closed';
+                jList.innerHTML += `
+                    <div class="list-item">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number || 'N/A'}</strong>
+                            <span class="pill ${statClass}">${job.status}</span>
+                        </div>
+                        <div style="font-size:0.85rem; color:#64748b; margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString()}</div>
+                        <div style="font-size:0.85rem; color:#e74c3c; font-weight:bold; margin-bottom:4px;">Problem: ${job.problem_mentioned || '--'}</div>
+                        <div style="font-size:0.85rem; font-weight:bold; color:var(--success);">Allocated Labor Yield: ₹${jobLabor}</div>
+                    </div>`;
+
+                // Render Review if exists
+                if(job.is_reviewed) {
+                    const stars = '★'.repeat(job.review_rating) + '☆'.repeat(5 - job.review_rating);
+                    rList.innerHTML += `
+                        <div class="list-item">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <strong>JC-${job.id.split('-')[0].toUpperCase()}</strong>
+                                <span class="stars">${stars}</span>
+                            </div>
+                            <div style="font-size:0.8rem; color:#475569; font-style:italic;">"${job.review_mech_feedback || 'No written feedback'}"</div>
+                            ${job.review_rating === 5 ? `<div style="font-size:0.75rem; color:var(--gold); font-weight:bold; margin-top:4px;">+ Points Awarded (10% of Labor)</div>` : ''}
+                        </div>`;
+                }
+            });
+        } else { jList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No allotted jobs found.</p>'; }
+        
+        if(rList.innerHTML === '') rList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No reviews submitted yet.</p>';
+
+        document.getElementById('dispTotalLabor').innerText = `₹${totalLaborEarned}`;
+
+        // 2. Fetch Financial Ledger (Payouts)
+        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Mechanic Payout').eq('stakeholder_id', activeMech.id).order('created_at', { ascending: false });
+        const pList = document.getElementById('payoutList'); pList.innerHTML = '';
+        if(payouts && payouts.length > 0) {
+            payouts.forEach(p => {
+                pList.innerHTML += `
+                    <div class="list-item" style="display:flex; justify-content:space-between;">
+                        <div>
+                            <strong>${new Date(p.created_at).toLocaleDateString()}</strong><br>
+                            <span style="font-size:0.8rem; color:#64748b;">${p.note || 'Cash Out'}</span>
+                        </div>
+                        <strong style="color:var(--success);">₹${p.amount}</strong>
+                    </div>`;
+            });
+        } else { pList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No payout history.</p>'; }
+    }
+</script>
+</body>
+</html>
