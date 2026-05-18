@@ -66,6 +66,14 @@
         <div class="card">
             <h3 class="card-title">Active Packages & AMC</h3>
             <div id="amcList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No active packages.</p></div>
+            <div id="engineWarrantyTerms" style="display:none; background:#f0fdf4; border:1px solid #bbf7d0; padding:16px; border-radius:8px; font-size:0.85rem; color:#166534; line-height:1.5; margin-top:16px;">
+                <h4 style="margin:0 0 8px 0; font-size:0.95rem;">⚙️ इंजन वारंटी नियम व शर्तें:</h4>
+                1. ये वारंटी 1 साल या 35000 किमी (जो पहले हो) तक मान्य है।<br>
+                2. यह वारंटी केवल निर्धारित समय पर माय केयर सर्विस सेंटर में सर्विस कराने पर ही मान्य है।<br>
+                3. यह गारंटी रिपेयर (लेबर) के लिए है। स्पेयर पार्ट रिप्लेसमेंट 50-50 (आधा खर्च ग्राहक का) के हिसाब से किया जाएगा। लेबर निःशुल्क रहेगा।<br>
+                4. आपके सभी सर्विस कूपन आपके मोबाइल नंबर पर डिजिटल रूप से लिंक हैं।<br>
+                5. अन्य खामियों (फ्यूचर एडवाइस में लिखित) के कारण इंजन में शिकायत आती है, तो सेंटर की जवाबदेही नहीं होगी।
+            </div>
         </div>
     </div>
 </div>
@@ -126,14 +134,22 @@
 
         const { data: subs } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').eq('customer_mobile', activeCustomer.mobile_number).gt('expires_at', new Date().toISOString());
         const aList = document.getElementById('amcList'); aList.innerHTML = '';
+        let hasEngineWarranty = false;
+
         if(subs && subs.length > 0) {
             subs.forEach(sub => {
                 const expDate = new Date(sub.expires_at).toLocaleDateString();
                 if(sub.plan_type === 'Panch Par Ek') aList.innerHTML += `<div class="list-item"><strong>Loyalty Program (5-for-1)</strong><br><span style="font-size:0.85rem; color:#15803d;">Services Completed: ${sub.services_logged}/5</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`;
-                else if(sub.plan_type === 'Engine Restoration') aList.innerHTML += `<div class="list-item"><strong>Engine Guarantee Activated</strong><br><span style="font-size:0.85rem; color:#0369a1;">Check Workshop for Schedule</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`;
+                else if(sub.plan_type === 'Engine Restoration') {
+                    hasEngineWarranty = true;
+                    aList.innerHTML += `<div class="list-item"><strong>Engine Guarantee Activated</strong><br><span style="font-size:0.85rem; color:#0369a1;">Check Workshop for Schedule</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`;
+                }
                 else { const remaining = sub.amc_vouchers ? sub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; aList.innerHTML += `<div class="list-item"><strong>Prepaid AMC</strong><br><span style="font-size:0.85rem; color:#b45309;">Vouchers Left: ${remaining}</span><br><span style="font-size:0.8rem; color:#e74c3c;">Expires: ${expDate}</span></div>`; }
             });
         } else { aList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No active packages.</p>'; }
+
+        // Unhides the Engine Rules box if they own the package
+        if(hasEngineWarranty) { document.getElementById('engineWarrantyTerms').style.display = 'block'; }
     }
 
     function setRating(val) { document.getElementById('revRating').value = val; const stars = document.getElementById('starContainer').children; for(let i=0; i<5; i++) { stars[i].className = i < val ? 'active' : ''; } }
