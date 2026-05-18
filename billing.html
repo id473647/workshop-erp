@@ -62,7 +62,12 @@
         <div style="flex: 1;">
             <div class="plate-header" id="regPlate">Loading active instance...</div>
             <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
-            <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Assigned Tech: --</span>
+            
+            <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:bold; color:#64748b;">TECH:</span>
+                <select id="primaryMech" style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); font-size:0.75rem; font-weight:bold; color:var(--primary); background:#f8fafc;"><option value="">-- Unassigned --</option></select>
+                <select id="coMech" style="padding:4px 8px; border-radius:4px; border:1px dashed var(--info); font-size:0.75rem; font-weight:bold; color:var(--info); background:white;"><option value="">+ Co-Mechanic (50% Split)</option></select>
+            </div>
         </div>
         
         <div style="flex: 1.5; text-align: center; display: flex; flex-direction: column; justify-content: center; padding: 0 15px;">
@@ -126,7 +131,6 @@
             <h4 style="margin:0 0 16px 0; color:var(--primary);">Overarching Service Scope</h4>
             <div class="inputs-grid">
                 <div class="field-group"><label>Variable Allocated Labour (₹)</label><input type="number" id="vLabour" value="0" oninput="compileDynamicSums()"></div>
-                
                 <div class="field-group">
                     <label>Lathe & External Work (₹)</label>
                     <div style="display:flex; gap:8px;">
@@ -134,7 +138,6 @@
                         <input type="text" id="vLatheNotes" placeholder="Breakdown: WELDING 100, DRILL 50" style="width:65%;" oninput="this.value=this.value.toUpperCase()">
                     </div>
                 </div>
-
                 <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label id="lblAdvance">Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;">
@@ -223,14 +226,23 @@
         if (sessionRole === 'green' || sessionRole === 'moped') { document.getElementById('draftActionBlock').style.display = 'block'; document.getElementById('lblAdvance').innerText = `Prepaid Advance (${sessionRole.charAt(0).toUpperCase() + sessionRole.slice(1)} Ledger) (₹)`; } else { document.getElementById('settlementActionBlock').style.display = 'grid'; }
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
 
-        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*), mechanics(name)').eq('id', targetJobId).single();
+        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
         if(job) {
-            activeJobContext = job; document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`; document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`; document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
+            activeJobContext = job; document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`; document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             
-            // LOAD SAVED VALUES
+            // FETCH & POPULATE MECHANIC DROPDOWNS (SCENARIO 1 & 2)
+            const { data: mechs } = await supabaseClient.from('mechanics').select('id, name').eq('is_active', true).order('name');
+            let pOpt = '<option value="">-- Unassigned --</option>';
+            let cOpt = '<option value="">+ Co-Mechanic (50% Split)</option>';
+            mechs?.forEach(m => { pOpt += `<option value="${m.id}">${m.name}</option>`; cOpt += `<option value="${m.id}">${m.name}</option>`; });
+            document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt;
+
+            if (job.mech_id) document.getElementById('primaryMech').value = job.mech_id;
+            if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
+
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; 
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; 
-            document.getElementById('vLatheNotes').value = job.external_work_notes || ''; // NEW LATHE NOTES CHECK
+            document.getElementById('vLatheNotes').value = job.external_work_notes || ''; 
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
@@ -298,46 +310,23 @@
 
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
     
-    // SMART TOKEN SEARCH IMPLEMENTED HERE
     function queryCatalogAutocomplete(inputRef) {
         const searchVal = inputRef.value.trim().toLowerCase(); 
         const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
-        
         const searchTokens = searchVal.split(' ').filter(token => token.length > 0);
-        
-        const filtered = globalCatalogCache.filter(item => {
-            const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase();
-            return searchTokens.every(token => searchableText.includes(token));
-        }).slice(0, 10);
-        
-        if(filtered.length > 0) { 
-            filtered.forEach(p => { 
-                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0})"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
-            }); 
-            listContainer.style.display = 'block'; 
-        } else {
-            listContainer.style.display = 'none';
-        }
+        const filtered = globalCatalogCache.filter(item => { const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase(); return searchTokens.every(token => searchableText.includes(token)); }).slice(0, 10);
+        if(filtered.length > 0) { filtered.forEach(p => { listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0})"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; }); listContainer.style.display = 'block'; } else { listContainer.style.display = 'none'; }
     }
     
     function hideAutocomplete() { setTimeout(() => { document.getElementById('autolist-n').style.display = 'none'; }, 200); }
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate) { document.getElementById('nPart').value = nameStr; document.getElementById('nBrand').value = brandStr; document.getElementById('nRate').value = defaultRate; document.getElementById('autolist-n').style.display = 'none'; }
     
-    // ALL CAPS FORCING IMPLEMENTED HERE
     async function pushItemToJobCard() {
-        const partStr = document.getElementById('nPart').value.trim(); 
-        const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
-        const typeSelect = document.getElementById('nType').value; 
-        const qVal = parseFloat(document.getElementById('nQty').value) || 1; 
-        const rVal = parseFloat(document.getElementById('nRate').value) || 0;
+        const partStr = document.getElementById('nPart').value.trim(); const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; const typeSelect = document.getElementById('nType').value; const qVal = parseFloat(document.getElementById('nQty').value) || 1; const rVal = parseFloat(document.getElementById('nRate').value) || 0;
         if(!partStr) return; 
-        
         const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
-        
-        const cleanName = partStr.toUpperCase(); 
-        const cleanBrand = brandStr.toUpperCase();
-        
+        const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase();
         supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget }).then();
         const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: wareTarget, item_name: `${cleanName} (${cleanBrand})`, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost });
         if(!error) { document.getElementById('nPart').value = ''; document.getElementById('nQty').value = '1'; document.getElementById('nRate').value = '0'; loadInventoryLedgers(); }
@@ -368,9 +357,10 @@
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - pUsed);
     }
 
-    // SAVING LATHE NOTES INCORPORATED HERE
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
+        
+        // CAPTURING LATE ASSIGNMENT & CO-MECHANIC DATA
         const updates = { 
             total_invoice_value: netVal, 
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
@@ -379,8 +369,11 @@
             advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
             payment_mode: modeTarget, 
             status: statusTarget, 
-            closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null 
+            closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null,
+            mech_id: document.getElementById('primaryMech').value || null,
+            co_mech_id: document.getElementById('coMech').value || null
         };
+        
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
         if(!error) {
