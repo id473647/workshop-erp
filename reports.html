@@ -35,7 +35,7 @@
         th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
 
-        /* Thermal Print Styles (Using dynamic active classes to print the right one) */
+        /* Thermal Print Styles */
         .thermal-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.8rem; line-height: 1.3; margin: 0 auto; box-sizing: border-box; }
         @media print {
             body * { visibility: hidden; }
@@ -143,10 +143,13 @@
                     <span class="summary-val" id="eodGreenNet" style="color:var(--danger);">₹0 <span style="font-size:0.8rem;">Owed</span></span>
                     <div class="sub-val"><span>Billed: ₹<span id="eodGreenBilled">0</span></span><span>Paid: ₹<span id="eodGreenPaid">0</span></span></div>
                 </div>
+                
                 <div class="summary-box" style="border:1px solid #fca5a5;">
                     <span class="summary-title">LATHE WORKERS</span>
                     <span class="summary-val" id="eodLatheNet" style="color:var(--danger);">₹0 <span style="font-size:0.8rem;">Owed</span></span>
                     <div class="sub-val"><span>Billed: ₹<span id="eodLatheBilled">0</span></span><span>Paid: ₹<span id="eodLathePaid">0</span></span></div>
+                    <div id="eodLatheCheatSheet" style="margin-top:8px; font-size:0.75rem; color:#991b1b; text-align:left; background:#fee2e2; padding:6px; border-radius:4px; max-height:80px; overflow-y:auto; border:1px dashed #fca5a5;">
+                        </div>
                 </div>
             </div>
 
@@ -239,7 +242,7 @@
         window.print();
     }
 
-    // --- EOD REALTIME REPORT ENGINE (Updated for Payouts) ---
+    // --- EOD REALTIME REPORT ENGINE ---
     async function runEodReport() {
         const targetDate = document.getElementById('eodDate').value;
         if (!targetDate) return;
@@ -247,28 +250,37 @@
         const startDate = new Date(targetDate); startDate.setHours(0,0,0,0);
         const endDate = new Date(targetDate); endDate.setHours(23,59,59,999);
 
-        // 1. Fetch Job Cards & Expenses
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, total_invoice_value, advance_paid, payment_mode, lathe_welding').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
+        // Fetch Data (Now including external_work_notes)
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, total_invoice_value, advance_paid, payment_mode, lathe_welding, external_work_notes').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
         const { data: openJobs } = await supabaseClient.from('job_cards').select('advance_paid').eq('status', 'Open').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
         const { data: expenses } = await supabaseClient.from('workshop_expenses').select('amount, stakeholder_id, expense_category').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
 
         let grossCash = 0; let totalUpi = 0; let totalLatheBilled = 0; let totalExp = 0;
         let paidMoped = 0; let paidGreen = 0; let paidLathe = 0;
+        let latheBreakdownHtml = ''; // CHEAT SHEET STORAGE
 
-        // Process Cash & UPI
         (openJobs || []).forEach(oj => { grossCash += parseFloat(oj.advance_paid) || 0; });
         const closedJobIds = [];
+        
         (jobs || []).forEach(j => {
             closedJobIds.push(j.id);
             const netPaid = parseFloat(j.total_invoice_value) || 0;
             const advPaid = parseFloat(j.advance_paid) || 0;
-            totalLatheBilled += parseFloat(j.lathe_welding) || 0;
+            const rowLatheVal = parseFloat(j.lathe_welding) || 0;
+            totalLatheBilled += rowLatheVal;
 
             if (j.payment_mode === 'Cash') { grossCash += netPaid + advPaid; } 
             else if (j.payment_mode === 'UPI') { totalUpi += netPaid; grossCash += advPaid; }
+
+            // LATHE CHEAT SHEET BUILDER
+            if (rowLatheVal > 0 && j.external_work_notes) {
+                latheBreakdownHtml += `<div style="margin-bottom:4px;"><b>JC-${j.id.split('-')[0].toUpperCase()}:</b> ${j.external_work_notes}</div>`;
+            }
         });
 
-        // Process Expenses & Specific Payouts
+        // POPULATE THE LATHE CHEAT SHEET
+        document.getElementById('eodLatheCheatSheet').innerHTML = latheBreakdownHtml || 'No breakdown notes for today.';
+
         (expenses || []).forEach(e => { 
             const amt = Math.abs(parseFloat(e.amount) || 0);
             totalExp += amt; 
@@ -281,7 +293,6 @@
 
         const netCash = grossCash - totalExp;
 
-        // Fetch Job Card Items to calculate Billed Liabilities
         let billedMoped = 0; let billedGreen = 0;
         if (closedJobIds.length > 0) {
             const { data: items } = await supabaseClient.from('job_card_items').select('warehouse_type, total_price').in('job_card_id', closedJobIds);
@@ -291,12 +302,10 @@
             });
         }
 
-        // Net Liabilities Logic
         const netMoped = billedMoped - paidMoped;
         const netGreen = billedGreen - paidGreen;
         const netLathe = totalLatheBilled - paidLathe;
 
-        // Update Dashboard Display
         document.getElementById('eodNetCash').innerText = `₹${Math.floor(netCash)}`;
         document.getElementById('eodUpi').innerText = `₹${Math.floor(totalUpi)}`;
         document.getElementById('eodExp').innerText = `₹${Math.floor(totalExp)}`;
@@ -313,7 +322,6 @@
         document.getElementById('eodLathePaid').innerText = Math.floor(paidLathe);
         document.getElementById('eodLatheNet').innerHTML = `₹${Math.floor(netLathe)} <span style="font-size:0.8rem;">${netLathe >= 0 ? 'Owed' : 'Overpaid'}</span>`;
 
-        // Update EOD Thermal Print Display
         document.getElementById('ptEodDate').innerText = new Date(targetDate).toLocaleDateString('en-IN');
         document.getElementById('ptEodTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
         document.getElementById('ptUpi').innerText = `₹${Math.floor(totalUpi)}`;
@@ -325,7 +333,6 @@
         document.getElementById('ptLathe').innerText = `₹${Math.floor(netLathe)}`;
     }
 
-    // --- LOG CASH HANDOVER (VENDOR PAYOUT) ---
     async function commitCashHandover() {
         const vendor = document.getElementById('payoutVendor').value;
         const amount = parseFloat(document.getElementById('payoutAmount').value) || 0;
@@ -334,34 +341,24 @@
         if (amount <= 0) return alert("Enter a valid amount.");
 
         const { error } = await supabaseClient.from('workshop_expenses').insert({
-            expense_category: 'Vendor Payout',
-            stakeholder_id: vendor,
-            amount: amount,
-            note: note,
-            recorded_by: sessionRole
+            expense_category: 'Vendor Payout', stakeholder_id: vendor, amount: amount, note: note, recorded_by: sessionRole
         });
 
-        if (error) {
-            alert("Database Error."); return;
-        }
+        if (error) return alert("Database Error.");
 
-        // Setup Thermal Receipt for Handover
         document.getElementById('ptHOdate').innerText = new Date().toLocaleDateString('en-IN');
         document.getElementById('ptHOtime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
         document.getElementById('ptHOvendor').innerText = vendor;
         document.getElementById('ptHOamount').innerText = `₹${amount}`;
         document.getElementById('ptHOnote').innerText = note;
 
-        // Reset fields & refresh
         document.getElementById('payoutAmount').value = '0';
         document.getElementById('payoutNote').value = '';
-        runEodReport(); // instantly recalculates net cash and net owed
         
-        // Print Receipt automatically
+        runEodReport();
         triggerPrint('printHandoverContainer');
     }
 
-    // --- OTHER TABS (Analytics, Promos, Wallets) ---
     async function runNewCustomerReport() {
         const range = document.getElementById('dateRange').value; const tbody = document.getElementById('analyticsTableBody'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Scanning database...</td></tr>';
         let startDate = new Date(); if(range === 'today') { startDate.setHours(0,0,0,0); } else if(range === 'week') { startDate.setDate(startDate.getDate() - 7); } else if(range === 'month') { startDate.setDate(startDate.getDate() - 30); } else if(range === 'all') { startDate = new Date(2020, 0, 1); }
@@ -409,7 +406,6 @@
         document.getElementById('repCustWallet').innerText = `₹${Math.floor(cSum)}`; document.getElementById('repMechWallet').innerText = `${Math.floor(mSum)} Pts`;
     }
 
-    // Auto-load EOD report on startup
     runEodReport();
 </script>
 </body>
