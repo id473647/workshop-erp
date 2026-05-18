@@ -220,11 +220,7 @@
             activeJobContext = job; document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`; document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`; document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
-            // Load attached photo if exists!
-            if (job.photo_url) {
-                document.getElementById('btnViewPhoto').style.display = 'inline-block';
-                document.getElementById('attachedImagePreview').src = job.photo_url;
-            }
+            if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
 
             if (job.customer_mobile) {
                 const { data: custData } = await supabaseClient.from('customers').select('name, global_discount_coupon, loyalty_points').eq('mobile_number', job.customer_mobile).single();
@@ -252,10 +248,7 @@
 
     async function fetchApplicableProtocols(catGroup) {
         const sel = document.getElementById('serviceProtocolSelect'); sel.innerHTML = '<option value="">+ Inject Fixed Protocol Module...</option>';
-        if(catGroup) {
-            const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true });
-            if(pkgs && pkgs.length > 0) pkgs.forEach(p => { sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; });
-        }
+        if(catGroup) { const { data: pkgs } = await supabaseClient.from('service_packages').select('*').eq('vehicle_category', catGroup).order('base_rate', { ascending: true }); if(pkgs && pkgs.length > 0) pkgs.forEach(p => { sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; }); }
     }
 
     async function addFixedProtocol() {
@@ -291,22 +284,50 @@
     }
 
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
+    
     function queryCatalogAutocomplete(inputRef) {
-        const searchVal = inputRef.value.trim().toLowerCase(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
+        const searchVal = inputRef.value.trim().toLowerCase(); 
+        const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
-        const filtered = globalCatalogCache.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 10);
-        if(filtered.length > 0) { filtered.forEach(p => { listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${p.brand.replace(/'/g,"\\'")}', ${p.default_price || 0})"><strong>${p.item_name}</strong> (${p.brand})</div>`; }); listContainer.style.display = 'block'; } else listContainer.style.display = 'none';
+        
+        const searchTokens = searchVal.split(' ').filter(token => token.length > 0);
+        
+        const filtered = globalCatalogCache.filter(item => {
+            const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase();
+            return searchTokens.every(token => searchableText.includes(token));
+        }).slice(0, 10);
+        
+        if(filtered.length > 0) { 
+            filtered.forEach(p => { 
+                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0})"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
+            }); 
+            listContainer.style.display = 'block'; 
+        } else {
+            listContainer.style.display = 'none';
+        }
     }
+    
     function hideAutocomplete() { setTimeout(() => { document.getElementById('autolist-n').style.display = 'none'; }, 200); }
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate) { document.getElementById('nPart').value = nameStr; document.getElementById('nBrand').value = brandStr; document.getElementById('nRate').value = defaultRate; document.getElementById('autolist-n').style.display = 'none'; }
     
     async function pushItemToJobCard() {
-        const partStr = document.getElementById('nPart').value.trim(); const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; const typeSelect = document.getElementById('nType').value; const qVal = parseFloat(document.getElementById('nQty').value) || 1; const rVal = parseFloat(document.getElementById('nRate').value) || 0;
-        if(!partStr) return; const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); const cleanName = partStr.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); const cleanBrand = brandStr.toUpperCase();
+        const partStr = document.getElementById('nPart').value.trim(); 
+        const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
+        const typeSelect = document.getElementById('nType').value; 
+        const qVal = parseFloat(document.getElementById('nQty').value) || 1; 
+        const rVal = parseFloat(document.getElementById('nRate').value) || 0;
+        if(!partStr) return; 
+        
+        const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
+        
+        const cleanName = partStr.toUpperCase(); 
+        const cleanBrand = brandStr.toUpperCase();
+        
         supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget }).then();
         const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: wareTarget, item_name: `${cleanName} (${cleanBrand})`, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost });
         if(!error) { document.getElementById('nPart').value = ''; document.getElementById('nQty').value = '1'; document.getElementById('nRate').value = '0'; loadInventoryLedgers(); }
     }
+    
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
