@@ -52,31 +52,44 @@
 <body>
 
 <nav class="sticky-nav">
-    <a href="index.html" class="nav-anchor">← FLOOR CONSOLE</a><a href="index.html" class="center-home-btn">🏠 HOME</a><span id="roleTag" class="badge-role">GUEST</span>
+    <a href="index.html" class="nav-anchor">← FLOOR CONSOLE</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span id="roleTag" class="badge-role">GUEST</span>
 </nav>
 
 <div class="container">
     <div id="bannerAsset" class="context-banner">
         <div style="flex: 1;">
-            <div class="plate-header" id="regPlate">Loading...</div>
-            <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing...</span>
-            <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Tech: --</span>
+            <div class="plate-header" id="regPlate">Loading active instance...</div>
+            <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
+            <span id="mechLabel" class="meta-text" style="color:var(--primary); font-weight:700; display:block;">Assigned Tech: --</span>
         </div>
+        
         <div style="flex: 1.5; text-align: center; display: flex; flex-direction: column; justify-content: center; padding: 0 15px;">
             <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-bottom: 4px;">Problem: --</div>
-            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--primary);">Protocols: Standard</div>
+            <button id="btnViewPhoto" onclick="document.getElementById('modalPhoto').style.display='flex'" style="display:none; background:var(--info); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer; margin: 0 auto 6px auto; width: fit-content;">📸 View Attached Photo</button>
+            <div id="protocolLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--primary);">Protocols: Standard Variable Labor</div>
         </div>
+        
         <div style="flex: 1; text-align: right;">
             <div id="prepaidPill" class="prepaid-badge">Paid Advance: ₹0</div>
         </div>
     </div>
 
+    <div id="modalPhoto" class="overlay-modal">
+        <div class="modal-card" style="text-align:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+                <h3 style="margin:0; color:var(--primary);">Visual Attachment</h3>
+                <button onclick="document.getElementById('modalPhoto').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+            </div>
+            <img id="attachedImagePreview" src="" style="max-width:100%; max-height:60vh; border-radius:8px; border:1px solid var(--border);">
+        </div>
+    </div>
+
     <div id="amcVoucherBlock" style="display:none; background:#ecfdf5; padding:16px; border-radius:8px; border:1px solid #a7f3d0; margin-bottom:16px;">
-        <span style="font-size:0.85rem; font-weight:bold; color:#047857; display:block; margin-bottom:8px;">🎁 Active Vouchers Found</span>
+        <span style="font-size:0.85rem; font-weight:bold; color:#047857; display:block; margin-bottom:8px;">🎁 Active Subscription Vouchers Found</span>
         <div style="display:flex; gap:12px; align-items:center;">
-            <select id="activeVoucherSelect" style="flex:1; padding:10px; border-radius:6px; border:1px solid #34d399; font-weight:bold;" onchange="compileDynamicSums()">
-                <option value="">-- Do Not Apply Voucher --</option>
-            </select>
+            <select id="activeVoucherSelect" style="flex:1; padding:10px; border-radius:6px; border:1px solid #34d399; font-weight:bold;" onchange="compileDynamicSums()"><option value="">-- Do Not Apply Voucher --</option></select>
         </div>
     </div>
 
@@ -207,6 +220,12 @@
             activeJobContext = job; document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; document.getElementById('mechLabel').innerText = `Floor Tech: ${job.mechanics?.name || 'Unassigned'}`; document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${parseFloat(job.advance_paid) || 0}`; document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
+            // Load attached photo if exists!
+            if (job.photo_url) {
+                document.getElementById('btnViewPhoto').style.display = 'inline-block';
+                document.getElementById('attachedImagePreview').src = job.photo_url;
+            }
+
             if (job.customer_mobile) {
                 const { data: custData } = await supabaseClient.from('customers').select('name, global_discount_coupon, loyalty_points').eq('mobile_number', job.customer_mobile).single();
                 if (custData) {
@@ -214,10 +233,8 @@
                     customerWalletBalance = parseFloat(custData.loyalty_points) || 0;
                     if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); }
                 }
-                
                 const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
                 if(subs && subs.length > 0) customerHasActiveSubscription = true;
-
                 const { data: vouchers } = await supabaseClient.from('amc_vouchers').select('*').eq('customer_mobile', job.customer_mobile).eq('is_redeemed', false).gt('expires_at', new Date().toISOString());
                 if(vouchers && vouchers.length > 0) {
                     const sel = document.getElementById('activeVoucherSelect'); let hasMatch = false;
@@ -301,7 +318,6 @@
         });
 
         let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); }
-        
         activeVoucherWaiverValue = 0; const vDrop = document.getElementById('activeVoucherSelect');
         if(vDrop && vDrop.value !== "") activeVoucherWaiverValue = servicePkgGrossTotal;
 
@@ -370,7 +386,7 @@
                     const { data: engSub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: 'Engine Restoration', amount_paid: 0, expires_at: d6.toISOString(), services_logged: 0 }).select().single();
                     if (engSub) {
                         const engPromises = schedule.map((svc, index) => { return supabaseClient.from('amc_vouchers').insert({ subscription_id: engSub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `ENG-${engSub.id.substring(0,4).toUpperCase()}-S${index+1}`, voucher_type: svc.type, valid_from: new Date(), expires_at: svc.exp, mechanic_payout_eligible: svc.type === 'ENGINE_PAID' }); });
-                        await Promise.all(engPromises); alert(`Engine Guarantee Activated!`);
+                        await Promise.all(engPromises); alert(`Engine Guarantee Activated! 6 scheduled tracking vouchers generated.`);
                     }
                 }
                 populateReceiptDocument(modeTarget, netVal, updates); document.getElementById('modalReceipt').style.display = 'flex';
