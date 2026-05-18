@@ -29,6 +29,15 @@
         .amc-highlight { background: #fefce8; border-left: 4px solid var(--service); }
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
         .rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; } .rep-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px; } .rep-val { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
+        
+        /* Thermal Print Styles for Hindi Contract */
+        .contract-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.8rem; line-height: 1.3; margin: 0 auto; box-sizing: border-box; }
+        .print-btn { background:#0369a1; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer; margin-top:4px; display:flex; align-items:center; gap:4px; }
+        @media print {
+            body * { visibility: hidden; }
+            #printContractContainer, #printContractContainer * { visibility: visible; }
+            #printContractContainer { display: block; position: absolute; left: 0; top: 0; width: 300px; padding: 0; margin: 0; }
+        }
     </style>
 </head>
 <body>
@@ -42,6 +51,31 @@
 </nav>
 
 <div class="wrapper">
+    <div id="printContractContainer" class="contract-print-area">
+        <div style="text-align:center; border-bottom:1px dashed black; padding-bottom:8px; margin-bottom:8px;">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" style="height:30px; filter:grayscale(100%); margin-bottom:4px;">
+            <div style="font-size:1.1rem; font-weight:bold;">My Care Service Center</div>
+            <div style="font-size:0.75rem;">Gurudwara Road, Ganj Betul</div>
+            <div style="font-size:0.75rem;">PH: 9425002214, 8989171751</div>
+        </div>
+        <div style="text-align:center; font-weight:bold; font-size:0.9rem; margin-bottom:8px; text-transform:uppercase;" id="ptTitle">--</div>
+        
+        <div style="font-size:0.75rem; margin-bottom:2px;">Date: <span id="ptDate">--</span></div>
+        <div style="font-size:0.75rem; margin-bottom:2px;">Customer: <strong id="ptName">--</strong></div>
+        <div style="font-size:0.75rem; margin-bottom:2px;">Mobile: <strong id="ptMobile">--</strong></div>
+        <div style="font-size:0.75rem; margin-bottom:8px;">Vehicle: <strong id="ptVehicle">--</strong></div>
+        
+        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.85rem; text-align:center;">नियम व शर्तें (Terms & Conditions)</div>
+        <div id="ptRules" style="font-size:0.75rem; text-align:left; margin-top:6px; line-height:1.5;"></div>
+        
+        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.85rem; text-align:center;">सर्विस शेड्यूल / वाउचर (Schedule)</div>
+        <div id="ptSchedule" style="font-size:0.75rem; margin-top:6px; line-height:1.6;"></div>
+        
+        <div style="text-align:center; font-size:0.7rem; border-top:1px dashed black; padding-top:8px; margin-top:12px;">
+            यह सिस्टम जनरेटेड डिजिटल कॉन्ट्रैक्ट है।<br>हस्ताक्षर की आवश्यकता नहीं है।
+        </div>
+    </div>
+
     <div id="hubGrid" class="utility-workspace active">
         <div class="block-title" style="margin-bottom:20px;">Enterprise CRM & Logic Configuration</div>
         <div class="utility-grid">
@@ -194,10 +228,66 @@
         clientList?.forEach(c => {
             const mySubs = (subs || []).filter(s => s.customer_mobile === c.mobile_number);
             let amcHtml = '<span style="color:#94a3b8; font-size:0.75rem;">No Active AMC</span>';
-            if(mySubs && mySubs.length > 0) { amcHtml = ''; mySubs.forEach(mySub => { const expStr = new Date(mySub.expires_at).toLocaleDateString('en-IN'); if(mySub.plan_type === 'Panch Par Ek') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--success); font-weight:bold; font-size:0.75rem;">Loyalty: ${mySub.services_logged||0}/5 Done</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } else if (mySub.plan_type === 'Engine Restoration') { amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--primary); font-weight:bold; font-size:0.75rem;">Engine Guar: Active</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } else { const openVouchers = mySub.amc_vouchers ? mySub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; amcHtml += `<div style="margin-bottom:4px;"><span style="color:var(--info); font-weight:bold; font-size:0.75rem;">Prepaid AMC: ${openVouchers} Left</span><br><small style="color:var(--danger);">Expires: ${expStr}</small></div>`; } }); }
+            if(mySubs && mySubs.length > 0) { 
+                amcHtml = ''; 
+                mySubs.forEach(mySub => { 
+                    const expStr = new Date(mySub.expires_at).toLocaleDateString('en-IN'); 
+                    const printBtn = `<button class="print-btn" onclick="printThermalContract('${mySub.id}', '${c.mobile_number}')">🖨️ PRINT RULES</button>`;
+                    
+                    if(mySub.plan_type === 'Panch Par Ek') { amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--success); font-weight:bold; font-size:0.75rem;">Loyalty: ${mySub.services_logged||0}/5 Done</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                    else if (mySub.plan_type === 'Engine Restoration') { amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--primary); font-weight:bold; font-size:0.75rem;">Engine Guar: Active</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                    else { const openVouchers = mySub.amc_vouchers ? mySub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--info); font-weight:bold; font-size:0.75rem;">Prepaid AMC: ${openVouchers} Left</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                }); 
+            }
             const tierOptions = ['Regular', 'Silver', 'Gold', 'Platinum'].map(t => `<option value="${t}" ${c.category === t ? 'selected' : ''}>${t}</option>`).join(''); const tierSelectHtml = `<select class="editable-select" onchange="stageTierUpdate('${c.mobile_number}', this.value)">${tierOptions}</select>`;
             cBody.innerHTML += `<tr class="${mySubs.length > 0 ? 'amc-highlight' : ''}"><td><span class="clickable-ref" onclick="openCustomerReportModal('${c.mobile_number}')">${c.mobile_number}</span></td><td>${c.name || 'Unnamed'}</td><td>${tierSelectHtml}</td><td>${amcHtml}</td></tr>`;
         });
+    }
+
+    // --- NEW THERMAL HINDI CONTRACT PRINTER ---
+    async function printThermalContract(subId, mobile) {
+        // Fetch Sub & Customer & Vouchers & Vehicle
+        const { data: sub } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').eq('id', subId).single();
+        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', mobile).single();
+        if(!sub || !cust) return;
+
+        let vehStr = "All Registered (Fleet)";
+        if(sub.vehicle_id) {
+            const v = cust.vehicles.find(veh => veh.id === sub.vehicle_id);
+            if(v) vehStr = `${v.reg_number} (${v.make_model})`;
+        }
+
+        document.getElementById('ptDate').innerText = new Date().toLocaleDateString('en-IN');
+        document.getElementById('ptName').innerText = cust.name;
+        document.getElementById('ptMobile').innerText = mobile;
+        document.getElementById('ptVehicle').innerText = vehStr;
+
+        let rulesHtml = ""; let scheduleHtml = "";
+        
+        if (sub.plan_type === 'Engine Restoration') {
+            document.getElementById('ptTitle').innerText = "इंजन वारंटी एग्रीमेंट";
+            rulesHtml = `1. ये वारंटी 1 साल या 35000 किमी (जो पहले हो) तक मान्य है।<br>2. वारंटी केवल निर्धारित समय पर माय केयर सर्विस सेंटर में सर्विस कराने पर मान्य है।<br>3. समय से 15 दिन से अधिक देरी होने पर सिस्टम द्वारा वारंटी स्वतः रद्द हो जाएगी।<br>4. यह गारंटी रिपेयर (लेबर) के लिए है। स्पेयर पार्ट रिप्लेसमेंट 50-50 (आधा खर्च ग्राहक का) होगा। लेबर फ्री रहेगा।<br>5. सर्विस कूपन आपके मोबाइल नंबर पर डिजिटल रूप से लिंक हैं। कागज़ लाना अनिवार्य नहीं।<br>6. अन्य खामियों (फ्यूचर एडवाइस में लिखित) के कारण शिकायत की जवाबदेही सेंटर की नहीं होगी।`;
+            
+            sub.amc_vouchers.sort((a,b) => new Date(a.expires_at) - new Date(b.expires_at)).forEach((v, index) => {
+                const isFree = v.voucher_type === 'ENGINE_FREE' ? 'FREE' : 'PAID';
+                scheduleHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px dotted #ccc; margin-bottom:2px;"><span>${index+1}. ${isFree} Service</span><strong>By ${new Date(v.expires_at).toLocaleDateString('en-IN')}</strong></div>`;
+            });
+        } 
+        else if (sub.plan_type === 'Prepaid AMC') {
+            document.getElementById('ptTitle').innerText = "प्रीपेड AMC एग्रीमेंट";
+            rulesHtml = `1. यह पैकेज 1 वर्ष (या 4 सर्विस) के लिए मान्य है।<br>2. स्पेयर पार्ट्स पर 5% की अतिरिक्त छूट लागू है।<br>3. आपके 4 प्रीमियम सर्विस वाउचर आपके मोबाइल नंबर पर डिजिटल रूप से सुरक्षित हैं।`;
+            scheduleHtml = `<b>4x Premium Service Vouchers Active</b><br>Expires on: ${new Date(sub.expires_at).toLocaleDateString('en-IN')}`;
+        }
+        else if (sub.plan_type === 'Panch Par Ek') {
+            document.getElementById('ptTitle').innerText = "लॉयल्टी प्रोग्राम (5-पर-1)";
+            rulesHtml = `1. यह प्लान 2 वर्ष के लिए मान्य है।<br>2. 5 प्रीमियम/जंबो सर्विस पूरी करने पर 1 सर्विस का लेबर चार्ज बिल्कुल मुफ्त मिलेगा।<br>3. ट्रैकिंग आपके मोबाइल नंबर पर सिस्टम द्वारा की जा रही है।`;
+            scheduleHtml = `<b>Loyalty Active</b><br>Current Status: ${sub.services_logged||0}/5 Services Done<br>Expires on: ${new Date(sub.expires_at).toLocaleDateString('en-IN')}`;
+        }
+
+        document.getElementById('ptRules').innerHTML = rulesHtml;
+        document.getElementById('ptSchedule').innerHTML = scheduleHtml;
+
+        window.print();
     }
 
     async function stageTierUpdate(mobile, newTier) { await supabaseClient.from('customers').update({ category: newTier }).eq('mobile_number', mobile); compileCustomerManagementLedgers(); }
