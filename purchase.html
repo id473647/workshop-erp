@@ -61,7 +61,7 @@
         </div>
         <div class="field-group">
             <label>Paper Invoice / Bill Number</label>
-            <input type="text" id="billNumber" placeholder="e.g. INV-2026-894">
+            <input type="text" id="billNumber" placeholder="e.g. INV-2026-894" oninput="this.value=this.value.toUpperCase()">
         </div>
         <div class="field-group">
             <label>Billing Date</label>
@@ -79,7 +79,7 @@
         </div>
         <div class="field-group">
             <label>Brand (Optional)</label>
-            <input type="text" id="nBrand" placeholder="e.g. HERO">
+            <input type="text" id="nBrand" placeholder="e.g. HERO" oninput="this.value=this.value.toUpperCase()">
         </div>
         <div class="field-group">
             <label>Qty Received</label>
@@ -118,17 +118,14 @@
     let globalCatalog = [];
     let stagedItems = [];
 
-    // Set today's date default
     document.getElementById('billDate').valueAsDate = new Date();
 
     async function initPurchasePortal() {
-        // Load Vendors
         const { data: vendors } = await supabaseClient.from('vendors').select('*').order('vendor_name');
         const vSel = document.getElementById('vendorSelect');
         vSel.innerHTML = '<option value="">-- Select Vendor --</option>';
         vendors?.forEach(v => vSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`);
 
-        // Prefetch Catalog
         const { data: prods } = await supabaseClient.from('product_master').select('*');
         globalCatalog = prods || [];
     }
@@ -137,10 +134,7 @@
         const vName = prompt("Enter new Supplier/Vendor Name:");
         if (vName) {
             const { data, error } = await supabaseClient.from('vendors').insert({ vendor_name: vName.toUpperCase() }).select().single();
-            if (!error && data) {
-                alert("Vendor added!");
-                initPurchasePortal();
-            }
+            if (!error && data) { alert("Vendor added!"); initPurchasePortal(); }
         }
     }
 
@@ -149,11 +143,16 @@
         const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
         
-        const filtered = globalCatalog.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 10);
+        const searchTokens = searchVal.split(' ').filter(token => token.length > 0);
+        
+        const filtered = globalCatalog.filter(item => {
+            const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase();
+            return searchTokens.every(token => searchableText.includes(token));
+        }).slice(0, 10);
         
         if(filtered.length > 0) { 
             filtered.forEach(p => { 
-                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'Std'})</span></div>`; 
+                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
             }); 
             listContainer.style.display = 'block'; 
         } else {
@@ -175,9 +174,7 @@
 
         if (!pName || qty <= 0) return alert("Valid Part Name and Quantity required.");
 
-        // Title Case the Name
-        pName = pName.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        
+        pName = pName.toUpperCase();
         const unitCost = tCost / qty;
 
         stagedItems.push({
@@ -188,23 +185,17 @@
             unit_cost: unitCost
         });
 
-        // Reset fields
         document.getElementById('nPart').value = '';
         document.getElementById('nBrand').value = '';
         document.getElementById('nQty').value = '1';
         document.getElementById('nCost').value = '0';
-        
         renderGrid();
     }
 
-    function removeStagedItem(index) {
-        stagedItems.splice(index, 1);
-        renderGrid();
-    }
+    function removeStagedItem(index) { stagedItems.splice(index, 1); renderGrid(); }
 
     function renderGrid() {
-        const tbody = document.getElementById('purchaseGrid');
-        tbody.innerHTML = '';
+        const tbody = document.getElementById('purchaseGrid'); tbody.innerHTML = '';
         let grandTotal = 0;
 
         if (stagedItems.length === 0) {
@@ -212,15 +203,7 @@
         } else {
             stagedItems.forEach((item, index) => {
                 grandTotal += item.total_cost;
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>${item.item_name}</strong><br><small style="color:#64748b;">${item.brand}</small></td>
-                        <td>${item.qty}</td>
-                        <td>₹${item.total_cost.toFixed(2)}</td>
-                        <td style="color:var(--info); font-weight:bold;">₹${item.unit_cost.toFixed(2)}</td>
-                        <td><button onclick="removeStagedItem(${index})" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer; font-size:1.1rem;">×</button></td>
-                    </tr>
-                `;
+                tbody.innerHTML += `<tr><td><strong>${item.item_name}</strong><br><small style="color:#64748b;">${item.brand}</small></td><td>${item.qty}</td><td>₹${item.total_cost.toFixed(2)}</td><td style="color:var(--info); font-weight:bold;">₹${item.unit_cost.toFixed(2)}</td><td><button onclick="removeStagedItem(${index})" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer; font-size:1.1rem;">×</button></td></tr>`;
             });
         }
         document.getElementById('grandTotalDisplay').innerText = grandTotal.toFixed(2);
@@ -234,71 +217,36 @@
         if (!vendorId) return alert("Please select a vendor.");
         if (stagedItems.length === 0) return alert("Add at least one item to the invoice.");
 
-        const btn = document.getElementById('btnCommit');
-        btn.innerText = "PROCESSING... DO NOT CLOSE";
-        btn.disabled = true;
-
+        const btn = document.getElementById('btnCommit'); btn.innerText = "PROCESSING... DO NOT CLOSE"; btn.disabled = true;
         let grandTotal = stagedItems.reduce((sum, item) => sum + item.total_cost, 0);
 
-        // 1. Create Purchase Invoice Master Record
         const { data: invData, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
-            vendor_id: vendorId,
-            invoice_number: billNo || 'N/A',
-            invoice_date: bDate,
-            total_bill_amount: grandTotal,
-            recorded_by: sessionRole
+            vendor_id: vendorId, invoice_number: billNo || 'N/A', invoice_date: bDate, total_bill_amount: grandTotal, recorded_by: sessionRole
         }).select().single();
 
-        if (invErr) {
-            alert("Error saving invoice header.");
-            btn.innerText = "SAVE INVOICE & UPDATE INVENTORY"; btn.disabled = false; return;
-        }
+        if (invErr) { alert("Error saving invoice header."); btn.innerText = "SAVE INVOICE & UPDATE INVENTORY"; btn.disabled = false; return; }
 
-        // 2. Loop through items to update Master Stock and MAC
         for (let item of stagedItems) {
-            // Find existing product to calculate MAC
             const existingProduct = globalCatalog.find(p => p.item_name === item.item_name && p.brand === item.brand);
-            
-            let newStock = item.qty;
-            let newMac = item.unit_cost;
+            let newStock = item.qty; let newMac = item.unit_cost;
 
             if (existingProduct) {
                 const oldStock = parseInt(existingProduct.current_stock) || 0;
                 const oldMac = parseFloat(existingProduct.mac) || 0;
-                
-                // Avoid dividing by zero if stock is negative
                 const effectiveOldStock = oldStock > 0 ? oldStock : 0;
                 const totalNewStock = effectiveOldStock + item.qty;
-                
-                // MAC Formula = [ (Old Stock * Old MAC) + (New Qty * New Unit Cost) ] / Total New Stock
                 newMac = ((effectiveOldStock * oldMac) + (item.total_cost)) / totalNewStock;
-                newStock = oldStock + item.qty; // Actual real stock (even if recovering from negative)
+                newStock = oldStock + item.qty; 
             }
 
-            // Upsert into Product Master
             await supabaseClient.from('product_master').upsert({
-                item_name: item.item_name,
-                brand: item.brand,
-                warehouse_type: 'Service', // Defaulting to main shop floor
-                current_stock: newStock,
-                mac: newMac
+                item_name: item.item_name, brand: item.brand, warehouse_type: 'Service', current_stock: newStock, mac: newMac
             }, { onConflict: 'item_name, brand' });
 
-            // Insert Line Item to Invoice History
-            await supabaseClient.from('purchase_invoice_items').insert({
-                purchase_invoice_id: invData.id,
-                item_name: item.item_name,
-                brand: item.brand,
-                qty: item.qty,
-                total_cost: item.total_cost,
-                unit_cost: item.unit_cost
-            });
+            await supabaseClient.from('purchase_invoice_items').insert({ purchase_invoice_id: invData.id, item_name: item.item_name, brand: item.brand, qty: item.qty, total_cost: item.total_cost, unit_cost: item.unit_cost });
         }
-
-        alert("✅ Inventory Successfully Updated & MAC Recalculated!");
-        window.location.reload();
+        alert("✅ Inventory Successfully Updated & MAC Recalculated!"); window.location.reload();
     }
-
     initPurchasePortal();
 </script>
 </body>
