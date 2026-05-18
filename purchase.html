@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase & Inventory Intake - My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --warning: #f59e0b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); padding-bottom: 40px; }
+        .sticky-nav { max-width: 1000px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
+        .badge-role { background: var(--warning); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        
+        .container { max-width: 1000px; margin: 20px auto; padding: 24px; background: white; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.03); box-sizing: border-box; }
+        .block-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .field-group { display: flex; flex-direction: column; gap: 6px; position: relative; } 
+        label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; } 
+        input, select { padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-weight: bold; color: var(--primary); box-sizing: border-box; }
+        
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.95rem; transition: opacity 0.15s; }
+        .btn-success { background: var(--success); color: white; width: 100%; margin-top: 20px; font-size: 1.1rem; padding: 16px; }
+        .btn-link { background: none; color: var(--info); border: 1px dashed var(--info); padding: 8px 12px; font-size: 0.8rem; }
+        
+        .entry-strip { display: flex; flex-wrap: wrap; gap: 10px; background: #f8fafc; padding: 16px; border: 1px solid var(--border); border-radius: 8px; align-items: flex-end; margin-bottom: 20px; }
+        .entry-strip > div:nth-child(1) { flex: 3 1 250px; } .entry-strip > div:nth-child(2) { flex: 2 1 150px; } .entry-strip > div:nth-child(3) { flex: 1 1 100px; } .entry-strip > div:nth-child(4) { flex: 1.5 1 120px; }
+        .btn-add { background: var(--primary); color: white; border: none; height: 45px; width: 60px; border-radius: 8px; font-size: 1.5rem; font-weight: bold; cursor: pointer; }
+        
+        .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
+        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; } .autocomplete-item:hover { background: #f0f7ff; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+        th { background: #f1f5f9; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 2px solid var(--border); }
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        
+        .valuation-banner { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: right; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+    <a href="utility-router.html" class="nav-anchor">← BACK TO SETTINGS</a>
+    <a href="index.html" class="center-home-btn">🏠 HOME</a>
+    <span class="badge-role">PURCHASE / INVENTORY</span>
+</nav>
+
+<div class="container">
+    <div class="block-title">
+        Step 1: Supplier Invoice Details
+        <button class="btn btn-link" onclick="promptNewVendor()">+ Add New Vendor</button>
+    </div>
+    
+    <div class="inputs-grid">
+        <div class="field-group">
+            <label>Select Supplier / Vendor</label>
+            <select id="vendorSelect"><option value="">-- Select Vendor --</option></select>
+        </div>
+        <div class="field-group">
+            <label>Paper Invoice / Bill Number</label>
+            <input type="text" id="billNumber" placeholder="e.g. INV-2026-894">
+        </div>
+        <div class="field-group">
+            <label>Billing Date</label>
+            <input type="date" id="billDate">
+        </div>
+    </div>
+
+    <div class="block-title" style="margin-top: 32px;">Step 2: Scan / Enter Products</div>
+    
+    <div class="entry-strip">
+        <div class="field-group">
+            <label>Part Name / SKU</label>
+            <input type="text" id="nPart" placeholder="Type to search or create new..." oninput="queryCatalogAutocomplete(this)" autocomplete="off">
+            <div id="autolist-n" class="autocomplete-container"></div>
+        </div>
+        <div class="field-group">
+            <label>Brand (Optional)</label>
+            <input type="text" id="nBrand" placeholder="e.g. HERO">
+        </div>
+        <div class="field-group">
+            <label>Qty Received</label>
+            <input type="number" id="nQty" value="1" min="1">
+        </div>
+        <div class="field-group">
+            <label>Total Cost Paid (₹)</label>
+            <input type="number" id="nCost" placeholder="For all Qty" value="0" min="0">
+        </div>
+        <button class="btn-add" onclick="stageItemToGrid()">+</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>Product Name & Brand</th><th>Qty</th><th>Total Cost Paid</th><th>Est. Unit Cost</th><th>Action</th></tr></thead>
+            <tbody id="purchaseGrid">
+                <tr><td colspan="5" style="text-align:center; color:#94a3b8; font-style:italic;">No items added to invoice yet.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="valuation-banner">
+        <span style="font-size:1rem; color:#d97706;">Total Bill Value:</span>
+        <span>₹<span id="grandTotalDisplay">0</span></span>
+    </div>
+
+    <button id="btnCommit" class="btn btn-success" onclick="commitPurchaseInvoice()">SAVE INVOICE & UPDATE INVENTORY</button>
+</div>
+
+<script>
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin';
+    
+    let globalCatalog = [];
+    let stagedItems = [];
+
+    // Set today's date default
+    document.getElementById('billDate').valueAsDate = new Date();
+
+    async function initPurchasePortal() {
+        // Load Vendors
+        const { data: vendors } = await supabaseClient.from('vendors').select('*').order('vendor_name');
+        const vSel = document.getElementById('vendorSelect');
+        vSel.innerHTML = '<option value="">-- Select Vendor --</option>';
+        vendors?.forEach(v => vSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`);
+
+        // Prefetch Catalog
+        const { data: prods } = await supabaseClient.from('product_master').select('*');
+        globalCatalog = prods || [];
+    }
+
+    async function promptNewVendor() {
+        const vName = prompt("Enter new Supplier/Vendor Name:");
+        if (vName) {
+            const { data, error } = await supabaseClient.from('vendors').insert({ vendor_name: vName.toUpperCase() }).select().single();
+            if (!error && data) {
+                alert("Vendor added!");
+                initPurchasePortal();
+            }
+        }
+    }
+
+    function queryCatalogAutocomplete(inputRef) {
+        const searchVal = inputRef.value.trim().toLowerCase(); 
+        const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
+        if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
+        
+        const filtered = globalCatalog.filter(item => item.item_name.toLowerCase().includes(searchVal)).slice(0, 10);
+        
+        if(filtered.length > 0) { 
+            filtered.forEach(p => { 
+                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'Std'})</span></div>`; 
+            }); 
+            listContainer.style.display = 'block'; 
+        } else {
+            listContainer.style.display = 'none';
+        }
+    }
+
+    function applySelectedCatalogItem(nameStr, brandStr) { 
+        document.getElementById('nPart').value = nameStr; 
+        document.getElementById('nBrand').value = brandStr; 
+        document.getElementById('autolist-n').style.display = 'none'; 
+    }
+
+    function stageItemToGrid() {
+        let pName = document.getElementById('nPart').value.trim();
+        let pBrand = document.getElementById('nBrand').value.trim().toUpperCase() || 'STANDARD';
+        let qty = parseInt(document.getElementById('nQty').value) || 0;
+        let tCost = parseFloat(document.getElementById('nCost').value) || 0;
+
+        if (!pName || qty <= 0) return alert("Valid Part Name and Quantity required.");
+
+        // Title Case the Name
+        pName = pName.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        
+        const unitCost = tCost / qty;
+
+        stagedItems.push({
+            item_name: pName,
+            brand: pBrand,
+            qty: qty,
+            total_cost: tCost,
+            unit_cost: unitCost
+        });
+
+        // Reset fields
+        document.getElementById('nPart').value = '';
+        document.getElementById('nBrand').value = '';
+        document.getElementById('nQty').value = '1';
+        document.getElementById('nCost').value = '0';
+        
+        renderGrid();
+    }
+
+    function removeStagedItem(index) {
+        stagedItems.splice(index, 1);
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const tbody = document.getElementById('purchaseGrid');
+        tbody.innerHTML = '';
+        let grandTotal = 0;
+
+        if (stagedItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8; font-style:italic;">No items added to invoice yet.</td></tr>';
+        } else {
+            stagedItems.forEach((item, index) => {
+                grandTotal += item.total_cost;
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${item.item_name}</strong><br><small style="color:#64748b;">${item.brand}</small></td>
+                        <td>${item.qty}</td>
+                        <td>₹${item.total_cost.toFixed(2)}</td>
+                        <td style="color:var(--info); font-weight:bold;">₹${item.unit_cost.toFixed(2)}</td>
+                        <td><button onclick="removeStagedItem(${index})" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer; font-size:1.1rem;">×</button></td>
+                    </tr>
+                `;
+            });
+        }
+        document.getElementById('grandTotalDisplay').innerText = grandTotal.toFixed(2);
+    }
+
+    async function commitPurchaseInvoice() {
+        const vendorId = document.getElementById('vendorSelect').value;
+        const billNo = document.getElementById('billNumber').value.trim();
+        const bDate = document.getElementById('billDate').value;
+
+        if (!vendorId) return alert("Please select a vendor.");
+        if (stagedItems.length === 0) return alert("Add at least one item to the invoice.");
+
+        const btn = document.getElementById('btnCommit');
+        btn.innerText = "PROCESSING... DO NOT CLOSE";
+        btn.disabled = true;
+
+        let grandTotal = stagedItems.reduce((sum, item) => sum + item.total_cost, 0);
+
+        // 1. Create Purchase Invoice Master Record
+        const { data: invData, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
+            vendor_id: vendorId,
+            invoice_number: billNo || 'N/A',
+            invoice_date: bDate,
+            total_bill_amount: grandTotal,
+            recorded_by: sessionRole
+        }).select().single();
+
+        if (invErr) {
+            alert("Error saving invoice header.");
+            btn.innerText = "SAVE INVOICE & UPDATE INVENTORY"; btn.disabled = false; return;
+        }
+
+        // 2. Loop through items to update Master Stock and MAC
+        for (let item of stagedItems) {
+            // Find existing product to calculate MAC
+            const existingProduct = globalCatalog.find(p => p.item_name === item.item_name && p.brand === item.brand);
+            
+            let newStock = item.qty;
+            let newMac = item.unit_cost;
+
+            if (existingProduct) {
+                const oldStock = parseInt(existingProduct.current_stock) || 0;
+                const oldMac = parseFloat(existingProduct.mac) || 0;
+                
+                // Avoid dividing by zero if stock is negative
+                const effectiveOldStock = oldStock > 0 ? oldStock : 0;
+                const totalNewStock = effectiveOldStock + item.qty;
+                
+                // MAC Formula = [ (Old Stock * Old MAC) + (New Qty * New Unit Cost) ] / Total New Stock
+                newMac = ((effectiveOldStock * oldMac) + (item.total_cost)) / totalNewStock;
+                newStock = oldStock + item.qty; // Actual real stock (even if recovering from negative)
+            }
+
+            // Upsert into Product Master
+            await supabaseClient.from('product_master').upsert({
+                item_name: item.item_name,
+                brand: item.brand,
+                warehouse_type: 'Service', // Defaulting to main shop floor
+                current_stock: newStock,
+                mac: newMac
+            }, { onConflict: 'item_name, brand' });
+
+            // Insert Line Item to Invoice History
+            await supabaseClient.from('purchase_invoice_items').insert({
+                purchase_invoice_id: invData.id,
+                item_name: item.item_name,
+                brand: item.brand,
+                qty: item.qty,
+                total_cost: item.total_cost,
+                unit_cost: item.unit_cost
+            });
+        }
+
+        alert("✅ Inventory Successfully Updated & MAC Recalculated!");
+        window.location.reload();
+    }
+
+    initPurchasePortal();
+</script>
+</body>
+</html>
