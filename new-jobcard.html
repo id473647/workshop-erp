@@ -8,7 +8,7 @@
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; }
         .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
@@ -33,15 +33,19 @@
         .item-add-trigger { background: #fef3c7; color: #b45309; text-align: center; font-weight: 700; }
         .sales-pitch-banner { display: none; padding: 14px 20px; font-weight: bold; text-align: center; border-radius: 8px; margin-bottom: 20px; font-size: 0.95rem; animation: pulseBanner 2s infinite; }
         @keyframes pulseBanner { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
+        .upload-btn { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.85rem; width: 100%; margin-top: 8px; }
     </style>
 </head>
 <body>
+
 <nav class="sticky-nav">
     <a href="index.html" class="nav-anchor">← DASHBOARD</a><a href="index.html" class="center-home-btn">🏠 HOME</a><span class="badge-role">JOB CARD INTAKE</span>
 </nav>
+
 <div class="wrapper">
     <div id="salesPitch" class="sales-pitch-banner"></div>
     <div class="container">
+        
         <div id="step1" class="active-step">
             <div class="block-title">Customer Account Verification</div>
             <label style="margin-top:0;">1. Customer Mobile Number</label>
@@ -97,13 +101,21 @@
             <div id="activeTargetBadge" class="status-badge">--</div>
             <div class="block-title">Operational Directive Parameters</div>
             <textarea id="complaint" rows="3" placeholder="Outline active client intake statements explicitly"></textarea>
-            <div class="inputs-grid" style="margin-top:12px;">
+            
+            <div style="margin-top:8px;">
+                <input type="file" id="jcPhoto" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoSelection(this)">
+                <button class="upload-btn" onclick="document.getElementById('jcPhoto').click()">📸 CAPTURE VISUAL PROOF / ATTACHMENT</button>
+                <div id="photoStatus" style="color:var(--success); font-weight:bold; font-size:0.8rem; margin-top:4px; display:none; text-align:center;">✓ Photo successfully queued for upload.</div>
+            </div>
+
+            <div class="inputs-grid" style="margin-top:16px;">
                 <div class="field-group"><label style="margin-top:0;">Fixed Service Protocol</label><select id="serviceProtocolSelect" onchange="applyServiceProtocolRate()" style="color:var(--primary); font-weight:bold;"><option value="" data-rate="0">-- Standard / Custom Scope --</option></select></div>
                 <div class="field-group"><label style="margin-top:0;">Authorized Budget Estimate (₹)</label><input type="number" id="estimate" value="0" min="0"></div>
                 <div class="field-group"><label style="margin-top:0;" id="lblAdvance">Upfront Prepaid Advance (₹)</label><input type="number" id="prepaidBuffer" value="0" min="0"></div>
             </div>
             <div id="mechAssignmentBlock"><label style="margin-top:16px;">Assign Workshop Technician</label><select id="mechSelect" style="margin-top:4px;"></select></div>
-            <button class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">COMMIT JOB CARD & DISPATCH</button>
+            
+            <button id="btnSubmitJob" class="btn btn-success" style="margin-top:24px;" onclick="finalizeJobCardCreation()">COMMIT JOB CARD & DISPATCH</button>
         </div>
     </div>
 </div>
@@ -116,8 +128,21 @@
     if (activeRole === 'green' || activeRole === 'moped') { document.getElementById('mechAssignmentBlock').style.display = 'none'; document.getElementById('lblAdvance').innerText = `Upfront Prepaid Advance (${activeRole.charAt(0).toUpperCase() + activeRole.slice(1)} Ledger) (₹)`; }
 
     let evaluatedPhoneContext = null; let targetCustomerProfile = null; let activeVehId = null; let globalVehicleDirectory = []; let isCustomChassisMode = false; let hasActiveSubscription = false;
+    let selectedImageFile = null; // Holds the camera photo
 
     function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
+
+    // --- PHOTO HANDLING LOGIC ---
+    function handlePhotoSelection(input) {
+        if(input.files && input.files[0]) {
+            selectedImageFile = input.files[0];
+            document.getElementById('photoStatus').style.display = 'block';
+            document.querySelector('.upload-btn').style.background = '#dcfce7';
+            document.querySelector('.upload-btn').style.color = '#15803d';
+            document.querySelector('.upload-btn').style.borderColor = '#bbf7d0';
+            document.querySelector('.upload-btn').innerText = "📷 CHANGE PHOTO";
+        }
+    }
 
     async function processAutonomousPhoneSearch(phoneStringVal) {
         const cleanStr = phoneStringVal.trim(); const pitchBanner = document.getElementById('salesPitch'); pitchBanner.style.display = 'none'; hasActiveSubscription = false;
@@ -218,12 +243,48 @@
 
     function applyServiceProtocolRate() { const sel = document.getElementById('serviceProtocolSelect'); const rate = sel.options[sel.selectedIndex].getAttribute('data-rate'); if(rate > 0) document.getElementById('estimate').value = rate; }
 
+    // Enhanced Finalize Function with Image Upload Logic
     async function finalizeJobCardCreation() {
+        const btn = document.getElementById('btnSubmitJob');
+        btn.innerText = "Processing... Please wait"; btn.disabled = true;
+
         const mechIdValue = (activeRole === 'green' || activeRole === 'moped') ? null : (document.getElementById('mechSelect').value || null);
-        const { data: newJc } = await supabaseClient.from('job_cards').insert({ customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue, problem_mentioned: document.getElementById('complaint').value.trim(), estimate_given: parseFloat(document.getElementById('estimate').value) || 0, advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, source_role: activeRole, status: 'Open' }).select().single();
+        
+        // Step 1: Create the actual Job Card first
+        const { data: newJc, error: jcError } = await supabaseClient.from('job_cards').insert({ 
+            customer_mobile: evaluatedPhoneContext, vehicle_id: activeVehId, mech_id: mechIdValue, 
+            problem_mentioned: document.getElementById('complaint').value.trim(), 
+            estimate_given: parseFloat(document.getElementById('estimate').value) || 0, 
+            advance_paid: parseFloat(document.getElementById('prepaidBuffer').value) || 0, 
+            source_role: activeRole, status: 'Open' 
+        }).select().single();
+
+        if (jcError) { alert("Error creating Job Card: " + jcError.message); btn.innerText = "COMMIT JOB CARD & DISPATCH"; btn.disabled = false; return; }
+
         if(newJc) {
+            // Step 2: Push Fixed Protocol into items if selected
             const selProtocol = document.getElementById('serviceProtocolSelect'); const pkgName = selProtocol.value; const pkgRate = parseFloat(selProtocol.options[selProtocol.selectedIndex].getAttribute('data-rate')) || 0;
             if (pkgName && pkgRate > 0) { await supabaseClient.from('job_card_items').insert({ job_card_id: newJc.id, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate }); }
+            
+            // Step 3: Handle the Image Upload
+            if (selectedImageFile) {
+                btn.innerText = "Uploading Visual Proof...";
+                const fileExt = selectedImageFile.name.split('.').pop();
+                const fileName = `${newJc.id}_${Date.now()}.${fileExt}`;
+                
+                const { data: uploadData, error: uploadErr } = await supabaseClient.storage.from('job_card_photos').upload(fileName, selectedImageFile);
+
+                if (!uploadErr && uploadData) {
+                    const { data: publicUrlData } = supabaseClient.storage.from('job_card_photos').getPublicUrl(fileName);
+                    if (publicUrlData) {
+                        await supabaseClient.from('job_cards').update({ photo_url: publicUrlData.publicUrl }).eq('id', newJc.id);
+                    }
+                } else {
+                    console.error("Image upload failed:", uploadErr);
+                    // We don't alert here because the job card is already safely created. We just move on.
+                }
+            }
+            
             window.location.href = 'index.html';
         }
     }
