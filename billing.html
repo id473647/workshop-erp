@@ -55,6 +55,7 @@
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
 
+        /* Base Receipt (Thermal Narrow) */
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -70,7 +71,21 @@
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; }
         .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
         
-        @media print { body * { visibility: hidden; } #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; } }
+        /* A5/A6 Print Transformation Class */
+        .a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; border: 1px solid #000 !important; }
+        .a5-mode .receipt-shop-title { font-size: 1.4rem !important; margin-bottom: 8px !important; }
+        .a5-mode .receipt-meta { font-size: 0.9rem !important; margin-bottom: 4px !important; }
+        .a5-mode .receipt-item-row { font-size: 0.9rem !important; padding-bottom: 4px; border-bottom: 1px dotted #ccc; }
+        .a5-mode .receipt-item-sub { font-size: 0.8rem !important; }
+        .a5-mode .receipt-logo-container img { height: 45px !important; }
+        
+        @media print { 
+            body * { visibility: hidden; } 
+            #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } 
+            #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
+            #renderThermalReceiptTarget:not(.a5-mode) { width: 300px; max-width: 300px; padding: 0; }
+            #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 10mm; } /* Ideal for A5/A6 Scaling */
+        }
     </style>
 </head>
 <body>
@@ -214,6 +229,18 @@
     </div>
 </div>
 
+<div id="modalPrintChoice" class="overlay-modal" style="z-index: 300;">
+    <div class="modal-card" style="text-align:center; max-width: 400px;">
+        <h3 style="margin-top:0; color:var(--primary);">Select Print Format</h3>
+        <p style="font-size:0.85rem; color:#64748b;">Choose the receipt layout for your current printer.</p>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+            <button class="btn-action btn-success" onclick="executePrint('thermal')">🖨️ THERMAL (3-Inch / Narrow)</button>
+            <button class="btn-action btn-info" onclick="executePrint('a5')">📄 A5 / A6 (Portrait Invoice)</button>
+            <button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPrintChoice').style.display='none'">CANCEL</button>
+        </div>
+    </div>
+</div>
+
 <div id="modalReceipt" class="overlay-modal">
     <div class="modal-card">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
@@ -262,7 +289,7 @@
         </div>
         <div class="action-strip-bar">
             <button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN</button>
-            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="window.print()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPrintSelection()">🖨️ PRINT</button>
             <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button>
         </div>
     </div>
@@ -326,7 +353,7 @@
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; 
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; 
             document.getElementById('vLatheNotes').value = job.external_work_notes || ''; 
-            document.getElementById('vFutureAdvice').value = job.future_advice || ''; // ISSUE 3 FIX: Load advice
+            document.getElementById('vFutureAdvice').value = job.future_advice || ''; 
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
@@ -344,12 +371,11 @@
             if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); }
         }
         
-        // ISSUE 4 FIX: Check AMC status to show/hide the promotional message
         const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
         if(subs && subs.length > 0) {
-            document.getElementById('receiptPromoHindi').style.display = 'none'; // Hide if already an AMC member
+            document.getElementById('receiptPromoHindi').style.display = 'none';
         } else {
-            document.getElementById('receiptPromoHindi').style.display = 'block'; // Show if not a member
+            document.getElementById('receiptPromoHindi').style.display = 'block';
         }
     }
 
@@ -401,11 +427,9 @@
 
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
     
-    // ISSUE 1 FIX: Auto-detect Lube based on keywords typed
     function queryCatalogAutocomplete(inputRef) {
         const searchVal = inputRef.value.trim().toLowerCase(); 
         
-        // Auto-switch to Lube if keywords match
         if(/(oil|lube|liquid|fluid|10w|20w|coolant|synthetic)/i.test(searchVal)) {
             document.getElementById('nType').value = 'Lube';
         } else {
@@ -425,7 +449,6 @@
         } else { listContainer.style.display = 'none'; }
     }
     
-    // ISSUE 1 FIX: Auto-lock to Lube if they click a previously saved lube
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate, metricStr) { 
         document.getElementById('nPart').value = nameStr; 
         document.getElementById('nBrand').value = brandStr; 
@@ -441,7 +464,6 @@
 
         if(!partStr) return; 
         
-        // ISSUE 2 FIX: Strict 50ml validation
         if(typeSelect === 'Lube' && qVal < 50) {
             return alert("Lubricants must be entered in ML. You cannot enter less than 50 ML. If you mean 1 Liter, please enter 1000.");
         }
@@ -516,7 +538,7 @@
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
             lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, 
             external_work_notes: document.getElementById('vLatheNotes').value.trim(),
-            future_advice: document.getElementById('vFutureAdvice').value.trim(), // ISSUE 3 FIX: Save advice
+            future_advice: document.getElementById('vFutureAdvice').value.trim(),
             advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
             payment_mode: modeTarget, status: statusTarget, closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null,
             mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null
@@ -581,7 +603,6 @@
             document.getElementById('thSplitRow').style.display = 'none';
         }
 
-        // ISSUE 3 FIX: Print Future Advice if filled
         if(scopeVals.future_advice) {
             document.getElementById('thFutureAdviceRow').style.display = 'block';
             document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice;
@@ -595,6 +616,22 @@
         html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
             layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95);
         });
+    }
+
+    // PRINT TOGGLE LOGIC
+    function triggerPrintSelection() {
+        document.getElementById('modalPrintChoice').style.display = 'flex';
+    }
+
+    function executePrint(mode) {
+        const container = document.getElementById('renderThermalReceiptTarget');
+        if (mode === 'a5') {
+            container.classList.add('a5-mode');
+        } else {
+            container.classList.remove('a5-mode');
+        }
+        document.getElementById('modalPrintChoice').style.display = 'none';
+        setTimeout(() => { window.print(); }, 200);
     }
 
     initializeJobContext();
