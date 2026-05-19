@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mechanic Portal - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); }
@@ -12,24 +13,21 @@
         .header h1 { margin: 0; font-size: 1.2rem; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border); }
-        input[type="tel"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; }
-        .btn { width: 100%; background: var(--info); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        input[type="tel"], input[type="date"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; }
+        .btn { width: 100%; background: var(--info); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; gap: 8px; }
         
-        /* Dashboard Stats */
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .stat-box { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
-        .stat-val { font-size: 1.8rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
-        .stat-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: bold; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
+        .stat-title { font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-weight: bold; }
         
         .points-card { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
         
-        /* Tabs */
         .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
         .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-weight: bold; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; }
         .tab-btn.active { color: var(--info); border-bottom-color: var(--info); }
         .tab-content { display: none; } .tab-content.active { display: block; }
         
-        /* Lists */
         .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
         .list-item:last-child { border-bottom: none; }
         .pill { font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 12px; background: #e2e8f0; color: #475569; }
@@ -38,6 +36,18 @@
         .stars { color: var(--gold); font-size: 1.1rem; letter-spacing: 2px; }
         
         #viewLogin { display: block; } #viewDashboard { display: none; }
+
+        .filter-strip { display: flex; gap: 8px; margin-bottom: 16px; }
+        .filter-strip input { margin-bottom: 0; padding: 8px; font-size: 0.85rem; }
+
+        /* Hidden Printable PDF Container */
+        #pdfRenderTarget { display: none; padding: 30px; font-family: 'Helvetica', sans-serif; color: #000; background: #fff; width: 800px; }
+        .pdf-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; }
+        .pdf-table th, .pdf-table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .pdf-table th { background: #f1f5f9; font-weight: bold; }
+        .credit-text { color: #15803d; font-weight: bold; }
+        .debit-text { color: #b91c1c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -65,8 +75,8 @@
                 <div class="stat-val" id="dispComm">0%</div>
             </div>
             <div class="stat-box">
-                <div class="stat-title">Total Earned Labor</div>
-                <div class="stat-val" id="dispTotalLabor">₹0</div>
+                <div class="stat-title">Your Net Share Earned</div>
+                <div class="stat-val" id="dispTotalLabor" style="color:var(--success);">₹0</div>
             </div>
         </div>
 
@@ -85,16 +95,43 @@
         </div>
 
         <div id="tabLedger" class="tab-content card">
-            <h3 style="margin-top:0; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Payout History</h3>
+            <h3 style="margin-top:0; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Generate Statement</h3>
+            
+            <div class="filter-strip">
+                <input type="date" id="ledgStart">
+                <input type="date" id="ledgEnd">
+            </div>
+            <button class="btn" style="background:var(--primary); margin-bottom:16px;" onclick="generateLedgerStatement()">📄 GENERATE PDF LEDGER</button>
+            
+            <h3 style="margin-top:20px; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Recent Cash Payouts</h3>
             <div id="payoutList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading payouts...</p></div>
         </div>
     </div>
 </div>
 
+<div id="pdfRenderTarget">
+    <div class="pdf-header">
+        <h2 style="margin:0;">My Care Service Center - Crew Statement</h2>
+        <p style="margin:4px 0; color:#444;" id="pdfMeta">Technician Name | Dates</p>
+    </div>
+    <table class="pdf-table" id="pdfTable">
+        <thead><tr><th>Date</th><th>Ref / Job Card</th><th>Description</th><th>Credit (Earned)</th><th>Debit (Paid)</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <div style="text-align:right; font-size:1.2rem; font-weight:bold; margin-top:20px;">
+        Net Outstanding Balance: <span id="pdfNetBal">₹0</span>
+    </div>
+</div>
+
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEdwin";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     let activeMech = null;
+
+    // Set default dates
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('ledgStart').value = new Date(new Date().setDate(1)).toISOString().split('T')[0]; // First of month
+    document.getElementById('ledgEnd').value = todayStr;
 
     function switchTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); event.target.classList.add('active'); document.getElementById(tabId).classList.add('active'); }
 
@@ -112,10 +149,10 @@
     }
 
     async function loadMechanicData() {
-        // 1. Fetch Job Cards
-        const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number), job_card_items(warehouse_type, total_price)').eq('mech_id', activeMech.id).order('created_at', { ascending: false });
+        // Fetch Jobs (Either Primary or Co-Mech)
+        const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number), job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at', { ascending: false });
         
-        let totalLaborEarned = 0;
+        let totalNetShare = 0;
         const jList = document.getElementById('jobsList'); jList.innerHTML = '';
         const rList = document.getElementById('reviewsList'); rList.innerHTML = '';
 
@@ -123,8 +160,21 @@
             jobs.forEach(job => {
                 // Calculate Job Labor
                 let pkgLabor = 0; if(job.job_card_items) { job.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
-                const jobLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor;
-                if(job.status === 'Closed') totalLaborEarned += jobLabor;
+                const grossLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor;
+                
+                // 50/50 Split Logic
+                let allocatedLabor = grossLabor;
+                let splitTag = "";
+                if (job.mech_id && job.co_mech_id) {
+                    allocatedLabor = grossLabor / 2;
+                    splitTag = " <span style='color:var(--info); font-size:0.7rem;'>(50% Co-Mech Split)</span>";
+                }
+
+                // Calculate Their % Share
+                const commRate = parseFloat(activeMech.commission_rate) || 0;
+                const myNetShare = allocatedLabor * (commRate / 100);
+
+                if(job.status === 'Closed') totalNetShare += myNetShare;
 
                 // Render Job Card
                 const statClass = job.status === 'Open' ? 'open' : 'closed';
@@ -135,12 +185,12 @@
                             <span class="pill ${statClass}">${job.status}</span>
                         </div>
                         <div style="font-size:0.85rem; color:#64748b; margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString()}</div>
-                        <div style="font-size:0.85rem; color:#e74c3c; font-weight:bold; margin-bottom:4px;">Problem: ${job.problem_mentioned || '--'}</div>
-                        <div style="font-size:0.85rem; font-weight:bold; color:var(--success);">Allocated Labor Yield: ₹${jobLabor}</div>
+                        <div style="font-size:0.85rem; color:#475569; margin-bottom:2px;">Job Gross Labor: ₹${grossLabor}${splitTag}</div>
+                        <div style="font-size:0.85rem; font-weight:bold; color:var(--success);">Your Share Earned (${commRate}%): ₹${myNetShare.toFixed(2)}</div>
                     </div>`;
 
-                // Render Review if exists
-                if(job.is_reviewed) {
+                // Render Review
+                if(job.is_reviewed && job.mech_id === activeMech.id) {
                     const stars = '★'.repeat(job.review_rating) + '☆'.repeat(5 - job.review_rating);
                     rList.innerHTML += `
                         <div class="list-item">
@@ -149,7 +199,6 @@
                                 <span class="stars">${stars}</span>
                             </div>
                             <div style="font-size:0.8rem; color:#475569; font-style:italic;">"${job.review_mech_feedback || 'No written feedback'}"</div>
-                            ${job.review_rating === 5 ? `<div style="font-size:0.75rem; color:var(--gold); font-weight:bold; margin-top:4px;">+ Points Awarded (10% of Labor)</div>` : ''}
                         </div>`;
                 }
             });
@@ -157,10 +206,10 @@
         
         if(rList.innerHTML === '') rList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No reviews submitted yet.</p>';
 
-        document.getElementById('dispTotalLabor').innerText = `₹${totalLaborEarned}`;
+        document.getElementById('dispTotalLabor').innerText = `₹${Math.floor(totalNetShare)}`;
 
-        // 2. Fetch Financial Ledger (Payouts)
-        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Mechanic Payout').eq('stakeholder_id', activeMech.id).order('created_at', { ascending: false });
+        // Fetch Payouts
+        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', activeMech.id).order('created_at', { ascending: false }).limit(10);
         const pList = document.getElementById('payoutList'); pList.innerHTML = '';
         if(payouts && payouts.length > 0) {
             payouts.forEach(p => {
@@ -170,10 +219,55 @@
                             <strong>${new Date(p.created_at).toLocaleDateString()}</strong><br>
                             <span style="font-size:0.8rem; color:#64748b;">${p.note || 'Cash Out'}</span>
                         </div>
-                        <strong style="color:var(--success);">₹${p.amount}</strong>
+                        <strong style="color:var(--danger);">-₹${p.amount}</strong>
                     </div>`;
             });
         } else { pList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No payout history.</p>'; }
+    }
+
+    async function generateLedgerStatement() {
+        const start = document.getElementById('ledgStart').value;
+        const end = document.getElementById('ledgEnd').value;
+        if (!start || !end) return alert("Select Date Range");
+
+        // Fetch Data for Date Range
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, mech_id, co_mech_id, job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).eq('status', 'Closed').gte('closed_at', start).lte('closed_at', end + 'T23:59:59');
+        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', activeMech.id).gte('created_at', start).lte('created_at', end + 'T23:59:59');
+
+        let totalCredit = 0; let totalDebit = 0;
+        const tbody = document.getElementById('pdfTable').querySelector('tbody'); tbody.innerHTML = '';
+
+        // Compile Credits
+        (jobs || []).forEach(job => {
+            let pkgLabor = 0; if(job.job_card_items) { job.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
+            let grossLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor;
+            let splitText = "";
+            if (job.mech_id && job.co_mech_id) { grossLabor = grossLabor / 2; splitText = " (50% Split)"; }
+            
+            const commRate = parseFloat(activeMech.commission_rate) || 0;
+            const myShare = grossLabor * (commRate / 100);
+            totalCredit += myShare;
+
+            tbody.innerHTML += `<tr><td>${new Date(job.closed_at).toLocaleDateString()}</td><td>JC-${job.id.split('-')[0].toUpperCase()}</td><td>Labor Commission${splitText}</td><td class="credit-text">+₹${myShare.toFixed(2)}</td><td>--</td></tr>`;
+        });
+
+        // Compile Debits
+        (payouts || []).forEach(p => {
+            totalDebit += parseFloat(p.amount) || 0;
+            tbody.innerHTML += `<tr><td>${new Date(p.created_at).toLocaleDateString()}</td><td>PAYOUT</td><td>${p.note || 'Cash Issued'}</td><td>--</td><td class="debit-text">-₹${p.amount}</td></tr>`;
+        });
+
+        document.getElementById('pdfMeta').innerText = `Technician: ${activeMech.name} | Period: ${start} to ${end}`;
+        document.getElementById('pdfNetBal').innerText = `₹${Math.floor(totalCredit - totalDebit)}`;
+
+        // Generate PDF
+        const element = document.getElementById('pdfRenderTarget');
+        element.style.display = 'block'; // Unhide for rendering
+        const opt = { margin: 0.5, filename: `Ledger_${activeMech.name.replace(/\s/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+        
+        html2pdf().set(opt).from(element).save().then(() => {
+            element.style.display = 'none'; // Hide again
+        });
     }
 </script>
 </body>
