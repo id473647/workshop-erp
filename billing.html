@@ -16,7 +16,6 @@
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* Edit vehicle hover effect */
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; cursor: pointer; transition: color 0.2s; }
         .plate-header:hover { color: var(--info); text-decoration: underline; }
         
@@ -27,7 +26,7 @@
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
         .inline-add-strip > div:nth-child(1) { flex: 2 1 180px; position: relative; }
         .inline-add-strip > input:nth-child(2) { flex: 1 1 90px; }
-        .inline-add-strip > select:nth-child(3) { flex: 1 1 80px; }
+        .inline-add-strip > select:nth-child(3) { flex: 1 1 80px; font-weight:bold; }
         .inline-add-strip > input:nth-child(4) { flex: 0.5 1 60px; }
         .inline-add-strip > input:nth-child(5) { flex: 0.5 1 60px; }
         .inline-add-strip > select:nth-child(6) { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
@@ -56,7 +55,6 @@
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
 
-        /* Receipt Print CSS */
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -113,8 +111,8 @@
                 <div id="autolist-n" class="autocomplete-container"></div>
             </div>
             <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
-            <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--border);"><option value="Spare">Spare (Pcs)</option><option value="Lube">Lube (ML)</option></select>
-            <input type="number" id="nQty" placeholder="Qty" value="1" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="Spare">Spare (Pcs)</option><option value="Lube">Lube (ML)</option></select>
+            <input type="number" id="nQty" placeholder="Qty / ML" value="1" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
             <input type="number" id="nRate" placeholder="Rate (₹)" value="0" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
             
             <select id="nIssuer" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;">
@@ -154,6 +152,12 @@
                         <input type="text" id="vLatheNotes" placeholder="Breakdown: WELDING 100, DRILL 50" style="width:65%;" oninput="this.value=this.value.toUpperCase()">
                     </div>
                 </div>
+                
+                <div class="field-group" style="grid-column: 1 / -1;">
+                    <label style="color:var(--danger);">Future Advice / Remarks (Prints on Bill)</label>
+                    <input type="text" id="vFutureAdvice" placeholder="e.g. Chain sprocket needs replacement next service" oninput="this.value=this.value.toUpperCase()">
+                </div>
+
                 <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label id="lblAdvance">Prepaid Deposit / Advance (₹)</label><input type="number" id="vAdvance" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;">
@@ -246,6 +250,14 @@
                 <div style="display:flex; justify-content:space-between;"><span>UPI Rcvd:</span><strong id="thSplitUpi">₹0</strong></div>
             </div>
 
+            <div class="receipt-meta" id="thFutureAdviceRow" style="display:none; margin-top:8px; padding-top:6px; border-top:1px dashed black; color:var(--danger); font-weight:bold;">
+                Future Advice / सुझाव:<br><span id="thFutureAdviceText" style="font-weight:normal; color:black; display:block; margin-top:2px; line-height:1.4;"></span>
+            </div>
+
+            <div id="receiptPromoHindi" style="font-size:0.75rem; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin-top:10px; margin-bottom:6px; text-align:center;">
+                <b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं! आज ही हमारे मैनेजर से पूछें।
+            </div>
+
             <div class="receipt-footer" id="receiptFooterDynamicText">Computer Generated Document.<br>Thank You.</div>
         </div>
         <div class="action-strip-bar">
@@ -266,7 +278,6 @@
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; 
     let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0;
     
-    // Split Payment Vars
     let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
 
     function convertNumberToWords(amount) {
@@ -315,6 +326,7 @@
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; 
             document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; 
             document.getElementById('vLatheNotes').value = job.external_work_notes || ''; 
+            document.getElementById('vFutureAdvice').value = job.future_advice || ''; // ISSUE 3 FIX: Load advice
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
@@ -330,6 +342,14 @@
             activeCustomerName = custData.name; activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0;
             customerWalletBalance = parseFloat(custData.loyalty_points) || 0;
             if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); }
+        }
+        
+        // ISSUE 4 FIX: Check AMC status to show/hide the promotional message
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
+        if(subs && subs.length > 0) {
+            document.getElementById('receiptPromoHindi').style.display = 'none'; // Hide if already an AMC member
+        } else {
+            document.getElementById('receiptPromoHindi').style.display = 'block'; // Show if not a member
         }
     }
 
@@ -381,14 +401,23 @@
 
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
     
+    // ISSUE 1 FIX: Auto-detect Lube based on keywords typed
     function queryCatalogAutocomplete(inputRef) {
-        const searchVal = inputRef.value.trim().toLowerCase(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
+        const searchVal = inputRef.value.trim().toLowerCase(); 
+        
+        // Auto-switch to Lube if keywords match
+        if(/(oil|lube|liquid|fluid|10w|20w|coolant|synthetic)/i.test(searchVal)) {
+            document.getElementById('nType').value = 'Lube';
+        } else {
+            document.getElementById('nType').value = 'Spare';
+        }
+
+        const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = '';
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; }
         const searchTokens = searchVal.split(' ').filter(token => token.length > 0);
         const filtered = globalCatalogCache.filter(item => { const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase(); return searchTokens.every(token => searchableText.includes(token)); }).slice(0, 10);
         
         if(filtered.length > 0) { 
-            // ISSUE 1 FIX: Send the unit_metric to apply function
             filtered.forEach(p => { 
                 listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0}, '${p.unit_metric || 'Pcs'}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
             }); 
@@ -396,7 +425,7 @@
         } else { listContainer.style.display = 'none'; }
     }
     
-    // ISSUE 1 FIX: Auto-Select Lube Dropdown
+    // ISSUE 1 FIX: Auto-lock to Lube if they click a previously saved lube
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate, metricStr) { 
         document.getElementById('nPart').value = nameStr; 
         document.getElementById('nBrand').value = brandStr; 
@@ -412,7 +441,7 @@
 
         if(!partStr) return; 
         
-        // ISSUE 2 FIX: Minimum 50ML Validation for Lube
+        // ISSUE 2 FIX: Strict 50ml validation
         if(typeSelect === 'Lube' && qVal < 50) {
             return alert("Lubricants must be entered in ML. You cannot enter less than 50 ML. If you mean 1 Liter, please enter 1000.");
         }
@@ -420,7 +449,6 @@
         const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
         const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase();
         
-        // Upsert to product master to remember if it was ML or Pcs for future auto-select
         supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal }).then();
         
         const { error } = await supabaseClient.from('job_card_items').insert({ 
@@ -454,7 +482,6 @@
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - pUsed);
     }
 
-    // SPLIT PAYMENT MODAL FUNCTIONS
     function openSplitPaymentModal() {
         const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
         document.getElementById('splitTotalDisplay').innerText = netVal;
@@ -482,7 +509,6 @@
         document.getElementById('modalSplitPayment').style.display = 'none';
     }
 
-    // ISSUE 4 FIX: Render receipt properly and handle credit
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
         const updates = { 
@@ -490,6 +516,7 @@
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
             lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, 
             external_work_notes: document.getElementById('vLatheNotes').value.trim(),
+            future_advice: document.getElementById('vFutureAdvice').value.trim(), // ISSUE 3 FIX: Save advice
             advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
             payment_mode: modeTarget, status: statusTarget, closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null,
             mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null
@@ -500,7 +527,6 @@
             if(statusTarget === 'Closed') {
                 populateReceiptDocument(modeTarget, netVal, updates);
                 
-                // Print "CREDIT BILL" heavily if selected
                 if(modeTarget === 'Credit') {
                     document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>";
                 } else {
@@ -553,6 +579,14 @@
         } else {
             document.getElementById('thMode').innerText = paymentMode;
             document.getElementById('thSplitRow').style.display = 'none';
+        }
+
+        // ISSUE 3 FIX: Print Future Advice if filled
+        if(scopeVals.future_advice) {
+            document.getElementById('thFutureAdviceRow').style.display = 'block';
+            document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice;
+        } else {
+            document.getElementById('thFutureAdviceRow').style.display = 'none';
         }
     }
 
