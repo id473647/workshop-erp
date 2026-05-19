@@ -3,73 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Command Center Dashboard - My Care ERP</title>
+    <title>Dashboard - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --purple: #8e44ad; --utility: #64748b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; }
-        .logo-matrix img { height: 32px; object-fit: contain; }
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
-        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
-        .wrapper { max-width: 950px; margin: 20px auto; padding: 0 20px; box-sizing: border-box; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --warning: #f59e0b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .wrapper { max-width: 950px; margin: 20px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
         @media (max-width: 768px) { .wrapper { grid-template-columns: 1fr; } }
-        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-        .navigation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .action-btn { padding: 14px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; text-decoration: none; color: white; text-align: center; display: block; transition: opacity 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .action-btn:hover { opacity: 0.9; }
-        .bg-green { background: var(--success); } .bg-moped { background: var(--moped); } .bg-service { background: var(--service); } .bg-retail { background: var(--danger); }
-        .search-strip { margin-bottom: 16px; }
-        .search-strip input { width: 100%; padding: 10px; border: 1px solid var(--info); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; background: #f0f9ff; font-weight: bold; }
-        .jc-list { display: flex; flex-direction: column; gap: 10px; max-height: 500px; overflow-y: auto; }
-        .jc-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color 0.15s; }
-        .jc-card:hover { border-color: var(--success); background: #f0fdf4; }
-        .jc-plate { font-weight: 900; font-size: 1rem; color: var(--primary); }
+        .card-panel { background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); }
+        .block-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
+        .nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+        .nav-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; text-decoration: none; color: inherit; }
+        .nav-card:hover { border-color: var(--info); background: #f0f7ff; }
+        .search-box { width: 100%; padding: 12px; border: 1px solid var(--info); border-radius: 8px; box-sizing: border-box; margin-bottom: 16px; font-weight: bold; background: #f0f9ff; }
+        .jc-list { display: flex; flex-direction: column; gap: 10px; max-height: 600px; overflow-y: auto; }
+        .jc-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; }
+        .jc-card:hover { border-color: var(--success); }
+        .jc-plate { font-weight: 900; font-size: 1.1rem; color: var(--primary); }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <div class="logo-matrix">
-        <img src="logo-main.jpg" onerror="this.style.display='none'">
-        <img src="logo-green.png" onerror="this.style.display='none'">
-    </div>
-    <div class="nav-actions">
-        <button class="btn-header" onclick="history.back()">← BACK</button>
-        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">GUEST</span>
-    </div>
+    <div style="font-weight:bold; font-size:1.2rem;">My Care ERP</div>
+    <span id="roleDisplay" class="badge-role">LOADING...</span>
 </nav>
 
 <div class="wrapper">
-    <div>
-        <div class="card-panel">
-            <div class="block-title">Operational Modules</div>
-            <div class="navigation-grid">
-                <a href="new-jobcard.html" class="action-btn bg-service">New Job Card</a>
-                <a href="pos.html" class="action-btn bg-retail">Retail POS</a>
-                <a href="purchase.html" class="action-btn" style="background:#f59e0b;">Inventory/Purchase</a>
-                <a href="utility-router.html" class="action-btn" style="background:var(--utility);">Settings & CRM</a>
-            </div>
-        </div>
+    <div class="card-panel">
+        <div class="block-title">Operational Modules</div>
+        <div class="nav-grid" id="moduleGrid"></div>
     </div>
 
-    <div>
-        <div class="card-panel">
-            <div class="block-title">Active Floor Job Cards</div>
-            
-            <div class="search-strip">
-                <input type="text" id="sQuery" placeholder="🔍 Search by Mobile Number..." oninput="loadActiveJobCards()">
-            </div>
-
-            <div id="activeJobsContainer" class="jc-list">
-                <div style="text-align:center; padding:20px;">Fetching open workflows...</div>
-            </div>
-        </div>
+    <div class="card-panel">
+        <div class="block-title">Active Floor Job Cards</div>
+        <input type="text" id="jcSearchInput" class="search-box" placeholder="🔍 Search by Mobile Number..." oninput="loadActiveJobCards()">
+        <div id="activeJobsContainer" class="jc-list"></div>
     </div>
 </div>
 
@@ -77,41 +48,36 @@
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    
-    document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
+    const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE');
+
+    if (!activeRole) window.location.href = 'login.html';
+    else { document.getElementById('roleDisplay').innerText = activeRole.toUpperCase(); renderRoleModules(); loadActiveJobCards(); }
+
+    function renderRoleModules() {
+        const grid = document.getElementById('moduleGrid');
+        if (activeRole === 'admin' || activeRole === 'service') grid.innerHTML += `<a href="new-jobcard.html" class="nav-card">📋<div class="nav-title">New Job Card</div></a>`;
+        grid.innerHTML += `<a href="pos.html" class="nav-card">🛒<div class="nav-title">Retail POS</div></a>`;
+        if (activeRole === 'admin' || activeRole === 'green' || activeRole === 'moped') grid.innerHTML += `<a href="purchase.html" class="nav-card">📦<div class="nav-title">Inventory Intake</div></a>`;
+        if (activeRole === 'admin') grid.innerHTML += `<a href="reports.html" class="nav-card">📈<div class="nav-title">EOD & Reports</div></a><a href="utility-router.html" class="nav-card">⚙️<div class="nav-title">Settings</div></a>`;
+    }
 
     async function loadActiveJobCards() {
-        const queryVal = document.getElementById('sQuery').value.trim();
+        const search = document.getElementById('jcSearchInput').value.trim();
+        let query = supabaseClient.from('job_cards').select('*, vehicles(reg_number)').eq('status', 'Open').order('created_at', { ascending: false });
+        if (search) query = query.ilike('customer_mobile', `%${search}%`);
         
-        // Fetch ALL open cards, ordered by newest
-        let query = supabaseClient.from('job_cards')
-            .select('*, vehicles(reg_number)')
-            .eq('status', 'Open')
-            .order('created_at', { ascending: false });
-
-        const { data: jobs, error } = await query;
+        const { data: jobs } = await query;
         const container = document.getElementById('activeJobsContainer');
+        container.innerHTML = (jobs && jobs.length > 0) ? '' : '<div style="text-align:center; padding:20px;">No active cards.</div>';
         
-        if (error) { container.innerHTML = 'Error loading cards.'; return; }
-
-        // Filter by mobile locally (faster for a workshop volume)
-        const filteredJobs = jobs.filter(j => !queryVal || j.customer_mobile?.includes(queryVal));
-
-        container.innerHTML = filteredJobs.length > 0 ? '' : '<div style="text-align:center; padding:20px;">No open job cards.</div>';
-        
-        filteredJobs.forEach(j => {
+        jobs?.forEach(j => {
             container.innerHTML += `
                 <div class="jc-card" onclick="window.location.href='billing.html?id=${j.id}'">
                     <div class="jc-plate">${j.vehicles?.reg_number || 'UNKNOWN'}</div>
-                    <div style="font-size:0.75rem; color:#64748b;">${j.customer_mobile || 'Walk-in'}</div>
+                    <div style="font-size:0.8rem;">👤 ${j.customer_mobile || 'Walk-in'}</div>
                 </div>`;
         });
     }
-
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
-    
-    loadActiveJobCards();
 </script>
 </body>
 </html>
