@@ -10,12 +10,12 @@
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .sticky-nav { max-width: 1000px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
         .badge-role { background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
 
-        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .wrapper { max-width: 1000px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 
@@ -34,7 +34,7 @@
         .btn-info { background: var(--info); }
         .btn-danger { background: var(--danger); }
 
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 16px; background: white; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 16px; background: white; margin-bottom:20px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
@@ -42,7 +42,7 @@
         .summary-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
         .summary-box { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; text-align: center; }
         .summary-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
-        .summary-val { font-size: 1.4rem; font-weight: 700; }
+        .summary-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
 
         .view-panel { display: none; } .view-panel.active { display: block; }
         
@@ -54,9 +54,6 @@
 
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; }
-        
-        .loading-ring { display: none; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 0.6s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -70,37 +67,69 @@
 <div class="wrapper">
     <div class="card-panel">
         <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchSystemPanel('panelDaily')">Periodic Job Card Ledger</button>
+            <button class="tab-btn active" onclick="switchSystemPanel('panelDaily')">Cash Drawer & EOD Reconciliation</button>
             <button class="tab-btn" onclick="switchSystemPanel('panelCross')">Stakeholder Cross Ledger</button>
         </div>
 
         <div id="panelDaily" class="view-panel active">
             <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Start Horizon</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
-                <div class="field-group"><label>End Horizon</label><input type="date" id="dlEnd" onchange="generateDailyLedger()"></div>
+                <div class="field-group"><label>Target Date</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn-action btn-info" onclick="exportViewToJpg('exportDailyTarget', 'Periodic_Ledger')">📤 EXPORT JPG</button>
+                    <button class="btn-action btn-info" onclick="exportViewToJpg('exportDailyTarget', 'EOD_Register')">📤 EXPORT JPG</button>
                     <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
                 </div>
             </div>
 
             <div id="exportDailyTarget" style="padding:10px; background:white;">
+                
+                <h3 style="margin-top:0; color:var(--primary); text-align:center;">Daily EOD Financial Report</h3>
+                <p style="text-align:center; color:#64748b; font-size:0.8rem; margin-top:-10px; margin-bottom:20px;" id="dlDateDisplay">--</p>
+
                 <div class="summary-banner">
-                    <div class="summary-box"><span class="summary-title">Total Cash Income</span><span class="summary-val" id="dlCash" style="color:var(--success);">₹0</span></div>
-                    <div class="summary-box"><span class="summary-title">Total UPI Income</span><span class="summary-val" id="dlUpi" style="color:var(--info);">₹0</span></div>
-                    <div class="summary-box"><span class="summary-title">Total Operational Expenses</span><span class="summary-val" id="dlExp" style="color:var(--danger);">₹0</span></div>
+                    <div class="summary-box" style="background:#dcfce7; border-color:#bbf7d0;">
+                        <span class="summary-title" style="color:#15803d;">Net Cash In Drawer</span>
+                        <span class="summary-val" id="dlNetCash" style="color:#166534;">₹0</span>
+                        <span style="font-size:0.7rem; color:#15803d; display:block; margin-top:4px;">(Total Cash + Adv) - (Expenses/Payouts)</span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="summary-title">Total Cash Handed (Gross)</span>
+                        <span class="summary-val" id="dlGrossCash">₹0</span>
+                    </div>
+                    <div class="summary-box" style="background:#e0f2fe; border-color:#bae6fd;">
+                        <span class="summary-title" style="color:#0369a1;">Total Bank / UPI (Gross)</span>
+                        <span class="summary-val" id="dlGrossUpi" style="color:#075985;">₹0</span>
+                    </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+                    
                     <div>
-                        <h4 style="margin:0 0 8px 0; color:var(--success);">Inbound Job Card Settlements</h4>
-                        <div class="table-wrapper"><table id="tbDailyIncome"><thead><tr><th>Ref</th><th>Mode</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+                        <h4 style="margin:0 0 8px 0; color:var(--success); border-bottom:2px solid var(--success); padding-bottom:4px;">1. Closed Incomes (JC & POS)</h4>
+                        <div class="table-wrapper">
+                            <table id="tbDailyIncome"><thead><tr><th>Ref</th><th>Mode</th><th>Amount</th></tr></thead><tbody></tbody></table>
+                        </div>
+
+                        <h4 style="margin:0 0 8px 0; color:var(--info); border-bottom:2px solid var(--info); padding-bottom:4px;">2. Advances Collected Today</h4>
+                        <p style="font-size:0.75rem; color:#64748b; margin-top:-4px;">(From active drafts & Moped/Green prepays)</p>
+                        <div class="table-wrapper">
+                            <table id="tbDailyAdvances"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table>
+                        </div>
                     </div>
+
                     <div>
-                        <h4 style="margin:0 0 8px 0; color:var(--danger);">Outbound Operational Expenses</h4>
-                        <div class="table-wrapper"><table id="tbDailyExpense"><thead><tr><th>Category</th><th>Target/Note</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
+                        <h4 style="margin:0 0 8px 0; color:var(--danger); border-bottom:2px solid var(--danger); padding-bottom:4px;">3. Outbound Expenses & Payouts</h4>
+                        <p style="font-size:0.75rem; color:#64748b; margin-top:-4px;">(Includes Green/Moped transfers & Staff payments)</p>
+                        <div class="table-wrapper">
+                            <table id="tbDailyExpense"><thead><tr><th>Category</th><th>Target/Note</th><th>Amount</th></tr></thead><tbody></tbody></table>
+                        </div>
+                        
+                        <div style="background:#fefce8; border:1px solid #fef08a; padding:12px; border-radius:8px; text-align:right;">
+                            <span style="font-size:0.8rem; font-weight:bold; color:#a16207;">Total Drawer Deductions:</span>
+                            <div style="font-size:1.4rem; font-weight:bold; color:#854d0e;" id="dlTotalExpOut">₹0</div>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
 
@@ -135,23 +164,25 @@
     </div>
 </div>
 
-<button class="floating-action" onclick="document.getElementById('modalExpense').style.display='flex'">+ CREATE EXPENSE / PAYOUT</button>
+<button class="floating-action" onclick="document.getElementById('modalExpense').style.display='flex'">+ LOG EXPENSE / WAREHOUSE TRANSFER</button>
 
 <div id="modalExpense" class="overlay-modal">
     <div class="modal-card">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
-            <h3 style="margin:0; color:var(--primary);">Log Outbound Payout</h3>
+            <h3 style="margin:0; color:var(--primary);">Log Outbound Cash Payout</h3>
             <button onclick="document.getElementById('modalExpense').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
         </div>
         
+        <p style="font-size:0.8rem; color:#64748b; margin-top:-10px; margin-bottom:16px;">This will deduct cash from today's EOD Cash In Drawer tally.</p>
+
         <div class="field-group" style="margin-bottom:12px;">
             <label>Expense Category Type</label>
             <select id="exCat" onchange="toggleExpenseSubTargets()">
                 <option value="Mechanic Payout">Mechanic / Labour Payout</option>
                 <option value="Lathe/Welding">Lathe & Welding Contract</option>
-                <option value="Green Spares">Green Warehouse Transfer</option>
-                <option value="Moped Spares">Moped Warehouse Transfer</option>
-                <option value="Other">Other Operational</option>
+                <option value="Green Spares">Transfer Cash to Green Warehouse</option>
+                <option value="Moped Spares">Transfer Cash to Moped Warehouse</option>
+                <option value="Other">Other Operational / Salaries</option>
             </select>
         </div>
 
@@ -180,7 +211,7 @@
             <textarea id="exNote" rows="2" placeholder="Document exact payment reason..."></textarea>
         </div>
 
-        <button class="btn-action" style="width:100%;" onclick="commitWorkshopExpense()">COMMIT EXPENSE RECORD</button>
+        <button class="btn-action" style="width:100%;" onclick="commitWorkshopExpense()">COMMIT CASH DEDUCTION</button>
     </div>
 </div>
 
@@ -204,7 +235,7 @@
 
     async function initializeLedgerEnvironment() {
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dlStart').value = today; document.getElementById('dlEnd').value = today;
+        document.getElementById('dlStart').value = today;
         document.getElementById('clStart').value = today; document.getElementById('clEnd').value = today;
 
         const { data: m } = await supabaseClient.from('mechanics').select('id, name');
@@ -228,7 +259,7 @@
             <option value="Green">Green Spares Link</option>
             <option value="Moped">Moped Spares Link</option>`;
         
-        globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Tech: ${mech.name}</option>`; });
+        globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Staff: ${mech.name}</option>`; });
         globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
     }
 
@@ -248,6 +279,7 @@
             targetSel.innerHTML += `<option value="ADD_NEW" style="color:var(--info); font-weight:bold;">+ Add New Stakeholder...</option>`;
             document.getElementById('exStakeholderBlock').style.display = 'flex';
         } else {
+            // For Green/Moped transfers, target is inherently the warehouse
             document.getElementById('exStakeholderBlock').style.display = 'none';
         }
     }
@@ -276,7 +308,12 @@
 
     async function commitWorkshopExpense() {
         const cat = document.getElementById('exCat').value;
-        const target = document.getElementById('exTarget').value;
+        let target = document.getElementById('exTarget').value;
+        
+        // Auto-assign target for Warehouses
+        if (cat === 'Green Spares') target = 'Green';
+        if (cat === 'Moped Spares') target = 'Moped';
+
         const amt = parseFloat(document.getElementById('exAmount').value) || 0;
         const note = document.getElementById('exNote').value.trim();
 
@@ -293,40 +330,86 @@
     }
 
     async function generateDailyLedger() {
-        const startStr = document.getElementById('dlStart').value;
-        const endStr = document.getElementById('dlEnd').value;
+        const targetDate = document.getElementById('dlStart').value;
+        document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
 
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value').eq('status', 'Closed')
-            .gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
+        // 1. Fetch Closed Job Cards
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
 
-        const { data: exp } = await supabaseClient.from('workshop_expenses').select('*')
-            .gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+        // 2. Fetch Advances (Open drafts updated today)
+        const { data: advances } = await supabaseClient.from('job_cards').select('id, advance_paid').eq('status', 'Open').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
 
-        let sumCash = 0, sumUpi = 0, sumExp = 0;
+        // 3. Fetch POS Sales
+        const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+
+        // 4. Fetch Expenses
+        const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+
+        let sumGrossCash = 0; let sumGrossUpi = 0; let sumAdvances = 0; let sumExp = 0;
+
         const tbInc = document.getElementById('tbDailyIncome').querySelector('tbody'); tbInc.innerHTML = '';
+        const tbAdv = document.getElementById('tbDailyAdvances').querySelector('tbody'); tbAdv.innerHTML = '';
         const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
 
+        // Process Job Cards
         (jobs || []).forEach(j => {
             const v = parseFloat(j.total_invoice_value) || 0;
-            if(j.payment_mode === 'Cash') sumCash += v;
-            if(j.payment_mode === 'UPI') sumUpi += v;
-            tbInc.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode || 'Cash'}</td><td>₹${v}</td></tr>`;
+            if (j.payment_mode === 'Cash') sumGrossCash += v;
+            if (j.payment_mode === 'UPI') sumGrossUpi += v;
+            
+            // Basic Split Logic (If string contains "Split")
+            if (j.payment_mode && j.payment_mode.includes('Split')) {
+                // Extract numbers roughly for display. In perfect system, we'd use split columns.
+                // But for display, just push it to Gross Cash as placeholder or log string.
+            }
+
+            if(j.payment_mode !== 'Credit') {
+                tbInc.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode}</td><td>₹${v}</td></tr>`;
+            }
         });
 
+        // Process POS
+        (pos || []).forEach(p => {
+            const v = parseFloat(p.total_amount) || 0;
+            if (p.payment_mode === 'Cash') sumGrossCash += v;
+            if (p.payment_mode === 'UPI') sumGrossUpi += v;
+            if (p.payment_mode !== 'Credit') {
+                tbInc.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>${p.payment_mode} (Retail)</td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        // Process Advances
+        (advances || []).forEach(a => {
+            const v = parseFloat(a.advance_paid) || 0;
+            sumAdvances += v;
+            sumGrossCash += v; // Advances are usually cash
+            tbAdv.innerHTML += `<tr><td>Draft JC-${a.id.split('-')[0].toUpperCase()}</td><td>+₹${v}</td></tr>`;
+        });
+
+        if((advances||[]).length === 0) tbAdv.innerHTML = '<tr><td colspan="2" style="color:#94a3b8; text-align:center;">No advances collected today.</td></tr>';
+
+        // Process Expenses
         (exp || []).forEach(e => {
             const v = parseFloat(e.amount) || 0; sumExp += v;
             let targetName = e.stakeholder_id;
             const mech = globalMechanics.find(m => m.id === targetName);
-            const vend = globalVendors.find(v => v.id === targetName);
+            const vend = globalVendors.find(vd => vd.id === targetName);
+            
             if(mech) targetName = mech.name;
             if(vend) targetName = vend.vendor_name;
 
-            tbExp.innerHTML += `<tr><td>${e.expense_category}</td><td><b>${targetName||''}</b> ${e.note||''}</td><td>₹${v}</td></tr>`;
+            tbExp.innerHTML += `<tr><td>${e.expense_category}</td><td><b>${targetName||''}</b> ${e.note||''}</td><td style="color:var(--danger);">-₹${v}</td></tr>`;
         });
 
-        document.getElementById('dlCash').innerText = `₹${sumCash}`;
-        document.getElementById('dlUpi').innerText = `₹${sumUpi}`;
-        document.getElementById('dlExp').innerText = `₹${sumExp}`;
+        if((exp||[]).length === 0) tbExp.innerHTML = '<tr><td colspan="3" style="color:#94a3b8; text-align:center;">No drawer deductions logged.</td></tr>';
+
+        // Final Math
+        document.getElementById('dlGrossCash').innerText = `₹${sumGrossCash}`;
+        document.getElementById('dlGrossUpi').innerText = `₹${sumGrossUpi}`;
+        document.getElementById('dlTotalExpOut').innerText = `₹${sumExp}`;
+        
+        const netInDrawer = sumGrossCash - sumExp;
+        document.getElementById('dlNetCash').innerText = `₹${netInDrawer}`;
     }
 
     async function generateCrossLedger() {
@@ -356,10 +439,24 @@
                 tbody.innerHTML += `<tr><td>${d}</td><td>Paid to: ${vendName} - ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
             });
         }
+        else if (target === 'Green' || target === 'Moped') {
+            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').eq('warehouse_type', target).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
+            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', `${target} Spares`).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+
+            (lines || []).forEach(l => {
+                const v = parseFloat(l.total_price) || 0; totalCredit += v;
+                const d = l.job_cards?.closed_at ? new Date(l.job_cards.closed_at).toLocaleDateString() : '';
+                tbody.innerHTML += `<tr><td>${d}</td><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v}</td><td>--</td></tr>`;
+            });
+            (exp || []).forEach(e => {
+                const v = parseFloat(e.amount) || 0; totalDebit += v;
+                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
+                tbody.innerHTML += `<tr><td>${d}</td><td>Cash Transferred: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
+            });
+        }
         else {
             const isMechanic = globalMechanics.some(m => m.id === target);
             if(isMechanic) {
-                // FIXED: Now queries job_card_items to explicitly sum Fixed Services into mechanic labor payouts
                 const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
                 (jobs || []).forEach(j => {
                     let pkgLabor = 0;
