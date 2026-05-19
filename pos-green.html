@@ -59,7 +59,6 @@
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .clickable-ref { color: var(--info); font-weight: 700; text-decoration: underline; cursor: pointer; }
         
-        /* Flex Wrap applied to inline addition bar */
         .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
         .inline-add-strip > div:nth-child(1) { flex: 3 1 200px; position: relative; } 
@@ -188,7 +187,12 @@
     </div>
 
     <div id="transactionInvoicerFlow" class="card-panel step-section">
-        <div class="block-title">Direct Operational Stack Compilation</div>
+        <div class="block-title" style="display: flex; justify-content: space-between; align-items: center;">
+            Direct Operational Stack Compilation
+            <select id="posCashierSelect" style="padding: 6px 12px; font-size: 0.85rem; border: 1px solid var(--info); color: var(--info); font-weight: bold; background: #f0f9ff;">
+                <option value="">👤 Sold By (Select Staff)</option>
+            </select>
+        </div>
         
         <div class="inline-add-strip-wrapper">
             <div id="dynamicRowsContainer" class="inline-add-strip">
@@ -304,6 +308,18 @@
     let currentPosTabMode = 'AgedCredit';
     
     document.getElementById('roleDisplay').innerText = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'GUEST').toUpperCase();
+
+    // --- NEW: FETCH STAFF LIST FOR THE SOLD BY DROPDOWN ---
+    async function initPosTerminal() {
+        const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
+        let staffOpt = '<option value="">👤 Sold By (Select Staff)</option>';
+        staffList?.forEach(s => {
+            // Include anyone who makes sense to attribute a sale to
+            staffOpt += `<option value="${s.id}">${s.name} (${s.staff_role})</option>`;
+        });
+        document.getElementById('posCashierSelect').innerHTML = staffOpt;
+        queryPosHistoryEngine();
+    }
 
     function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
     function enforceBrandCapitalization(inputRef) { inputRef.value = inputRef.value.toUpperCase(); }
@@ -505,14 +521,17 @@
         document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
     }
 
+    // --- NEW: SAVING THE "SOLD BY" ID FOR GAMIFICATION ---
     async function commitInvoiceExecution(modeTarget, statusTarget) {
         const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
+        const cashierId = document.getElementById('posCashierSelect').value || null; // FETCH DROPDOWN
 
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
             customer_mobile: evaluatedPhoneContext, customer_name: enforceTitleCaseNomenclature(mappedClientName), 
             total_amount: finalNetValuation, payment_mode: modeTarget, status: statusTarget, source_role: activeRole,
+            sold_by_id: cashierId, // SAVE TO DATABASE
             closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null
         }).select().single();
 
@@ -532,7 +551,7 @@
                 }
             }
             if(itemPromises.length > 0) await Promise.all(itemPromises);
-            alert(`Task closed successfully via routing: ${modeTarget}`); window.location.href = 'index.html';
+            alert(`Task closed successfully via routing: ${modeTarget}`); window.location.reload(); // Quick refresh to clear terminal
         }
     }
 
@@ -625,7 +644,8 @@
         });
     }
 
-    queryPosHistoryEngine();
+    // Initialize the module immediately on load
+    initPosTerminal();
 </script>
 </body>
 </html>
