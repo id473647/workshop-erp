@@ -24,19 +24,22 @@
         .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input[type="date"], input[type="text"], input[type="number"], select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
         .btn-action { background: var(--info); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
 
-        .summary-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .summary-box { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; text-align: center; }
-        .summary-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
-        .summary-val { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
-        .sub-val { font-size: 0.85rem; color: #475569; font-weight: 600; margin-top: 6px; display: flex; justify-content: space-between; padding: 0 10px; }
+        /* The XYZ Formula Table */
+        .math-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1rem; border: 2px solid var(--primary); }
+        .math-table th, .math-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .math-table td:nth-child(2) { text-align: right; font-weight: bold; font-family: monospace; font-size: 1.1rem; }
+        .row-sub { background: #fef2f2; color: var(--danger); }
+        .row-add { background: #f0fdf4; color: var(--success); }
+        .row-result { background: #f1f5f9; color: var(--primary); font-weight: 900; font-size: 1.1rem; border-top: 2px solid var(--primary); }
+        .row-final { background: var(--primary); color: white; font-weight: 900; font-size: 1.3rem; }
 
         .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 400px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        table.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        table.data-table th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+        table.data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
 
         /* Thermal Print Styles */
-        .thermal-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.8rem; line-height: 1.3; margin: 0 auto; box-sizing: border-box; }
+        .thermal-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.85rem; line-height: 1.4; margin: 0 auto; box-sizing: border-box; }
         @media print {
             body * { visibility: hidden; }
             .thermal-print-area.print-active, .thermal-print-area.print-active * { visibility: visible; }
@@ -47,7 +50,8 @@
 <body>
 
 <nav class="sticky-nav">
-    <a href="utility-router.html" class="nav-anchor">← Back to Settings</a>
+    <a href="utility-router.html" class="nav-anchor" id="navBack">← Back to Settings</a>
+    <span id="roleDisplay" style="font-weight:bold; color:var(--primary); text-transform:uppercase;">REPORTS</span>
     <a href="index.html" class="btn-header">🏠 HOME</a>
 </nav>
 
@@ -55,52 +59,40 @@
     
     <div id="printEodContainer" class="thermal-print-area">
         <div style="text-align:center; border-bottom:1px dashed black; padding-bottom:8px; margin-bottom:8px;">
-            <div style="font-size:1.1rem; font-weight:bold;">My Care Service Center</div>
-            <div style="font-size:0.85rem; margin-top:4px;">LIVE CASH REGISTER SUMMARY</div>
+            <div style="font-size:1.2rem; font-weight:bold;">My Care Service Center</div>
+            <div style="font-size:0.9rem; margin-top:4px;">CASH RECONCILIATION</div>
         </div>
-        <div style="font-size:0.75rem; margin-bottom:2px;">Date: <strong id="ptEodDate">--</strong></div>
-        <div style="font-size:0.75rem; margin-bottom:8px;">Printed: <span id="ptEodTime">--</span></div>
+        <div style="font-size:0.8rem; margin-bottom:2px;">Date: <strong id="ptEodDate">--</strong></div>
+        <div style="font-size:0.8rem; margin-bottom:8px;">Printed: <span id="ptEodTime">--</span></div>
         
-        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.85rem; text-align:center;">CASH DRAWER RECONCILIATION</div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>UPI / Bank Received:</span><strong id="ptUpi">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>Gross Cash Received:</span><strong id="ptGrossCash">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px; color:red;"><span>Less Shop Payouts:</span><strong id="ptExp">-₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:0.9rem; font-weight:bold; border-top:1px solid #ccc; padding-top:4px;"><span>NET CASH EXPECTED:</span><strong id="ptNetCash">₹0</strong></div>
+        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.9rem; text-align:center;">CASH BREAKDOWN</div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>[X] Total Income:</span><strong id="ptX">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>[-] [Y] UPI/Cards:</span><strong id="ptY">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>[-] [Z] Old Advances:</span><strong id="ptZ">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:bold; border-top:1px dotted #ccc; padding-top:4px;"><span>[=] [C] NET CASH:</span><strong id="ptC">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>[+] [A] New Advances:</span><strong id="ptA">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:bold; border-top:1px dotted #ccc; padding-top:4px;"><span>[=] [TC] TOTAL CASH:</span><strong id="ptTC">₹0</strong></div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; color:red;"><span>[-] [E] Expenses:</span><strong id="ptE">-₹0</strong></div>
+        
+        <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:1.1rem; font-weight:bold; border-top:1px solid #000; padding-top:8px;"><span>DRAWER CASH:</span><strong id="ptDrawer">₹0</strong></div>
 
-        <div style="border-top:1px dashed black; padding-top:8px; margin-top:12px; font-weight:bold; font-size:0.85rem; text-align:center;">PENDING PAYABLES (TODAY)</div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>Owed to Moped:</span><strong id="ptMoped">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>Owed to Green:</span><strong id="ptGreen">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>Lathe Work Billed:</span><strong id="ptLathe">₹0</strong></div>
+        <div id="ptGreenSection" style="display:none; border-top:1px dashed black; padding-top:8px; margin-top:12px; font-weight:bold; font-size:0.85rem; text-align:center;">
+            <div style="margin-bottom:6px;">GREEN / MOPED PAYABLES</div>
+            <div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:normal;"><span>Owed to Moped:</span><strong id="ptMoped">₹0</strong></div>
+            <div style="display:flex; justify-content:space-between; margin-top:2px; font-weight:normal;"><span>Owed to Green:</span><strong id="ptGreen">₹0</strong></div>
+        </div>
 
-        <div style="text-align:center; font-size:0.7rem; border-top:1px dashed black; padding-top:8px; margin-top:16px;">
+        <div style="text-align:center; font-size:0.75rem; border-top:1px dashed black; padding-top:12px; margin-top:20px;">
             Manager Signature: _______________
         </div>
     </div>
 
-    <div id="printHandoverContainer" class="thermal-print-area">
-        <div style="text-align:center; border-bottom:1px dashed black; padding-bottom:8px; margin-bottom:8px;">
-            <div style="font-size:1.1rem; font-weight:bold;">My Care Service Center</div>
-            <div style="font-size:0.85rem; margin-top:4px;">CASH HANDOVER VOUCHER</div>
-        </div>
-        <div style="font-size:0.75rem; margin-bottom:2px;">Date: <strong id="ptHOdate">--</strong></div>
-        <div style="font-size:0.75rem; margin-bottom:8px;">Time: <span id="ptHOtime">--</span></div>
-        
-        <div style="margin-top:12px; font-size:0.85rem;">Paid To: <strong id="ptHOvendor" style="font-size:1rem; display:block; margin-top:4px;">--</strong></div>
-        <div style="margin-top:8px; font-size:0.85rem;">Amount: <strong id="ptHOamount" style="font-size:1.2rem; display:block; margin-top:4px;">₹0</strong></div>
-        <div style="margin-top:8px; font-size:0.75rem;">Remarks: <span id="ptHOnote">--</span></div>
-        
-        <div style="margin-top:30px; font-size:0.75rem; display:flex; justify-content:space-between; border-top:1px dashed black; padding-top:8px;">
-            <div style="text-align:center;">Manager<br><br>_______</div>
-            <div style="text-align:center;">Receiver<br><br>_______</div>
-        </div>
-    </div>
-
     <div class="card-panel">
-        <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchTab('tabEOD')">EOD Cash Register</button>
-            <button class="tab-btn" onclick="switchTab('tabAnalytics')">New Customer Analytics</button>
-            <button class="tab-btn" onclick="switchTab('tabPromos')">Promotional Leads</button>
-            <button class="tab-btn" onclick="switchTab('tabWallets')">Loyalty Ledgers</button>
+        <div class="tabs-header" id="tabsHeader">
+            <button class="tab-btn active" onclick="switchTab('tabEOD')">EOD Cash Formula</button>
+            <button class="tab-btn" onclick="switchTab('tabAnalytics')" id="btnTabAnalytics">New Customer Analytics</button>
+            <button class="tab-btn" onclick="switchTab('tabPromos')" id="btnTabPromos">Promotional Leads</button>
+            <button class="tab-btn" onclick="switchTab('tabWallets')" id="btnTabWallets">Loyalty Ledgers</button>
         </div>
 
         <div id="tabEOD" class="view-panel active">
@@ -109,66 +101,30 @@
                     <label>Select Date for Register</label>
                     <input type="date" id="eodDate" onchange="runEodReport()">
                 </div>
-                <button class="btn-action" style="background:var(--primary);" onclick="runEodReport()">🔄 REFRESH LIVE LEDGER</button>
-                <button class="btn-action" style="background:var(--success);" onclick="triggerPrint('printEodContainer')">🖨️ PRINT EOD / MID-DAY SUMMARY</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="runEodReport()">🔄 REFRESH FORMULA</button>
+                <button class="btn-action" style="background:var(--success);" onclick="triggerPrint('printEodContainer')">🖨️ PRINT EOD SLIP</button>
             </div>
 
-            <div class="summary-banner" style="margin-top:20px;">
-                <div class="summary-box" style="background:#dcfce7; border-color:#bbf7d0;">
-                    <span class="summary-title" style="color:#15803d;">Net Cash in Drawer</span>
-                    <span class="summary-val" id="eodNetCash" style="color:#166534;">₹0</span>
-                    <span style="font-size:0.7rem; color:#15803d;">(Gross Cash - Shop Payouts)</span>
-                </div>
-                <div class="summary-box" style="background:#e0f2fe; border-color:#bae6fd;">
-                    <span class="summary-title" style="color:#0369a1;">UPI / Digital Receipts</span>
-                    <span class="summary-val" id="eodUpi" style="color:#075985;">₹0</span>
-                </div>
-                <div class="summary-box" style="background:#fefce8; border-color:#fef08a;">
-                    <span class="summary-title" style="color:#a16207;">Total Shop Payouts</span>
-                    <span class="summary-val" id="eodExp" style="color:#854d0e;">₹0</span>
-                </div>
-            </div>
+            <table class="math-table">
+                <tbody>
+                    <tr><td>[X] TOTAL GROSS INCOME <span style="font-size:0.75rem; color:#64748b; display:block;">(All Cash & UPI Bills Closed Today)</span></td><td id="uiX">₹0</td></tr>
+                    <tr class="row-sub"><td>[-] [Y] UPI / CARDS <span style="font-size:0.75rem; display:block;">(Digital payments from today's bills)</span></td><td id="uiY">₹0</td></tr>
+                    <tr class="row-sub"><td>[-] [Z] OLD ADVANCES DEPOSITED EARLIER <span style="font-size:0.75rem; display:block;">(Advances applied to bills closed today, but cash was collected on a previous day)</span></td><td id="uiZ">₹0</td></tr>
+                    <tr class="row-result"><td>[=] [C] NET CASH FROM BILLS</td><td id="uiC">₹0</td></tr>
+                    <tr class="row-add"><td>[+] [A] ADVANCES DEPOSITED TODAY <span style="font-size:0.75rem; display:block;">(New cash deposits collected today for Open or Closed jobs)</span></td><td id="uiA">₹0</td></tr>
+                    <tr class="row-result"><td>[=] [TC] TOTAL CASH IN HAND</td><td id="uiTC">₹0</td></tr>
+                    <tr class="row-sub"><td>[-] [E] TOTAL EXPENSES & HANDOVERS <span style="font-size:0.75rem; display:block;">(Money paid out to staff, lathe, or warehouses today)</span></td><td id="uiE">₹0</td></tr>
+                    <tr class="row-final"><td>CASH IN DRAWER</td><td id="uiDrawer">₹0</td></tr>
+                </tbody>
+            </table>
 
-            <div class="block-title" style="margin-top:24px;">Liabilities & Mid-Day Payouts</div>
-            <p style="font-size:0.8rem; color:#64748b; margin-top:0;">Tracks parts/lathe billed today against cash handed over to them today.</p>
-            
-            <div class="summary-banner" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                <div class="summary-box" style="border:1px solid #fca5a5;">
-                    <span class="summary-title">MOPED WAREHOUSE</span>
-                    <span class="summary-val" id="eodMopedNet" style="color:var(--danger);">₹0 <span style="font-size:0.8rem;">Owed</span></span>
-                    <div class="sub-val"><span>Billed: ₹<span id="eodMopedBilled">0</span></span><span>Paid: ₹<span id="eodMopedPaid">0</span></span></div>
+            <div id="owedSection" style="margin-top:24px; padding:16px; border:1px solid #fca5a5; border-radius:8px; background:#fef2f2; display:none;">
+                <h4 style="margin:0 0 12px 0; color:var(--danger);">Outstanding Liabilities (To be paid out from Drawer)</h4>
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #fca5a5; padding-bottom:8px; margin-bottom:8px;">
+                    <strong>Owed to Moped Warehouse:</strong> <span id="uiMopedNet">₹0</span>
                 </div>
-                <div class="summary-box" style="border:1px solid #fca5a5;">
-                    <span class="summary-title">GREEN WAREHOUSE</span>
-                    <span class="summary-val" id="eodGreenNet" style="color:var(--danger);">₹0 <span style="font-size:0.8rem;">Owed</span></span>
-                    <div class="sub-val"><span>Billed: ₹<span id="eodGreenBilled">0</span></span><span>Paid: ₹<span id="eodGreenPaid">0</span></span></div>
-                </div>
-                
-                <div class="summary-box" style="border:1px solid #fca5a5;">
-                    <span class="summary-title">LATHE WORKERS</span>
-                    <span class="summary-val" id="eodLatheNet" style="color:var(--danger);">₹0 <span style="font-size:0.8rem;">Owed</span></span>
-                    <div class="sub-val"><span>Billed: ₹<span id="eodLatheBilled">0</span></span><span>Paid: ₹<span id="eodLathePaid">0</span></span></div>
-                    <div id="eodLatheCheatSheet" style="margin-top:8px; font-size:0.75rem; color:#991b1b; text-align:left; background:#fee2e2; padding:6px; border-radius:4px; max-height:80px; overflow-y:auto; border:1px dashed #fca5a5;">
-                        </div>
-                </div>
-            </div>
-
-            <div style="background:#fffbeb; border:1px solid #fcd34d; padding:16px; border-radius:8px; margin-top:20px;">
-                <h4 style="margin:0 0 12px 0; color:#b45309;">💸 Issue Cash Handover</h4>
-                <div class="inputs-grid" style="margin-bottom:0;">
-                    <div class="field-group">
-                        <label>Select Receiver</label>
-                        <select id="payoutVendor"><option value="MOPED WAREHOUSE">Moped Warehouse</option><option value="GREEN WAREHOUSE">Green Warehouse</option><option value="LATHE WORKER">Lathe Worker</option><option value="OTHER">Other / Misc Expense</option></select>
-                    </div>
-                    <div class="field-group">
-                        <label>Amount Handed Over (₹)</label>
-                        <input type="number" id="payoutAmount" value="0" min="1">
-                    </div>
-                    <div class="field-group">
-                        <label>Remarks</label>
-                        <input type="text" id="payoutNote" placeholder="e.g. Mid-day collection" oninput="this.value=this.value.toUpperCase()">
-                    </div>
-                    <button class="btn-action" style="background:#059669;" onclick="commitCashHandover()">LOG & PRINT SLIP</button>
+                <div style="display:flex; justify-content:space-between;">
+                    <strong>Owed to Green Warehouse:</strong> <span id="uiGreenNet">₹0</span>
                 </div>
             </div>
         </div>
@@ -178,41 +134,24 @@
                 <div class="field-group"><label>Date Range Selector</label><select id="dateRange" onchange="runNewCustomerReport()"><option value="today">Today</option><option value="week">This Week (Last 7 Days)</option><option value="month">This Month (Last 30 Days)</option><option value="all">All Time History</option></select></div>
                 <button class="btn-action" style="background:var(--primary);" onclick="runNewCustomerReport()">RUN REPORT</button>
             </div>
-            <div class="summary-banner">
-                <div class="summary-box"><span class="summary-title">Total New Customers</span><span class="summary-val" id="kpiTotal">0</span></div>
-                <div class="summary-box"><span class="summary-title">Day-1 AMC Sales</span><span class="summary-val" id="kpiAmc" style="color:var(--success);">0</span></div>
-                <div class="summary-box"><span class="summary-title">AMC Conversion Rate</span><span class="summary-val" id="kpiConv" style="color:var(--info);">0%</span></div>
-            </div>
             <div class="table-wrapper">
-                <table><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC Purchased?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Scanning...</td></tr></tbody></table>
+                <table class="data-table"><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC Purchased?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Scanning...</td></tr></tbody></table>
             </div>
         </div>
 
         <div id="tabPromos" class="view-panel">
             <div class="block-title">Bulk SMS & WhatsApp Marketing Extractors</div>
-            <p style="font-size:0.85rem; color:#64748b; line-height:1.4; margin-bottom:20px;">These automated tools scan your database to find customers who own specific vehicle types but <strong>do not</strong> have an active AMC subscription. Download the CSV and upload it to your bulk SMS provider.</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <div style="border:1px solid #bae6fd; background:#f0f9ff; padding:20px; border-radius:8px; text-align:center;">
-                    <h3 style="color:#0369a1; margin:0 0 10px 0;">Motorcycle Owners</h3>
-                    <p style="font-size:0.8rem; color:#0c4a6e; margin-bottom:16px;">Targets Splendor, Pulsar, Apache, and Bullet owners missing Prepaid AMC.</p>
-                    <button class="btn-action" style="background:#0284c7; width:100%;" onclick="exportLeads('Motorcycle')">📥 DOWNLOAD MOTORCYCLE LEADS</button>
-                </div>
-                <div style="border:1px solid #bbf7d0; background:#f0fdf4; padding:20px; border-radius:8px; text-align:center;">
-                    <h3 style="color:#15803d; margin:0 0 10px 0;">Scooter Owners</h3>
-                    <p style="font-size:0.8rem; color:#166534; margin-bottom:16px;">Targets Activa, Jupiter, and Access owners missing Loyalty Plan.</p>
-                    <button class="btn-action" style="background:#16a34a; width:100%;" onclick="exportLeads('Scooter')">📥 DOWNLOAD SCOOTER LEADS</button>
-                </div>
+            <p style="font-size:0.85rem; color:#64748b; line-height:1.4; margin-bottom:20px;">Targets specific vehicle owners missing active plans for SMS campaigns.</p>
+            <div style="display:flex; gap:16px;">
+                <button class="btn-action" style="background:#0284c7; flex:1;" onclick="exportLeads('Motorcycle')">📥 MOTORCYCLE LEADS</button>
+                <button class="btn-action" style="background:#16a34a; flex:1;" onclick="exportLeads('Scooter')">📥 SCOOTER LEADS</button>
             </div>
         </div>
 
         <div id="tabWallets" class="view-panel">
             <div class="block-title">Master Digital Currency Liabilities</div>
-            <div class="summary-banner">
-                <div class="summary-box"><span class="summary-title">Customer Wallet Liability</span><span class="summary-val" id="repCustWallet" style="color:var(--info);">₹0</span></div>
-                <div class="summary-box"><span class="summary-title">Mechanic Points Pending</span><span class="summary-val" id="repMechWallet" style="color:var(--success);">0 Pts</span></div>
-            </div>
             <div class="table-wrapper">
-                <table><thead><tr><th>Mobile Key</th><th>Customer Name</th><th>Wallet Balance</th><th>Referral Code</th></tr></thead><tbody id="walletTableBody"></tbody></table>
+                <table class="data-table"><thead><tr><th>Mobile Key</th><th>Customer Name</th><th>Wallet Balance</th><th>Referral Code</th></tr></thead><tbody id="walletTableBody"></tbody></table>
             </div>
         </div>
 
@@ -226,6 +165,15 @@
 
     document.getElementById('eodDate').valueAsDate = new Date();
 
+    // RBAC Configuration
+    document.getElementById('roleDisplay').innerText = `REPORTS - ${sessionRole.toUpperCase()}`;
+    if (sessionRole === 'green' || sessionRole === 'moped') {
+        document.getElementById('btnTabAnalytics').style.display = 'none';
+        document.getElementById('btnTabPromos').style.display = 'none';
+        document.getElementById('btnTabWallets').style.display = 'none';
+        document.getElementById('navBack').style.display = 'none'; // They don't have utility-router
+    }
+
     function switchTab(tabId) { 
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
         document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active')); 
@@ -235,14 +183,13 @@
         if(tabId === 'tabEOD') runEodReport();
     }
 
-    // --- PRINTING LOGIC ---
     function triggerPrint(containerId) {
         document.querySelectorAll('.thermal-print-area').forEach(el => el.classList.remove('print-active'));
         document.getElementById(containerId).classList.add('print-active');
         window.print();
     }
 
-    // --- EOD REALTIME REPORT ENGINE ---
+    // THE XYZ FORMULA ENGINE
     async function runEodReport() {
         const targetDate = document.getElementById('eodDate').value;
         if (!targetDate) return;
@@ -250,113 +197,127 @@
         const startDate = new Date(targetDate); startDate.setHours(0,0,0,0);
         const endDate = new Date(targetDate); endDate.setHours(23,59,59,999);
 
-        // Fetch Data (Now including external_work_notes)
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, total_invoice_value, advance_paid, payment_mode, lathe_welding, external_work_notes').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
-        const { data: openJobs } = await supabaseClient.from('job_cards').select('advance_paid').eq('status', 'Open').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
-        const { data: expenses } = await supabaseClient.from('workshop_expenses').select('amount, stakeholder_id, expense_category').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
+        // Fetch Data
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, total_invoice_value, advance_paid, payment_mode, created_at, source_role').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
+        const { data: openJobs } = await supabaseClient.from('job_cards').select('advance_paid, created_at, source_role').eq('status', 'Open').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
+        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount, payment_mode, source_role').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
+        const { data: expenses } = await supabaseClient.from('workshop_expenses').select('amount, stakeholder_id, expense_category, recorded_by').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
 
-        let grossCash = 0; let totalUpi = 0; let totalLatheBilled = 0; let totalExp = 0;
-        let paidMoped = 0; let paidGreen = 0; let paidLathe = 0;
-        let latheBreakdownHtml = ''; // CHEAT SHEET STORAGE
+        let X = 0; // Total Income (Cash + UPI)
+        let Y = 0; // Total UPI
+        let Z = 0; // Old Advances
+        let A = 0; // New Advances (Today)
+        let E = 0; // Expenses
 
-        (openJobs || []).forEach(oj => { grossCash += parseFloat(oj.advance_paid) || 0; });
+        let billedMoped = 0, paidMoped = 0;
+        let billedGreen = 0, paidGreen = 0;
         const closedJobIds = [];
-        
+
+        // PROCESS JOB CARDS
         (jobs || []).forEach(j => {
+            // RBAC Filtering: If Green/Moped, only process jobs they generated (for POS equivalents)
+            if((sessionRole === 'green' || sessionRole === 'moped') && j.source_role !== sessionRole) return;
+
             closedJobIds.push(j.id);
-            const netPaid = parseFloat(j.total_invoice_value) || 0;
-            const advPaid = parseFloat(j.advance_paid) || 0;
-            const rowLatheVal = parseFloat(j.lathe_welding) || 0;
-            totalLatheBilled += rowLatheVal;
+            const total = parseFloat(j.total_invoice_value) || 0;
+            const advance = parseFloat(j.advance_paid) || 0;
+            const isUpi = j.payment_mode === 'UPI';
+            const isCredit = j.payment_mode === 'Credit';
 
-            if (j.payment_mode === 'Cash') { grossCash += netPaid + advPaid; } 
-            else if (j.payment_mode === 'UPI') { totalUpi += netPaid; grossCash += advPaid; }
+            if (!isCredit) {
+                X += total;
+                if (isUpi) Y += total; // If bill is UPI, entire total goes to Y (we assume advance was cash or handled separately, but standard logic puts total in UPI bucket)
 
-            // LATHE CHEAT SHEET BUILDER
-            if (rowLatheVal > 0 && j.external_work_notes) {
-                latheBreakdownHtml += `<div style="margin-bottom:4px;"><b>JC-${j.id.split('-')[0].toUpperCase()}:</b> ${j.external_work_notes}</div>`;
+                // Date Check for Advance
+                const jcDate = new Date(j.created_at).toISOString().split('T')[0];
+                if (jcDate === targetDate) A += advance; // Advance collected today
+                else Z += advance; // Advance collected previously
             }
         });
 
-        // POPULATE THE LATHE CHEAT SHEET
-        document.getElementById('eodLatheCheatSheet').innerHTML = latheBreakdownHtml || 'No breakdown notes for today.';
+        // PROCESS OPEN JOBS (For Today's Advances)
+        (openJobs || []).forEach(oj => {
+            if((sessionRole === 'green' || sessionRole === 'moped') && oj.source_role !== sessionRole) return;
+            const ojDate = new Date(oj.created_at).toISOString().split('T')[0];
+            if (ojDate === targetDate) A += (parseFloat(oj.advance_paid) || 0);
+        });
 
-        (expenses || []).forEach(e => { 
+        // PROCESS POS SALES
+        (pos || []).forEach(p => {
+            if((sessionRole === 'green' || sessionRole === 'moped') && p.source_role !== sessionRole) return;
+            const total = parseFloat(p.total_amount) || 0;
+            const isUpi = p.payment_mode === 'UPI';
+            const isCredit = p.payment_mode === 'Credit';
+            
+            if (!isCredit) {
+                X += total;
+                if (isUpi) Y += total;
+            }
+        });
+
+        // PROCESS EXPENSES
+        (expenses || []).forEach(e => {
+            // RBAC Filtering: Only show expenses recorded by this role
+            if((sessionRole === 'green' || sessionRole === 'moped') && e.recorded_by !== sessionRole) return;
+
             const amt = Math.abs(parseFloat(e.amount) || 0);
-            totalExp += amt; 
+            E += amt; 
+            
             if(e.expense_category === 'Vendor Payout') {
-                if(e.stakeholder_id === 'MOPED WAREHOUSE') paidMoped += amt;
-                else if(e.stakeholder_id === 'GREEN WAREHOUSE') paidGreen += amt;
-                else if(e.stakeholder_id === 'LATHE WORKER') paidLathe += amt;
-            }
+                if(e.stakeholder_id === 'MOPED WAREHOUSE' || e.stakeholder_id === 'Moped') paidMoped += amt;
+                else if(e.stakeholder_id === 'GREEN WAREHOUSE' || e.stakeholder_id === 'Green') paidGreen += amt;
+            } else if (e.expense_category === 'Green Spares') paidGreen += amt;
+            else if (e.expense_category === 'Moped Spares') paidMoped += amt;
         });
 
-        const netCash = grossCash - totalExp;
+        // MATH EXECUTION
+        const C = X - Y - Z;
+        const TC = C + A;
+        const Drawer = TC - E;
 
-        let billedMoped = 0; let billedGreen = 0;
-        if (closedJobIds.length > 0) {
-            const { data: items } = await supabaseClient.from('job_card_items').select('warehouse_type, total_price').in('job_card_id', closedJobIds);
-            (items || []).forEach(item => {
-                if (item.warehouse_type === 'Moped') billedMoped += parseFloat(item.total_price) || 0;
-                if (item.warehouse_type === 'Green') billedGreen += parseFloat(item.total_price) || 0;
-            });
-        }
+        // DOM UPDATES
+        document.getElementById('uiX').innerText = `₹${X}`;
+        document.getElementById('uiY').innerText = `₹${Y}`;
+        document.getElementById('uiZ').innerText = `₹${Z}`;
+        document.getElementById('uiC').innerText = `₹${C}`;
+        document.getElementById('uiA').innerText = `₹${A}`;
+        document.getElementById('uiTC').innerText = `₹${TC}`;
+        document.getElementById('uiE').innerText = `₹${E}`;
+        document.getElementById('uiDrawer').innerText = `₹${Drawer}`;
 
-        const netMoped = billedMoped - paidMoped;
-        const netGreen = billedGreen - paidGreen;
-        const netLathe = totalLatheBilled - paidLathe;
-
-        document.getElementById('eodNetCash').innerText = `₹${Math.floor(netCash)}`;
-        document.getElementById('eodUpi').innerText = `₹${Math.floor(totalUpi)}`;
-        document.getElementById('eodExp').innerText = `₹${Math.floor(totalExp)}`;
+        document.getElementById('ptX').innerText = `₹${X}`;
+        document.getElementById('ptY').innerText = `₹${Y}`;
+        document.getElementById('ptZ').innerText = `₹${Z}`;
+        document.getElementById('ptC').innerText = `₹${C}`;
+        document.getElementById('ptA').innerText = `₹${A}`;
+        document.getElementById('ptTC').innerText = `₹${TC}`;
+        document.getElementById('ptE').innerText = `-₹${E}`;
+        document.getElementById('ptDrawer').innerText = `₹${Drawer}`;
         
-        document.getElementById('eodMopedBilled').innerText = Math.floor(billedMoped);
-        document.getElementById('eodMopedPaid').innerText = Math.floor(paidMoped);
-        document.getElementById('eodMopedNet').innerHTML = `₹${Math.floor(netMoped)} <span style="font-size:0.8rem;">${netMoped >= 0 ? 'Owed' : 'Overpaid'}</span>`;
-
-        document.getElementById('eodGreenBilled').innerText = Math.floor(billedGreen);
-        document.getElementById('eodGreenPaid').innerText = Math.floor(paidGreen);
-        document.getElementById('eodGreenNet').innerHTML = `₹${Math.floor(netGreen)} <span style="font-size:0.8rem;">${netGreen >= 0 ? 'Owed' : 'Overpaid'}</span>`;
-
-        document.getElementById('eodLatheBilled').innerText = Math.floor(totalLatheBilled);
-        document.getElementById('eodLathePaid').innerText = Math.floor(paidLathe);
-        document.getElementById('eodLatheNet').innerHTML = `₹${Math.floor(netLathe)} <span style="font-size:0.8rem;">${netLathe >= 0 ? 'Owed' : 'Overpaid'}</span>`;
-
         document.getElementById('ptEodDate').innerText = new Date(targetDate).toLocaleDateString('en-IN');
         document.getElementById('ptEodTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('ptUpi').innerText = `₹${Math.floor(totalUpi)}`;
-        document.getElementById('ptGrossCash').innerText = `₹${Math.floor(grossCash)}`;
-        document.getElementById('ptExp').innerText = `-₹${Math.floor(totalExp)}`;
-        document.getElementById('ptNetCash').innerText = `₹${Math.floor(netCash)}`;
-        document.getElementById('ptMoped').innerText = `₹${Math.floor(netMoped)}`;
-        document.getElementById('ptGreen').innerText = `₹${Math.floor(netGreen)}`;
-        document.getElementById('ptLathe').innerText = `₹${Math.floor(netLathe)}`;
-    }
 
-    async function commitCashHandover() {
-        const vendor = document.getElementById('payoutVendor').value;
-        const amount = parseFloat(document.getElementById('payoutAmount').value) || 0;
-        const note = document.getElementById('payoutNote').value.trim().toUpperCase() || 'MID-DAY SETTLEMENT';
+        // OUTSTANDING LIABILITIES (For Admin/Workshop Only)
+        if (sessionRole === 'admin' || sessionRole === 'service') {
+            document.getElementById('owedSection').style.display = 'block';
+            document.getElementById('ptGreenSection').style.display = 'block';
 
-        if (amount <= 0) return alert("Enter a valid amount.");
+            if (closedJobIds.length > 0) {
+                const { data: items } = await supabaseClient.from('job_card_items').select('warehouse_type, total_price').in('job_card_id', closedJobIds);
+                (items || []).forEach(item => {
+                    if (item.warehouse_type === 'Moped') billedMoped += parseFloat(item.total_price) || 0;
+                    if (item.warehouse_type === 'Green') billedGreen += parseFloat(item.total_price) || 0;
+                });
+            }
 
-        const { error } = await supabaseClient.from('workshop_expenses').insert({
-            expense_category: 'Vendor Payout', stakeholder_id: vendor, amount: amount, note: note, recorded_by: sessionRole
-        });
+            const netMoped = billedMoped - paidMoped;
+            const netGreen = billedGreen - paidGreen;
 
-        if (error) return alert("Database Error.");
-
-        document.getElementById('ptHOdate').innerText = new Date().toLocaleDateString('en-IN');
-        document.getElementById('ptHOtime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('ptHOvendor').innerText = vendor;
-        document.getElementById('ptHOamount').innerText = `₹${amount}`;
-        document.getElementById('ptHOnote').innerText = note;
-
-        document.getElementById('payoutAmount').value = '0';
-        document.getElementById('payoutNote').value = '';
-        
-        runEodReport();
-        triggerPrint('printHandoverContainer');
+            document.getElementById('uiMopedNet').innerText = `₹${netMoped}`;
+            document.getElementById('uiGreenNet').innerText = `₹${netGreen}`;
+            document.getElementById('ptMoped').innerText = `₹${netMoped}`;
+            document.getElementById('ptGreen').innerText = `₹${netGreen}`;
+        }
     }
 
     async function runNewCustomerReport() {
@@ -364,21 +325,18 @@
         let startDate = new Date(); if(range === 'today') { startDate.setHours(0,0,0,0); } else if(range === 'week') { startDate.setDate(startDate.getDate() - 7); } else if(range === 'month') { startDate.setDate(startDate.getDate() - 30); } else if(range === 'all') { startDate = new Date(2020, 0, 1); }
         
         const { data: newCusts } = await supabaseClient.from('customers').select('*').gte('created_at', startDate.toISOString()).order('created_at', {ascending: false});
-        if(!newCusts || newCusts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No new customers registered in this timeframe.</td></tr>'; document.getElementById('kpiTotal').innerText = '0'; document.getElementById('kpiAmc').innerText = '0'; document.getElementById('kpiConv').innerText = '0%'; return; }
+        if(!newCusts || newCusts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No new customers registered in this timeframe.</td></tr>'; return; }
 
         const phoneList = newCusts.map(c => c.mobile_number);
         const { data: vehicles } = await supabaseClient.from('vehicles').select('customer_mobile, category_group').in('customer_mobile', phoneList);
         const { data: amcs } = await supabaseClient.from('amc_subscriptions').select('customer_mobile, created_at').in('customer_mobile', phoneList);
 
-        let amcCount = 0; tbody.innerHTML = '';
+        tbody.innerHTML = '';
         newCusts.forEach(cust => {
             const custDate = new Date(cust.created_at); const myVeh = (vehicles || []).find(v => v.customer_mobile === cust.mobile_number); const vehType = myVeh ? myVeh.category_group : 'Unknown';
             const myAmc = (amcs || []).find(a => { if(a.customer_mobile !== cust.mobile_number) return false; const diffDays = Math.ceil(Math.abs(new Date(a.created_at) - custDate) / (1000 * 60 * 60 * 24)); return diffDays <= 1; });
-            if(myAmc) amcCount++;
             tbody.innerHTML += `<tr><td>${custDate.toLocaleDateString('en-IN')}</td><td><strong>${cust.mobile_number}</strong></td><td>${cust.name}</td><td>${vehType}</td><td>${myAmc ? '<span style="color:var(--success); font-weight:bold;">YES</span>' : '<span style="color:#94a3b8;">No</span>'}</td></tr>`;
         });
-
-        document.getElementById('kpiTotal').innerText = newCusts.length; document.getElementById('kpiAmc').innerText = amcCount; document.getElementById('kpiConv').innerText = `${((amcCount / newCusts.length) * 100).toFixed(1)}%`;
     }
 
     async function exportLeads(targetType) {
@@ -399,11 +357,8 @@
 
     async function loadWalletReport() {
         const { data: custs } = await supabaseClient.from('customers').select('mobile_number, name, loyalty_points, referral_code').gt('loyalty_points', 0).order('loyalty_points', {ascending: false});
-        const { data: mechs } = await supabaseClient.from('mechanics').select('earned_points').gt('earned_points', 0);
-        let cSum = 0; let mSum = 0; const tbody = document.getElementById('walletTableBody'); tbody.innerHTML = '';
-        (custs || []).forEach(c => { cSum += parseFloat(c.loyalty_points) || 0; tbody.innerHTML += `<tr><td>${c.mobile_number}</td><td>${c.name}</td><td><strong>₹${Math.floor(c.loyalty_points)}</strong></td><td>${c.referral_code || 'N/A'}</td></tr>`; });
-        (mechs || []).forEach(m => { mSum += parseFloat(m.earned_points) || 0; });
-        document.getElementById('repCustWallet').innerText = `₹${Math.floor(cSum)}`; document.getElementById('repMechWallet').innerText = `${Math.floor(mSum)} Pts`;
+        const tbody = document.getElementById('walletTableBody'); tbody.innerHTML = '';
+        (custs || []).forEach(c => { tbody.innerHTML += `<tr><td>${c.mobile_number}</td><td>${c.name}</td><td><strong>₹${Math.floor(c.loyalty_points)}</strong></td><td>${c.referral_code || 'N/A'}</td></tr>`; });
     }
 
     runEodReport();
