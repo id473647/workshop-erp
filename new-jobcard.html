@@ -29,7 +29,7 @@
         .btn-action { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 1.05rem; width: 100%; transition: opacity 0.15s; margin-top: 10px; }
         .btn-action:hover { opacity: 0.9; }
         
-        .new-badge { background: var(--warning); color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; display: inline-block; vertical-align: middle; }
+        .new-badge { background: var(--danger); color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-left: 6px; display: inline-block; vertical-align: middle; font-weight:bold; }
     </style>
 </head>
 <body>
@@ -56,7 +56,7 @@
                 <input type="tel" id="jcMobile" placeholder="10 Digits" maxlength="10" autofocus oninput="processCustomerLookup(this.value)">
             </div>
             <div class="field-group">
-                <label>Customer Name <span id="newCustBadge" class="new-badge" style="display:none;">NEW</span></label>
+                <label>Customer Name <span id="newCustBadge" class="new-badge" style="display:none;">NEW CUSTOMER - PITCH AMC!</span></label>
                 <input type="text" id="jcName" placeholder="Full Name" oninput="this.value=this.value.toUpperCase()">
             </div>
         </div>
@@ -72,47 +72,35 @@
         <div id="newVehicleBlock" style="display:none; background:#f1f5f9; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <h4 style="margin:0 0 12px 0; color:var(--info); font-size:0.9rem;">Register New Asset</h4>
             <div class="inputs-grid" style="margin-bottom:0;">
-                <div class="field-group">
-                    <label>Registration Plate (MP48...)</label>
-                    <input type="text" id="nvReg" placeholder="e.g. MP48 AB 1234" oninput="this.value=this.value.toUpperCase().replace(/\s/g, '')">
-                </div>
-                <div class="field-group">
-                    <label>Make & Model</label>
-                    <input type="text" id="nvModel" placeholder="e.g. SPLENDOR PLUS" oninput="this.value=this.value.toUpperCase()">
-                </div>
-                <div class="field-group">
-                    <label>Category / Segment</label>
-                    <select id="nvCategory">
-                        <option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option>
-                        <option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option>
-                        <option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option>
-                        <option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option>
-                        <option value="(I) Scooterate">(I) Scooterate</option>
-                    </select>
-                </div>
+                <div class="field-group"><label>Registration Plate (MP48...)</label><input type="text" id="nvReg" placeholder="e.g. MP48 AB 1234" oninput="this.value=this.value.toUpperCase().replace(/\s/g, '')"></div>
+                <div class="field-group"><label>Make & Model</label><input type="text" id="nvModel" placeholder="e.g. SPLENDOR PLUS" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Category / Segment</label><select id="nvCategory"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option><option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
             </div>
         </div>
-
     </div>
 
     <div class="card-panel">
-        <div class="block-title">Job Requirements</div>
+        <div class="block-title">Job Requirements & Assignment</div>
         
+        <div class="inputs-grid" style="margin-bottom: 20px;">
+            <div class="field-group">
+                <label>Primary Technician</label>
+                <select id="intakePrimaryMech"><option value="">-- Unassigned --</option></select>
+            </div>
+            <div class="field-group">
+                <label>Co-Mechanic (50% Split)</label>
+                <select id="intakeCoMech"><option value="">-- None --</option></select>
+            </div>
+        </div>
+
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
             <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase()"></textarea>
         </div>
 
         <div class="inputs-grid">
-            <div class="field-group">
-                <label>Budget Estimate Given (₹)</label>
-                <input type="number" id="jcEstimate" value="0" min="0">
-            </div>
-            <div class="field-group">
-                <label>Prepaid Advance Collected (₹)</label>
-                <input type="number" id="jcAdvance" value="0" min="0">
-                <span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to EOD Drawer)</span>
-            </div>
+            <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
+            <div class="field-group"><label>Prepaid Advance Collected (₹)</label><input type="number" id="jcAdvance" value="0" min="0"><span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to EOD Drawer)</span></div>
         </div>
 
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED</button>
@@ -132,7 +120,16 @@
         window.location.href = 'login.html';
     }
 
-    let isExistingCustomer = false;
+    async function loadMechanics() {
+        const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('staff_role', 'Mechanic').eq('is_active', true);
+        const pSel = document.getElementById('intakePrimaryMech');
+        const cSel = document.getElementById('intakeCoMech');
+        (staff || []).forEach(m => {
+            pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+            cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+    }
+    loadMechanics();
 
     async function processCustomerLookup(mobileStr) {
         const cleanMobile = mobileStr.trim();
@@ -143,7 +140,6 @@
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
             document.getElementById('newVehicleBlock').style.display = 'none';
-            isExistingCustomer = false;
             nBadge.style.display = 'none';
             return;
         }
@@ -151,19 +147,15 @@
         const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(id, reg_number, make_model)').eq('mobile_number', cleanMobile).single();
         
         if (cust) {
-            isExistingCustomer = true;
             nBadge.style.display = 'none';
             document.getElementById('jcName').value = cust.name;
             vSelect.innerHTML = '';
             if (cust.vehicles && cust.vehicles.length > 0) {
-                cust.vehicles.forEach(v => {
-                    vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`;
-                });
+                cust.vehicles.forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`; });
             }
             vSelect.innerHTML += `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         } else {
-            isExistingCustomer = false;
             nBadge.style.display = 'inline-block';
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
@@ -173,11 +165,8 @@
 
     function toggleNewVehicleFields() {
         const vSelect = document.getElementById('jcVehicleSelect').value;
-        if (vSelect === 'NEW') {
-            document.getElementById('newVehicleBlock').style.display = 'block';
-        } else {
-            document.getElementById('newVehicleBlock').style.display = 'none';
-        }
+        if (vSelect === 'NEW') document.getElementById('newVehicleBlock').style.display = 'block';
+        else document.getElementById('newVehicleBlock').style.display = 'none';
     }
 
     async function commitNewJobCard() {
@@ -186,64 +175,39 @@
         const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
         const advance = parseFloat(document.getElementById('jcAdvance').value) || 0;
+        const pMech = document.getElementById('intakePrimaryMech').value || null;
+        const cMech = document.getElementById('intakeCoMech').value || null;
         
         if (mobile.length !== 10) return alert("Please enter a valid 10-digit mobile number.");
         if (!name) return alert("Please enter the customer's name.");
         if (!problem) return alert("Please document the customer's problem.");
         
         const btn = document.getElementById('btnCreateJc');
-        btn.innerText = "PROCESSING...";
-        btn.disabled = true;
+        btn.innerText = "PROCESSING..."; btn.disabled = true;
 
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
 
-        await supabaseClient.from('customers').upsert({
-            mobile_number: mobile,
-            name: name,
-            category: 'Regular'
-        }, { onConflict: 'mobile_number' });
+        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, category: 'Regular' }, { onConflict: 'mobile_number' });
 
         if (finalVehicleId === 'NEW') {
             const reg = document.getElementById('nvReg').value.trim().toUpperCase();
             const model = document.getElementById('nvModel').value.trim().toUpperCase();
             const cat = document.getElementById('nvCategory').value;
             
-            if (!reg || !model) {
-                alert("Please fill out the new vehicle Registration Number and Model.");
-                btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false;
-                return;
-            }
-
-            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({
-                customer_mobile: mobile, reg_number: reg, make_model: model, category_group: cat
-            }).select().single();
-
-            if (vehErr) {
-                alert("Error registering vehicle: " + vehErr.message);
-                btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false;
-                return;
-            }
+            if (!reg || !model) { alert("Please fill out the new vehicle Registration Number and Model."); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
+            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ customer_mobile: mobile, reg_number: reg, make_model: model, category_group: cat }).select().single();
+            if (vehErr) { alert("Error registering vehicle: " + vehErr.message); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
             finalVehicleId = newVeh.id;
         } 
 
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile,
-            vehicle_id: finalVehicleId,
-            problem_mentioned: problem,
-            estimate_given: estimate,
-            advance_paid: advance,
-            status: 'Open',
-            source_role: activeRole
+            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance,
+            mech_id: pMech, co_mech_id: cMech, status: 'Open', source_role: activeRole
         }).select().single();
 
-        if (jcErr) {
-            alert("Error creating Job Card: " + jcErr.message);
-            btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false;
-            return;
-        }
+        if (jcErr) { alert("Error creating Job Card: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
 
-        alert("Job Card Successfully Opened!");
-        window.location.href = 'index.html';
+        window.location.href = `billing.html?id=${jc.id}`;
     }
 </script>
 </body>
