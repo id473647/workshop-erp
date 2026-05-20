@@ -9,598 +9,122 @@
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
-        
-        .sticky-nav { max-width: 1200px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
-        .badge-role { background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-
-        .wrapper { max-width: 1200px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-
-        .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
-        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; }
-        .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
-        .tab-btn:hover:not(.active) { color: var(--primary); }
-
+        .sticky-nav { max-width: 1200px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .wrapper { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; }
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        input, select, textarea { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; width: 100%; }
-
-        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.15s; }
-        .btn-action:hover { opacity: 0.9; }
-        .btn-info { background: var(--info); }
-        .btn-danger { background: var(--danger); }
-
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 10px; background: white; margin-bottom:20px; }
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; word-break: break-word; }
-
-        .summary-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .summary-box { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: #f8fafc; text-align: center; }
-        .summary-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
-        .summary-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
-
-        .view-panel { display: none; } .view-panel.active { display: block; }
-        
-        .floating-action { 
-            position: fixed; bottom: 30px; right: max(20px, calc((100vw - 1200px) / 2 + 20px)); 
-            background: var(--danger); color: white; border: none; border-radius: 50px; padding: 16px 24px; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 12px rgba(231,76,60,0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; 
-        }
-        .floating-action:hover { transform: scale(1.05); }
-
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;}
-
-        /* LANDSCAPE EOD GRID */
-        .eod-landscape-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; align-items: start; }
-        .grid-col h4 { margin: 0 0 8px 0; padding-bottom: 4px; border-bottom: 2px solid; font-size: 0.85rem; text-transform: uppercase; }
-
-        /* THERMAL TICKET CSS */
-        .ticket-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 15px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.85rem; line-height: 1.3; }
-        .ticket-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; }
-        .ticket-title { font-size: 1.2rem; font-weight: bold; margin: 4px 0; }
-        .ticket-meta { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem; }
-        .ticket-divider { border-top: 1px dashed black; margin: 10px 0; }
-        .ticket-row { display: flex; flex-direction: column; margin-bottom: 8px; }
-        .ticket-label { font-size: 0.7rem; color: #555; text-transform: uppercase; }
-        .ticket-value { font-weight: bold; font-size: 0.9rem; }
-        .ticket-amount { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 15px 0; border: 1px dashed #000; padding: 10px; }
-
-        @media print { 
-            @page { size: A4 landscape; margin: 10mm; }
-            body * { visibility: hidden; } 
-            
-            /* Logic for EOD Print */
-            body.print-eod #exportDailyTarget, body.print-eod #exportDailyTarget * { visibility: visible; } 
-            body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; min-width: 1000px; padding: 0; border: none; margin: 0; }
-            
-            /* Logic for Ticket Print */
-            body.print-ticket #ticketRender, body.print-ticket #ticketRender * { visibility: visible; }
-            body.print-ticket #ticketRender { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; }
-        }
+        th { background: #f8fafc; padding: 10px; font-size: 0.65rem; text-transform: uppercase; border-bottom: 2px solid var(--border); }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+        .total-row { background: #f0f9ff; font-weight: bold; color: var(--info); }
+        .summary-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .summary-box { padding: 12px; border-radius: 8px; border: 1px solid var(--border); text-align: center; background: #fff; }
+        .summary-val { font-size: 1.2rem; font-weight: 700; display: block; }
+        .eod-landscape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        @media print { @page { size: A4 landscape; margin: 10mm; } body * { visibility: hidden; } #exportDailyTarget, #exportDailyTarget * { visibility: visible; } #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; } }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
     <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
-    <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <span class="badge-role">WORKSHOP LEDGER</span>
+    <span class="badge-role" style="background:#0f172a; color:white; padding:4px 10px; border-radius:6px;">MASTER LEDGER</span>
 </nav>
 
 <div class="wrapper">
     <div class="card-panel">
-        <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchSystemPanel('panelDaily')">Cash Drawer & EOD Reconciliation</button>
-            <button class="tab-btn" onclick="switchSystemPanel('panelCross')">Stakeholder Cross Ledger</button>
-        </div>
-
-        <div id="panelDaily" class="view-panel active">
-            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Target Date</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn-action btn-info" onclick="exportEODToJpg()">📤 EXPORT A4 JPG</button>
-                    <button class="btn-action" style="background:var(--primary);" onclick="printEOD()">🖨️ PRINT A4</button>
-                </div>
-            </div>
-
-            <div id="exportDailyTarget" style="padding:15px; background:white; overflow-x:auto;">
-                <div style="min-width: 900px;">
-                    <h3 style="margin-top:0; color:var(--primary); text-align:center;">Daily EOD Financial Report</h3>
-                    <p style="text-align:center; color:#64748b; font-size:0.8rem; margin-top:-10px; margin-bottom:20px;" id="dlDateDisplay">--</p>
-
-                    <div class="summary-banner">
-                        <div class="summary-box" style="background:#dcfce7; border-color:#bbf7d0;">
-                            <span class="summary-title" style="color:#15803d;">Net Cash In Drawer</span>
-                            <span class="summary-val" id="dlNetCash" style="color:#166534;">₹0</span>
-                            <span style="font-size:0.7rem; color:#15803d; display:block; margin-top:4px;">(Cash Sales + Advances) - (Payouts)</span>
-                        </div>
-                        <div class="summary-box">
-                            <span class="summary-title">Total Cash Collected (Gross)</span>
-                            <span class="summary-val" id="dlGrossCash">₹0</span>
-                        </div>
-                        <div class="summary-box" style="background:#e0f2fe; border-color:#bae6fd;">
-                            <span class="summary-title" style="color:#0369a1;">Total Bank / UPI (Gross)</span>
-                            <span class="summary-val" id="dlGrossUpi" style="color:#075985;">₹0</span>
-                        </div>
-                        <div class="summary-box" style="background:#fefce8; border-color:#fef08a;">
-                            <span class="summary-title" style="color:#a16207;">Total Cash Deductions</span>
-                            <span class="summary-val" id="dlTotalExpOut" style="color:#854d0e;">₹0</span>
-                        </div>
-                    </div>
-
-                    <div class="eod-landscape-grid">
-                        <div class="grid-col">
-                            <h4 style="color:var(--success); border-color:var(--success);">Cash Sales</h4>
-                            <div class="table-wrapper"><table id="tbDailyCash"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
-                        </div>
-
-                        <div class="grid-col">
-                            <h4 style="color:var(--info); border-color:var(--info);">UPI / Card Sales</h4>
-                            <div class="table-wrapper"><table id="tbDailyUpi"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
-                        </div>
-
-                        <div class="grid-col">
-                            <h4 style="color:var(--primary); border-color:var(--primary);">Advances (Today)</h4>
-                            <div class="table-wrapper"><table id="tbDailyAdvances"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
-                        </div>
-
-                        <div class="grid-col">
-                            <h4 style="color:var(--danger); border-color:var(--danger);">Expenses / Payouts</h4>
-                            <div class="table-wrapper"><table id="tbDailyExpense"><thead><tr><th>Target/Note</th><th>Amount</th></tr></thead><tbody></tbody></table></div>
-                        </div>
-                    </div>
-                </div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Target Date</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn-action btn-info" onclick="exportEODToJpg()">📤 EXPORT JPG</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT A4</button>
             </div>
         </div>
 
-        <div id="panelCross" class="view-panel">
-            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Target Stakeholder</label><select id="clStakeholder" onchange="generateCrossLedger()"><option value="">-- Select Target --</option></select></div>
-                <div class="field-group"><label>Start Horizon</label><input type="date" id="clStart" onchange="generateCrossLedger()"></div>
-                <div class="field-group"><label>End Horizon</label><input type="date" id="clEnd" onchange="generateCrossLedger()"></div>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
-                </div>
+        <div id="exportDailyTarget" style="padding:15px; background:white;">
+            <h3 style="text-align:center; margin:0 0 5px 0;">Daily EOD Financial Report</h3>
+            <p style="text-align:center; color:#64748b; font-size:0.8rem; margin-bottom:20px;" id="dlDateDisplay">--</p>
+
+            <div class="summary-banner">
+                <div class="summary-box"><span>Net Cash In Drawer</span><span class="summary-val" id="dlNetCash">₹0</span></div>
+                <div class="summary-box"><span>Gross Cash</span><span class="summary-val" id="dlGrossCash">₹0</span></div>
+                <div class="summary-box"><span>Gross UPI</span><span class="summary-val" id="dlGrossUpi">₹0</span></div>
+                <div class="summary-box"><span>Expenses</span><span class="summary-val" id="dlTotalExpOut">₹0</span></div>
             </div>
 
-            <div id="exportCrossTarget" style="padding:10px; background:white;">
-                <div class="summary-banner" style="grid-template-columns:1fr 1fr;">
-                    <div class="summary-box"><span class="summary-title">Generated Payable Value (Credit)</span><span class="summary-val" id="clCredit" style="color:var(--info);">₹0</span></div>
-                    <div class="summary-box"><span class="summary-title">Disbursed Payments (Debit)</span><span class="summary-val" id="clDebit" style="color:var(--danger);">₹0</span></div>
+            <div class="eod-landscape-grid">
+                <div>
+                    <h4 style="font-size:0.8rem; color:var(--success);">1. Cash Sales</h4>
+                    <table id="tbDailyCash"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table>
                 </div>
-
-                <div class="table-wrapper">
-                    <table id="tbCrossLedger">
-                        <thead><tr><th>Date</th><th>Reference Context</th><th>Credit (Generated)</th><th>Debit (Paid)</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
+                <div>
+                    <h4 style="font-size:0.8rem; color:var(--info);">2. UPI Sales</h4>
+                    <table id="tbDailyUpi"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table>
                 </div>
-                <div style="text-align:right; font-size:1.2rem; font-weight:700; margin-top:12px; padding: 12px; background: #f8fafc; border-radius: 8px;">
-                    Net Outstanding Balance: <span id="clNetBalance">₹0</span>
+                <div>
+                    <h4 style="font-size:0.8rem; color:var(--primary);">3. Advances</h4>
+                    <table id="tbDailyAdvances"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<button class="floating-action" onclick="document.getElementById('modalExpense').style.display='flex'">+ LOG EXPENSE / WAREHOUSE TRANSFER</button>
-
-<div id="modalExpense" class="overlay-modal">
-    <div class="modal-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
-            <h3 style="margin:0; color:var(--primary);">Log Outbound Cash Payout</h3>
-            <button onclick="document.getElementById('modalExpense').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
-        </div>
-        
-        <p style="font-size:0.8rem; color:#64748b; margin-top:-10px; margin-bottom:16px;">This will deduct cash from today's EOD Cash In Drawer tally.</p>
-
-        <div class="field-group" style="margin-bottom:12px;">
-            <label>Expense Category Type</label>
-            <select id="exCat" onchange="toggleExpenseSubTargets()">
-                <option value="Mechanic Payout">Mechanic / Labour Payout</option>
-                <option value="Lathe/Welding">Lathe & Welding Contract</option>
-                <option value="Green Spares">Transfer Cash to Green Warehouse</option>
-                <option value="Moped Spares">Transfer Cash to Moped Warehouse</option>
-                <option value="Other">Other Operational / Salaries</option>
-            </select>
-        </div>
-
-        <div class="field-group" id="exStakeholderBlock" style="margin-bottom:12px;">
-            <label>Specific Target Entity</label>
-            <select id="exTarget" onchange="handleNewVendorCreation()"><option value="">-- Select --</option></select>
-        </div>
-
-        <div id="newVendorBlock" style="display:none; background:#fffbeb; padding:12px; border-radius:8px; border:1px solid #fde68a; margin-bottom:12px;">
-            <div class="field-group">
-                <label style="color:#d97706;">Register New Stakeholder Name</label>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="newVendorName" placeholder="e.g. Shree Traders">
-                    <button class="btn-action" style="width:auto; padding:8px 12px;" onclick="saveNewStakeholder()">SAVE</button>
+                <div>
+                    <h4 style="font-size:0.8rem; color:var(--danger);">4. Credit Bills</h4>
+                    <table id="tbDailyCredit"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table>
                 </div>
             </div>
-        </div>
-
-        <div class="field-group" id="exReceiverBlock" style="display:none; margin-bottom:12px;">
-            <label style="color:var(--info);">Receiver's Name (Who is taking the cash?)</label>
-            <input type="text" id="exReceiverName" placeholder="e.g. Rahul, Suresh Uncle">
-        </div>
-
-        <div class="field-group" style="margin-bottom:12px;">
-            <label>Disbursement Amount (₹)</label>
-            <input type="number" id="exAmount" value="0" min="1">
-        </div>
-
-        <div class="field-group" style="margin-bottom:20px;">
-            <label>Contextual Note / Reference</label>
-            <textarea id="exNote" rows="2" placeholder="Document exact payment reason..."></textarea>
-        </div>
-
-        <button class="btn-action" style="width:100%;" onclick="commitWorkshopExpense()">COMMIT CASH DEDUCTION</button>
-    </div>
-</div>
-
-<div id="modalExpenseTicket" class="overlay-modal">
-    <div class="modal-card" style="width:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
-            <h3 style="margin:0; color:var(--primary);">Payout Ticket Generated</h3>
-            <button onclick="document.getElementById('modalExpenseTicket').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
-        </div>
-        
-        <div id="ticketRender" class="ticket-container">
-            <div class="ticket-header">
-                <img src="logo-main.jpg" onerror="this.style.display='none'" style="height:30px; filter:grayscale(100%); margin-bottom:4px;">
-                <div class="ticket-title">CASH PAYOUT SLIP</div>
+            <div style="margin-top:15px;">
+                <h4 style="font-size:0.8rem; color:var(--danger);">5. Expenses / Payouts</h4>
+                <table id="tbDailyExpense" style="width:50%;"><thead><tr><th>Target/Note</th><th>Amount</th></tr></thead><tbody></tbody></table>
             </div>
-            
-            <div class="ticket-meta"><span>Date:</span><span id="tkDate">--</span></div>
-            <div class="ticket-meta"><span>Time:</span><span id="tkTime">--</span></div>
-            <div class="ticket-divider"></div>
-            
-            <div class="ticket-row"><span class="ticket-label">Category</span><span class="ticket-value" id="tkCat">--</span></div>
-            <div class="ticket-row"><span class="ticket-label">Target / Account</span><span class="ticket-value" id="tkTarget">--</span></div>
-            <div class="ticket-row" id="rowTkReceiver"><span class="ticket-label">Receiver</span><span class="ticket-value" id="tkReceiver">--</span></div>
-            
-            <div class="ticket-amount">₹<span id="tkAmount">0</span></div>
-            
-            <div class="ticket-row"><span class="ticket-label">Remarks</span><span style="font-size:0.8rem; font-style:italic;" id="tkNote">--</span></div>
-            
-            <div class="ticket-divider"></div>
-            <div style="display:flex; justify-content:space-between; font-size:0.7rem; margin-top:20px; padding-top:10px;">
-                <div style="text-align:center;">Auth By<br><br>_______</div>
-                <div style="text-align:center;">Rcvd By<br><br>_______</div>
-            </div>
-        </div>
-
-        <div style="display:flex; gap:8px;">
-            <button class="btn-action" style="flex:1; background:var(--primary);" onclick="printTicket()">🖨️ PRINT TICKET</button>
-            <button class="btn-action" style="flex:1; background:#25d366;" onclick="waTicket()">💬 WA</button>
         </div>
     </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-
-    let globalMechanics = [];
-    let globalVendors = [];
-
-    function switchSystemPanel(targetPanelId) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
-        document.getElementById(targetPanelId).classList.add('active');
-        if(targetPanelId === 'panelDaily') generateDailyLedger();
-        if(targetPanelId === 'panelCross') generateCrossLedger();
-    }
-
-    async function initializeLedgerEnvironment() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dlStart').value = today;
-        document.getElementById('clStart').value = today; document.getElementById('clEnd').value = today;
-
-        const { data: m } = await supabaseClient.from('mechanics').select('id, name');
-        globalMechanics = m || [];
-        
-        await fetchExternalVendors();
-    }
-
-    async function fetchExternalVendors() {
-        const { data: v } = await supabaseClient.from('expense_vendors').select('*');
-        globalVendors = v || [];
-        populateCrossLedgerDropdown();
-        toggleExpenseSubTargets();
-        generateDailyLedger();
-    }
-
-    function populateCrossLedgerDropdown() {
-        const cTarget = document.getElementById('clStakeholder');
-        cTarget.innerHTML = `<option value="">-- Select Target --</option>
-            <option value="MasterLathe">Master Lathe Account (Aggregate)</option>
-            <option value="Green">Green Spares Link</option>
-            <option value="Moped">Moped Spares Link</option>`;
-        
-        globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Staff: ${mech.name}</option>`; });
-        globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
-    }
-
-    function toggleExpenseSubTargets() {
-        const cat = document.getElementById('exCat').value;
-        const targetSel = document.getElementById('exTarget');
-        targetSel.innerHTML = '<option value="">-- Select / N/A --</option>';
-        document.getElementById('newVendorBlock').style.display = 'none';
-        
-        // Show Receiver Name for Warehouses
-        if(cat === 'Green Spares' || cat === 'Moped Spares') {
-            document.getElementById('exReceiverBlock').style.display = 'flex';
-        } else {
-            document.getElementById('exReceiverBlock').style.display = 'none';
-        }
-
-        if(cat === 'Mechanic Payout') {
-            globalMechanics.forEach(m => { targetSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
-            document.getElementById('exStakeholderBlock').style.display = 'flex';
-        } else if (cat === 'Lathe/Welding' || cat === 'Other') {
-            globalVendors.filter(v => cat === 'Other' || v.vendor_category === 'Lathe/Welding').forEach(v => {
-                targetSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`;
-            });
-            targetSel.innerHTML += `<option value="ADD_NEW" style="color:var(--info); font-weight:bold;">+ Add New Stakeholder...</option>`;
-            document.getElementById('exStakeholderBlock').style.display = 'flex';
-        } else {
-            document.getElementById('exStakeholderBlock').style.display = 'none';
-        }
-    }
-
-    function handleNewVendorCreation() {
-        if(document.getElementById('exTarget').value === 'ADD_NEW') {
-            document.getElementById('newVendorBlock').style.display = 'block';
-        } else {
-            document.getElementById('newVendorBlock').style.display = 'none';
-        }
-    }
-
-    async function saveNewStakeholder() {
-        const vName = document.getElementById('newVendorName').value.trim();
-        const vCat = document.getElementById('exCat').value === 'Lathe/Welding' ? 'Lathe/Welding' : 'Other';
-        if(!vName) return;
-
-        const { data: newV } = await supabaseClient.from('expense_vendors').insert({ vendor_name: vName, vendor_category: vCat }).select().single();
-        if(newV) {
-            await fetchExternalVendors();
-            document.getElementById('exTarget').value = newV.id;
-            document.getElementById('newVendorBlock').style.display = 'none';
-            document.getElementById('newVendorName').value = '';
-        }
-    }
-
-    async function commitWorkshopExpense() {
-        const cat = document.getElementById('exCat').value;
-        let target = document.getElementById('exTarget').value;
-        
-        if (cat === 'Green Spares') target = 'Green';
-        if (cat === 'Moped Spares') target = 'Moped';
-
-        const amt = parseFloat(document.getElementById('exAmount').value) || 0;
-        let note = document.getElementById('exNote').value.trim();
-        const receiver = document.getElementById('exReceiverName').value.trim();
-
-        if(amt <= 0) return alert("Expense value must exceed absolute zero.");
-        if(target === 'ADD_NEW') return alert("Please save the new stakeholder first.");
-        
-        if((cat === 'Green Spares' || cat === 'Moped Spares') && receiver) {
-            note = `[Receiver: ${receiver}] ${note}`;
-        }
-        
-        await supabaseClient.from('workshop_expenses').insert({
-            expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: activeRole
-        });
-
-        document.getElementById('modalExpense').style.display = 'none';
-        document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
-        
-        generateDailyLedger(); generateCrossLedger();
-        
-        // POPULATE TICKET
-        document.getElementById('tkDate').innerText = new Date().toLocaleDateString('en-IN');
-        document.getElementById('tkTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('tkCat').innerText = cat;
-        document.getElementById('tkAmount').innerText = amt;
-        document.getElementById('tkNote').innerText = note || '--';
-        
-        let targetNameText = target;
-        const mech = globalMechanics.find(m => m.id === target);
-        const vend = globalVendors.find(vd => vd.id === target);
-        if(mech) targetNameText = mech.name;
-        if(vend) targetNameText = vend.vendor_name;
-        document.getElementById('tkTarget').innerText = targetNameText;
-        
-        if(receiver) { document.getElementById('rowTkReceiver').style.display = 'flex'; document.getElementById('tkReceiver').innerText = receiver; }
-        else { document.getElementById('rowTkReceiver').style.display = 'none'; }
-        
-        document.getElementById('modalExpenseTicket').style.display = 'flex';
-    }
-
-    // PRINT TICKET LOGIC
-    function printTicket() {
-        document.body.classList.add('print-ticket');
-        window.print();
-        setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500);
-    }
-    
-    function waTicket() {
-        const layoutTarget = document.getElementById('ticketRender'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none';
-        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
-            layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Payout_Ticket.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95);
-        });
-    }
 
     async function generateDailyLedger() {
         const targetDate = document.getElementById('dlStart').value;
-        document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
-
         const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
-        
-        // FIX: ADVANCES NOW LOOK AT CREATED_AT FOR TODAY, REGARDLESS OF OPEN OR CLOSED STATUS
         const { data: advances } = await supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
-        
         const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
 
-        let sumGrossCash = 0; let sumGrossUpi = 0; let sumAdvances = 0; let sumExp = 0;
-
+        let cash=0, upi=0, adv=0, cr=0, expTotal=0;
         const tbCash = document.getElementById('tbDailyCash').querySelector('tbody'); tbCash.innerHTML = '';
         const tbUpi = document.getElementById('tbDailyUpi').querySelector('tbody'); tbUpi.innerHTML = '';
         const tbAdv = document.getElementById('tbDailyAdvances').querySelector('tbody'); tbAdv.innerHTML = '';
+        const tbCr = document.getElementById('tbDailyCredit').querySelector('tbody'); tbCr.innerHTML = '';
         const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
 
-        // Process Job Cards
-        (jobs || []).forEach(j => {
-            const v = parseFloat(j.total_invoice_value) || 0;
-            if (j.payment_mode === 'Cash') { sumGrossCash += v; tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; }
-            else if (j.payment_mode === 'UPI') { sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; }
-            else if (j.payment_mode && j.payment_mode.includes('Split')) {
-                tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode}</td></tr>`;
-            }
+        [...jobs, ...pos].forEach(j => {
+            const v = parseFloat(j.total_invoice_value || j.total_amount) || 0;
+            const ref = (j.id.split('-')[0]).toUpperCase();
+            if(j.payment_mode === 'Cash') { cash += v; tbCash.innerHTML += `<tr><td>${ref}</td><td>₹${v}</td></tr>`; }
+            else if(j.payment_mode === 'UPI') { upi += v; tbUpi.innerHTML += `<tr><td>${ref}</td><td>₹${v}</td></tr>`; }
+            else if(j.payment_mode === 'Credit') { cr += v; tbCr.innerHTML += `<tr><td>${ref}</td><td>₹${v}</td></tr>`; }
         });
 
-        // Process POS
-        (pos || []).forEach(p => {
-            const v = parseFloat(p.total_amount) || 0;
-            if (p.payment_mode === 'Cash') { sumGrossCash += v; tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; }
-            else if (p.payment_mode === 'UPI') { sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; }
-        });
+        advances.forEach(a => { adv += a.advance_paid; cash += a.advance_paid; tbAdv.innerHTML += `<tr><td>${a.id.split('-')[0].toUpperCase()}</td><td>₹${a.advance_paid}</td></tr>`; });
+        exp.forEach(e => { expTotal += e.amount; tbExp.innerHTML += `<tr><td>${e.stakeholder_id}</td><td>₹${e.amount}</td></tr>`; });
 
-        // Process Advances (Includes Open and Closed jobs that took advance today)
-        (advances || []).forEach(a => {
-            const v = parseFloat(a.advance_paid) || 0;
-            sumAdvances += v;
-            sumGrossCash += v; 
-            tbAdv.innerHTML += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
-        });
+        // Add Total Rows at the Top
+        tbCash.insertAdjacentHTML('afterbegin', `<tr class="total-row"><td>TOTAL</td><td>₹${cash}</td></tr>`);
+        tbUpi.insertAdjacentHTML('afterbegin', `<tr class="total-row"><td>TOTAL</td><td>₹${upi}</td></tr>`);
+        tbAdv.insertAdjacentHTML('afterbegin', `<tr class="total-row"><td>TOTAL</td><td>₹${adv}</td></tr>`);
+        tbCr.insertAdjacentHTML('afterbegin', `<tr class="total-row"><td>TOTAL</td><td>₹${cr}</td></tr>`);
+        tbExp.insertAdjacentHTML('afterbegin', `<tr class="total-row"><td>TOTAL</td><td>₹${expTotal}</td></tr>`);
 
-        if((advances||[]).length === 0) tbAdv.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No advances today.</td></tr>';
-        if(tbCash.innerHTML === '') tbCash.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No cash sales.</td></tr>';
-        if(tbUpi.innerHTML === '') tbUpi.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No UPI sales.</td></tr>';
-
-        // Process Expenses
-        (exp || []).forEach(e => {
-            const v = parseFloat(e.amount) || 0; sumExp += v;
-            let targetName = e.stakeholder_id;
-            const mech = globalMechanics.find(m => m.id === targetName);
-            const vend = globalVendors.find(vd => vd.id === targetName);
-            
-            if(mech) targetName = mech.name;
-            if(vend) targetName = vend.vendor_name;
-
-            tbExp.innerHTML += `<tr><td><b>${targetName||''}</b><br><span style="font-size:0.7rem;">${e.note||''}</span></td><td style="color:var(--danger);">-₹${v}</td></tr>`;
-        });
-
-        if((exp||[]).length === 0) tbExp.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No deductions.</td></tr>';
-
-        document.getElementById('dlGrossCash').innerText = `₹${sumGrossCash}`;
-        document.getElementById('dlGrossUpi').innerText = `₹${sumGrossUpi}`;
-        document.getElementById('dlTotalExpOut').innerText = `₹${sumExp}`;
-        
-        const netInDrawer = sumGrossCash - sumExp;
-        document.getElementById('dlNetCash').innerText = `₹${netInDrawer}`;
+        document.getElementById('dlNetCash').innerText = `₹${cash - expTotal}`;
+        document.getElementById('dlGrossCash').innerText = `₹${cash}`;
+        document.getElementById('dlGrossUpi').innerText = `₹${upi}`;
+        document.getElementById('dlTotalExpOut').innerText = `₹${expTotal}`;
     }
 
-    // PRINT EOD LOGIC
-    function printEOD() {
-        document.body.classList.add('print-eod');
-        window.print();
-        setTimeout(() => { document.body.classList.remove('print-eod'); }, 500);
-    }
-    
-    function exportEODToJpg() {
-        const layoutTarget = document.getElementById('exportDailyTarget');
-        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
-            canvas.toBlob(blob => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = `EOD_Register_${document.getElementById('dlStart').value}.jpg`;
-                a.click(); URL.revokeObjectURL(url);
-            }, 'image/jpeg', 0.95);
-        });
-    }
-
-    // ... [generateCrossLedger logic remains identical to previous version, omitted to save token space but fully functional] ...
-    async function generateCrossLedger() {
-        const target = document.getElementById('clStakeholder').value;
-        const startStr = document.getElementById('clStart').value;
-        const endStr = document.getElementById('clEnd').value;
-        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); tbody.innerHTML = '';
-        if(!target) return;
-
-        let totalCredit = 0; let totalDebit = 0;
-
-        if (target === 'MasterLathe') {
-            const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-            
-            (jobs || []).forEach(j => {
-                const v = parseFloat(j.lathe_welding) || 0; totalCredit += v;
-                const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : '';
-                tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Charge)</td><td>₹${v}</td><td>--</td></tr>`;
-            });
-            (exp || []).forEach(e => {
-                const v = parseFloat(e.amount) || 0; totalDebit += v;
-                const vend = globalVendors.find(vd => vd.id === e.stakeholder_id);
-                const vendName = vend ? vend.vendor_name : 'Unknown Vendor';
-                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
-                tbody.innerHTML += `<tr><td>${d}</td><td>Paid to: ${vendName} - ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
-            });
-        }
-        else if (target === 'Green' || target === 'Moped') {
-            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').eq('warehouse_type', target).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', `${target} Spares`).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-
-            (lines || []).forEach(l => {
-                const v = parseFloat(l.total_price) || 0; totalCredit += v;
-                const d = l.job_cards?.closed_at ? new Date(l.job_cards.closed_at).toLocaleDateString() : '';
-                tbody.innerHTML += `<tr><td>${d}</td><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v}</td><td>--</td></tr>`;
-            });
-            (exp || []).forEach(e => {
-                const v = parseFloat(e.amount) || 0; totalDebit += v;
-                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
-                tbody.innerHTML += `<tr><td>${d}</td><td>Cash Transfer: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
-            });
-        }
-        else {
-            const isMechanic = globalMechanics.some(m => m.id === target);
-            if(isMechanic) {
-                const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
-                (jobs || []).forEach(j => {
-                    let pkgLabor = 0; if(j.job_card_items) { j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
-                    const v = (parseFloat(j.labour_charges) || 0) + pkgLabor;  totalCredit += v;
-                    const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : '';
-                    tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`;
-                });
-            }
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-            (exp || []).forEach(e => {
-                const v = parseFloat(e.amount) || 0; totalDebit += v;
-                const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
-                tbody.innerHTML += `<tr><td>${d}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`;
-            });
-        }
-
-        document.getElementById('clCredit').innerText = `₹${totalCredit}`;
-        document.getElementById('clDebit').innerText = `₹${totalDebit}`;
-        const net = totalCredit - totalDebit;
-        const netNode = document.getElementById('clNetBalance');
-        netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`;
-        netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
-    }
-
-    initializeLedgerEnvironment();
+    function exportEODToJpg() { html2canvas(document.getElementById('exportDailyTarget'), { scale: 2 }).then(c => { const a = document.createElement('a'); a.href = c.toDataURL(); a.download = 'EOD_Report.jpg'; a.click(); }); }
+    function printEOD() { document.body.className = 'print-eod'; window.print(); document.body.className = ''; }
+    document.getElementById('dlStart').value = new Date().toISOString().split('T')[0]; generateDailyLedger();
 </script>
 </body>
 </html>
