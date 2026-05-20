@@ -3,198 +3,408 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings & Master Data - My Care ERP</title>
+    <title>Utility Operations Gateway - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
-        .sticky-nav { max-width: 1000px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary);}
-        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .badge-role { background: var(--warning); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
-        .wrapper { max-width: 1000px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; }
-        .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
-        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; }
-        .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
-        .view-panel { display: none; } .view-panel.active { display: block; }
+        :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --gold: #f59e0b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
+        .badge-role { background: var(--utility); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .utility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .u-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
+        .u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
+        .u-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px; }
+        .u-desc { font-size: 0.8rem; color: #64748b; line-height: 1.3; margin: 0; }
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input[type="text"], input[type="number"], select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
-        .btn-action { background: var(--info); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: opacity 0.1s; } .btn-action:hover { opacity: 0.9; }
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 500px; }
-        table.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } table.data-table th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } table.data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; } .btn-info { background: #2980b9; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; } table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .utility-workspace { display: none; } .utility-workspace.active { display: block; }
+        .editable-select { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border); font-weight: bold; cursor: pointer; }
+        .amc-highlight { background: #fefce8; border-left: 4px solid var(--service); }
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
+        .rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; } .rep-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 16px; } .rep-val { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
+        
+        .contract-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.8rem; line-height: 1.3; margin: 0 auto; box-sizing: border-box; }
+        .print-btn { background:#0369a1; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; cursor:pointer; margin-top:4px; display:flex; align-items:center; gap:4px; }
+        .edit-icon { cursor: pointer; margin-left: 8px; color: var(--info); font-size: 0.9rem; text-decoration: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #printContractContainer, #printContractContainer * { visibility: visible; }
+            #printContractContainer { display: block; position: absolute; left: 0; top: 0; width: 300px; padding: 0; margin: 0; }
+        }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <div class="logo-matrix">
-        <img src="logo-main.jpg" onerror="this.style.display='none'">
-        <img src="logo-green.png" onerror="this.style.display='none'">
-    </div>
-    <div class="nav-actions">
-        <a href="reports.html" class="btn-header">📊 ENTERPRISE REPORTS</a>
-        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
-        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">ADMIN</span>
+    <a href="index.html" class="nav-anchor" style="font-size:1rem; color:var(--primary);">← Back to Hub</a>
+    <div style="display:flex; align-items:center; gap:8px;">
+        <span id="roleDisplay" class="badge-role">GUEST</span>
+        <button class="btn-header" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'">LOGOUT</button>
     </div>
 </nav>
 
 <div class="wrapper">
-    <div class="card-panel">
-        <div class="tabs-header">
-            <button class="tab-btn active" onclick="switchTab('tabCRM')">👥 Customer CRM</button>
-            <button class="tab-btn" onclick="switchTab('tabInv')">📦 Inventory Rules</button>
-            <button class="tab-btn" onclick="switchTab('tabSrv')">📋 Service Matrices</button>
-            <button class="tab-btn" onclick="switchTab('tabStaff')">👷 Staff Directory</button>
+    <div id="printContractContainer" class="contract-print-area">
+        <div style="text-align:center; border-bottom:1px dashed black; padding-bottom:8px; margin-bottom:8px;">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" style="height:30px; filter:grayscale(100%); margin-bottom:4px;">
+            <div style="font-size:1.1rem; font-weight:bold;">My Care Service Center</div>
+            <div style="font-size:0.75rem;">Gurudwara Road, Ganj Betul</div>
+            <div style="font-size:0.75rem;">PH: 9425002214, 8989171751</div>
         </div>
+        <div style="text-align:center; font-weight:bold; font-size:0.9rem; margin-bottom:8px; text-transform:uppercase;" id="ptTitle">--</div>
+        <div style="font-size:0.75rem; margin-bottom:2px;">Date: <span id="ptDate">--</span></div>
+        <div style="font-size:0.75rem; margin-bottom:2px;">Customer: <strong id="ptName">--</strong></div>
+        <div style="font-size:0.75rem; margin-bottom:2px;">Mobile: <strong id="ptMobile">--</strong></div>
+        <div style="font-size:0.75rem; margin-bottom:8px;">Vehicle: <strong id="ptVehicle">--</strong></div>
+        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.85rem; text-align:center;">नियम व शर्तें (Terms & Conditions)</div>
+        <div id="ptRules" style="font-size:0.75rem; text-align:left; margin-top:6px; line-height:1.5;"></div>
+        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.85rem; text-align:center;">सर्विस शेड्यूल / वाउचर (Schedule)</div>
+        <div id="ptSchedule" style="font-size:0.75rem; margin-top:6px; line-height:1.6;"></div>
+        <div style="text-align:center; font-size:0.7rem; border-top:1px dashed black; padding-top:8px; margin-top:12px;">यह सिस्टम जनरेटेड डिजिटल कॉन्ट्रैक्ट है।<br>हस्ताक्षर की आवश्यकता नहीं है।</div>
+    </div>
 
-        <div id="tabCRM" class="view-panel active">
-            <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px;">
-                <div class="field-group" style="flex:2;"><label>Search Profile (Mobile or Name)</label><input type="text" id="crmSearch" placeholder="Type to search..." oninput="searchCRM()"></div>
-                <button class="btn-action" style="background:var(--success);" onclick="searchCRM()">SEARCH</button>
+    <div id="hubGrid" class="utility-workspace active">
+        <div class="block-title" style="margin-bottom:20px;">Enterprise CRM & Logic Configuration</div>
+        <div class="utility-grid">
+            <div class="u-card" style="border-left:4px solid var(--success);" onclick="openWorkspaceTarget('wsCustomers')">
+                <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">View absolute client identity lists, issue AMC subscriptions, and analyze tracking.</p>
             </div>
-            <div id="crmResults" style="margin-top:20px;"></div>
+            <div class="u-card" onclick="window.location.href='reports.html'">
+                <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">Extract Promotional Leads, Analyze New Customer Conversions, and Wallet Ledgers.</p>
+            </div>
+            <div class="u-card" onclick="openWorkspaceTarget('wsAmc')">
+                <h4 class="u-title">📋 Static Service Matrices</h4><p class="u-desc">Define standard base-rate models for periodic protocols.</p>
+            </div>
+            <div class="u-card" onclick="window.location.href='vehicle-manager.html'">
+                <h4 class="u-title">🏍️ Vehicle Management</h4><p class="u-desc">Manage standard fleet mapping logic and add global classifications.</p>
+            </div>
+            <div class="u-card" onclick="openWorkspaceTarget('wsPassword')">
+                <h4 class="u-title">🔑 Password Manager</h4><p class="u-desc">Modify persistent security login tokens.</p>
+            </div>
+            <div id="cardTech" class="u-card" onclick="openWorkspaceTarget('wsTech')">
+                <h4 class="u-title">👨‍🔧 Technician Ledger</h4><p class="u-desc">Instantiate profiles, log attendance, and Cash Out earned points.</p>
+            </div>
         </div>
+    </div>
 
-        <div id="tabInv" class="view-panel">
-            <h3 style="color:var(--primary); margin-top:0;">Brand Discount Tier Rules</h3>
-            <div class="inputs-grid" style="background:#fefce8; padding:16px; border-radius:8px; border:1px solid #fef08a;">
-                <div class="field-group"><label>Brand Name</label><input type="text" id="brandName" placeholder="e.g. MOTUL" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Regular Discount %</label><input type="number" id="brandReg" value="0"></div>
-                <div class="field-group"><label>Silver Discount %</label><input type="number" id="brandSilv" value="5"></div>
-                <div class="field-group"><label>Gold Discount %</label><input type="number" id="brandGold" value="10"></div>
-                <button class="btn-action" style="background:var(--primary);" onclick="saveBrandRule()">SAVE RULE</button>
+    <div id="wsCustomers" class="card-panel utility-workspace">
+        <div class="block-title">Customer Portfolio & AMC Contract Execution</div>
+        <div style="background:#fffbeb; padding:16px; border-radius:8px; border:1px solid #fde68a; margin-bottom:20px;">
+            <span style="font-size:0.85rem; font-weight:700; color:#b45309; display:block; margin-bottom:12px;">Sell AMC Subscriptions & Promos</span>
+            <div class="inputs-grid"><div class="field-group"><label>Customer Mobile</label><input type="tel" id="cAmcMobile" placeholder="10 Digits" maxlength="10" oninput="prefetchClientContextForAmc(this.value)"></div><div class="field-group"><label>Verified Client</label><input type="text" id="cAmcName" readonly style="background:#f1f5f9;" placeholder="..."></div></div>
+            <div id="amcConfigBlock" style="display:none; margin-top:12px; border-top:1px dashed #fcd34d; padding-top:12px;">
+                <div class="inputs-grid">
+                    <div class="field-group"><label>Contract Type</label><select id="amcTypeSelect" onchange="toggleAmcInputs()"><option value="LOYALTY">Panch par ek Free (Fleet Loyalty)</option><option value="PREPAID">Prepaid AMC (4x Premium Services)</option><option value="ENGINE">Engine Warranty Contract</option></select></div>
+                    <div class="field-group" id="amcPriceBlock"><label>Collection Amount (₹)</label><input type="number" id="amcPrice" value="10" min="0"></div>
+                    <div class="field-group" id="amcVehBlock" style="display:none;"><label>Lock to Specific Chassis</label><select id="amcVehicleSelect"></select></div>
+                </div>
+                <button class="btn-action" style="background:#f59e0b;" onclick="commitAmcSale()">AUTHORIZE AMC SUBSCRIPTION & COLLECT FUNDS</button>
             </div>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Brand</th><th>Regular %</th><th>Silver %</th><th>Gold %</th><th>Action</th></tr></thead><tbody id="brandTableBody"></tbody></table></div>
         </div>
+        <div class="block-title" style="font-size:0.9rem; display:flex; justify-content:space-between; align-items:flex-end;">
+            Absolute Associated Customer Ledgers
+            <div style="display:flex; gap:8px;"><input type="text" id="filterPhone" placeholder="Search Mobile..." style="padding:6px; font-size:0.75rem;" oninput="compileCustomerManagementLedgers()"></div>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>Mobile Key</th><th>Client Identity</th><th>Assigned Tier (Editable)</th><th>Active Contracts & Vouchers</th></tr></thead><tbody id="customerLedgerTableBody"></tbody></table>
+        </div>
+    </div>
 
-        <div id="tabSrv" class="view-panel">
-            <h3 style="color:var(--primary); margin-top:0;">Static Service Protocols</h3>
-            <div class="inputs-grid" style="background:#f0fdf4; padding:16px; border-radius:8px; border:1px solid #bbf7d0;">
-                <div class="field-group"><label>Protocol Name</label><input type="text" id="srvName" placeholder="e.g. Quick Service" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Vehicle Category</label><select id="srvCat"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
-                <div class="field-group"><label>Base Rate (₹)</label><input type="number" id="srvRate" value="99"></div>
-                <button class="btn-action" style="background:var(--success);" onclick="saveServiceProtocol()">ADD PROTOCOL</button>
+    <div id="modalEditCustomer" class="overlay-modal">
+        <div class="modal-card">
+            <h3 style="margin-top:0; color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:8px;">Edit Customer Profile</h3>
+            <p style="font-size:0.8rem; color:var(--danger); margin-bottom:16px;">*Mobile number cannot be edited as it securely links to all historical job cards and AMC subscriptions.</p>
+            <div class="inputs-grid">
+                <div class="field-group"><label>Mobile Number (Read-Only)</label><input type="text" id="ecMobile" readonly style="background:#f1f5f9;"></div>
+                <div class="field-group"><label>Customer Name</label><input type="text" id="ecName" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group" style="grid-column: 1 / -1;"><label>Registered Address</label><input type="text" id="ecAddress" oninput="this.value=this.value.toUpperCase()"></div>
             </div>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Protocol Name</th><th>Vehicle Category Segment</th><th>Fixed Rate</th><th>Action</th></tr></thead><tbody id="srvTableBody"></tbody></table></div>
+            <button class="btn-action" onclick="saveCustomerEdits()" style="margin-top:16px;">SAVE CHANGES</button>
+            <button class="btn-action" style="background:#e2e8f0; color:#1e293b; margin-top:8px;" onclick="document.getElementById('modalEditCustomer').style.display='none'">CANCEL</button>
         </div>
+    </div>
 
-        <div id="tabStaff" class="view-panel">
-            <h3 style="color:var(--primary); margin-top:0;">Staff & Technician Directory</h3>
-            <div class="inputs-grid" style="background:#f1f5f9; padding:16px; border-radius:8px;">
-                <div class="field-group"><label>Staff Name</label><input type="text" id="stfName"></div>
-                <div class="field-group"><label>Mobile Number (Login ID)</label><input type="text" id="stfMobile" maxlength="10"></div>
-                <div class="field-group"><label>System Role</label><select id="stfRole"><option value="Mechanic">Mechanic</option><option value="Spare Parts Staff">Spare Parts Staff</option><option value="Workshop Manager">Workshop Manager</option></select></div>
-                <div class="field-group"><label>Labor Comm %</label><input type="number" id="stfComm" value="0"></div>
-                <button class="btn-action" style="background:var(--primary);" onclick="saveStaff()">REGISTER</button>
-            </div>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Name</th><th>Mobile / ID</th><th>Role</th><th>Comm %</th><th>Action</th></tr></thead><tbody id="staffTableBody"></tbody></table></div>
+    <div id="wsPassword" class="card-panel utility-workspace">
+        <div class="block-title">System Key Management Engine</div>
+        <div class="inputs-grid">
+            <div class="field-group"><label>Target Assignment Channel</label><select id="pTargetRole"><option value="admin">Admin Gateway</option><option value="service">Service Gateway</option><option value="green">Green Gateway</option><option value="moped">Moped Gateway</option></select></div>
+            <div class="field-group"><label>Assigned PIN Hash</label><input type="text" id="pNewAdmin" placeholder="4 Digits" maxlength="4"></div>
         </div>
+        <button class="btn-action btn-info" onclick="commitAdminPasswordOverride()" style="margin-top:12px;">EXECUTE SECURITY KEY RESET</button>
+    </div>
+
+    <div id="wsTech" class="card-panel utility-workspace">
+        <div class="block-title">Technician Core Administration Ledgers</div>
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Technician Name</label><input type="text" id="tName" placeholder="Full Registered Descriptor" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Mobile Number (For Login)</label><input type="tel" id="tMobile" placeholder="10 Digits" maxlength="10"></div>
+                <div class="field-group"><label>Labor Scalar Commission (%)</label><input type="number" id="tComm" value="10" min="0" max="100"></div>
+            </div>
+            <button id="btnSaveTech" class="btn-action" onclick="upsertTechnicianProfileRecord()" style="margin-top:12px;">SAVE TECHNICIAN PROFILE</button>
+            <button id="btnCancelTechEdit" class="btn-action" onclick="cancelTechEdit()" style="margin-top:8px; background:#e2e8f0; color:#1e293b; display:none;">CANCEL EDIT</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Crew Member</th><th>Status Indicator</th><th>Earned Points</th><th>Action</th></tr></thead>
+                <tbody id="techDirectoryTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="wsAmc" class="card-panel utility-workspace">
+        <div class="block-title">Fixed Service Configurations</div>
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Package Scope</label><input type="text" id="amcPackageName" placeholder="e.g. QUICK SERVICE" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Target Fleet Category</label><select id="amcCategoryGroup"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option><option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
+                <div class="field-group"><label>Stipulated Base Cost (₹)</label><input type="number" id="amcBaseRate" value="0" min="0"></div>
+            </div>
+            <button class="btn-action btn-info" onclick="upsertServicePackageRecord()" style="margin-top:12px;">SAVE STATIC MATRIX</button>
+        </div>
+        <div class="table-wrapper">
+            <table><thead><tr><th>Service Package Scope</th><th>Assigned Fleet Tier</th><th>Base Charge</th><th>Action</th></tr></thead><tbody id="servicePackagesTableBody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div id="modalCustomerReport" class="overlay-modal">
+    <div class="modal-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
+            <div><h3 style="margin:0; color:var(--primary);">Comprehensive Master Report</h3><div id="repClientName" style="font-size:0.85rem; color:#64748b; font-weight:bold; margin-top:2px;">--</div></div>
+            <button onclick="document.getElementById('modalCustomerReport').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        <div class="rep-grid">
+            <div class="rep-box"><label>Total POS Spares Value</label><div class="rep-val" id="repPosVal">₹0</div></div>
+            <div class="rep-box"><label>Total Workshop Yield</label><div class="rep-val" id="repWkVal">₹0</div></div>
+        </div>
+        <h4 style="margin:0 0 8px 0; color:var(--primary); font-size:0.9rem;">Operational Perks</h4>
+        <div class="rep-grid" style="grid-template-columns:1fr 1fr;">
+            <div style="background:#dcfce7; padding:12px; border-radius:6px; border:1px solid #bbf7d0;"><label style="color:#15803d;">Free Services Remaining</label><div style="font-size:1.2rem; font-weight:bold; color:#15803d;" id="repFree">0</div></div>
+            <div style="background:#e0f2fe; padding:12px; border-radius:6px; border:1px solid #bae6fd;"><label style="color:#0369a1;">Wallet Balance</label><div style="font-size:1.2rem; font-weight:bold; color:#0369a1;" id="repCoup">₹0</div></div>
+        </div>
+        <h4 style="margin:16px 0 8px 0; color:var(--primary); font-size:0.9rem;">Chassis / Asset Directory</h4>
+        <div id="repVehicles" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:8px; font-size:0.85rem; min-height:50px;">Loading vehicles...</div>
     </div>
 </div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    
-    if(localStorage.getItem('ERP_ACTIVE_ROLE') !== 'admin') { alert("Admin Access Required"); window.location.href = 'index.html'; }
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
+    let targetCustomerProfileObj = null;
 
-    function switchTab(tabId) { 
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
-        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active')); 
-        event.target.classList.add('active'); document.getElementById(tabId).classList.add('active'); 
-        if(tabId === 'tabInv') loadBrands(); if(tabId === 'tabSrv') loadServices(); if(tabId === 'tabStaff') loadStaff();
+    function openWorkspaceTarget(targetDomId) { document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); document.getElementById(targetDomId).classList.add('active'); if(targetDomId === 'wsCustomers') compileCustomerManagementLedgers(); if(targetDomId === 'wsAmc') loadAmcPackagesDirectory(); if(targetDomId === 'wsTech') loadTechniciansDirectoryLedgers(); }
+    
+    async function prefetchClientContextForAmc(mobileVal) {
+        const str = mobileVal.trim(); if(str.length !== 10) { document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; targetCustomerProfileObj = null; return; }
+        const { data: cust } = await supabaseClient.from('customers').select('*, vehicles(id, reg_number, make_model)').eq('mobile_number', str).single();
+        if(cust) { targetCustomerProfileObj = cust; document.getElementById('cAmcName').value = cust.name; document.getElementById('amcConfigBlock').style.display = 'block'; const sel = document.getElementById('amcVehicleSelect'); sel.innerHTML = ''; (cust.vehicles || []).forEach(v => sel.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`); toggleAmcInputs(); }
+    }
+    function toggleAmcInputs() { const type = document.getElementById('amcTypeSelect').value; if(type === 'PREPAID' || type === 'ENGINE') { document.getElementById('amcVehBlock').style.display = 'flex'; document.getElementById('amcPrice').value = type === 'PREPAID' ? '999' : '0'; } else { document.getElementById('amcVehBlock').style.display = 'none'; document.getElementById('amcPrice').value = '10'; } }
+
+    async function commitAmcSale() {
+        const mobile = document.getElementById('cAmcMobile').value.trim(); const type = document.getElementById('amcTypeSelect').value; const price = parseFloat(document.getElementById('amcPrice').value) || 0; const vehId = (type === 'PREPAID' || type === 'ENGINE') ? document.getElementById('amcVehicleSelect').value : null;
+        if(!targetCustomerProfileObj) return;
+        
+        if (type === 'ENGINE') {
+            function addDaysSkipSunday(startDate, daysToAdd) { let date = new Date(startDate); date.setDate(date.getDate() + daysToAdd); if (date.getDay() === 0) date.setDate(date.getDate() + 1); return date; }
+            const d0 = new Date(); const d1 = addDaysSkipSunday(d0, 21); const d2 = addDaysSkipSunday(d1, 40); const d3 = addDaysSkipSunday(d2, 76); const d4 = addDaysSkipSunday(d3, 76); const d5 = addDaysSkipSunday(d4, 76); const d6 = addDaysSkipSunday(d5, 76);
+            const schedule = [ { exp: d1, type: 'ENGINE_FREE' }, { exp: d2, type: 'ENGINE_FREE' }, { exp: d3, type: 'ENGINE_PAID' }, { exp: d4, type: 'ENGINE_FREE' }, { exp: d5, type: 'ENGINE_PAID' }, { exp: d6, type: 'ENGINE_FREE' } ];
+            const { data: engSub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: 'Engine Restoration', amount_paid: price, expires_at: d6.toISOString(), services_logged: 0 }).select().single();
+            if (engSub) {
+                const engPromises = schedule.map((svc, index) => { return supabaseClient.from('amc_vouchers').insert({ subscription_id: engSub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `ENG-${engSub.id.substring(0,4).toUpperCase()}-S${index+1}`, voucher_type: svc.type, valid_from: new Date(), expires_at: svc.exp, mechanic_payout_eligible: svc.type === 'ENGINE_PAID' }); });
+                await Promise.all(engPromises); alert(`Engine Guarantee Activated! 6 scheduled tracking vouchers generated.`);
+            }
+        } else {
+            const expireDate = new Date(); if(type === 'LOYALTY') expireDate.setFullYear(expireDate.getFullYear() + 2); else expireDate.setFullYear(expireDate.getFullYear() + 1);
+            const { data: sub } = await supabaseClient.from('amc_subscriptions').insert({ customer_mobile: mobile, vehicle_id: vehId, plan_type: type === 'PREPAID' ? 'Prepaid AMC' : 'Panch Par Ek', amount_paid: price, expires_at: expireDate.toISOString(), services_logged: 0 }).select().single();
+            if(sub) {
+                if(type === 'PREPAID') {
+                    const voucherPromises = []; for(let i=0; i<4; i++) { voucherPromises.push(supabaseClient.from('amc_vouchers').insert({ subscription_id: sub.id, customer_mobile: mobile, vehicle_id: vehId, voucher_code: `AMC-${sub.id.substring(0,4).toUpperCase()}-P${i+1}`, voucher_type: 'PREPAID_PREMIUM', valid_from: new Date(), expires_at: expireDate, mechanic_payout_eligible: true })); }
+                    await Promise.all(voucherPromises); await supabaseClient.from('customers').update({ global_discount_coupon: 5 }).eq('mobile_number', mobile);
+                }
+            }
+        }
+        
+        await supabaseClient.from('workshop_expenses').insert({ expense_category: 'AMC Collection', stakeholder_id: 'Master Ledger', amount: -Math.abs(price), note: `AMC Sale: ${type}`, recorded_by: activeSessionRole });
+        alert(`Contract Generated!`); document.getElementById('cAmcMobile').value = ''; document.getElementById('cAmcName').value = ''; document.getElementById('amcConfigBlock').style.display = 'none'; compileCustomerManagementLedgers();
     }
 
-    // CRM LOGIC
-    async function searchCRM() {
-        const query = document.getElementById('crmSearch').value.trim();
-        const resBox = document.getElementById('crmResults');
-        if(query.length < 3) return resBox.innerHTML = '<p style="text-align:center; color:#64748b;">Type at least 3 characters to search.</p>';
-        
-        const { data: custs } = await supabaseClient.from('customers').select('*, vehicles(*)').or(`mobile_number.ilike.%${query}%,name.ilike.%${query}%`).limit(5);
-        resBox.innerHTML = '';
-        
-        if(!custs || custs.length === 0) return resBox.innerHTML = '<p style="text-align:center; color:var(--danger);">No profile found.</p>';
-        
-        custs.forEach(c => {
-            let vHtml = '';
-            (c.vehicles || []).forEach(v => { vHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding:8px 0;"><span>🏍️ ${v.reg_number} (${v.make_model})</span><button onclick="unmapVehicle('${v.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">[UNMAP]</button></div>`; });
+    async function compileCustomerManagementLedgers() {
+        const searchVal = document.getElementById('filterPhone').value.trim();
+        let query = supabaseClient.from('customers').select('*, vehicles(reg_number, make_model)').order('created_at', { ascending: false });
+        if(searchVal) query = query.ilike('mobile_number', `%${searchVal}%`);
+        const { data: clientList } = await query.limit(50);
+        const cBody = document.getElementById('customerLedgerTableBody'); cBody.innerHTML = '';
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').gt('expires_at', new Date().toISOString());
+
+        clientList?.forEach(c => {
+            const mySubs = (subs || []).filter(s => s.customer_mobile === c.mobile_number);
+            let amcHtml = '<span style="color:#94a3b8; font-size:0.75rem;">No Active AMC</span>';
+            if(mySubs && mySubs.length > 0) { 
+                amcHtml = ''; 
+                mySubs.forEach(mySub => { 
+                    const expStr = new Date(mySub.expires_at).toLocaleDateString('en-IN'); 
+                    const printBtn = `<button class="print-btn" onclick="printThermalContract('${mySub.id}', '${c.mobile_number}')">🖨️ PRINT RULES</button>`;
+                    
+                    if(mySub.plan_type === 'Panch Par Ek') { amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--success); font-weight:bold; font-size:0.75rem;">Loyalty: ${mySub.services_logged||0}/5 Done</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                    else if (mySub.plan_type === 'Engine Restoration') { amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--primary); font-weight:bold; font-size:0.75rem;">Engine Guar: Active</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                    else { const openVouchers = mySub.amc_vouchers ? mySub.amc_vouchers.filter(v => !v.is_redeemed).length : 0; amcHtml += `<div style="margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #fde68a;"><span style="color:var(--info); font-weight:bold; font-size:0.75rem;">Prepaid AMC: ${openVouchers} Left</span><br><small style="color:var(--danger);">Expires: ${expStr}</small>${printBtn}</div>`; } 
+                }); 
+            }
+            const tierOptions = ['Regular', 'Silver', 'Gold', 'Platinum'].map(t => `<option value="${t}" ${c.category === t ? 'selected' : ''}>${t}</option>`).join(''); const tierSelectHtml = `<select class="editable-select" onchange="stageTierUpdate('${c.mobile_number}', this.value)">${tierOptions}</select>`;
+            const safeName = c.name ? c.name.replace(/'/g, "\\'") : ''; const safeAddr = c.address ? c.address.replace(/'/g, "\\'") : '';
+            const editIcon = `<span class="edit-icon" onclick="openEditCustomerModal('${c.mobile_number}', '${safeName}', '${safeAddr}')">✏️</span>`;
             
-            resBox.innerHTML += `
-                <div style="border:1px solid var(--info); border-radius:8px; padding:16px; margin-bottom:16px; background:#f0f9ff;">
-                    <h3 style="margin:0 0 10px 0; color:var(--primary);">${c.name}</h3>
-                    <div style="display:flex; gap:16px; margin-bottom:16px;">
-                        <input type="text" id="updName_${c.mobile_number}" value="${c.name}" style="padding:6px; flex:1;">
-                        <select id="updCat_${c.mobile_number}" style="padding:6px; flex:1;">
-                            <option value="Regular" ${c.category==='Regular'?'selected':''}>Regular Tier</option>
-                            <option value="Silver" ${c.category==='Silver'?'selected':''}>Silver Tier</option>
-                            <option value="Gold" ${c.category==='Gold'?'selected':''}>Gold Tier</option>
-                        </select>
-                        <button class="btn-action" onclick="updateCustomer('${c.mobile_number}')">SAVE PROFILE</button>
-                    </div>
-                    <div style="background:white; padding:12px; border-radius:6px; border:1px solid var(--border);">
-                        <h4 style="margin:0 0 8px 0;">Mapped Vehicles</h4>${vHtml || '<p style="margin:0; color:#64748b; font-size:0.8rem;">No vehicles linked.</p>'}
-                    </div>
-                </div>`;
+            cBody.innerHTML += `<tr class="${mySubs.length > 0 ? 'amc-highlight' : ''}"><td><span class="clickable-ref" onclick="openCustomerReportModal('${c.mobile_number}')">${c.mobile_number}</span></td><td>${c.name || 'Unnamed'} ${editIcon}</td><td>${tierSelectHtml}</td><td>${amcHtml}</td></tr>`;
         });
     }
 
-    async function updateCustomer(mobile) {
-        const nName = document.getElementById(`updName_${mobile}`).value;
-        const nCat = document.getElementById(`updCat_${mobile}`).value;
-        await supabaseClient.from('customers').update({ name: nName, category: nCat }).eq('mobile_number', mobile);
-        alert("Profile Updated"); searchCRM();
+    function openEditCustomerModal(mobile, name, address) { document.getElementById('ecMobile').value = mobile; document.getElementById('ecName').value = name; document.getElementById('ecAddress').value = address; document.getElementById('modalEditCustomer').style.display = 'flex'; }
+
+    async function saveCustomerEdits() {
+        const mobile = document.getElementById('ecMobile').value;
+        const nameStr = document.getElementById('ecName').value.trim().toUpperCase(); 
+        const addressStr = document.getElementById('ecAddress').value.trim().toUpperCase(); 
+        await supabaseClient.from('customers').update({ name: nameStr, address: addressStr }).eq('mobile_number', mobile);
+        document.getElementById('modalEditCustomer').style.display = 'none';
+        compileCustomerManagementLedgers();
+        alert("Customer Profile Updated!");
+    }
+
+    async function printThermalContract(subId, mobile) {
+        const { data: sub } = await supabaseClient.from('amc_subscriptions').select('*, amc_vouchers(*)').eq('id', subId).single();
+        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', mobile).single();
+        if(!sub || !cust) return;
+
+        let vehStr = "All Registered (Fleet)";
+        if(sub.vehicle_id) { const v = cust.vehicles.find(veh => veh.id === sub.vehicle_id); if(v) vehStr = `${v.reg_number} (${v.make_model})`; }
+
+        document.getElementById('ptDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('ptName').innerText = cust.name; document.getElementById('ptMobile').innerText = mobile; document.getElementById('ptVehicle').innerText = vehStr;
+        let rulesHtml = ""; let scheduleHtml = "";
+        
+        if (sub.plan_type === 'Engine Restoration') {
+            document.getElementById('ptTitle').innerText = "इंजन वारंटी एग्रीमेंट";
+            rulesHtml = `1. ये वारंटी 1 साल या 35000 किमी (जो पहले हो) तक मान्य है।<br>2. वारंटी केवल निर्धारित समय पर माय केयर सर्विस सेंटर में सर्विस कराने पर मान्य है।<br>3. समय से 15 दिन से अधिक देरी होने पर सिस्टम द्वारा वारंटी स्वतः रद्द हो जाएगी।<br>4. यह गारंटी रिपेयर (लेबर) के लिए है। स्पेयर पार्ट रिप्लेसमेंट 50-50 (आधा खर्च ग्राहक का) होगा। लेबर फ्री रहेगा।<br>5. सर्विस कूपन आपके मोबाइल नंबर पर डिजिटल रूप से लिंक हैं। कागज़ लाना अनिवार्य नहीं।<br>6. अन्य खामियों (फ्यूचर एडवाइस में लिखित) के कारण शिकायत की जवाबदेही सेंटर की नहीं होगी।`;
+            sub.amc_vouchers.sort((a,b) => new Date(a.expires_at) - new Date(b.expires_at)).forEach((v, index) => { const isFree = v.voucher_type === 'ENGINE_FREE' ? 'FREE' : 'PAID'; scheduleHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px dotted #ccc; margin-bottom:2px;"><span>${index+1}. ${isFree} Service</span><strong>By ${new Date(v.expires_at).toLocaleDateString('en-IN')}</strong></div>`; });
+        } else if (sub.plan_type === 'Prepaid AMC') {
+            document.getElementById('ptTitle').innerText = "प्रीपेड AMC एग्रीमेंट";
+            rulesHtml = `1. यह पैकेज 1 वर्ष (या 4 सर्विस) के लिए मान्य है।<br>2. स्पेयर पार्ट्स पर 5% की अतिरिक्त छूट लागू है।<br>3. आपके 4 प्रीमियम सर्विस वाउचर आपके मोबाइल नंबर पर डिजिटल रूप से सुरक्षित हैं।`;
+            scheduleHtml = `<b>4x Premium Service Vouchers Active</b><br>Expires on: ${new Date(sub.expires_at).toLocaleDateString('en-IN')}`;
+        } else if (sub.plan_type === 'Panch Par Ek') {
+            document.getElementById('ptTitle').innerText = "लॉयल्टी प्रोग्राम (5-पर-1)";
+            rulesHtml = `1. यह प्लान 2 वर्ष के लिए मान्य है।<br>2. 5 प्रीमियम/जंबो सर्विस पूरी करने पर 1 सर्विस का लेबर चार्ज बिल्कुल मुफ्त मिलेगा।<br>3. ट्रैकिंग आपके मोबाइल नंबर पर सिस्टम द्वारा की जा रही है।`;
+            scheduleHtml = `<b>Loyalty Active</b><br>Current Status: ${sub.services_logged||0}/5 Services Done<br>Expires on: ${new Date(sub.expires_at).toLocaleDateString('en-IN')}`;
+        }
+
+        document.getElementById('ptRules').innerHTML = rulesHtml; document.getElementById('ptSchedule').innerHTML = scheduleHtml; window.print();
+    }
+
+    async function stageTierUpdate(mobile, newTier) { await supabaseClient.from('customers').update({ category: newTier }).eq('mobile_number', mobile); compileCustomerManagementLedgers(); }
+
+    async function openCustomerReportModal(mobile) {
+        const { data: cust } = await supabaseClient.from('customers').select('*, vehicles(reg_number, make_model)').eq('mobile_number', mobile).single();
+        if(!cust) return;
+        document.getElementById('repClientName').innerText = `${cust.name} | ${cust.mobile_number} | Tier: ${cust.category}`; document.getElementById('repFree').innerText = cust.free_services_issued || 0; document.getElementById('repCoup').innerText = `₹${Math.floor(cust.loyalty_points || 0)}`;
+        const vehDiv = document.getElementById('repVehicles'); vehDiv.innerHTML = (cust.vehicles || []).map(v => `<b>${v.reg_number}</b> - ${v.make_model}`).join('<br>') || 'No assets mapped.';
+        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('customer_mobile', mobile).eq('status', 'Closed'); let posSum = 0; (pos || []).forEach(p => posSum += parseFloat(p.total_amount) || 0); document.getElementById('repPosVal').innerText = `₹${posSum.toFixed(2)}`;
+        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('status', 'Closed'); let jcSum = 0; (jc || []).forEach(j => { jcSum += parseFloat(j.total_invoice_value) || 0; }); document.getElementById('repWkVal').innerText = `₹${jcSum.toFixed(2)}`;
+        document.getElementById('modalCustomerReport').style.display = 'flex';
+    }
+
+    let activeEditMechId = null;
+    function editMechanic(id, name, mobile, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE TECHNICIAN PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
+    function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tComm').value = '10'; document.getElementById('btnSaveTech').innerText = "SAVE TECHNICIAN PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
+
+    async function upsertTechnicianProfileRecord() { 
+        const nameStr = document.getElementById('tName').value.trim().toUpperCase(); 
+        const mobStr = document.getElementById('tMobile').value.trim();
+        const commVal = parseFloat(document.getElementById('tComm').value) || 0; 
+        if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); 
+        
+        if (activeEditMechId) {
+            const { error } = await supabaseClient.from('mechanics').update({ mobile_number: mobStr, name: nameStr, commission_rate: commVal }).eq('id', activeEditMechId); 
+            if(error) return alert("Database Error: Mobile number may already exist.");
+        } else {
+            const { error } = await supabaseClient.from('mechanics').insert({ mobile_number: mobStr, name: nameStr, commission_rate: commVal });
+            if(error) return alert("Database Error: Mobile number may already exist.");
+        }
+        cancelTechEdit(); loadTechniciansDirectoryLedgers(); 
     }
     
-    async function unmapVehicle(vid) {
-        if(confirm("Remove this vehicle from the profile?")) {
-            await supabaseClient.from('vehicles').delete().eq('id', vid); searchCRM();
+    async function loadTechniciansDirectoryLedgers() {
+        const { data: list } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('name');
+        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
+        list?.forEach(t => {
+            const pts = parseFloat(t.earned_points) || 0;
+            const cashBtn = pts >= 100 ? `<button onclick="cashOutMechanic('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Cash Out ₹${Math.floor(pts)}</button>` : '';
+            const safeName = t.name.replace(/'/g, "\\'");
+            tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editMechanic('${t.id}', '${safeName}', '${t.mobile_number}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="color:var(--success); font-weight:700;">Active</span></td><td><strong style="color:var(--gold);">${Math.floor(pts)} Pts</strong></td><td style="display:flex; gap:8px;">${cashBtn}<button onclick="downloadTechnicianLedgerStatement('${t.id}', '${t.name}')" style="background:none; border:1px solid var(--info); color:var(--info); font-weight:700; cursor:pointer; padding:4px 8px; border-radius:4px;">Ledger</button></td></tr>`;
+        });
+    }
+
+    async function markAttendance(mechId) { const { error } = await supabaseClient.from('mechanic_attendance').insert({ mech_id: mechId, date: new Date().toISOString().split('T')[0], status: 'Present' }); if(error) alert("Already marked present for today!"); else alert("Attendance Logged."); }
+
+    async function cashOutMechanic(mechId, points) {
+        if(confirm(`Convert ${Math.floor(points)} points to ₹${Math.floor(points)} cash payout?`)) {
+            await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', mechId);
+            await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Mechanic Payout', stakeholder_id: mechId, amount: Math.floor(points), note: '5-Star Incentive Cash Out', recorded_by: activeSessionRole });
+            loadTechniciansDirectoryLedgers(); alert("Points converted! Added to today's Workshop Expenses.");
         }
     }
 
-    // INVENTORY / BRANDS LOGIC
-    async function loadBrands() {
-        const { data: b } = await supabaseClient.from('brand_master').select('*').order('brand_name');
-        const tb = document.getElementById('brandTableBody'); tb.innerHTML = '';
-        (b||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.brand_name}</strong></td><td>${item.disc_regular}%</td><td>${item.disc_silver}%</td><td>${item.disc_gold}%</td><td><button onclick="deleteBrand('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; });
-    }
-    async function saveBrandRule() {
-        const name = document.getElementById('brandName').value; const r = document.getElementById('brandReg').value; const s = document.getElementById('brandSilv').value; const g = document.getElementById('brandGold').value;
-        if(!name) return; await supabaseClient.from('brand_master').upsert({ brand_name: name, disc_regular: r, disc_silver: s, disc_gold: g }); loadBrands();
-    }
-    async function deleteBrand(id) { await supabaseClient.from('brand_master').delete().eq('id', id); loadBrands(); }
+    // UPDATED DOWNLOAD FUNCTION FOR CO-MECHANIC 50/50 SPLIT LOGIC
+    async function downloadTechnicianLedgerStatement(techId, techName) {
+        // FETCHES JOBS WHERE THEY ARE PRIMARY *OR* CO-MECHANIC
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_date, closed_at, labour_charges, status, mech_id, co_mech_id, job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${techId},co_mech_id.eq.${techId}`).eq('status', 'Closed');
+        
+        let outputContentStr = `MY CARE ERP - TECHNICIAN LEDGER STATEMENT\nCrew Member: ${techName}\nExtracted: ${new Date().toISOString().split('T')[0]}\n------------------------------------------------\n\n`;
+        let calculatedLaborSubtotal = 0;
+        
+        if(jobs && jobs.length > 0) { 
+            jobs.forEach(j => { 
+                let pkgLabor = 0; 
+                if(j.job_card_items) { j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); } 
+                
+                const rawLaborScalar = (parseFloat(j.labour_charges) || 0) + pkgLabor; 
+                
+                // 50/50 SPLIT LOGIC FOR TXT EXPORT
+                let finalLaborForThisTech = rawLaborScalar;
+                let splitNote = '';
+                if (j.mech_id && j.co_mech_id) {
+                    finalLaborForThisTech = rawLaborScalar / 2;
+                    splitNote = ' [50% Co-Mechanic Split]';
+                }
 
-    // SERVICES LOGIC
-    async function loadServices() {
-        const { data: s } = await supabaseClient.from('service_packages').select('*').order('vehicle_category');
-        const tb = document.getElementById('srvTableBody'); tb.innerHTML = '';
-        (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.package_name}</strong></td><td>${item.vehicle_category}</td><td>₹${item.base_rate}</td><td><button onclick="deleteSrv('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; });
+                calculatedLaborSubtotal += finalLaborForThisTech; 
+                const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : (j.jc_date || 'N/A'); 
+                outputContentStr += `Reference: JC-${j.id.split('-')[0].toUpperCase()} | Settled: ${d} | Net Labor: Rs.${finalLaborForThisTech}${splitNote}\n`; 
+            }); 
+            outputContentStr += `\n------------------------------------------------\nTotal Labor Generated: Rs.${calculatedLaborSubtotal}\n`; 
+        } else { 
+            outputContentStr += "No closed historical labor items.\n"; 
+        }
+        
+        const blobFile = new Blob([outputContentStr], { type: 'text/plain' }); 
+        const downloadElement = document.createElement('a'); 
+        downloadElement.href = URL.createObjectURL(blobFile); 
+        downloadElement.download = `Ledger_Statement_${techName.replace(/\s+/g,'_')}.txt`; 
+        downloadElement.click(); 
+        URL.revokeObjectURL(downloadElement.href);
     }
-    async function saveServiceProtocol() {
-        const name = document.getElementById('srvName').value; const cat = document.getElementById('srvCat').value; const rate = document.getElementById('srvRate').value;
-        if(!name) return; await supabaseClient.from('service_packages').insert({ package_name: name, vehicle_category: cat, base_rate: rate }); loadServices();
-    }
-    async function deleteSrv(id) { await supabaseClient.from('service_packages').delete().eq('id', id); loadServices(); }
 
-    // STAFF LOGIC
-    async function loadStaff() {
-        const { data: s } = await supabaseClient.from('mechanics').select('*').order('name');
-        const tb = document.getElementById('staffTableBody'); tb.innerHTML = '';
-        (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.name}</strong></td><td>${item.mobile_number}</td><td>${item.staff_role}</td><td>${item.commission_rate}%</td><td><button onclick="deleteStaff('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; });
-    }
-    async function saveStaff() {
-        const name = document.getElementById('stfName').value; const mob = document.getElementById('stfMobile').value; const role = document.getElementById('stfRole').value; const comm = document.getElementById('stfComm').value;
-        if(!name || mob.length !== 10) return alert("Valid Name and 10-digit mobile required.");
-        await supabaseClient.from('mechanics').insert({ name: name, mobile_number: Number(mob), staff_role: role, commission_rate: comm, is_active: true }); loadStaff();
-    }
-    async function deleteStaff(id) { await supabaseClient.from('mechanics').delete().eq('id', id); loadStaff(); }
-
-    switchTab('tabCRM');
+    async function upsertServicePackageRecord() { const pName = document.getElementById('amcPackageName').value.toUpperCase(); const pCat = document.getElementById('amcCategoryGroup').value; const pRate = parseFloat(document.getElementById('amcBaseRate').value) || 0; await supabaseClient.from('service_packages').upsert({ package_name: pName, vehicle_category: pCat, base_rate: pRate }); loadAmcPackagesDirectory(); }
+    async function loadAmcPackagesDirectory() { const { data: packages } = await supabaseClient.from('service_packages').select('*').order('vehicle_category').order('base_rate'); const tbody = document.getElementById('servicePackagesTableBody'); tbody.innerHTML = ''; packages?.forEach(pkg => { tbody.innerHTML += `<tr><td><strong>${pkg.package_name}</strong></td><td>${pkg.vehicle_category}</td><td><strong>₹${pkg.base_rate}</strong></td><td style="text-align:center;"></td></tr>`; }); }
+    async function commitAdminPasswordOverride() { const targetChan = document.getElementById('pTargetRole').value; const newPin = document.getElementById('pNewAdmin').value.trim(); if(newPin.length !== 4) return alert("Specify 4-digit string."); await supabaseClient.from('system_credentials').upsert({ role_key: targetChan, pin_hash: newPin }); alert(`Updated: ${targetChan}`); document.getElementById('pNewAdmin').value = ''; }
 </script>
 </body>
 </html>
