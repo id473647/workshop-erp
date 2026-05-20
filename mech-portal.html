@@ -9,12 +9,15 @@
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); padding-bottom:40px;}
+        
+        /* UNIVERSAL NAV */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
         .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary);}
         .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
         .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+        
         .container { max-width: 600px; margin: 20px auto; padding: 0 20px; box-sizing: border-box; }
         .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border); }
         input[type="tel"], input[type="date"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; }
@@ -119,8 +122,8 @@
         const mobile = document.getElementById('loginMobile').value.trim();
         if(mobile.length !== 10) return alert("Enter valid 10-digit number.");
         
-        // FIX: Handle Data Type Strictness by attempting string, then numeric
         let mechData = null;
+        // Dual check for strict DB formatting
         const { data: stringMatch } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', mobile).single();
         if (stringMatch) mechData = stringMatch;
         else {
