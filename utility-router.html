@@ -7,36 +7,43 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --gold: #f59e0b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
-        .badge-role { background: var(--utility); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom:40px; }
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
+        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary);}
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--utility); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
         .utility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
         .u-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
         .u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
         .u-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px; }
         .u-desc { font-size: 0.8rem; color: #64748b; line-height: 1.3; margin: 0; }
+        
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
         .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
         .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; } .btn-info { background: #2980b9; }
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; } table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; background: white;} table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .utility-workspace { display: none; } .utility-workspace.active { display: block; }
-        .editable-select { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border); font-weight: bold; cursor: pointer; }
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 650px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
         .edit-icon { cursor: pointer; margin-left: 8px; color: var(--info); font-size: 0.9rem; text-decoration: none; }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <a href="index.html" class="nav-anchor" style="font-size:1rem; color:var(--primary);">← Back to Hub</a>
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div class="logo-matrix"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div>
+    <div class="nav-actions">
+        <button class="btn-header" onclick="openWorkspaceTarget('hubGrid')">← BACK TO HUB</button>
+        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
-        <button class="btn-header" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'">LOGOUT</button>
     </div>
 </nav>
 
@@ -44,25 +51,60 @@
     <div id="hubGrid" class="utility-workspace active">
         <div class="block-title" style="margin-bottom:20px;">Enterprise CRM & Logic Configuration</div>
         <div class="utility-grid">
-            <div class="u-card" style="border-left:4px solid var(--success);" onclick="openWorkspaceTarget('wsCustomers')">
-                <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">View client identity lists and issue AMC subscriptions.</p>
+            <div class="u-card" style="border-left:4px solid var(--success);" id="cardCRM" onclick="openWorkspaceTarget('wsCustomers')">
+                <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">Manage client profiles, map vehicles, and adjust discount tiers.</p>
             </div>
-            <div class="u-card" onclick="window.location.href='reports.html'">
+            <div class="u-card" id="cardReports" onclick="window.location.href='reports.html'">
                 <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">EOD Register, Marketing Leads, and Analytics.</p>
             </div>
-            <div class="u-card" onclick="openWorkspaceTarget('wsTech')">
-                <h4 class="u-title">👨‍💼 Enterprise Staff & Payroll</h4><p class="u-desc">Manage Mechanics, Managers, and Spares Staff (Attendance & Pay).</p>
+            <div class="u-card" id="cardStaff" onclick="openWorkspaceTarget('wsTech')">
+                <h4 class="u-title">👨‍💼 Staff & Payroll</h4><p class="u-desc">Manage Mechanics, Managers, Attendance & Commission Rules.</p>
             </div>
-            <div class="u-card" style="border-left:4px solid var(--gold);" onclick="openWorkspaceTarget('wsSchemes')">
+            <div class="u-card" id="cardInv" onclick="openWorkspaceTarget('wsInv')">
+                <h4 class="u-title">📦 Inventory Master</h4><p class="u-desc">Configure brand discount rules and product categories.</p>
+            </div>
+            <div class="u-card" id="cardSrv" onclick="openWorkspaceTarget('wsSrv')">
+                <h4 class="u-title">📋 Service Matrices</h4><p class="u-desc">Define standard base-rate models for service packages.</p>
+            </div>
+            <div class="u-card" style="border-left:4px solid var(--gold);" id="cardGamification" onclick="openWorkspaceTarget('wsSchemes')">
                 <h4 class="u-title">🏆 Gamification Engine</h4><p class="u-desc">Create and manage target-based incentive schemes for staff.</p>
             </div>
-            <div class="u-card" onclick="openWorkspaceTarget('wsAmc')">
-                <h4 class="u-title">📋 Static Service Matrices</h4><p class="u-desc">Define standard base-rate models for service packages.</p>
-            </div>
-            <div class="u-card" onclick="openWorkspaceTarget('wsPassword')">
-                <h4 class="u-title">🔑 Password Manager</h4><p class="u-desc">Modify persistent security login tokens.</p>
+            <div class="u-card" id="cardAmc" onclick="window.location.href='amc-manager.html'">
+                <h4 class="u-title">🌟 AMC Issuance</h4><p class="u-desc">Navigate to the Annual Maintenance Contract Portal.</p>
             </div>
         </div>
+    </div>
+
+    <div id="wsCustomers" class="card-panel utility-workspace">
+        <div class="block-title">Customer Relationship Manager</div>
+        <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px;">
+            <div class="field-group" style="flex:2;"><label>Search Profile (Mobile or Name)</label><input type="text" id="crmSearch" placeholder="Type to search..." oninput="searchCRM()"></div>
+            <button class="btn-action" style="background:var(--success);" onclick="searchCRM()">SEARCH</button>
+        </div>
+        <div id="crmResults" style="margin-top:20px;"></div>
+    </div>
+
+    <div id="wsInv" class="card-panel utility-workspace">
+        <div class="block-title">Brand Discount Tier Rules</div>
+        <div class="inputs-grid" style="background:#fefce8; padding:16px; border-radius:8px; border:1px solid #fef08a;">
+            <div class="field-group"><label>Brand Name</label><input type="text" id="brandName" placeholder="e.g. MOTUL" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Regular Discount %</label><input type="number" id="brandReg" value="0"></div>
+            <div class="field-group"><label>Silver Discount %</label><input type="number" id="brandSilv" value="5"></div>
+            <div class="field-group"><label>Gold Discount %</label><input type="number" id="brandGold" value="10"></div>
+            <button class="btn-action" style="background:var(--primary);" onclick="saveBrandRule()">SAVE RULE</button>
+        </div>
+        <div class="table-wrapper"><table class="data-table"><thead><tr><th>Brand</th><th>Regular %</th><th>Silver %</th><th>Gold %</th><th>Action</th></tr></thead><tbody id="brandTableBody"></tbody></table></div>
+    </div>
+
+    <div id="wsSrv" class="card-panel utility-workspace">
+        <div class="block-title">Static Service Protocols</div>
+        <div class="inputs-grid" style="background:#f0fdf4; padding:16px; border-radius:8px; border:1px solid #bbf7d0;">
+            <div class="field-group"><label>Protocol Name</label><input type="text" id="srvName" placeholder="e.g. Quick Service" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Vehicle Category</label><select id="srvCat"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
+            <div class="field-group"><label>Base Rate (₹)</label><input type="number" id="srvRate" value="99"></div>
+            <button class="btn-action" style="background:var(--success);" onclick="saveServiceProtocol()">ADD PROTOCOL</button>
+        </div>
+        <div class="table-wrapper"><table class="data-table"><thead><tr><th>Protocol Name</th><th>Vehicle Category Segment</th><th>Fixed Rate</th><th>Action</th></tr></thead><tbody id="srvTableBody"></tbody></table></div>
     </div>
 
     <div id="wsTech" class="card-panel utility-workspace">
@@ -85,10 +127,7 @@
             <button id="btnCancelTechEdit" class="btn-action" onclick="cancelTechEdit()" style="margin-top:8px; background:#e2e8f0; color:#1e293b; display:none;">CANCEL EDIT</button>
         </div>
         <div class="table-wrapper">
-            <table>
-                <thead><tr><th>Crew Member</th><th>Role</th><th>Wallet / Points</th><th>Action</th></tr></thead>
-                <tbody id="techDirectoryTableBody"></tbody>
-            </table>
+            <table><thead><tr><th>Crew Member</th><th>Role</th><th>Wallet / Points</th><th>Action</th></tr></thead><tbody id="techDirectoryTableBody"></tbody></table>
         </div>
     </div>
 
@@ -101,12 +140,7 @@
                 <div class="field-group"><label>Target Audience</label><select id="schRole"><option value="Mechanic">Mechanics</option><option value="Workshop Manager">Workshop Managers</option></select></div>
                 <div class="field-group">
                     <label>Target Metric</label>
-                    <select id="schMetric">
-                        <option value="GREEN_SPARES_VOL">Green Spares Billed (₹)</option>
-                        <option value="GREEN_LUBE_VOL">Green Lube Billed (ML)</option>
-                        <option value="JOB_CARD_COUNT">Total Job Cards Closed (Count)</option>
-                        <option value="ENGINE_RESTORE_COUNT">Engine Restorations (Count)</option>
-                    </select>
+                    <select id="schMetric"><option value="GREEN_SPARES_VOL">Green Spares Billed (₹)</option><option value="GREEN_LUBE_VOL">Green Lube Billed (ML)</option><option value="JOB_CARD_COUNT">Total Job Cards Closed (Count)</option><option value="ENGINE_RESTORE_COUNT">Engine Restorations (Count)</option></select>
                 </div>
                 <div class="field-group"><label>Target Value</label><input type="number" id="schTarget" placeholder="e.g. 35000"></div>
                 <div class="field-group"><label>Reward (₹)</label><input type="number" id="schReward" placeholder="e.g. 500"></div>
@@ -117,105 +151,106 @@
             <table><thead><tr><th>Scheme Name</th><th>Audience & Metric</th><th>Target -> Reward</th><th>Status</th></tr></thead><tbody id="schemesTableBody"></tbody></table>
         </div>
     </div>
-
-    <div id="wsCustomers" class="card-panel utility-workspace"><div class="block-title">Customer Portfolio (Go Back to Hub to View)</div></div>
-    <div id="wsAmc" class="card-panel utility-workspace"><div class="block-title">Static Service Matrices (Go Back to Hub to View)</div></div>
-    <div id="wsPassword" class="card-panel utility-workspace"><div class="block-title">Password Manager (Go Back to Hub to View)</div></div>
 </div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin';
+    
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
+    
+    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
 
+    // === RBAC ENGINE: ENFORCE VISIBILITY ===
+    if (activeSessionRole === 'service') {
+        document.getElementById('cardInv').style.display = 'none'; // Service cannot manage inventory brands
+        document.getElementById('cardGamification').style.display = 'none'; // Admin only
+    } else if (activeSessionRole === 'green' || activeSessionRole === 'moped') {
+        document.getElementById('cardGamification').style.display = 'none'; // Admin only
+        document.getElementById('cardSrv').style.display = 'none'; // Green/Moped don't define service protocols
+    }
+    // Admin sees everything.
+
+    // === ROUTER LOGIC ===
     function openWorkspaceTarget(targetDomId) { 
         document.querySelectorAll('.utility-workspace').forEach(w => w.classList.remove('active')); 
         document.getElementById(targetDomId).classList.add('active'); 
+        
         if(targetDomId === 'wsTech') loadStaffDirectoryLedgers(); 
         if(targetDomId === 'wsSchemes') loadSchemes();
+        if(targetDomId === 'wsInv') loadBrands();
+        if(targetDomId === 'wsSrv') loadServices();
     }
 
-    // --- STAFF DIRECTORY (Mechanics, Managers, Spares) ---
+    // === 1. CRM LOGIC ===
+    async function searchCRM() {
+        const query = document.getElementById('crmSearch').value.trim(); const resBox = document.getElementById('crmResults');
+        if(query.length < 3) return resBox.innerHTML = '<p style="text-align:center; color:#64748b;">Type at least 3 characters to search.</p>';
+        const { data: custs } = await supabaseClient.from('customers').select('*, vehicles(*)').or(`mobile_number.ilike.%${query}%,name.ilike.%${query}%`).limit(5);
+        resBox.innerHTML = ''; if(!custs || custs.length === 0) return resBox.innerHTML = '<p style="text-align:center; color:var(--danger);">No profile found.</p>';
+        
+        custs.forEach(c => {
+            let vHtml = ''; (c.vehicles || []).forEach(v => { vHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0; padding:8px 0;"><span>🏍️ ${v.reg_number} (${v.make_model})</span><button onclick="unmapVehicle('${v.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">[UNMAP]</button></div>`; });
+            resBox.innerHTML += `
+                <div style="border:1px solid var(--info); border-radius:8px; padding:16px; margin-bottom:16px; background:#f0f9ff;">
+                    <h3 style="margin:0 0 10px 0; color:var(--primary);">${c.name}</h3>
+                    <div style="display:flex; gap:16px; margin-bottom:16px;">
+                        <input type="text" id="updName_${c.mobile_number}" value="${c.name}" style="padding:6px; flex:1;">
+                        <select id="updCat_${c.mobile_number}" style="padding:6px; flex:1;">
+                            <option value="Regular" ${c.category==='Regular'?'selected':''}>Regular Tier</option>
+                            <option value="Silver" ${c.category==='Silver'?'selected':''}>Silver Tier</option>
+                            <option value="Gold" ${c.category==='Gold'?'selected':''}>Gold Tier</option>
+                        </select>
+                        <button class="btn-action" onclick="updateCustomer('${c.mobile_number}')">SAVE PROFILE</button>
+                    </div>
+                    <div style="background:white; padding:12px; border-radius:6px; border:1px solid var(--border);">
+                        <h4 style="margin:0 0 8px 0;">Mapped Vehicles</h4>${vHtml || '<p style="margin:0; color:#64748b; font-size:0.8rem;">No vehicles linked.</p>'}
+                    </div>
+                </div>`;
+        });
+    }
+    async function updateCustomer(mobile) { const nName = document.getElementById(`updName_${mobile}`).value; const nCat = document.getElementById(`updCat_${mobile}`).value; await supabaseClient.from('customers').update({ name: nName, category: nCat }).eq('mobile_number', mobile); alert("Profile Updated"); searchCRM(); }
+    async function unmapVehicle(vid) { if(confirm("Remove this vehicle from the profile?")) { await supabaseClient.from('vehicles').delete().eq('id', vid); searchCRM(); } }
+
+    // === 2. INVENTORY BRANDS LOGIC ===
+    async function loadBrands() { const { data: b } = await supabaseClient.from('brand_master').select('*').order('brand_name'); const tb = document.getElementById('brandTableBody'); tb.innerHTML = ''; (b||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.brand_name}</strong></td><td>${item.disc_regular}%</td><td>${item.disc_silver}%</td><td>${item.disc_gold}%</td><td><button onclick="deleteBrand('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); }
+    async function saveBrandRule() { const name = document.getElementById('brandName').value; const r = document.getElementById('brandReg').value; const s = document.getElementById('brandSilv').value; const g = document.getElementById('brandGold').value; if(!name) return; await supabaseClient.from('brand_master').upsert({ brand_name: name, disc_regular: r, disc_silver: s, disc_gold: g }); loadBrands(); }
+    async function deleteBrand(id) { await supabaseClient.from('brand_master').delete().eq('id', id); loadBrands(); }
+
+    // === 3. SERVICE PROTOCOLS LOGIC ===
+    async function loadServices() { const { data: s } = await supabaseClient.from('service_packages').select('*').order('vehicle_category'); const tb = document.getElementById('srvTableBody'); tb.innerHTML = ''; (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.package_name}</strong></td><td>${item.vehicle_category}</td><td>₹${item.base_rate}</td><td><button onclick="deleteSrv('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); }
+    async function saveServiceProtocol() { const name = document.getElementById('srvName').value; const cat = document.getElementById('srvCat').value; const rate = document.getElementById('srvRate').value; if(!name) return; await supabaseClient.from('service_packages').insert({ package_name: name, vehicle_category: cat, base_rate: rate }); loadServices(); }
+    async function deleteSrv(id) { await supabaseClient.from('service_packages').delete().eq('id', id); loadServices(); }
+
+    // === 4. STAFF & PAYROLL LOGIC ===
     let activeEditMechId = null;
     function editStaff(id, name, mobile, role, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tRole').value = role || 'Mechanic'; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
     function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tRole').value = 'Mechanic'; document.getElementById('tComm').value = '0'; document.getElementById('btnSaveTech').innerText = "SAVE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
-
     async function upsertStaffProfileRecord() { 
-        const nameStr = document.getElementById('tName').value.trim().toUpperCase(); 
-        const mobStr = document.getElementById('tMobile').value.trim();
-        const roleStr = document.getElementById('tRole').value;
-        const commVal = parseFloat(document.getElementById('tComm').value) || 0; 
+        const nameStr = document.getElementById('tName').value.trim().toUpperCase(); const mobStr = document.getElementById('tMobile').value.trim(); const roleStr = document.getElementById('tRole').value; const commVal = parseFloat(document.getElementById('tComm').value) || 0; 
         if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); 
-        
-        const payload = { mobile_number: mobStr, name: nameStr, staff_role: roleStr, commission_rate: commVal };
-        
-        if (activeEditMechId) {
-            const { error } = await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); 
-            if(error) return alert("Database Error: Mobile number may already exist.");
-        } else {
-            const { error } = await supabaseClient.from('mechanics').insert(payload);
-            if(error) return alert("Database Error: Mobile number may already exist.");
-        }
+        const payload = { mobile_number: Number(mobStr), name: nameStr, staff_role: roleStr, commission_rate: commVal, is_active: true }; 
+        if (activeEditMechId) { await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); } else { await supabaseClient.from('mechanics').insert(payload); } 
         cancelTechEdit(); loadStaffDirectoryLedgers(); 
     }
-    
-    async function loadStaffDirectoryLedgers() {
-        const { data: list } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name');
-        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
-        list?.forEach(t => {
-            const pts = parseFloat(t.earned_points) || 0;
-            const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Pay ₹${Math.floor(pts)}</button>` : '';
-            const safeName = t.name.replace(/'/g, "\\'");
-            tbody.innerHTML += `<tr>
-                <td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td>
-                <td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">${t.staff_role}</span></td>
-                <td><strong style="color:var(--gold);">${Math.floor(pts)} ₹/Pts</strong></td>
-                <td style="display:flex; gap:8px;">${cashBtn}</td>
-            </tr>`;
-        });
+    async function loadStaffDirectoryLedgers() { 
+        const { data: list } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name'); 
+        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = ''; 
+        list?.forEach(t => { 
+            const pts = parseFloat(t.earned_points) || 0; 
+            const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Pay ₹${Math.floor(pts)}</button>` : ''; 
+            const safeName = t.name.replace(/'/g, "\\'"); 
+            tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">${t.staff_role}</span></td><td><strong style="color:var(--gold);">${Math.floor(pts)} ₹/Pts</strong></td><td style="display:flex; gap:8px;">${cashBtn}</td></tr>`; 
+        }); 
     }
-
     async function markAttendance(staffId) { const { error } = await supabaseClient.from('mechanic_attendance').insert({ mech_id: staffId, date: new Date().toISOString().split('T')[0], status: 'Present' }); if(error) alert("Already marked present for today!"); else alert("Attendance Logged."); }
+    async function cashOutStaff(staffId, points) { if(confirm(`Process ₹${Math.floor(points)} payout?`)) { await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', staffId); await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Mechanic Payout', stakeholder_id: staffId, amount: Math.floor(points), note: 'Wallet / Incentive Cash Out', recorded_by: activeSessionRole }); loadStaffDirectoryLedgers(); alert("Payout processed! Added to today's Workshop Expenses."); } }
 
-    async function cashOutStaff(staffId, points) {
-        if(confirm(`Process ₹${Math.floor(points)} payout?`)) {
-            await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', staffId);
-            await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Mechanic Payout', stakeholder_id: staffId, amount: Math.floor(points), note: 'Wallet / Incentive Cash Out', recorded_by: activeSessionRole });
-            loadStaffDirectoryLedgers(); alert("Payout processed! Added to today's Workshop Expenses.");
-        }
-    }
-
-    // --- GAMIFICATION SCHEME ENGINE ---
-    async function createScheme() {
-        const sName = document.getElementById('schName').value.trim().toUpperCase();
-        const sRole = document.getElementById('schRole').value;
-        const sMetric = document.getElementById('schMetric').value;
-        const sTarget = parseFloat(document.getElementById('schTarget').value);
-        const sReward = parseFloat(document.getElementById('schReward').value);
-
-        if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters.");
-
-        await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward });
-        alert("Scheme activated!"); loadSchemes();
-    }
-
-    async function loadSchemes() {
-        const { data: schemes } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false });
-        const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = '';
-        schemes?.forEach(s => {
-            const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`;
-            tbody.innerHTML += `<tr>
-                <td><strong>${s.scheme_name}</strong></td>
-                <td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td>
-                <td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td>
-                <td>${statusHtml}</td>
-            </tr>`;
-        });
-    }
-
+    // === 5. GAMIFICATION LOGIC ===
+    async function createScheme() { const sName = document.getElementById('schName').value.trim().toUpperCase(); const sRole = document.getElementById('schRole').value; const sMetric = document.getElementById('schMetric').value; const sTarget = parseFloat(document.getElementById('schTarget').value); const sReward = parseFloat(document.getElementById('schReward').value); if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters."); await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward }); alert("Scheme activated!"); loadSchemes(); }
+    async function loadSchemes() { const { data: schemes } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false }); const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = ''; schemes?.forEach(s => { const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`; tbody.innerHTML += `<tr><td><strong>${s.scheme_name}</strong></td><td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td><td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td><td>${statusHtml}</td></tr>`; }); }
     async function toggleScheme(id, makeActive) { await supabaseClient.from('active_schemes').update({ is_active: makeActive }).eq('id', id); loadSchemes(); }
-
 </script>
 </body>
 </html>
