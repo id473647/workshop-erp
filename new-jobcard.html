@@ -100,7 +100,17 @@
 
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
-            <div class="field-group"><label>Prepaid Advance Collected (₹)</label><input type="number" id="jcAdvance" value="0" min="0"><span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to EOD Drawer)</span></div>
+            
+            <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
+                <label>Workshop Advance Collected (₹)</label>
+                <input type="number" id="jcAdvance" value="0" min="0">
+                <span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to Workshop Drawer)</span>
+            </div>
+            <div class="field-group" id="blockPrepaid" style="display:none;">
+                <label>Prepaid Deposited (₹)</label>
+                <input type="number" id="jcPrepaid" value="0" min="0">
+                <span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to Parts Drawer)</span>
+            </div>
         </div>
 
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED</button>
@@ -118,6 +128,13 @@
     if(activeRole !== 'admin' && activeRole !== 'service' && activeRole !== 'green' && activeRole !== 'moped') {
         alert("You do not have authorization to create Job Cards.");
         window.location.href = 'login.html';
+    }
+
+    // Toggle logic for showing the right field
+    if (activeRole === 'green' || activeRole === 'moped') {
+        document.getElementById('blockPrepaid').style.display = 'flex';
+    } else {
+        document.getElementById('blockWorkshopAdvance').style.display = 'flex';
     }
 
     async function loadMechanics() {
@@ -175,6 +192,7 @@
         const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
         const advance = parseFloat(document.getElementById('jcAdvance').value) || 0;
+        const prepaid = parseFloat(document.getElementById('jcPrepaid').value) || 0;
         const pMech = document.getElementById('intakePrimaryMech').value || null;
         const cMech = document.getElementById('intakeCoMech').value || null;
         
@@ -201,7 +219,7 @@
         } 
 
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance,
+            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance, prepaid_amount: prepaid,
             mech_id: pMech, co_mech_id: cMech, status: 'Open', source_role: activeRole
         }).select().single();
 
