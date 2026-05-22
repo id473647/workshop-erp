@@ -1,33 +1,737 @@
-async function submitReview() {
-        const r = parseInt(document.getElementById('revRating').value); if(r === 0) return alert("Please provide a star rating.");
-        await supabaseClient.from('job_cards').update({ review_rating: r, is_reviewed: true, review_mech_feedback: document.getElementById('revMech').value, review_spares_feedback: document.getElementById('revSpares').value, review_lube_feedback: document.getElementById('revLube').value, review_advice: document.getElementById('revAdvice').value }).eq('id', pendingReviewJobId);
-        
-        // NOW FETCHES CO-MECHANIC DATA AS WELL
-        const { data: jc } = await supabaseClient.from('job_cards').select('mech_id, co_mech_id, labour_charges, job_card_items(warehouse_type, total_price)').eq('id', pendingReviewJobId).single();
-        
-        if (jc && (jc.mech_id || jc.co_mech_id)) {
-            const searchId = jc.mech_id || jc.co_mech_id; // Check penalty against primary tech
-            const today = new Date(); const day = today.getDay() || 7; if (day !== 1) today.setHours(-24 * (day - 1)); today.setHours(0,0,0,0); const startOfWeek = today.toISOString();
-            const { count: negativeCount } = await supabaseClient.from('job_cards').select('*', { count: 'exact', head: true }).eq('mech_id', searchId).eq('is_reviewed', true).lt('review_rating', 3).gte('closed_at', startOfWeek);
-            
-            let pkgLabor = 0; if(jc.job_card_items) { jc.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
-            const totalLaborForJob = (parseFloat(jc.labour_charges) || 0) + pkgLabor;
-            const baseRewardPoints = totalLaborForJob * 0.10;
-            
-            // 50/50 SPLIT LOGIC
-            let actualReward = baseRewardPoints;
-            if (jc.mech_id && jc.co_mech_id) { actualReward = baseRewardPoints / 2; }
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Care - Customer Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a237e;
+            --success: #4CAF50;
+            --warning: #F44336;
+            --bg-light: #f5f5f5;
+            --text-dark: #333;
+            --text-light: #777;
+            --gold: #FFD700;
+        }
 
-            if (r === 5 && negativeCount <= 2) {
-                if (jc.mech_id) {
-                    const { data: mech1 } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.mech_id).single();
-                    await supabaseClient.from('mechanics').update({ earned_points: (parseFloat(mech1.earned_points) || 0) + actualReward }).eq('id', jc.mech_id);
-                }
-                if (jc.co_mech_id) {
-                    const { data: mech2 } = await supabaseClient.from('mechanics').select('earned_points').eq('id', jc.co_mech_id).single();
-                    await supabaseClient.from('mechanics').update({ earned_points: (parseFloat(mech2.earned_points) || 0) + actualReward }).eq('id', jc.co_mech_id);
-                }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+            padding-bottom: 70px; /* Space for bottom nav */
+        }
+
+        /* UNIVERSAL SYSTEM RULES - NAV [cite: 2985, 2986] */
+        .top-nav {
+            position: sticky;
+            top: 0;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .nav-left, .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logos {
+            display: flex;
+            gap: 5px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .role-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Layout Constraints */
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* Card UI */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .card-header {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Forms & Inputs */
+        input[type="text"], input[type="tel"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .btn-action {
+            background: var(--warning);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        /* Status Colors */
+        .status-open { color: var(--success); font-weight: bold; }
+        .status-closed { color: var(--text-light); }
+        .badge-warning { background: var(--warning); color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            text-align: center;
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.8rem;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .nav-item i {
+            display: block;
+            font-size: 1.5rem;
+            margin-bottom: 3px;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        /* Tabs */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* Star Rating */
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .star-rating input { display: none; }
+        .star-rating label {
+            font-size: 44px; /* Minimum 44px touch target */
+            color: #ccc;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        
+        .star-rating input:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: var(--gold);
+        }
+
+        /* Toasts */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-dark);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 3000;
+            display: none;
+        }
+        
+        .rules-box {
+            background: #e8eaf6;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .wallet-banner {
+            background: linear-gradient(135deg, var(--primary), #3f51b5);
+            color: white;
+            text-align: center;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="top-nav">
+        <div class="nav-left">
+            <i class="fas fa-arrow-left" onclick="alert('Going Back')" style="cursor:pointer;"></i>
+            <div class="logos">
+                <span>MYCARE</span> | <span>ERP</span>
+            </div>
+        </div>
+        <div class="nav-right">
+            <span class="role-badge">Customer</span>
+            <i class="fas fa-home" onclick="location.reload()" style="cursor:pointer;"></i>
+            <i class="fas fa-sign-out-alt" onclick="logout()" style="cursor:pointer;"></i>
+        </div>
+    </nav>
+
+    <div id="login-section" class="container">
+        <div class="card" style="margin-top: 50px; text-align: center;">
+            <i class="fas fa-motorcycle" style="font-size: 4rem; color: var(--primary); margin-bottom: 20px;"></i>
+            <h2>ग्राहक पोर्टल</h2>
+            <p style="margin-bottom: 20px; color: var(--text-light);">अपने सर्विस रिकॉर्ड और वॉलेट देखने के लिए लॉगिन करें</p>
+            
+            <input type="tel" id="mobile-input" placeholder="10-digit Mobile Number" maxlength="10">
+            <button class="btn-primary" onclick="attemptLogin()">View My Records</button>
+        </div>
+    </div>
+
+    <div id="dashboard-section" style="display: none;">
+        
+        <div class="container" style="padding-bottom: 0;">
+            <h3 id="customer-welcome" style="color: var(--primary);"></h3>
+            <p id="customer-vehicles" style="color: var(--text-light); margin-bottom: 10px;"></p>
+        </div>
+
+        <div id="tab-jobs" class="tab-content active container">
+            </div>
+
+        <div id="tab-amc" class="tab-content container">
+            </div>
+
+        <div id="tab-wallet" class="tab-content container">
+            </div>
+
+        <div id="tab-promos" class="tab-content container">
+            </div>
+
+        <div class="bottom-nav">
+            <a class="nav-item active" onclick="switchTab('jobs', this)"><i class="fas fa-wrench"></i>जॉब कार्ड</a>
+            <a class="nav-item" onclick="switchTab('amc', this)"><i class="fas fa-shield-alt"></i>AMC</a>
+            <a class="nav-item" onclick="switchTab('wallet', this)"><i class="fas fa-wallet"></i>वॉलेट</a>
+            <a class="nav-item" onclick="switchTab('promos', this)"><i class="fas fa-bullhorn"></i>प्रमोशन</a>
+        </div>
+    </div>
+
+    <div id="review-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="color: var(--primary); margin-bottom: 15px;">सेवा का मूल्यांकन करें</h3>
+            <input type="hidden" id="review-job-id">
+            <input type="hidden" id="review-mech-id">
+            
+            <p>मैकेनिक की सेवा (Mechanic Feedback)</p>
+            <div class="star-rating" id="rating-mech">
+                <input type="radio" id="m5" name="mech" value="5"><label for="m5">★</label>
+                <input type="radio" id="m4" name="mech" value="4"><label for="m4">★</label>
+                <input type="radio" id="m3" name="mech" value="3"><label for="m3">★</label>
+                <input type="radio" id="m2" name="mech" value="2"><label for="m2">★</label>
+                <input type="radio" id="m1" name="mech" value="1"><label for="m1">★</label>
+            </div>
+
+            <div id="spares-rating-container">
+                <p>स्पेयर पार्ट्स की गुणवत्ता (Spares Feedback)</p>
+                <div class="star-rating" id="rating-spares">
+                    <input type="radio" id="s5" name="spares" value="5"><label for="s5">★</label>
+                    <input type="radio" id="s4" name="spares" value="4"><label for="s4">★</label>
+                    <input type="radio" id="s3" name="spares" value="3"><label for="s3">★</label>
+                    <input type="radio" id="s2" name="spares" value="2"><label for="s2">★</label>
+                    <input type="radio" id="s1" name="spares" value="1"><label for="s1">★</label>
+                </div>
+            </div>
+
+            <div id="lube-rating-container">
+                <p>लुब्रिकेंट की गुणवत्ता (Lubricant Feedback)</p>
+                <div class="star-rating" id="rating-lube">
+                    <input type="radio" id="l5" name="lube" value="5"><label for="l5">★</label>
+                    <input type="radio" id="l4" name="lube" value="4"><label for="l4">★</label>
+                    <input type="radio" id="l3" name="lube" value="3"><label for="l3">★</label>
+                    <input type="radio" id="l2" name="lube" value="2"><label for="l2">★</label>
+                    <input type="radio" id="l1" name="lube" value="1"><label for="l1">★</label>
+                </div>
+            </div>
+
+            <p>सेवा प्रोटोकॉल और भविष्य की सलाह</p>
+            <div class="star-rating" id="rating-protocol">
+                <input type="radio" id="p5" name="protocol" value="5"><label for="p5">★</label>
+                <input type="radio" id="p4" name="protocol" value="4"><label for="p4">★</label>
+                <input type="radio" id="p3" name="protocol" value="3"><label for="p3">★</label>
+                <input type="radio" id="p2" name="protocol" value="2"><label for="p2">★</label>
+                <input type="radio" id="p1" name="protocol" value="1"><label for="p1">★</label>
+            </div>
+
+            <textarea id="review-comments" placeholder="कोई और बात बताना चाहते हैं?" style="width: 100%; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #ccc;"></textarea>
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-outline" onclick="closeModal()">रद्द करें</button>
+                <button class="btn-primary" onclick="submitReview()">जमा करें</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        /**
+         * GLOBAL RULES IMPLEMENTATION
+         * ALL text inputs must trigger .toUpperCase() on insertion 
+         */
+        document.addEventListener('input', function(e) {
+            if (e.target.tagName.toLowerCase() === 'input' && e.target.type === 'text' || e.target.tagName.toLowerCase() === 'textarea') {
+                let start = e.target.selectionStart;
+                let end = e.target.selectionEnd;
+                e.target.value = e.target.value.toUpperCase();
+                e.target.setSelectionRange(start, end);
+            }
+        });
+
+        // --- MOCK DATABASE (Supabase Abstraction) ---
+        let currentCustomer = null;
+        
+        // Mock DB Data
+        const DB = {
+            customers: {
+                "9876543210": { mobile: "9876543210", name: "Rahul Sharma", referral_code: "MC-987654", wallet_points: 250, referral_discount_active: false, enrolled_in_loyalty: true }
+            },
+            job_cards: [
+                { id: "JC-101", customer_mobile: "9876543210", vehicle_no: "MH12AB1234", mechanic_id: "M1", status: "Closed", date_created: "2026-05-10", date_closed: "2026-05-11", services_done: "General Service, Oil Change", used_spares: true, used_lube: true },
+                { id: "JC-105", customer_mobile: "9876543210", vehicle_no: "MH12AB1234", mechanic_id: "M2", status: "Open", date_created: "2026-05-22", date_closed: null, services_done: "Brake Pad Replacement", used_spares: true, used_lube: false }
+            ],
+            invoices: [
+                { id: "INV-101", customer_mobile: "9876543210", job_card_id: "JC-101", total_amount: 1500, date: "2026-05-11", paid: true }
+            ],
+            reviews: [], // Tracks reviews to prompt for missing ones
+            amc_plans: [
+                { id: "AMC-1", customer_mobile: "9876543210", plan_name: "Silver Maintenance", start_date: "2026-01-01", end_date: "2026-12-31", services_remaining: 2 }
+            ],
+            engine_restorations: [
+                { id: "ER-1", customer_mobile: "9876543210", vehicle_no: "MH12AB1234", warranty_start: "2025-06-01", warranty_end: "2026-06-01", status: "Active" } // Expiring soon for demo
+            ],
+            loyalty_points_log: [
+                { id: 1, customer_mobile: "9876543210", points: 250, type: "credit", reason: "Referral Bonus", date: "2026-04-15", expiry_date: "2027-04-15" }
+            ],
+            promotions: [
+                { title: "मानसून स्पेशल", desc: "सभी इंजन ऑइल पर 10% की छूट!", validity: "30 June 2026" }
+            ]
+        };
+
+        // --- APP LOGIC ---
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function attemptLogin() {
+            const mobile = document.getElementById('mobile-input').value;
+            if(mobile.length !== 10) {
+                showToast("कृपया 10 अंकों का मोबाइल नंबर दर्ज करें।");
+                return;
+            }
+
+            // Mock Supabase Fetch
+            const customer = DB.customers[mobile];
+            if(customer) {
+                currentCustomer = customer;
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard-section').style.display = 'block';
+                
+                document.getElementById('customer-welcome').innerText = `नमस्ते, ${customer.name}`;
+                document.getElementById('customer-vehicles').innerText = `मोबाईल: ${customer.mobile}`;
+                
+                loadDashboardData();
+            } else {
+                showToast("आपका रिकॉर्ड नहीं मिला। कृपया वर्कशॉप से संपर्क करें।");
             }
         }
-        alert("Thank you for your feedback! / आपकी प्रतिक्रिया के लिए धन्यवाद!"); closeReview(); loadDashboardData();
-    }
+
+        function logout() {
+            currentCustomer = null;
+            document.getElementById('dashboard-section').style.display = 'none';
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('mobile-input').value = '';
+        }
+
+        function switchTab(tabId, element) {
+            // UI Toggle
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            element.classList.add('active');
+        }
+
+        function loadDashboardData() {
+            renderJobs();
+            renderAMC();
+            renderWallet();
+            renderPromos();
+        }
+
+        // --- TAB A: JOB CARDS ---
+        function renderJobs() {
+            const container = document.getElementById('tab-jobs');
+            container.innerHTML = '';
+            
+            const jobs = DB.job_cards.filter(j => j.customer_mobile === currentCustomer.mobile);
+            
+            if(jobs.length === 0) {
+                container.innerHTML = '<p>कोई जॉब कार्ड नहीं मिला।</p>';
+                return;
+            }
+
+            jobs.forEach(job => {
+                const invoice = DB.invoices.find(i => i.job_card_id === job.id);
+                const hasReview = DB.reviews.some(r => r.job_card_id === job.id);
+                
+                let reviewHtml = '';
+                if(job.status === 'Closed' && !hasReview) {
+                    reviewHtml = `
+                        <div style="background: #fff3e0; padding: 10px; border-radius: 6px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #e65100; font-weight: bold; font-size: 0.9rem;">अपनी सेवा का अनुभव साझा करें</span>
+                            <button class="btn-action" onclick="openReviewModal('${job.id}', '${job.mechanic_id}', ${job.used_spares}, ${job.used_lube})">Rate Now</button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += `
+                    <div class="card">
+                        <div class="card-header">
+                            <span>#${job.id}</span>
+                            <span class="${job.status === 'Open' ? 'status-open' : 'status-closed'}">${job.status}</span>
+                        </div>
+                        <p><strong>Vehicle:</strong> ${job.vehicle_no}</p>
+                        <p><strong>Date:</strong> ${job.date_created}</p>
+                        <p><strong>Services:</strong> ${job.services_done}</p>
+                        ${invoice ? `<p><strong>Bill Amount:</strong> ₹${invoice.total_amount}</p>` : ''}
+                        ${reviewHtml}
+                    </div>
+                `;
+            });
+        }
+
+        // --- TAB B: AMC & WARRANTY ---
+        function renderAMC() {
+            const container = document.getElementById('tab-amc');
+            container.innerHTML = '<h4>AMC Plans</h4>';
+            
+            const amcs = DB.amc_plans.filter(a => a.customer_mobile === currentCustomer.mobile);
+            amcs.forEach(amc => {
+                container.innerHTML += `
+                    <div class="card">
+                        <div class="card-header"><span>${amc.plan_name}</span></div>
+                        <p><strong>Valid till:</strong> ${amc.end_date}</p>
+                        <p><strong>Services Remaining:</strong> <span style="color:var(--primary); font-weight:bold; font-size: 1.2rem;">${amc.services_remaining}</span></p>
+                    </div>
+                `;
+            });
+
+            container.innerHTML += '<h4 style="margin-top: 20px;">Engine Restorations (Warranty)</h4>';
+            const engines = DB.engine_restorations.filter(e => e.customer_mobile === currentCustomer.mobile);
+            engines.forEach(eng => {
+                // Check if expiring within 30 days
+                const endD = new Date(eng.warranty_end);
+                const now = new Date("2026-05-22"); // Using current context date
+                const diffTime = Math.abs(endD - now);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                let warningBadge = '';
+                if(diffDays <= 30 && endD > now) {
+                    warningBadge = `<span class="badge-warning">वारंटी जल्द समाप्त हो रही है!</span>`;
+                }
+
+                container.innerHTML += `
+                    <div class="card">
+                        <div class="card-header"><span>Vehicle: ${eng.vehicle_no}</span></div>
+                        <p><strong>Start:</strong> ${eng.warranty_start}</p>
+                        <p><strong>End:</strong> ${eng.warranty_end} ${warningBadge}</p>
+                        <p><strong>Status:</strong> <span class="status-open">${eng.status}</span></p>
+                    </div>
+                `;
+            });
+        }
+
+        // --- TAB C: WALLET & REFERRAL ---
+        function renderWallet() {
+            const container = document.getElementById('tab-wallet');
+            let loyaltyHtml = '';
+
+            if(!currentCustomer.enrolled_in_loyalty) {
+                loyaltyHtml = `
+                    <div class="card" style="text-align: center;">
+                        <p>आप हमारे लॉयल्टी प्रोग्राम में शामिल नहीं हैं।</p>
+                        <button class="btn-primary" style="margin-top: 10px;" onclick="enrollLoyalty()">Enroll Now</button>
+                    </div>
+                `;
+            } else {
+                const logs = DB.loyalty_points_log.filter(l => l.customer_mobile === currentCustomer.mobile);
+                let logHtml = logs.map(l => `
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 5px 0;">
+                        <span>${l.date} | ${l.reason}</span>
+                        <span style="color: ${l.type === 'credit' ? 'var(--success)' : 'var(--warning)'}">${l.type === 'credit' ? '+' : '-'}${l.points}</span>
+                    </div>
+                `).join('');
+
+                const shareText = encodeURIComponent(`मेरे वर्कशॉप में आइए और कोड ${currentCustomer.referral_code} लगाएं — आपको 5% की छूट मिलेगी!`);
+
+                loyaltyHtml = `
+                    <div class="wallet-banner">
+                        <h2 style="font-size: 2.5rem; margin-bottom: 5px;">${currentCustomer.wallet_points}</h2>
+                        <p>कुल वॉलेट पॉइंट्स (1 Point = ₹1)</p>
+                        <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.8;">पॉइंट्स 365 दिनों के लिए वैध हैं</p>
+                    </div>
+
+                    <div class="card">
+                        <h4 style="color: var(--primary);">आपका रेफरल कोड</h4>
+                        <div style="background: var(--bg-light); padding: 15px; text-align: center; font-size: 1.5rem; font-weight: bold; letter-spacing: 2px; border: 2px dashed #ccc; margin: 10px 0;">
+                            ${currentCustomer.referral_code}
+                        </div>
+                        <a href="https://wa.me/?text=${shareText}" target="_blank" class="btn-primary" style="text-decoration: none; display: block; text-align: center; background: #25D366;">
+                            <i class="fab fa-whatsapp"></i> Share on WhatsApp
+                        </a>
+                    </div>
+
+                    <div class="card">
+                        <h4 style="margin-bottom: 10px;">हाल के ट्रांजेक्शन</h4>
+                        ${logHtml}
+                    </div>
+                `;
+            }
+
+            const rulesHtml = `
+                <div class="card rules-box">
+                    <h4 style="margin-bottom: 10px; color: var(--primary);">रेफरल प्रोग्राम के नियम:</h4>
+                    <ol style="padding-left: 20px;">
+                        <li>अपना रेफरल कोड नए या पुराने ग्राहक को दें।</li>
+                        <li>नए ग्राहक को बिल पर 5% की तत्काल छूट मिलेगी।</li>
+                        <li>जब वह ग्राहक बिल चुकाएगा, आपके वॉलेट में उस बिल का 3% जमा होगा।</li>
+                        <li>यदि कोई पुराना ग्राहक 1 साल से नहीं आया है और आपके कोड से आता है, तो उसे भी 5% छूट मिलेगी।</li>
+                        <li>अर्जित पॉइंट्स 1 साल के भीतर उपयोग करने होंगे।</li>
+                        <li>एक बिल में अधिकतम 20% तक ही पॉइंट्स रिडीम किए जा सकते हैं।</li>
+                        <li>पॉइंट्स रिडीम करने के लिए काउंटर पर अपना मोबाइल नंबर दें।</li>
+                    </ol>
+                </div>
+            `;
+
+            container.innerHTML = loyaltyHtml + rulesHtml;
+        }
+
+        function enrollLoyalty() {
+            // Mock API Call
+            currentCustomer.enrolled_in_loyalty = true;
+            showToast("लॉयल्टी प्रोग्राम में आपका स्वागत है!");
+            renderWallet();
+        }
+
+        // --- TAB D: PROMOTIONS ---
+        function renderPromos() {
+            const container = document.getElementById('tab-promos');
+            container.innerHTML = '';
+            
+            DB.promotions.forEach(p => {
+                container.innerHTML += `
+                    <div class="card" style="border-left: 4px solid var(--warning);">
+                        <h3 style="color: var(--primary);">${p.title}</h3>
+                        <p style="margin: 10px 0;">${p.desc}</p>
+                        <small style="color: var(--text-light);">वैधता: ${p.validity}</small>
+                    </div>
+                `;
+            });
+        }
+
+        // --- SECTION 3: REVIEW MODAL LOGIC ---
+        function openReviewModal(jobId, mechId, usedSpares, usedLube) {
+            document.getElementById('review-job-id').value = jobId;
+            document.getElementById('review-mech-id').value = mechId;
+            
+            document.getElementById('spares-rating-container').style.display = usedSpares ? 'block' : 'none';
+            document.getElementById('lube-rating-container').style.display = usedLube ? 'block' : 'none';
+            
+            // Clear previous selections
+            document.querySelectorAll('.star-rating input').forEach(r => r.checked = false);
+            document.getElementById('review-comments').value = '';
+
+            document.getElementById('review-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('review-modal').style.display = 'none';
+        }
+
+        function submitReview() {
+            const jobId = document.getElementById('review-job-id').value;
+            const mechId = document.getElementById('review-mech-id').value;
+            
+            // Get Radio Values
+            const mechStars = document.querySelector('input[name="mech"]:checked')?.value;
+            const sparesStars = document.querySelector('input[name="spares"]:checked')?.value || null;
+            const lubeStars = document.querySelector('input[name="lube"]:checked')?.value || null;
+            const protocolStars = document.querySelector('input[name="protocol"]:checked')?.value;
+            const comments = document.getElementById('review-comments').value;
+
+            if(!mechStars || !protocolStars) {
+                showToast("कृपया आवश्यक स्टार रेटिंग भरें।");
+                return;
+            }
+
+            // Calculate Overall
+            let total = parseInt(mechStars) + parseInt(protocolStars);
+            let count = 2;
+            if(sparesStars) { total += parseInt(sparesStars); count++; }
+            if(lubeStars) { total += parseInt(lubeStars); count++; }
+            const overallStars = total / count;
+
+            // Mock saving to DB.reviews table
+            const newReview = {
+                id: "REV-" + Math.floor(Math.random() * 1000),
+                job_card_id: jobId,
+                customer_mobile: currentCustomer.mobile,
+                mechanic_id: mechId,
+                mechanic_stars: parseInt(mechStars),
+                spares_stars: sparesStars ? parseInt(sparesStars) : null,
+                lubricant_stars: lubeStars ? parseInt(lubeStars) : null,
+                protocol_stars: parseInt(protocolStars),
+                overall_stars: overallStars,
+                comments: comments,
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            DB.reviews.push(newReview);
+
+            /**
+             * MECHANIC INCENTIVE LOGIC (Integration point for backend/Supabase Trigger)
+             * If overall average >= 4 stars OR mechanic_stars == 5:
+             * --> Update mechanic_points table: Add 10% of labour_charges to earned_points.
+             * * Check Lockout:
+             * --> Query reviews for mechId this week. If count(mechanic_stars < 3) > 2:
+             * --> Set lockout_active = true in mechanic_points.
+             * * (This is processed server-side. Note left for backend integration).
+             */
+
+            showToast("आपकी प्रतिक्रिया के लिए धन्यवाद!");
+            closeModal();
+            renderJobs(); // Refresh to remove "Rate Now" button
+        }
+
+        /* * ==========================================
+         * INTEGRATION POINTS DOCUMENTATION (FOR DEVS)
+         * ==========================================
+         * * 1. new-jobcard.html: 
+         * Add a field for 'Referral Code'. Before saving to `job_cards` table, 
+         * query `customers.referral_code`. If match found, set `referral_discount_active = true` 
+         * on the new customer's record.
+         * * 2. billing.html:
+         * When retrieving bill data, check if `customer.wallet_points > 0` AND `enrolled_in_loyalty == true`.
+         * If yes, render UI: "वॉलेट पॉइंट्स उपयोग करें".
+         * JS Constraint: `max_redemption = invoice.total_amount * 0.20`.
+         * On Submit: Deduct points from `loyalty_points_log` (type: 'debit').
+         * If `referral_discount_active` was true on customer, credit 3% of bill amount to 
+         * the original referrer's wallet points in `loyalty_points_log` (type: 'credit', expiry: +365 days).
+         * * 3. reports.html:
+         * Create a "Loyalty & Wallets" view. 
+         * Query `loyalty_points_log` to SUM outstanding unexpired points (Liability).
+         * Query `mechanic_points` to view `earned_points` and provide "Convert to Cash" API call 
+         * which zeroes out `earned_points` and inserts into `workshop_expenses`.
+         * * 4. utility-router.html (Technician Ledger):
+         * Query `mechanic_points` for `earned_points`, `lockout_active`.
+         * Insert record into `mechanic_attendance` on "Mark Present" click.
+         */
+    </script>
+</body>
+</html>
