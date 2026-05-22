@@ -10,7 +10,6 @@
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); padding-bottom:40px;}
         
-        /* UNIVERSAL NAV */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
         .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
@@ -27,6 +26,9 @@
         .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
         .stat-title { font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-weight: bold; }
         .points-card { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        
+        .lockout-banner { display: none; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 20px; }
+        
         .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
         .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-weight: bold; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; }
         .tab-btn.active { color: var(--info); border-bottom-color: var(--info); }
@@ -66,6 +68,10 @@
     </div>
 
     <div id="viewDashboard">
+        <div id="lockoutAlert" class="lockout-banner">
+            ⚠️ इस सप्ताह आपका पॉइंट अर्जन बंद है (Lockout Active)। बेहतर सेवा दें।
+        </div>
+
         <div class="points-card">
             <div style="font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Earned Reward Points</div>
             <div style="font-size:3rem; font-weight:bold; margin:4px 0;" id="dispPoints">0</div>
@@ -73,7 +79,7 @@
         </div>
 
         <div class="stat-grid">
-            <div class="stat-box"><div class="stat-title">Base Commission</div><div class="stat-val" id="dispComm">0%</div></div>
+            <div class="stat-box"><div class="stat-title">Weekly Score (Avg)</div><div class="stat-val" id="dispAvgScore">--</div></div>
             <div class="stat-box"><div class="stat-title">Your Net Share Earned</div><div class="stat-val" id="dispTotalLabor" style="color:var(--success);">₹0</div></div>
         </div>
 
@@ -122,21 +128,18 @@
         const mobile = document.getElementById('loginMobile').value.trim();
         if(mobile.length !== 10) return alert("Enter valid 10-digit number.");
         
-        let mechData = null;
-        // Dual check for strict DB formatting
-        const { data: stringMatch } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', mobile).single();
-        if (stringMatch) mechData = stringMatch;
-        else {
-            const { data: numMatch } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', Number(mobile)).single();
-            if (numMatch) mechData = numMatch;
-        }
+        const { data: mechData } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', mobile).single();
 
         if(mechData) {
             activeMech = mechData;
             document.getElementById('viewLogin').style.display = 'none'; document.getElementById('viewDashboard').style.display = 'block';
             document.getElementById('dispPoints').innerText = Math.floor(mechData.earned_points || 0);
-            document.getElementById('dispComm').innerText = `${mechData.commission_rate || 0}%`;
             document.getElementById('roleDisplay').innerText = `TECH: ${mechData.name.toUpperCase()}`;
+            
+            if (mechData.lockout_active) {
+                document.getElementById('lockoutAlert').style.display = 'block';
+            }
+
             loadMechanicData();
         } else { alert("Login Failed: Mobile number not found in Technician Registry."); }
     }
@@ -144,6 +147,9 @@
     async function loadMechanicData() {
         const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number), job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at', { ascending: false });
         let totalNetShare = 0; const jList = document.getElementById('jobsList'); jList.innerHTML = ''; const rList = document.getElementById('reviewsList'); rList.innerHTML = '';
+
+        const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        let weekReviewTotal = 0; let weekReviewCount = 0;
 
         if(jobs && jobs.length > 0) {
             jobs.forEach(job => {
@@ -160,11 +166,21 @@
                 if(job.is_reviewed && job.mech_id === activeMech.id) {
                     const stars = '★'.repeat(job.review_rating) + '☆'.repeat(5 - job.review_rating);
                     rList.innerHTML += `<div class="list-item"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:0.8rem; color:#475569; font-style:italic;">"${job.review_mech_feedback || 'No feedback'}"</div></div>`;
+                    
+                    // Analytics for weekly score
+                    if (new Date(job.closed_at) >= startOfWeek) {
+                        weekReviewTotal += job.review_rating;
+                        weekReviewCount++;
+                    }
                 }
             });
         } else { jList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No allotted jobs found.</p>'; }
         if(rList.innerHTML === '') rList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No reviews submitted yet.</p>';
+        
         document.getElementById('dispTotalLabor').innerText = `₹${Math.floor(totalNetShare)}`;
+        if (weekReviewCount > 0) {
+            document.getElementById('dispAvgScore').innerText = `${(weekReviewTotal / weekReviewCount).toFixed(1)} / 5`;
+        }
 
         const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', activeMech.id).order('created_at', { ascending: false }).limit(10);
         const pList = document.getElementById('payoutList'); pList.innerHTML = '';
