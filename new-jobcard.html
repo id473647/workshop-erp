@@ -101,6 +101,11 @@
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
             
+            <div class="field-group">
+                <label>Referral Code (If Any)</label>
+                <input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            
             <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
                 <label>Workshop Advance Collected (₹)</label>
                 <input type="number" id="jcAdvance" value="0" min="0">
@@ -191,6 +196,7 @@
         const name = document.getElementById('jcName').value.trim().toUpperCase();
         const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
+        const refCode = document.getElementById('jcReferral').value.trim().toUpperCase();
         const advance = parseFloat(document.getElementById('jcAdvance').value) || 0;
         const prepaid = parseFloat(document.getElementById('jcPrepaid').value) || 0;
         const pMech = document.getElementById('intakePrimaryMech').value || null;
@@ -203,9 +209,63 @@
         const btn = document.getElementById('btnCreateJc');
         btn.innerText = "PROCESSING..."; btn.disabled = true;
 
+        // --- NEW REFERRAL LOGIC ---
+        let applyReferralDiscount = false;
+        let referrerMobile = null;
+
+        if (refCode) {
+            // Check if referrer code is valid in customers table
+            const { data: referrerData } = await supabaseClient
+                .from('customers')
+                .select('mobile_number')
+                .eq('referral_code', refCode)
+                .single();
+
+            if (referrerData && referrerData.mobile_number !== mobile) {
+                referrerMobile = referrerData.mobile_number;
+                
+                // Rule: Honor discount if new OR inactive for > 1 year
+                const oneYearAgo = new Date();
+                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+                const { data: pastJobs } = await supabaseClient
+                    .from('job_cards')
+                    .select('created_at')
+                    .eq('customer_mobile', mobile)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (!pastJobs || pastJobs.length === 0 || new Date(pastJobs[0].created_at) < oneYearAgo) {
+                    applyReferralDiscount = true;
+                } else {
+                    alert("Referral code valid, but this customer has visited within the last 1 year. The 5% referral discount will not be applied.");
+                }
+            } else if (referrerData && referrerData.mobile_number === mobile) {
+                alert("Customer cannot use their own referral code.");
+            } else {
+                alert("Invalid Referral Code entered. Proceeding without referral discount.");
+            }
+        }
+        // --------------------------
+
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
 
-        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, category: 'Regular' }, { onConflict: 'mobile_number' });
+        // Update customer profile, injecting the referral discount boolean if applicable
+        const custPayload = { mobile_number: mobile, name: name, category: 'Regular' };
+        if (applyReferralDiscount) {
+            custPayload.referral_discount_active = true;
+        }
+        await supabaseClient.from('customers').upsert(custPayload, { onConflict: 'mobile_number' });
+
+        // If a valid referral occurred, record it in the referrals table
+        if (applyReferralDiscount && referrerMobile) {
+            await supabaseClient.from('referrals').insert({
+                referrer_mobile: referrerMobile,
+                referred_mobile: mobile,
+                referral_date: new Date().toISOString().split('T')[0],
+                reward_credited: false
+            });
+        }
 
         if (finalVehicleId === 'NEW') {
             const reg = document.getElementById('nvReg').value.trim().toUpperCase();
