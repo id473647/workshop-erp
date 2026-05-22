@@ -6,10 +6,9 @@
     <title>AMC & Offer Portal - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --accent: #d97706; }
+        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --accent: #d97706; --warning: #f59e0b;}
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
-        /* UNIVERSAL NAV */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
         .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
@@ -63,7 +62,7 @@
     <div class="card-panel">
         <div class="block-title">Active Contract Ledgers</div>
         <div class="table-wrapper">
-            <table><thead><tr><th>Target Plate</th><th>Client Contact</th><th>Tier Scope</th><th>Remaining Quotas</th><th>Contract State</th></tr></thead><tbody id="amcRegisterBody"></tbody></table>
+            <table><thead><tr><th>Target Plate</th><th>Client Contact</th><th>Tier Scope</th><th>Remaining Quotas</th><th>Expiry</th><th>Contract State</th></tr></thead><tbody id="amcRegisterBody"></tbody></table>
         </div>
     </div>
 </div>
@@ -79,16 +78,36 @@
         if(mob.length < 10 || !reg) return alert("System Guard: Check required primary indices.");
         const expiryDate = new Date(); expiryDate.setFullYear(expiryDate.getFullYear() + 1); const resolvedExpiryString = expiryDate.toISOString().split('T')[0];
         const baseServices = tier === 'Gold' ? 5 : (tier === 'Platinum' ? 10 : 3);
-        const { error } = await supabaseClient.from('amc_contracts').insert({ customer_mobile: mob, vehicle_reg: reg, tier_level: tier, expiry_date: resolvedExpiryString, remaining_washes: baseServices, remaining_services: baseServices });
+        const { error } = await supabaseClient.from('amc_contracts').insert({ customer_mobile: mob, vehicle_reg: reg, tier_level: tier, expiry_date: resolvedExpiryString, remaining_washes: baseServices, remaining_services: baseServices, is_active: true });
         if(error) alert("Database Insertion Abortion:\n" + error.message); else { alert(`Subscription contract securely logged to: ${reg}`); loadContractLedgers(); }
     }
 
     async function loadContractLedgers() {
-        const { data: contracts } = await supabaseClient.from('amc_contracts').select('*').order('activation_date', { ascending: false }).limit(10);
+        // We will fetch more to process the dates, but display top 20
+        const { data: contracts } = await supabaseClient.from('amc_contracts').select('*').order('activation_date', { ascending: false }).limit(20);
         const tbody = document.getElementById('amcRegisterBody'); tbody.innerHTML = '';
+        
         if(contracts && contracts.length > 0) {
-            contracts.forEach(plan => { const statusPillStyle = plan.is_active ? 'background:#dcfce7; color:#15803d;' : 'background:#fee2e2; color:#b91c1c;'; tbody.innerHTML += `<tr><td><strong>${plan.vehicle_reg}</strong></td><td>${plan.customer_mobile}</td><td><strong>${plan.tier_level}</strong></td><td>Washes: ${plan.remaining_washes} | Services: ${plan.remaining_services}</td><td><span class="status-pill" style="${statusPillStyle}">${plan.is_active ? 'Active' : 'Expired'}</span></td></tr>`; });
-        } else { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No active annual maintenance profiles detected.</td></tr>'; }
+            contracts.forEach(plan => { 
+                const endD = new Date(plan.expiry_date);
+                const nowD = new Date();
+                const diffTime = endD - nowD;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                let statusWord = 'Active';
+                let statusPillStyle = 'background:#dcfce7; color:#15803d;'; // Green
+
+                if (!plan.is_active || diffDays < 0) {
+                    statusWord = 'Expired';
+                    statusPillStyle = 'background:#fee2e2; color:#b91c1c;'; // Red
+                } else if (diffDays <= 30) {
+                    statusWord = 'Expiring Soon';
+                    statusPillStyle = 'background:#fef3c7; color:#b45309;'; // Yellow/Warning
+                }
+
+                tbody.innerHTML += `<tr><td><strong>${plan.vehicle_reg}</strong></td><td>${plan.customer_mobile}</td><td><strong>${plan.tier_level}</strong></td><td>Washes: ${plan.remaining_washes} | Services: ${plan.remaining_services}</td><td>${plan.expiry_date}</td><td><span class="status-pill" style="${statusPillStyle}">${statusWord}</span></td></tr>`; 
+            });
+        } else { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px; color:#94a3b8;">No active annual maintenance profiles detected.</td></tr>'; }
     }
     loadContractLedgers();
 </script>
