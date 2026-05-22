@@ -49,6 +49,9 @@
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; } .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
         .a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; border: 1px solid #000 !important; }
         #lockedBanner { display:none; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:16px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px; }
+        
+        .referral-alert { display: none; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 0.9rem; }
+        
         @media print { 
             body * { visibility: hidden; } 
             body.print-receipt #renderThermalReceiptTarget, body.print-receipt #renderThermalReceiptTarget * { visibility: visible; } 
@@ -75,6 +78,10 @@
         🔒 THIS JOB CARD IS <span id="lockedStatusWord">CLOSED</span> AND LOCKED.
         <div id="lockReasonDisplay" style="font-weight:normal; font-size:0.85rem; margin-top:4px; display:none;">Reason: <span id="lockReasonText"></span></div>
         <button id="btnUnlockAdmin" onclick="unlockForEdit()" style="display:none; margin-top:10px; background:#b91c1c; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">UNLOCK FOR BACKDATED EDIT</button>
+    </div>
+
+    <div id="referralAlertBanner" class="referral-alert">
+        🎉 5% Referral Discount Activated for this Customer! (Applied at Checkout)
     </div>
 
     <div id="bannerAsset" class="context-banner">
@@ -138,7 +145,11 @@
                 <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label>Prepaid Deposit (Green/Moped) (₹)</label><input type="number" id="vPrepaid" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label>Workshop Advance (₹)</label><input type="number" id="vAdvance" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
-                <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;"><label style="color:#0369a1;">Use Wallet Points (Max: ₹<span id="maxPointsVal">0</span>)</label><input type="number" id="vPointsUsed" class="input-lockable" value="0" min="0" oninput="compileDynamicSums()"></div>
+                
+                <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;">
+                    <label style="color:#0369a1; font-weight:bold;">वॉलेट पॉइंट्स उपयोग करें (अधिकतम: ₹<span id="maxPointsVal">0</span>)</label>
+                    <input type="number" id="vPointsUsed" class="input-lockable" value="0" min="0" oninput="compileDynamicSums()">
+                </div>
             </div>
         </div>
     </div>
@@ -173,7 +184,7 @@
 <div id="modalPhoto" class="overlay-modal"><div class="modal-card" style="text-align:center;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Visual Attachment</h3><button onclick="document.getElementById('modalPhoto').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><img id="attachedImagePreview" src="" style="max-width:100%; max-height:60vh; border-radius:8px; border:1px solid var(--border);"></div></div>
 <div id="modalSplitPayment" class="overlay-modal"><div class="modal-card"><h3 style="margin-top:0; color:var(--primary);">Split Payment Settlement</h3><p style="font-size:0.85rem; color:#64748b;">Net Payable: ₹<span id="splitTotalDisplay">0</span></p><div class="inputs-grid" style="margin-top:12px;"><div class="field-group"><label>Cash Received (₹)</label><input type="number" id="splitCashInput" value="0" min="0" oninput="calcSplit()"></div><div class="field-group"><label>UPI / Card Received (₹)</label><input type="number" id="splitUpiInput" value="0" min="0" readonly style="background:#f1f5f9;"></div></div><div style="display:flex; gap:10px; margin-top:20px;"><button class="btn-action btn-success" style="flex:1;" onclick="confirmSplitPayment()">CONFIRM SPLIT</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalSplitPayment').style.display='none'">CANCEL</button></div></div></div>
 <div id="modalPrintChoice" class="overlay-modal" style="z-index: 300;"><div class="modal-card" style="text-align:center; max-width: 400px;"><h3 style="margin-top:0; color:var(--primary);">Select Print Format</h3><div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;"><button class="btn-action btn-success" onclick="executePrint('thermal')">🖨️ THERMAL (3-Inch / Narrow)</button><button class="btn-action btn-info" onclick="executePrint('a5')">📄 A5 / A6 (Portrait Invoice)</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPrintChoice').style.display='none'">CANCEL</button></div></div></div>
-<div id="modalReceipt" class="overlay-modal"><div class="modal-card"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Job Card Document</h3><button onclick="window.location.href='index.html'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><div id="renderThermalReceiptTarget" class="receipt-container"><div class="receipt-header"><div class="receipt-logo-container"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div><div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div><div class="receipt-meta">GSTIN: 23ANAPB4613K1ZJ</div><div class="receipt-meta">Gurudwara Road, Ganj Betul</div><div class="receipt-meta">PH: 9425002214, 8989171751</div></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><div>Date: <span id="thDate">--</span></div><div>Time: <span id="thTime">--</span></div></div><div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Client: <strong id="thClientInfo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="margin-top:2px;">Problem: <strong id="thProblem">--</strong></div><div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; margin-top:6px; text-transform:uppercase;">ITEMS & SERVICES</div><div id="thStackedItemsContainer"></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Spares:</span><strong id="thPartsSum">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow"><span>Auto Spares Disc:</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Labor:</span><strong id="thLaborSum">₹0</strong></div><div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;"><span>Lathe Work:</span><strong id="thLatheSum">₹0</strong></div><div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div><div class="receipt-meta" id="rowPointsSum" style="display:flex; justify-content:space-between; color:#0369a1; font-weight:bold; display:none;"><span>Points Used:</span><strong id="thPointsSum">₹0</strong></div><div class="receipt-meta" id="rowAdvanceSum" style="display:flex; justify-content:space-between; color:red;"><span>Less Advance:</span><strong id="thAdvanceSum">₹0</strong></div><div class="receipt-meta" id="rowPrepaidSum" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Prepaid:</span><strong id="thPrepaidSum">₹0</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div><div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div><div class="receipt-meta" style="margin-top:2px; font-weight:bold;">Mode: <span id="thMode">--</span></div><div id="thSplitRow" style="display:none; font-size:0.75rem; border-top:1px dashed black; margin-top:4px; padding-top:4px;"><div style="display:flex; justify-content:space-between;"><span>Cash Rcvd:</span><strong id="thSplitCash">₹0</strong></div><div style="display:flex; justify-content:space-between;"><span>UPI Rcvd:</span><strong id="thSplitUpi">₹0</strong></div></div><div class="receipt-meta" id="thFutureAdviceRow" style="display:none; margin-top:8px; padding-top:6px; border-top:1px dashed black; color:var(--danger); font-weight:bold;">Future Advice / सुझाव:<br><span id="thFutureAdviceText" style="font-weight:normal; color:black; display:block; margin-top:2px; line-height:1.4;"></span></div><div id="receiptPromoHindi" style="font-size:0.75rem; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin-top:10px; margin-bottom:6px; text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div><div class="receipt-footer" id="receiptFooterDynamicText">Computer Generated Document.<br>Thank You.</div></div><div class="action-strip-bar"><button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN</button><button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPrintSelection()">🖨️ PRINT</button><button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button></div></div></div>
+<div id="modalReceipt" class="overlay-modal"><div class="modal-card"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Job Card Document</h3><button onclick="window.location.href='index.html'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><div id="renderThermalReceiptTarget" class="receipt-container"><div class="receipt-header"><div class="receipt-logo-container"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div><div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div><div class="receipt-meta">GSTIN: 23ANAPB4613K1ZJ</div><div class="receipt-meta">Gurudwara Road, Ganj Betul</div><div class="receipt-meta">PH: 9425002214, 8989171751</div></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><div>Date: <span id="thDate">--</span></div><div>Time: <span id="thTime">--</span></div></div><div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Client: <strong id="thClientInfo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="margin-top:2px;">Problem: <strong id="thProblem">--</strong></div><div style="font-weight:bold; font-size:0.7rem; border-bottom:1px black; padding-bottom:2px; margin-bottom:4px; margin-top:6px; text-transform:uppercase;">ITEMS & SERVICES</div><div id="thStackedItemsContainer"></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Spares:</span><strong id="thPartsSum">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow"><span>Auto Spares Disc:</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Labor:</span><strong id="thLaborSum">₹0</strong></div><div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;"><span>Lathe Work:</span><strong id="thLatheSum">₹0</strong></div><div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div><div class="receipt-meta" id="rowRefDiscSum" style="display:none; justify-content:space-between; color:#0284c7;"><span>Referral 5% Discount:</span><strong id="thRefDiscSum">₹0</strong></div><div class="receipt-meta" id="rowPointsSum" style="display:flex; justify-content:space-between; color:#0369a1; font-weight:bold; display:none;"><span>Wallet Points Used:</span><strong id="thPointsSum">-₹0</strong></div><div class="receipt-meta" id="rowAdvanceSum" style="display:flex; justify-content:space-between; color:red;"><span>Less Advance:</span><strong id="thAdvanceSum">₹0</strong></div><div class="receipt-meta" id="rowPrepaidSum" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Prepaid:</span><strong id="thPrepaidSum">₹0</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div><div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div><div class="receipt-meta" style="margin-top:2px; font-weight:bold;">Mode: <span id="thMode">--</span></div><div id="thSplitRow" style="display:none; font-size:0.75rem; border-top:1px dashed black; margin-top:4px; padding-top:4px;"><div style="display:flex; justify-content:space-between;"><span>Cash Rcvd:</span><strong id="thSplitCash">₹0</strong></div><div style="display:flex; justify-content:space-between;"><span>UPI Rcvd:</span><strong id="thSplitUpi">₹0</strong></div></div><div class="receipt-meta" id="thFutureAdviceRow" style="display:none; margin-top:8px; padding-top:6px; border-top:1px dashed black; color:var(--danger); font-weight:bold;">Future Advice / सुझाव:<br><span id="thFutureAdviceText" style="font-weight:normal; color:black; display:block; margin-top:2px; line-height:1.4;"></span></div><div id="receiptPromoHindi" style="font-size:0.75rem; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin-top:10px; margin-bottom:6px; text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div><div class="receipt-footer" id="receiptFooterDynamicText">Computer Generated Document.<br>Thank You.</div></div><div class="action-strip-bar"><button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN</button><button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPrintSelection()">🖨️ PRINT</button><button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button></div></div></div>
 
 <div id="mechTicketRender" style="display:none;">
     <div style="font-size: 1.5rem; font-weight: bold; text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">MECHANIC JOB TICKET</div>
@@ -193,7 +204,9 @@
     document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
 
     let lineItemsLocalMemory = []; let globalCatalogCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
-    let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
+    let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; 
+    let customerWalletBalance = 0; let isLoyaltyEnrolled = false; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
+    let isReferralDiscountActive = false; let appliedReferralDiscountVal = 0;
 
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
@@ -271,12 +284,33 @@
         }
     }
 
-    async function fetchCustomerContext(job) { const { data: custData } = await supabaseClient.from('customers').select('name, global_discount_coupon, loyalty_points').eq('mobile_number', job.customer_mobile).single(); if (custData) { activeCustomerName = custData.name; activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; customerWalletBalance = parseFloat(custData.loyalty_points) || 0; if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); } } const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); if(subs && subs.length > 0) { document.getElementById('receiptPromoHindi').style.display = 'none'; } else { document.getElementById('receiptPromoHindi').style.display = 'block'; } }
+    async function fetchCustomerContext(job) { 
+        const { data: custData } = await supabaseClient.from('customers').select('name, global_discount_coupon, loyalty_points, enrolled_in_loyalty, referral_discount_active').eq('mobile_number', job.customer_mobile).single(); 
+        if (custData) { 
+            activeCustomerName = custData.name; 
+            activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; 
+            customerWalletBalance = parseFloat(custData.loyalty_points) || 0; 
+            isLoyaltyEnrolled = custData.enrolled_in_loyalty || false;
+            isReferralDiscountActive = custData.referral_discount_active || false;
+
+            if(isReferralDiscountActive) {
+                document.getElementById('referralAlertBanner').style.display = 'block';
+            }
+
+            if(customerWalletBalance > 0 && isLoyaltyEnrolled) { 
+                document.getElementById('pointsRedemptionBlock').style.display = 'flex'; 
+                document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); 
+            } 
+        } 
+        
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); 
+        if(subs && subs.length > 0) { document.getElementById('receiptPromoHindi').style.display = 'none'; } 
+        else { document.getElementById('receiptPromoHindi').style.display = 'block'; } 
+    }
     
     async function fetchApplicableProtocols(catGroup) { 
         const sel = document.getElementById('serviceProtocolSelect'); 
         sel.innerHTML = '<option value="">+ Inject Fixed Protocol Module...</option>'; 
-        // Fallback or explicit mapping can go here if catGroup is empty, but we pull all packages just in case
         let query = supabaseClient.from('service_packages').select('*').order('base_rate', { ascending: true });
         if(catGroup) { query = query.eq('vehicle_category', catGroup); }
         
@@ -377,8 +411,16 @@
         const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
         const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
         
-        const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + l + t - d; 
+        let netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + l + t - d; 
         
+        // Referral Discount Math (5% off Net)
+        appliedReferralDiscountVal = 0;
+        if(isReferralDiscountActive) {
+            appliedReferralDiscountVal = netBeforeAdv * 0.05;
+            netBeforeAdv -= appliedReferralDiscountVal;
+        }
+
+        // Wallet Points Math (Max 20% of net)
         let pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; 
         const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
         if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); document.getElementById('vPointsUsed').value = pUsed; } 
@@ -391,7 +433,61 @@
     function confirmSplitPayment() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; let upi = parseFloat(document.getElementById('splitUpiInput').value) || 0; if ((cash + upi) !== netVal) return alert("Split amounts must equal Net Payable!"); isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi; commitInvoiceSettlement(`Split (Cash: ₹${cash}, UPI: ₹${upi})`, 'Closed'); document.getElementById('modalSplitPayment').style.display = 'none'; }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
-        const netVal = document.getElementById('netValuationDisplay').innerText;
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
+        const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
+        const custMobile = activeJobContext.customer_mobile;
+
+        // --- WALLET & REFERRAL SETTLEMENT LOGIC ---
+        if(statusTarget === 'Closed' && custMobile) {
+            
+            // 1. Deduct redeemed points
+            if(pUsed > 0) {
+                const { data: currentCust } = await supabaseClient.from('customers').select('loyalty_points').eq('mobile_number', custMobile).single();
+                const updatedPoints = (currentCust.loyalty_points || 0) - pUsed;
+                await supabaseClient.from('customers').update({ loyalty_points: updatedPoints }).eq('mobile_number', custMobile);
+                
+                await supabaseClient.from('loyalty_points_log').insert({
+                    customer_mobile: custMobile,
+                    points: pUsed,
+                    type: 'debit',
+                    reason: `Bill Redemption (JC-${targetJobId.split('-')[0].toUpperCase()})`,
+                    date: new Date().toISOString().split('T')[0]
+                });
+            }
+
+            // 2. Clear referral discount flag if used
+            if(isReferralDiscountActive) {
+                await supabaseClient.from('customers').update({ referral_discount_active: false }).eq('mobile_number', custMobile);
+            }
+
+            // 3. Process Referrer Reward 
+            const { data: referralCheck } = await supabaseClient.from('referrals').select('id, referrer_mobile').eq('referred_mobile', custMobile).eq('reward_credited', false).single();
+            if(referralCheck) {
+                const rewardPts = Math.floor(netVal * 0.03); // 3% of bill to referrer
+                const expDate = new Date(); expDate.setFullYear(expDate.getFullYear() + 1);
+
+                // Add points to referrer
+                const { data: referrerData } = await supabaseClient.from('customers').select('loyalty_points').eq('mobile_number', referralCheck.referrer_mobile).single();
+                if(referrerData) {
+                    const newPts = (referrerData.loyalty_points || 0) + rewardPts;
+                    await supabaseClient.from('customers').update({ loyalty_points: newPts }).eq('mobile_number', referralCheck.referrer_mobile);
+                    
+                    await supabaseClient.from('loyalty_points_log').insert({
+                        customer_mobile: referralCheck.referrer_mobile,
+                        points: rewardPts,
+                        type: 'credit',
+                        reason: `Referral Reward for JC-${targetJobId.split('-')[0].toUpperCase()}`,
+                        date: new Date().toISOString().split('T')[0],
+                        expiry_date: expDate.toISOString().split('T')[0]
+                    });
+                }
+                
+                // Mark referral as complete
+                await supabaseClient.from('referrals').update({ reward_credited: true, referred_bill_amount: netVal }).eq('id', referralCheck.id);
+            }
+        }
+        // ------------------------------------------
+
         const updates = { 
             total_invoice_value: netVal, labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
             lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, external_work_notes: document.getElementById('vLatheNotes').value.trim(), 
@@ -401,10 +497,21 @@
         };
         if(activeJobContext.status !== 'Closed' && statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
-        if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') { document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; } else { document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } document.getElementById('modalReceipt').style.display = 'flex'; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
+        
+        if(!error) { 
+            if(statusTarget === 'Closed') { 
+                populateReceiptDocument(modeTarget, netVal, updates, pUsed); 
+                if(modeTarget === 'Credit') { document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; } else { document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } 
+                document.getElementById('modalReceipt').style.display = 'flex'; 
+            } else { 
+                alert("Operational draft saved safely."); window.location.href = 'index.html'; 
+            } 
+        } else { 
+            alert("Database Error: " + error.message); 
+        }
     }
 
-    function populateReceiptDocument(paymentMode, finalNet, scopeVals) { 
+    function populateReceiptDocument(paymentMode, finalNet, scopeVals, pUsed) { 
         const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; 
         
         lineItemsLocalMemory.forEach(line => { 
@@ -423,6 +530,13 @@
         document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`; 
         const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } 
         const dDisc = document.getElementById('rowDiscSum'); const vDisc = parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; } 
+        
+        // Referral Discount Display
+        const rDisc = document.getElementById('rowRefDiscSum'); if(isReferralDiscountActive && appliedReferralDiscountVal > 0) { rDisc.style.display = 'flex'; document.getElementById('thRefDiscSum').innerText = `-₹${Math.round(appliedReferralDiscountVal)}`; } else { rDisc.style.display = 'none'; }
+
+        // Wallet Points Display
+        const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; }
+
         const dAdv = document.getElementById('rowAdvanceSum'); if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; } 
         const dPre = document.getElementById('rowPrepaidSum'); if (scopeVals.prepaid_amount > 0) { dPre.style.display = 'flex'; document.getElementById('thPrepaidSum').innerText = `₹${scopeVals.prepaid_amount}`; } else { dPre.style.display = 'none'; } 
         
