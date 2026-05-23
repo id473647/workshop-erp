@@ -334,7 +334,7 @@
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
 
     // Track internally separated totals to push to db
-    let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0;
+    let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
 
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
@@ -426,16 +426,15 @@
     async function fetchApplicableProtocols(catGroup) { 
         const sel = document.getElementById('serviceProtocolSelect'); 
         sel.innerHTML = '<option value="">+ Inject Fixed Protocol Module...</option>'; 
-        let query = supabaseClient.from('service_packages').select('*').order('base_rate', { ascending: true });
-        if(catGroup) { query = query.eq('vehicle_category', catGroup); }
+        let query = supabaseClient.from('service_packages').select('*').eq('is_active', true).order('base_rate');
+        if (catGroup && catGroup !== 'Unclassified' && catGroup !== '') { 
+            query = query.eq('vehicle_category', catGroup); 
+        }
         
         const { data: pkgs } = await query; 
-        if(pkgs && pkgs.length > 0) {
-            pkgs.forEach(p => { sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; }); 
-        } else {
-            sel.innerHTML += `<option value="Premium Service" data-rate="299">Premium Service - ₹299</option>`;
-            sel.innerHTML += `<option value="Standard Engine Package" data-rate="199">Standard Engine Package - ₹199</option>`;
-        }
+        pkgs?.forEach(p => { 
+            sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; 
+        }); 
     }
     
     async function addFixedProtocol() { 
@@ -540,10 +539,11 @@
         if(!partStr) return; if(typeSelect === 'Lube' && qVal < 50) { return alert("Lubricants must be entered in ML. Cannot enter less than 50 ML."); } 
         const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase(); 
         
-        // Fix 1 Step 1: Write category to product_master
-        supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }).then(); 
+        // Fix 1 Step 1 & Bug 2: Write category to product_master and use correct onConflict
+        supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name,brand' }).then(); 
         
-        const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: wareTarget, item_name: `${cleanName} (${cleanBrand})`, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId }); 
+        // Bug 1 Fix: Store just cleanName as item_name in job_card_items
+        const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: wareTarget, item_name: cleanName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId }); 
         
         if(!error) { 
             document.getElementById('nPart').value = ''; 
@@ -563,6 +563,7 @@
         
         // Fix 2 & 3 Step 2/3: Split items per role and adjust internal state
         let greenNet = 0; let mopedNet = 0; let serviceNet = 0;
+        let lubeNet = 0; // Bug 3 fix: Separate lube calculation
         
         lineItemsLocalMemory.forEach(line => { 
             let rowNet = parseFloat(line.total_price); 
@@ -573,6 +574,11 @@
             else if (line.warehouse_type === 'Service') serviceNet += rowNet;
             
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
+
+            // Bug 3 Calculation
+            if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr') {
+                lubeNet += rowNet;
+            }
         }); 
         
         let autoPartsDiscountValue = 0; 
@@ -597,11 +603,14 @@
             else if (remaining > 0) balNode.style.color = '#d97706';
             else balNode.style.color = 'var(--success)';
             
-            d = totalServiceDisc;
             greenNet = Math.max(0, greenNet - discGreen);
             mopedNet = Math.max(0, mopedNet - discMoped);
             l = Math.max(0, l - discLabour);
             t = Math.max(0, t - discLathe);
+
+            // Bug 4 Fix: DO NOT subtract d again — already deducted per head above
+            d = 0; 
+            partsGrossTotal = greenNet + mopedNet; // update gross with discounted values
         } else {
             d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
             if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
@@ -613,6 +622,7 @@
         internalMopedNet = mopedNet;
         internalLabourNet = l;
         internalLatheNet = t;
+        internalLubeNet = lubeNet; // Bug 3 Assign
 
         const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
         const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
@@ -645,11 +655,15 @@
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
         
+        // Debugging logs included as requested
+        console.log('SETTLEMENT lubricant_total:', internalLubeNet, 'green:', internalGreenNet, 'moped:', internalMopedNet);
+
         // Fix 2 & 3 Step 4: Add the accurately computed green/moped totals to the update payload
         const updates = { 
             total_invoice_value: netVal, 
             labour_charges: internalLabourNet, // Fix 3 Step 4
             lathe_welding: internalLatheNet, // Fix 3 Step 4
+            lubricant_total: internalLubeNet, // Bug 3 Fix
             external_work_notes: document.getElementById('vLatheNotes').value.trim(), 
             future_advice: document.getElementById('vFutureAdvice').value.trim(), 
             advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
@@ -664,6 +678,29 @@
         
         if(activeJobContext.status !== 'Closed' && statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
+        
+        // Bug 6 Fix: Write commission entries to staff_ledger upon successful Close
+        if (statusTarget === 'Closed' && !error) {
+            const totalLabour = internalLabourNet + servicePkgGrossTotal;
+            const hasCo = !!document.getElementById('coMech').value;
+            const primaryShare = hasCo ? totalLabour / 2 : totalLabour;
+            const coShare = hasCo ? totalLabour / 2 : 0;
+            const primaryMechId = document.getElementById('primaryMech').value;
+            const coMechId = document.getElementById('coMech').value;
+            const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+            const ledgerEntries = [];
+            if (primaryMechId) {
+                ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` });
+            }
+            if (hasCo && coMechId) {
+                ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` });
+            }
+            if (ledgerEntries.length > 0) {
+                console.log('STAFF LEDGER ENTRIES:', ledgerEntries);
+                await supabaseClient.from('staff_ledger').insert(ledgerEntries);
+            }
+        }
+
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') { document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; } else { document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } document.getElementById('modalReceipt').style.display = 'flex'; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
     }
 
