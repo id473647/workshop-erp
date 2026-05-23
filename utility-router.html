@@ -33,6 +33,9 @@
         .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; background: white;} table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
         .utility-workspace { display: none; } .utility-workspace.active { display: block; }
         .edit-icon { cursor: pointer; margin-left: 8px; color: var(--info); font-size: 0.9rem; text-decoration: none; }
+        
+        #dailyCollectionBar { background: #0f172a; color: white; padding: 8px 20px; font-size: 0.85rem; font-weight: bold; text-align: center; cursor: pointer; }
+        #dailyCollectionBar:hover { background: #1e293b; }
     </style>
 </head>
 <body>
@@ -46,6 +49,7 @@
         <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
 </nav>
+<div id="dailyCollectionBar" onclick="window.location.href='reports.html'">Today's Collection: Fetching...</div>
 
 <div class="wrapper">
     <div id="hubGrid" class="utility-workspace active">
@@ -57,6 +61,14 @@
             <div class="u-card" id="cardReports" onclick="window.location.href='reports.html'">
                 <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">EOD Register, Marketing Leads, and Analytics.</p>
             </div>
+            
+            <div class="u-card" id="cardGreenEod" onclick="window.location.href='reports.html?tab=eod-green'" style="display:none; border-left:4px solid var(--success);">
+                <h4 class="u-title">🟢 Green EOD Report</h4><p class="u-desc">Dedicated End of Day register for Green Warehouse.</p>
+            </div>
+            <div class="u-card" id="cardMopedEod" onclick="window.location.href='reports.html?tab=eod-moped'" style="display:none; border-left:4px solid var(--moped);">
+                <h4 class="u-title">🛵 Moped EOD Report</h4><p class="u-desc">Dedicated End of Day register for Moped Warehouse.</p>
+            </div>
+
             <div class="u-card" id="cardStaff" onclick="openWorkspaceTarget('wsTech')">
                 <h4 class="u-title">👨‍💼 Staff & Payroll</h4><p class="u-desc">Manage Mechanics, Managers, Attendance & Commission Rules.</p>
             </div>
@@ -164,13 +176,15 @@
 
     // === RBAC ENGINE: ENFORCE VISIBILITY ===
     if (activeSessionRole === 'service') {
-        document.getElementById('cardInv').style.display = 'none'; // Service cannot manage inventory brands
-        document.getElementById('cardGamification').style.display = 'none'; // Admin only
+        document.getElementById('cardInv').style.display = 'none';
+        document.getElementById('cardGamification').style.display = 'none';
     } else if (activeSessionRole === 'green' || activeSessionRole === 'moped') {
-        document.getElementById('cardGamification').style.display = 'none'; // Admin only
-        document.getElementById('cardSrv').style.display = 'none'; // Green/Moped don't define service protocols
+        document.getElementById('cardGamification').style.display = 'none';
+        document.getElementById('cardSrv').style.display = 'none';
     }
-    // Admin sees everything.
+    
+    if (activeSessionRole === 'green') document.getElementById('cardGreenEod').style.display = 'flex';
+    if (activeSessionRole === 'moped') document.getElementById('cardMopedEod').style.display = 'flex';
 
     // === ROUTER LOGIC ===
     function openWorkspaceTarget(targetDomId) { 
@@ -182,6 +196,17 @@
         if(targetDomId === 'wsInv') loadBrands();
         if(targetDomId === 'wsSrv') loadServices();
     }
+
+    async function loadDailyCollection() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { data: jc } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr);
+        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr);
+        let wsTotal = 0; let posTotal = 0;
+        (jc||[]).forEach(j => wsTotal += parseFloat(j.total_invoice_value)||0);
+        (pos||[]).forEach(p => posTotal += parseFloat(p.total_amount)||0);
+        document.getElementById('dailyCollectionBar').innerHTML = `Today's Collection: ₹${wsTotal} (Workshop) | ₹${posTotal} (POS)`;
+    }
+    loadDailyCollection();
 
     // === 1. CRM LOGIC ===
     async function searchCRM() {
