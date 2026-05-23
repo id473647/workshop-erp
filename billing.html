@@ -52,6 +52,13 @@
         
         #mechanic-print-ticket { display: none; }
         
+        /* New concession distribution block styles */
+        #serviceDiscBlock { display: none; background: #fffbeb; padding: 12px; border-radius: 6px; border: 1px solid #fde68a; margin-top: 10px; grid-column: 1 / -1; }
+        .dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
+        .dist-field { display: flex; flex-direction: column; gap: 2px; }
+        .dist-field label { font-size: 0.7rem; color: #92400e; }
+        .dist-field input { border: 1px solid #fcd34d; padding: 8px; }
+        
         @media print { 
             @page { margin: 8mm; }
             body * { visibility: hidden; } 
@@ -154,7 +161,24 @@
                 </div>
                 <div class="field-group"><label>Lathe & External Work (₹)</label><div style="display:flex; gap:8px;"><input type="number" id="vLathe" class="input-lockable" value="0" style="width:35%;" oninput="compileDynamicSums()"><input type="text" id="vLatheNotes" class="input-lockable" placeholder="Breakdown: WELDING 100" style="width:65%;" oninput="this.value=this.value.toUpperCase()"></div></div>
                 <div class="field-group" style="grid-column: 1 / -1;"><label style="color:var(--danger);">Future Advice / Remarks (Prints on Bill)</label><input type="text" id="vFutureAdvice" class="input-lockable" placeholder="e.g. Chain sprocket needs replacement next service" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                
+                <div class="field-group" id="simpleDiscBlock"><label>Applied Concession (₹)</label><input type="number" id="vFlatDisc" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                
+                <div id="serviceDiscBlock">
+                    <label style="font-weight:bold; color:#b45309;">CONCESSION DISTRIBUTION</label>
+                    <div style="margin-top:6px;">
+                        <label style="font-size:0.75rem; color:#92400e;">Total Concession (₹)</label>
+                        <input type="number" id="vTotalServiceDisc" class="input-lockable" value="0" style="border:1px solid #f59e0b; width:100%; box-sizing:border-box; padding:8px;" oninput="compileDynamicSums()">
+                    </div>
+                    <div class="dist-grid">
+                        <div class="dist-field"><label>Green (₹)</label><input type="number" id="vDiscGreen" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                        <div class="dist-field"><label>Moped (₹)</label><input type="number" id="vDiscMoped" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                        <div class="dist-field"><label>Labour (₹)</label><input type="number" id="vDiscLabour" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                        <div class="dist-field"><label>Lathe (₹)</label><input type="number" id="vDiscLathe" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
+                    </div>
+                    <div id="serviceDiscBalance" style="font-size:0.75rem; font-weight:bold; margin-top:8px; color:var(--success);">Remaining to Allocate: ₹0</div>
+                </div>
+
                 <div class="field-group"><label>Prepaid Deposit (Green/Moped) (₹)</label><input type="number" id="vPrepaid" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group"><label>Workshop Advance (₹)</label><input type="number" id="vAdvance" class="input-lockable" value="0" oninput="compileDynamicSums()"></div>
                 <div class="field-group" id="pointsRedemptionBlock" style="display:none; background:#e0f2fe; padding:10px; border-radius:6px; border:1px solid #bae6fd; grid-column: 1 / -1;"><label style="color:#0369a1;">Use Wallet Points (Max: ₹<span id="maxPointsVal">0</span>)</label><input type="number" id="vPointsUsed" class="input-lockable" value="0" min="0" oninput="compileDynamicSums()"></div>
@@ -309,6 +333,9 @@
     let lineItemsLocalMemory = []; let globalCatalogCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
 
+    // Track internally separated totals to push to db
+    let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0;
+
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
     async function editVehicleReg() {
@@ -331,6 +358,15 @@
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
+
+        // Fix 3 Step 5: Toggle concession block based on role
+        if (sessionRole === 'service' || sessionRole === 'admin') {
+            document.getElementById('serviceDiscBlock').style.display = 'block';
+            document.getElementById('simpleDiscBlock').style.display = 'none';
+        } else {
+            document.getElementById('serviceDiscBlock').style.display = 'none';
+            document.getElementById('simpleDiscBlock').style.display = 'block';
+        }
 
         const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
         let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By (Staff)</option>';
@@ -471,19 +507,16 @@
 
     function queryCatalogAutocomplete(inputRef) { 
         const searchVal = inputRef.value.trim().toLowerCase(); 
-        if(/\b(10w|20w|lube|synthetic|coolant|brake fluid)\b/i.test(searchVal) || (/\b(oil)\b/i.test(searchVal) && !searchVal.includes('filter'))) { 
-            document.getElementById('nType').value = 'Lube'; 
-        } else { 
-            document.getElementById('nType').value = 'Spare'; 
-        } 
         
         const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; 
         if(searchVal.length < 2) { listContainer.style.display = 'none'; return; } 
         const searchTokens = searchVal.split(' ').filter(token => token.length > 0); 
         const filtered = globalCatalogCache.filter(item => { const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase(); return searchTokens.every(token => searchableText.includes(token)); }).slice(0, 10); 
+        
         if(filtered.length > 0) { 
+            // Fix 1 Step 2: Pass category
             filtered.forEach(p => { 
-                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0}, '${p.unit_metric || 'Pcs'}', '${p.warehouse_type || 'Spare'}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
+                listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0}, '${p.unit_metric || 'Pcs'}', '${p.category || 'Spare'}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
             }); 
             listContainer.style.display = 'block'; 
         } else { 
@@ -491,15 +524,12 @@
         } 
     }
     
-    function applySelectedCatalogItem(nameStr, brandStr, defaultRate, metricStr, warehouseType) { 
+    // Fix 1 Step 3: Set nType accurately based on category, fallback to Spare if empty
+    function applySelectedCatalogItem(nameStr, brandStr, defaultRate, metricStr, categoryStr) { 
         document.getElementById('nPart').value = nameStr; 
         document.getElementById('nBrand').value = brandStr; 
         document.getElementById('nRate').value = defaultRate; 
-        if (metricStr === 'ML' || warehouseType.toLowerCase() === 'lube') { 
-            document.getElementById('nType').value = 'Lube'; 
-        } else { 
-            document.getElementById('nType').value = 'Spare'; 
-        } 
+        document.getElementById('nType').value = (categoryStr === 'Lube') ? 'Lube' : 'Spare'; 
         document.getElementById('autolist-n').style.display = 'none'; 
     }
     
@@ -510,7 +540,8 @@
         if(!partStr) return; if(typeSelect === 'Lube' && qVal < 50) { return alert("Lubricants must be entered in ML. Cannot enter less than 50 ML."); } 
         const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase(); 
         
-        supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal }, { onConflict: 'item_name, brand' }).then(); 
+        // Fix 1 Step 1: Write category to product_master
+        supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }).then(); 
         
         const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: wareTarget, item_name: `${cleanName} (${cleanBrand})`, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId }); 
         
@@ -529,18 +560,60 @@
 
     function compileDynamicSums() { 
         partsGrossTotal = 0; servicePkgGrossTotal = 0; 
+        
+        // Fix 2 & 3 Step 2/3: Split items per role and adjust internal state
+        let greenNet = 0; let mopedNet = 0; let serviceNet = 0;
+        
         lineItemsLocalMemory.forEach(line => { 
             let rowNet = parseFloat(line.total_price); 
             if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
+            
+            if (line.warehouse_type === 'Green') greenNet += rowNet;
+            else if (line.warehouse_type === 'Moped') mopedNet += rowNet;
+            else if (line.warehouse_type === 'Service') serviceNet += rowNet;
+            
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
         }); 
         
         let autoPartsDiscountValue = 0; 
         if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } 
         
-        const l = parseFloat(document.getElementById('vLabour').value) || 0; 
-        const t = parseFloat(document.getElementById('vLathe').value) || 0; 
-        const d = parseFloat(document.getElementById('vFlatDisc').value) || 0; 
+        let l = parseFloat(document.getElementById('vLabour').value) || 0; 
+        let t = parseFloat(document.getElementById('vLathe').value) || 0; 
+        let d = 0;
+        
+        // Fix 2 Step 2 & Fix 3 Step 3: Concession routing
+        if (sessionRole === 'service' || sessionRole === 'admin') {
+            const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
+            const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0;
+            const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0;
+            const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0;
+            const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0;
+            
+            const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe);
+            const balNode = document.getElementById('serviceDiscBalance');
+            balNode.innerText = `Remaining to Allocate: ₹${remaining}`;
+            if (remaining < 0) balNode.style.color = 'red';
+            else if (remaining > 0) balNode.style.color = '#d97706';
+            else balNode.style.color = 'var(--success)';
+            
+            d = totalServiceDisc;
+            greenNet = Math.max(0, greenNet - discGreen);
+            mopedNet = Math.max(0, mopedNet - discMoped);
+            l = Math.max(0, l - discLabour);
+            t = Math.max(0, t - discLathe);
+        } else {
+            d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
+            if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
+            else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
+        }
+        
+        // Lock these processed numbers into globals to be saved later in commitInvoiceSettlement
+        internalGreenNet = greenNet;
+        internalMopedNet = mopedNet;
+        internalLabourNet = l;
+        internalLatheNet = t;
+
         const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
         const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
         
@@ -555,6 +628,7 @@
             splitIndicator.style.display = 'none';
         }
 
+        // Net computation uses the original components minus global discount D
         const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
         
         let pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; 
@@ -570,13 +644,24 @@
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
+        
+        // Fix 2 & 3 Step 4: Add the accurately computed green/moped totals to the update payload
         const updates = { 
-            total_invoice_value: netVal, labour_charges: parseFloat(document.getElementById('vLabour').value) || 0, 
-            lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0, external_work_notes: document.getElementById('vLatheNotes').value.trim(), 
-            future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
+            total_invoice_value: netVal, 
+            labour_charges: internalLabourNet, // Fix 3 Step 4
+            lathe_welding: internalLatheNet, // Fix 3 Step 4
+            external_work_notes: document.getElementById('vLatheNotes').value.trim(), 
+            future_advice: document.getElementById('vFutureAdvice').value.trim(), 
+            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
             prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
-            payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null 
+            payment_mode: modeTarget, 
+            status: statusTarget, 
+            mech_id: document.getElementById('primaryMech').value || null, 
+            co_mech_id: document.getElementById('coMech').value || null,
+            green_total: internalGreenNet, // Fix 2/3 Step 4
+            moped_total: internalMopedNet  // Fix 2/3 Step 4
         };
+        
         if(activeJobContext.status !== 'Closed' && statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') { document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; } else { document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } document.getElementById('modalReceipt').style.display = 'flex'; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
@@ -600,7 +685,12 @@
         
         document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`; 
         const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } 
-        const dDisc = document.getElementById('rowDiscSum'); const vDisc = parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; } 
+        
+        // Read active concession input field for correct receipt presentation
+        const dDisc = document.getElementById('rowDiscSum'); 
+        const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; 
+        if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; } 
+        
         const dAdv = document.getElementById('rowAdvanceSum'); if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; } 
         const dPre = document.getElementById('rowPrepaidSum'); if (scopeVals.prepaid_amount > 0) { dPre.style.display = 'flex'; document.getElementById('thPrepaidSum').innerText = `₹${scopeVals.prepaid_amount}`; } else { dPre.style.display = 'none'; } 
         
@@ -613,7 +703,6 @@
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
     function executePrint(mode) { document.body.classList.remove('print-mechanic'); document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') { container.classList.add('a5-mode'); } else { container.classList.remove('a5-mode'); } document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.print(); document.body.classList.remove('print-receipt'); }, 200); }
     
-    // NEW PRINT MECHANIC TICKET LOGIC
     function printMechanicTicket() { 
         document.body.classList.remove('print-receipt'); 
         document.body.classList.add('print-mechanic'); 
@@ -673,7 +762,6 @@
         document.getElementById('tkFrontProtLab').innerText = `₹${protocolTotal}`;
         document.getElementById('tkFrontFinBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
         
-        // Populate Back Page
         document.getElementById('tkBackJc').innerText = jcFormatted;
         document.getElementById('tkBackReg').innerText = veh.reg_number || '--';
         
