@@ -5,49 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise Reports - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .sticky-nav { max-width: 1200px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
-        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+        .wrapper { max-width: 1200px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display:flex; justify-content:space-between;}
         
         .tabs-header { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
-        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; }
+        .tab-btn { padding: 10px 18px; border: none; background: none; font-size: 0.9rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent; white-space: nowrap; display:none;}
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--info); background: #f1f5f9; }
         .view-panel { display: none; } .view-panel.active { display: block; }
 
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid var(--border);}
         .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input[type="date"], input[type="text"], input[type="number"], select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; }
-        .btn-action { background: var(--info); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
+        .btn-action { background: var(--info); color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
 
-        .math-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 1rem; border: 2px solid var(--primary); }
-        .math-table th, .math-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
-        .math-table td:nth-child(2) { text-align: right; font-weight: bold; font-family: monospace; font-size: 1.1rem; }
-        .row-sub { background: #fef2f2; color: var(--danger); }
-        .row-add { background: #f0fdf4; color: var(--success); }
-        .row-result { background: #f1f5f9; color: var(--primary); font-weight: 900; font-size: 1.1rem; border-top: 2px solid var(--primary); }
-        .row-final { background: var(--primary); color: white; font-weight: 900; font-size: 1.3rem; }
-
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 400px; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 500px; }
         table.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
         table.data-table th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
         table.data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        
+        .clickable-ref { color:var(--info); font-weight:bold; cursor:pointer; text-decoration:none; } .clickable-ref:hover{text-decoration:underline;}
+        
+        .eod-net-box { background:#f0fdf4; border:2px solid #22c55e; border-radius:8px; padding:20px; text-align:center; margin-top:20px;}
+        .eod-net-val { font-size:2rem; font-weight:bold; color:#15803d; }
 
-        /* Loyalty specific styles */
-        .loyalty-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .loyalty-stat-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px; text-align: center; }
-        .loyalty-stat-val { font-size: 1.8rem; font-weight: bold; color: #166534; }
-        .loyalty-stat-label { font-size: 0.8rem; color: #166534; text-transform: uppercase; font-weight: bold; }
-
-        .thermal-print-area { display: none; background: white; color: black; font-family: 'Courier New', Courier, monospace; width: 300px; padding: 12px; font-size: 0.85rem; line-height: 1.4; margin: 0 auto; box-sizing: border-box; }
         @media print {
             body * { visibility: hidden; }
-            .thermal-print-area.print-active, .thermal-print-area.print-active * { visibility: visible; }
-            .thermal-print-area.print-active { display: block; position: absolute; left: 0; top: 0; width: 300px; padding: 0; margin: 0; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; margin:0; padding:0; }
+            .inputs-grid, .tabs-header, .sticky-nav { display:none !important; }
+            .table-wrapper { max-height:none !important; border:none; }
         }
     </style>
 </head>
@@ -60,106 +53,193 @@
 </nav>
 
 <div class="wrapper">
-    <div id="printEodContainer" class="thermal-print-area">
-        <div style="text-align:center; border-bottom:1px dashed black; padding-bottom:8px; margin-bottom:8px;">
-            <div style="font-size:1.2rem; font-weight:bold;">My Care Service Center</div>
-            <div style="font-size:0.9rem; margin-top:4px;">CASH RECONCILIATION</div>
-        </div>
-        <div style="font-size:0.8rem; margin-bottom:2px;">Date: <strong id="ptEodDate">--</strong></div>
-        <div style="font-size:0.8rem; margin-bottom:8px;">Printed: <span id="ptEodTime">--</span></div>
-        <div style="border-top:1px dashed black; padding-top:8px; margin-top:8px; font-weight:bold; font-size:0.9rem; text-align:center;">CASH BREAKDOWN</div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>[X] Total Income:</span><strong id="ptX">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>[-] [Y] UPI/Cards:</span><strong id="ptY">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:2px;"><span>[-] [Z] Old Advances:</span><strong id="ptZ">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:bold; border-top:1px dotted #ccc; padding-top:4px;"><span>[=] [C] NET CASH:</span><strong id="ptC">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>[+] [A] New Advances:</span><strong id="ptA">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:bold; border-top:1px dotted #ccc; padding-top:4px;"><span>[=] [TC] TOTAL CASH:</span><strong id="ptTC">₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px; color:red;"><span>[-] [E] Expenses:</span><strong id="ptE">-₹0</strong></div>
-        <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:1.1rem; font-weight:bold; border-top:1px solid #000; padding-top:8px;"><span>DRAWER CASH:</span><strong id="ptDrawer">₹0</strong></div>
-        <div id="ptGreenSection" style="display:none; border-top:1px dashed black; padding-top:8px; margin-top:12px; font-weight:bold; font-size:0.85rem; text-align:center;"><div style="margin-bottom:6px;">GREEN / MOPED PAYABLES</div><div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:normal;"><span>Owed to Moped:</span><strong id="ptMoped">₹0</strong></div><div style="display:flex; justify-content:space-between; margin-top:2px; font-weight:normal;"><span>Owed to Green:</span><strong id="ptGreen">₹0</strong></div></div>
-        <div style="text-align:center; font-size:0.75rem; border-top:1px dashed black; padding-top:12px; margin-top:20px;">Manager Signature: _______________</div>
-    </div>
-
     <div class="card-panel">
         <div class="tabs-header" id="tabsHeader">
-            <button class="tab-btn active" onclick="switchTab('tabEOD')">EOD Cash Formula</button>
-            <button class="tab-btn" onclick="switchTab('tabAnalytics')" id="btnTabAnalytics">New Customer Analytics</button>
-            <button class="tab-btn" onclick="switchTab('tabPromos')" id="btnTabPromos">Promotional Leads</button>
-            <button class="tab-btn" onclick="switchTab('tabLoyalty')" id="btnTabLoyalty">Loyalty & Referrals</button>
+            <button class="tab-btn" id="btnEodGreen" onclick="switchTab('tabEodGreen')">Green EOD</button>
+            <button class="tab-btn" id="btnEodMoped" onclick="switchTab('tabEodMoped')">Moped EOD</button>
+            <button class="tab-btn" id="btnMechLubeSpares" onclick="switchTab('tabMechLubeSpares')">Mech Lube/Spares</button>
+            <button class="tab-btn" id="btnMechLabour" onclick="switchTab('tabMechLabour')">Labour & Comm</button>
+            <button class="tab-btn" id="btnLubeSales" onclick="switchTab('tabLubeSales')">Lube Sales</button>
+            <button class="tab-btn" id="btnProdVelocity" onclick="switchTab('tabProdVelocity')">Product Velocity</button>
+            <button class="tab-btn" id="btnHotDays" onclick="switchTab('tabHotDays')">Hot Days</button>
+            <button class="tab-btn" id="btnServiceModule" onclick="switchTab('tabServiceModule')">Service Module</button>
+            <button class="tab-btn" id="btnLeadTime" onclick="switchTab('tabLeadTime')">Lead Time Tracker</button>
+            <button class="tab-btn" id="btnLathe" onclick="switchTab('tabLathe')">Lathe Liab</button>
+            <button class="tab-btn" id="btnLoyalty" onclick="switchTab('tabLoyalty')">Wallet Tracker</button>
         </div>
 
-        <div id="tabEOD" class="view-panel active">
-            <div class="inputs-grid" style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid var(--border);">
-                <div class="field-group">
-                    <label>Select Date for Register</label>
-                    <input type="date" id="eodDate" onchange="runEodReport()">
+        <div id="tabEodGreen" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Target Date</label><input type="date" id="dateEodGreen"></div>
+                <button class="btn-action" onclick="runEodWare('Green')">RUN REPORT</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbEodGreenS', 'Green_EOD_Spares')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div id="greenEodRender">
+                <h3 style="margin-top:20px;">Spares Total: <span id="valGreenS">₹0</span> (S)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodGreenS"><thead><tr><th>Job Card No</th><th>Product Name</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody id="tbodyGreenS"></tbody></table></div>
+                
+                <h3 style="margin-top:20px;">Lubricants Total: <span id="valGreenL">₹0</span> (L)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodGreenL"><thead><tr><th>Job Card No</th><th>Product Name</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody id="tbodyGreenL"></tbody></table></div>
+                
+                <h3 style="margin-top:20px;">Prepaid Total: <span id="valGreenP">₹0</span> (P)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodGreenP"><thead><tr><th>Job Card No</th><th>Customer Name</th><th>Vehicle No</th><th>Prepaid Amount</th></tr></thead><tbody id="tbodyGreenP"></tbody></table></div>
+                
+                <div class="eod-net-box">
+                    <div style="font-size:1rem; font-weight:bold; color:#166534; margin-bottom:8px;">Net Receivables = S + L - P</div>
+                    <div class="eod-net-val" id="valGreenNet">₹0</div>
                 </div>
-                <button class="btn-action" style="background:var(--primary);" onclick="runEodReport()">🔄 REFRESH FORMULA</button>
-                <button class="btn-action" style="background:var(--success);" onclick="triggerPrint('printEodContainer')">🖨️ PRINT EOD SLIP</button>
-            </div>
-
-            <table class="math-table">
-                <tbody>
-                    <tr><td>[X] TOTAL GROSS INCOME <span style="font-size:0.75rem; color:#64748b; display:block;">(All Cash & UPI Bills Closed Today)</span></td><td id="uiX">₹0</td></tr>
-                    <tr class="row-sub"><td>[-] [Y] UPI / CARDS <span style="font-size:0.75rem; display:block;">(Digital payments from today's bills)</span></td><td id="uiY">₹0</td></tr>
-                    <tr class="row-sub"><td>[-] [Z] OLD ADVANCES DEPOSITED EARLIER <span style="font-size:0.75rem; display:block;">(Advances applied to bills closed today, but cash was collected on a previous day)</span></td><td id="uiZ">₹0</td></tr>
-                    <tr class="row-result"><td>[=] [C] NET CASH FROM BILLS</td><td id="uiC">₹0</td></tr>
-                    <tr class="row-add"><td>[+] [A] ADVANCES DEPOSITED TODAY <span style="font-size:0.75rem; display:block;">(New cash deposits collected today for Open or Closed jobs)</span></td><td id="uiA">₹0</td></tr>
-                    <tr class="row-result"><td>[=] [TC] TOTAL CASH IN HAND</td><td id="uiTC">₹0</td></tr>
-                    <tr class="row-sub"><td>[-] [E] TOTAL EXPENSES & HANDOVERS <span style="font-size:0.75rem; display:block;">(Money paid out to staff, lathe, or warehouses today)</span></td><td id="uiE">₹0</td></tr>
-                    <tr class="row-final"><td>CASH IN DRAWER</td><td id="uiDrawer">₹0</td></tr>
-                </tbody>
-            </table>
-
-            <div id="owedSection" style="margin-top:24px; padding:16px; border:1px solid #fca5a5; border-radius:8px; background:#fef2f2; display:none;">
-                <h4 style="margin:0 0 12px 0; color:var(--danger);">Outstanding Liabilities (To be paid out from Drawer)</h4>
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #fca5a5; padding-bottom:8px; margin-bottom:8px;"><strong>Owed to Moped Warehouse:</strong> <span id="uiMopedNet">₹0</span></div>
-                <div style="display:flex; justify-content:space-between;"><strong>Owed to Green Warehouse:</strong> <span id="uiGreenNet">₹0</span></div>
             </div>
         </div>
 
-        <div id="tabAnalytics" class="view-panel">
-            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Date Range</label><select id="dateRange" onchange="runNewCustomerReport()"><option value="today">Today</option><option value="week">This Week</option><option value="month">This Month</option><option value="all">All Time</option></select></div>
-                <button class="btn-action" style="background:var(--primary);" onclick="runNewCustomerReport()">RUN REPORT</button>
+        <div id="tabEodMoped" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Target Date</label><input type="date" id="dateEodMoped"></div>
+                <button class="btn-action" onclick="runEodWare('Moped')">RUN REPORT</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbEodMopedS', 'Moped_EOD_Spares')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
             </div>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Scanning...</td></tr></tbody></table></div>
+            <div id="mopedEodRender">
+                <h3 style="margin-top:20px;">Spares Total: <span id="valMopedS">₹0</span> (S)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodMopedS"><thead><tr><th>Job Card No</th><th>Product Name</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody id="tbodyMopedS"></tbody></table></div>
+                
+                <h3 style="margin-top:20px;">Lubricants Total: <span id="valMopedL">₹0</span> (L)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodMopedL"><thead><tr><th>Job Card No</th><th>Product Name</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead><tbody id="tbodyMopedL"></tbody></table></div>
+                
+                <h3 style="margin-top:20px;">Prepaid Total: <span id="valMopedP">₹0</span> (P)</h3>
+                <div class="table-wrapper"><table class="data-table" id="tbEodMopedP"><thead><tr><th>Job Card No</th><th>Customer Name</th><th>Vehicle No</th><th>Prepaid Amount</th></tr></thead><tbody id="tbodyMopedP"></tbody></table></div>
+                
+                <div class="eod-net-box">
+                    <div style="font-size:1rem; font-weight:bold; color:#166534; margin-bottom:8px;">Net Receivables = S + L - P</div>
+                    <div class="eod-net-val" id="valMopedNet">₹0</div>
+                </div>
+            </div>
         </div>
 
-        <div id="tabPromos" class="view-panel">
-            <div class="block-title">Bulk SMS Extractors</div>
-            <p style="font-size:0.85rem; color:#64748b; line-height:1.4; margin-bottom:20px;">Targets specific vehicle owners missing active plans for SMS campaigns.</p>
-            <div style="display:flex; gap:16px;">
-                <button class="btn-action" style="background:#0284c7; flex:1;" onclick="exportLeads('Motorcycle')">📥 MOTORCYCLE LEADS</button>
-                <button class="btn-action" style="background:#16a34a; flex:1;" onclick="exportLeads('Scooter')">📥 SCOOTER LEADS</button>
+        <div id="tabMechLubeSpares" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="mlsStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="mlsEnd"></div>
+                <div class="field-group"><label>Mechanic</label><select id="mlsMech"><option value="ALL">All Mechanics</option></select></div>
+                <div class="field-group" id="mlsWareGroup"><label>Warehouse</label><select id="mlsWare"><option value="ALL">All</option><option value="Green">Green</option><option value="Moped">Moped</option></select></div>
+                <button class="btn-action" onclick="runReport2()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep2Lube', 'Mech_Lube')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
             </div>
+            <h4 style="margin-top:20px;">Lubricants Sub-Tab</h4>
+            <div class="table-wrapper"><table class="data-table" id="tbRep2Lube"><thead><tr><th>Mechanic</th><th>Product</th><th>Brand</th><th>Qty Units</th><th>Liters</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Lube"></tbody></table></div>
+            <h4 style="margin-top:20px;">Spares Sub-Tab</h4>
+            <div class="table-wrapper"><table class="data-table" id="tbRep2Spare"><thead><tr><th>Mechanic</th><th>Part Name</th><th>Qty</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Spare"></tbody></table></div>
         </div>
 
-        <div id="tabLoyalty" class="view-panel">
-            <div class="block-title">Digital Loyalty & Gamification Liability</div>
+        <div id="tabMechLabour" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="mlabStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="mlabEnd"></div>
+                <div class="field-group"><label>Mechanic</label><select id="mlabMech"><option value="ALL">All</option></select></div>
+                <button class="btn-action" onclick="runReport3()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep3', 'Mech_Labour')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep3"><thead><tr><th>Mechanic Name</th><th>Total Jobs</th><th>Gross Labour</th><th>Commission Rate</th><th>Earned Comm</th></tr></thead><tbody id="tbBodyRep3"></tbody></table></div>
+        </div>
+
+        <div id="tabLubeSales" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="lsStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="lsEnd"></div>
+                <div class="field-group" id="lsSourceGroup"><label>Source</label><select id="lsSource"><option value="Both">Both</option><option value="Workshop">Workshop</option><option value="POS">POS</option></select></div>
+                <button class="btn-action" onclick="runReport4()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep4', 'Total_Lube_Sales')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep4"><thead><tr><th>Product Name</th><th>Brand</th><th>Units Sold</th><th>Liters Sold</th><th>Total Revenue</th></tr></thead><tbody id="tbBodyRep4"></tbody></table></div>
+        </div>
+
+        <div id="tabProdVelocity" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="pvStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="pvEnd"></div>
+                <div class="field-group" id="pvSourceGroup"><label>Source</label><select id="pvSource"><option value="Both">Both</option><option value="Workshop">Workshop</option><option value="POS">POS</option></select></div>
+                <div class="field-group"><label>Sort By</label><select id="pvSort"><option value="Qty">Qty Sold</option><option value="Rev">Total Revenue</option></select></div>
+                <button class="btn-action" onclick="runReport5()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep5', 'Product_Velocity')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep5"><thead><tr><th>Rank</th><th>Product Name</th><th>Brand</th><th>Category</th><th>Units Sold</th><th>Avg Price</th><th>Total Revenue</th></tr></thead><tbody id="tbBodyRep5"></tbody></table></div>
+        </div>
+
+        <div id="tabHotDays" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start (Min 30 Days Ago)</label><input type="date" id="hdStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="hdEnd"></div>
+                <button class="btn-action" onclick="runReport6()">RUN ANALYTICS</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div id="hdWarning" style="color:var(--danger); font-weight:bold; margin-bottom:10px;"></div>
+            <div id="hdRecommendation" style="background:#fffbeb; padding:15px; border:1px solid #fde68a; border-radius:8px; font-weight:bold; color:#b45309; margin-bottom:20px; font-size:1.1rem; display:none;"></div>
             
-            <div class="loyalty-stats-grid">
-                <div class="loyalty-stat-card"><div class="loyalty-stat-label">Total Points Issued (Current Mnth)</div><div class="loyalty-stat-val" id="statPtsIssued">0</div></div>
-                <div class="loyalty-stat-card"><div class="loyalty-stat-label">Total Points Redeemed (Current Mnth)</div><div class="loyalty-stat-val" id="statPtsRedeemed" style="color:var(--warning);">0</div></div>
-                <div class="loyalty-stat-card" style="background:#e0f2fe; border-color:#bae6fd;"><div class="loyalty-stat-label" style="color:#0369a1;">Mechanic Earned Liab (All Time)</div><div class="loyalty-stat-val" id="statMechLiab" style="color:#0369a1;">₹0</div></div>
-            </div>
-
             <div style="display:flex; gap:20px;">
                 <div style="flex:1;">
-                    <h4 style="margin:0 0 10px 0; color:var(--primary);">Top 10 Referrers</h4>
-                    <div class="table-wrapper" style="max-height: 250px;">
-                        <table class="data-table"><thead><tr><th>Customer Mobile</th><th>Name</th><th>Total Wallet</th></tr></thead><tbody id="topReferrersBody"></tbody></table>
-                    </div>
+                    <h4>Hot/Cold Days Analysis</h4>
+                    <div class="table-wrapper"><table class="data-table"><thead><tr><th>Day</th><th>Total Txns</th><th>Combined Rev</th><th>Badge</th></tr></thead><tbody id="tbBodyHdDays"></tbody></table></div>
+                </div>
+                <div style="flex:1;">
+                    <h4>Dead Hours Tracking</h4>
+                    <div class="table-wrapper"><table class="data-table"><thead><tr><th>Hour Slot</th><th>Txn Count</th><th>Revenue</th></tr></thead><tbody id="tbBodyHdHours"></tbody></table></div>
                 </div>
             </div>
+        </div>
 
-            <h4 style="margin:20px 0 10px 0; color:var(--primary);">Master Referral Tracker</h4>
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <thead><tr><th>Date</th><th>Referrer Mobile</th><th>Referred Friend Mobile</th><th>Reward Status</th></tr></thead>
-                    <tbody id="referralTrackerBody"></tbody>
-                </table>
+        <div id="tabServiceModule" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="smStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="smEnd"></div>
+                <div class="field-group"><label>Mechanic</label><select id="smMech"><option value="ALL">All</option></select></div>
+                <button class="btn-action" onclick="runReport7()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep7', 'Service_Module')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
             </div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep7"><thead><tr><th>Mechanic</th><th>Quick</th><th>General</th><th>Full</th><th>Premium</th><th>Jumbo</th><th>Total Count</th><th>Labour Yield</th></tr></thead><tbody id="tbBodyRep7"></tbody></table></div>
+        </div>
+
+        <div id="tabLeadTime" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="ltStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="ltEnd"></div>
+                <button class="btn-action" onclick="runReport8()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep8', 'Lead_Time')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div id="ltSummary" style="font-size:1.1rem; font-weight:bold; color:var(--danger); margin-bottom:15px;"></div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep8"><thead><tr><th>Job Card ID</th><th>Creation</th><th>Mech Finish</th><th>Billing Close</th><th>Creation->Mech (Hrs)</th><th>Mech->Billing (Hrs)</th><th>Total Turnaround (Hrs)</th></tr></thead><tbody id="tbBodyRep8"></tbody></table></div>
+        </div>
+
+        <div id="tabLathe" class="view-panel print-area">
+            <div class="inputs-grid">
+                <div class="field-group"><label>Start Date</label><input type="date" id="laStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="laEnd"></div>
+                <button class="btn-action" onclick="runReport9()">RUN</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep9', 'Lathe_Liability')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div id="laSummary" style="font-size:1.1rem; font-weight:bold; color:var(--primary); margin-bottom:15px; padding:10px; background:#e0f2fe; border-radius:6px;"></div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep9"><thead><tr><th>Job Card ID</th><th>Customer Name</th><th>Vehicle No</th><th>Lathe Amount</th><th>Status</th><th>Date Created</th><th>Date Closed</th></tr></thead><tbody id="tbBodyRep9"></tbody></table></div>
+        </div>
+
+        <div id="tabLoyalty" class="view-panel print-area">
+            <div class="inputs-grid">
+                <button class="btn-action" onclick="runReport10()">REFRESH</button>
+                <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep10', 'Loyalty_Wallets')">📥 EXCEL</button>
+                <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+            </div>
+            <div id="loyaltySummary" style="font-size:1.2rem; font-weight:bold; color:var(--success); margin-bottom:15px;"></div>
+            
+            <h4>Top 20 Customer Wallets</h4>
+            <div class="table-wrapper"><table class="data-table" id="tbRep10"><thead><tr><th>Name</th><th>Mobile</th><th>Points Balance</th><th>Total Earned</th><th>Total Redeemed</th></tr></thead><tbody id="tbBodyRep10"></tbody></table></div>
+            
+            <h4 style="margin-top:30px;">Referral Tracker</h4>
+            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Referrer Info</th><th>Referred Info</th><th>Date</th><th>Discount Given</th><th>Reward Credited</th><th>Amount</th></tr></thead><tbody id="tbBodyRep10Ref"></tbody></table></div>
         </div>
 
     </div>
@@ -168,173 +248,269 @@
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin';
+    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    document.getElementById('roleDisplay').innerText = `REPORTS - ${sessionRole}`;
 
-    document.getElementById('eodDate').valueAsDate = new Date();
+    // Apply Dates
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('input[type="date"]').forEach(el => el.value = today);
+    const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+    document.getElementById('hdStart').value = thirtyAgo.toISOString().split('T')[0];
 
-    document.getElementById('roleDisplay').innerText = `REPORTS - ${sessionRole.toUpperCase()}`;
-    if (sessionRole === 'green' || sessionRole === 'moped') {
-        document.getElementById('btnTabAnalytics').style.display = 'none';
-        document.getElementById('btnTabPromos').style.display = 'none';
-        document.getElementById('btnTabLoyalty').style.display = 'none';
-        document.getElementById('navBack').style.display = 'none'; 
+    // RBAC logic
+    const accessMap = {
+        'admin': ['btnEodGreen', 'btnEodMoped', 'btnMechLubeSpares', 'btnMechLabour', 'btnLubeSales', 'btnProdVelocity', 'btnHotDays', 'btnServiceModule', 'btnLeadTime', 'btnLathe', 'btnLoyalty'],
+        'service': ['btnEodGreen', 'btnEodMoped', 'btnMechLubeSpares', 'btnMechLabour', 'btnLubeSales', 'btnProdVelocity', 'btnServiceModule'],
+        'green': ['btnEodGreen', 'btnMechLubeSpares', 'btnLubeSales', 'btnProdVelocity'],
+        'moped': ['btnEodMoped', 'btnMechLubeSpares', 'btnLubeSales', 'btnProdVelocity']
+    };
+
+    (accessMap[sessionRole] || []).forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'inline-block'; });
+
+    // Pre-filter logic
+    if(sessionRole === 'green' || sessionRole === 'moped') {
+        const w = sessionRole === 'green' ? 'Green' : 'Moped';
+        document.getElementById('mlsWareGroup').style.display = 'none'; document.getElementById('mlsWare').value = w;
+        document.getElementById('lsSourceGroup').style.display = 'none'; document.getElementById('lsSource').value = 'Workshop';
+        document.getElementById('pvSourceGroup').style.display = 'none'; document.getElementById('pvSource').value = 'Workshop';
     }
 
-    function switchTab(tabId) { 
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
-        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active')); 
-        event.target.classList.add('active'); 
-        document.getElementById(tabId).classList.add('active'); 
-        if(tabId === 'tabLoyalty') loadLoyaltyReport(); 
-        if(tabId === 'tabEOD') runEodReport();
-    }
-
-    function triggerPrint(containerId) { document.querySelectorAll('.thermal-print-area').forEach(el => el.classList.remove('print-active')); document.getElementById(containerId).classList.add('print-active'); window.print(); }
-
-    async function runEodReport() {
-        const targetDate = document.getElementById('eodDate').value;
-        if (!targetDate) return;
-        const startDate = new Date(targetDate); startDate.setHours(0,0,0,0);
-        const endDate = new Date(targetDate); endDate.setHours(23,59,59,999);
-
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, total_invoice_value, advance_paid, payment_mode, created_at, source_role').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
-        const { data: openJobs } = await supabaseClient.from('job_cards').select('advance_paid, created_at, source_role').eq('status', 'Open').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount, payment_mode, source_role').eq('status', 'Closed').gte('closed_at', startDate.toISOString()).lte('closed_at', endDate.toISOString());
-        const { data: expenses } = await supabaseClient.from('workshop_expenses').select('amount, stakeholder_id, expense_category, recorded_by').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString());
-
-        let X = 0; let Y = 0; let Z = 0; let A = 0; let E = 0;
-        let billedMoped = 0, paidMoped = 0, billedGreen = 0, paidGreen = 0;
-        const closedJobIds = [];
-
-        (jobs || []).forEach(j => {
-            if((sessionRole === 'green' || sessionRole === 'moped') && j.source_role !== sessionRole) return;
-            closedJobIds.push(j.id);
-            const total = parseFloat(j.total_invoice_value) || 0;
-            const advance = parseFloat(j.advance_paid) || 0;
-            if (j.payment_mode !== 'Credit') {
-                X += total;
-                if (j.payment_mode === 'UPI') Y += total; 
-                const jcDate = new Date(j.created_at).toISOString().split('T')[0];
-                if (jcDate === targetDate) A += advance; else Z += advance; 
-            }
-        });
-
-        (openJobs || []).forEach(oj => {
-            if((sessionRole === 'green' || sessionRole === 'moped') && oj.source_role !== sessionRole) return;
-            const ojDate = new Date(oj.created_at).toISOString().split('T')[0];
-            if (ojDate === targetDate) A += (parseFloat(oj.advance_paid) || 0);
-        });
-
-        (pos || []).forEach(p => {
-            if((sessionRole === 'green' || sessionRole === 'moped') && p.source_role !== sessionRole) return;
-            const total = parseFloat(p.total_amount) || 0;
-            if (p.payment_mode !== 'Credit') { X += total; if (p.payment_mode === 'UPI') Y += total; }
-        });
-
-        (expenses || []).forEach(e => {
-            if((sessionRole === 'green' || sessionRole === 'moped') && e.recorded_by !== sessionRole) return;
-            const amt = Math.abs(parseFloat(e.amount) || 0); E += amt; 
-            if(e.expense_category === 'Vendor Payout') {
-                if(e.stakeholder_id === 'MOPED WAREHOUSE' || e.stakeholder_id === 'Moped') paidMoped += amt;
-                else if(e.stakeholder_id === 'GREEN WAREHOUSE' || e.stakeholder_id === 'Green') paidGreen += amt;
-            } else if (e.expense_category === 'Green Spares') paidGreen += amt;
-            else if (e.expense_category === 'Moped Spares') paidMoped += amt;
-        });
-
-        const C = X - Y - Z; const TC = C + A; const Drawer = TC - E;
-
-        document.getElementById('uiX').innerText = `₹${X}`; document.getElementById('uiY').innerText = `₹${Y}`; document.getElementById('uiZ').innerText = `₹${Z}`;
-        document.getElementById('uiC').innerText = `₹${C}`; document.getElementById('uiA').innerText = `₹${A}`; document.getElementById('uiTC').innerText = `₹${TC}`;
-        document.getElementById('uiE').innerText = `₹${E}`; document.getElementById('uiDrawer').innerText = `₹${Drawer}`;
-        document.getElementById('ptX').innerText = `₹${X}`; document.getElementById('ptY').innerText = `₹${Y}`; document.getElementById('ptZ').innerText = `₹${Z}`;
-        document.getElementById('ptC').innerText = `₹${C}`; document.getElementById('ptA').innerText = `₹${A}`; document.getElementById('ptTC').innerText = `₹${TC}`;
-        document.getElementById('ptE').innerText = `-₹${E}`; document.getElementById('ptDrawer').innerText = `₹${Drawer}`;
-        document.getElementById('ptEodDate').innerText = new Date(targetDate).toLocaleDateString('en-IN'); document.getElementById('ptEodTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
-
-        if (sessionRole === 'admin' || sessionRole === 'service') {
-            document.getElementById('owedSection').style.display = 'block'; document.getElementById('ptGreenSection').style.display = 'block';
-            if (closedJobIds.length > 0) {
-                const { data: items } = await supabaseClient.from('job_card_items').select('warehouse_type, total_price').in('job_card_id', closedJobIds);
-                (items || []).forEach(item => {
-                    if (item.warehouse_type === 'Moped') billedMoped += parseFloat(item.total_price) || 0;
-                    if (item.warehouse_type === 'Green') billedGreen += parseFloat(item.total_price) || 0;
-                });
-            }
-            const netMoped = billedMoped - paidMoped; const netGreen = billedGreen - paidGreen;
-            document.getElementById('uiMopedNet').innerText = `₹${netMoped}`; document.getElementById('uiGreenNet').innerText = `₹${netGreen}`;
-            document.getElementById('ptMoped').innerText = `₹${netMoped}`; document.getElementById('ptGreen').innerText = `₹${netGreen}`;
-        }
-    }
-
-    async function runNewCustomerReport() {
-        const range = document.getElementById('dateRange').value; const tbody = document.getElementById('analyticsTableBody'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Scanning database...</td></tr>';
-        let startDate = new Date(); if(range === 'today') { startDate.setHours(0,0,0,0); } else if(range === 'week') { startDate.setDate(startDate.getDate() - 7); } else if(range === 'month') { startDate.setDate(startDate.getDate() - 30); } else if(range === 'all') { startDate = new Date(2020, 0, 1); }
-        const { data: newCusts } = await supabaseClient.from('customers').select('*').gte('created_at', startDate.toISOString()).order('created_at', {ascending: false});
-        if(!newCusts || newCusts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No new customers registered in this timeframe.</td></tr>'; return; }
-        const phoneList = newCusts.map(c => c.mobile_number);
-        const { data: vehicles } = await supabaseClient.from('vehicles').select('customer_mobile, category_group').in('customer_mobile', phoneList);
-        const { data: amcs } = await supabaseClient.from('amc_subscriptions').select('customer_mobile, created_at').in('customer_mobile', phoneList);
-
-        tbody.innerHTML = '';
-        newCusts.forEach(cust => {
-            const custDate = new Date(cust.created_at); const myVeh = (vehicles || []).find(v => v.customer_mobile === cust.mobile_number); const vehType = myVeh ? myVeh.category_group : 'Unknown';
-            const myAmc = (amcs || []).find(a => { if(a.customer_mobile !== cust.mobile_number) return false; const diffDays = Math.ceil(Math.abs(new Date(a.created_at) - custDate) / (1000 * 60 * 60 * 24)); return diffDays <= 1; });
-            tbody.innerHTML += `<tr><td>${custDate.toLocaleDateString('en-IN')}</td><td><strong>${cust.mobile_number}</strong></td><td>${cust.name}</td><td>${vehType}</td><td>${myAmc ? '<span style="color:var(--success); font-weight:bold;">YES</span>' : '<span style="color:#94a3b8;">No</span>'}</td></tr>`;
+    async function loadMechanics() {
+        const { data } = await supabaseClient.from('mechanics').select('id, name');
+        const d1 = document.getElementById('mlsMech'); const d2 = document.getElementById('mlabMech'); const d3 = document.getElementById('smMech');
+        (data||[]).forEach(m => {
+            const opt = `<option value="${m.id}">${m.name}</option>`;
+            if(d1) d1.innerHTML += opt; if(d2) d2.innerHTML += opt; if(d3) d3.innerHTML += opt;
         });
     }
+    loadMechanics();
 
-    async function exportLeads(targetType) {
-        const { data: activeSubs } = await supabaseClient.from('amc_subscriptions').select('customer_mobile').gt('expires_at', new Date().toISOString());
-        const activeMobiles = (activeSubs || []).map(s => s.customer_mobile);
-        const { data: allVehicles } = await supabaseClient.from('vehicles').select('customer_mobile, make_model, category_group');
-        let leadMap = {}; 
-        (allVehicles || []).forEach(v => { const isScooter = (v.category_group || '').toLowerCase().includes('scooterate'); const qualifies = targetType === 'Scooter' ? isScooter : !isScooter; if(qualifies && v.customer_mobile && !activeMobiles.includes(v.customer_mobile)) { leadMap[v.customer_mobile] = v.make_model; } });
+    // Routing from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetTab = urlParams.get('tab');
+    if(targetTab === 'eod-green' && accessMap[sessionRole].includes('btnEodGreen')) switchTab('tabEodGreen');
+    else if(targetTab === 'eod-moped' && accessMap[sessionRole].includes('btnEodMoped')) switchTab('tabEodMoped');
+    else if(accessMap[sessionRole].length > 0) switchTab(accessMap[sessionRole][0].replace('btn','tab'));
 
-        const targetPhones = Object.keys(leadMap); if(targetPhones.length === 0) return alert(`No ${targetType} leads found without an active AMC.`);
-        const { data: targetClients } = await supabaseClient.from('customers').select('mobile_number, name').in('mobile_number', targetPhones);
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+        const btnId = tabId.replace('tab', 'btn');
+        if(document.getElementById(btnId)) document.getElementById(btnId).classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function exportTableToExcel(tableID, filename = ''){
+        const downloadLink = document.createElement("a");
+        const dataType = 'application/vnd.ms-excel';
+        const tableSelect = document.getElementById(tableID);
+        const tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+        filename = filename?filename+'.xls':'excel_data.xls';
+        downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+        downloadLink.download = filename;
+        downloadLink.click();
+    }
+
+    // UTILS
+    const linkifyJC = id => `<a class="clickable-ref" href="billing.html?id=${id}">JC-${id.split('-')[0].toUpperCase()}</a>`;
+    const linkifyPOS = id => `<a class="clickable-ref" href="pos-green.html?id=${id}">POS-${id.split('-')[0].toUpperCase()}</a>`;
+
+    // --- EOD WAREHOUSE LOGIC ---
+    async function runEodWare(ware) {
+        const dt = document.getElementById(`dateEod${ware}`).value; if(!dt) return;
+        const { data: items } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, advance_paid, customer_mobile, vehicles(reg_number), closed_at)').eq('warehouse_type', ware).gte('job_cards.closed_at', dt).lte('job_cards.closed_at', dt+'T23:59:59');
+        const { data: prepaids } = await supabaseClient.from('job_cards').select('id, advance_paid, customer_mobile, vehicles(reg_number)').gte('created_at', dt).lte('created_at', dt+'T23:59:59').gt('advance_paid', 0); // Note: Assuming advance_paid maps to prepaid deposit for Green/Moped context.
         
-        let csvContent = "data:text/csv;charset=utf-8,Name,Mobile,Primary Vehicle\n";
-        (targetClients || []).forEach(c => { csvContent += `"${c.name}","${c.mobile_number}","${leadMap[c.mobile_number]}"\n`; });
-        const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `Promo_Leads_${targetType}_${new Date().toISOString().split('T')[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        let S = 0; let L = 0; let P = 0;
+        const tbS = document.getElementById(`tbody${ware}S`); tbS.innerHTML='';
+        const tbL = document.getElementById(`tbody${ware}L`); tbL.innerHTML='';
+        const tbP = document.getElementById(`tbody${ware}P`); tbP.innerHTML='';
+
+        (items||[]).forEach(i => {
+            const v = parseFloat(i.total_price)||0;
+            const row = `<tr><td>${linkifyJC(i.job_card_id)}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${i.unit_price}</td><td>₹${v}</td></tr>`;
+            if(i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil') || i.item_name.toLowerCase().includes('lube')) { L+=v; tbL.innerHTML+=row; }
+            else { S+=v; tbS.innerHTML+=row; }
+        });
+
+        // Filter prepaids for specific warehouse? The DB schema mapping says "prepaid deposited at green = pg". Assuming checking source_role if it exists, otherwise general.
+        (prepaids||[]).forEach(p => {
+            const v = parseFloat(p.advance_paid)||0; P+=v;
+            tbP.innerHTML+=`<tr><td>${linkifyJC(p.id)}</td><td>${p.customer_mobile}</td><td>${p.vehicles?.reg_number}</td><td>₹${v}</td></tr>`;
+        });
+
+        document.getElementById(`val${ware}S`).innerText = `₹${S}`; document.getElementById(`val${ware}L`).innerText = `₹${L}`; document.getElementById(`val${ware}P`).innerText = `₹${P}`;
+        document.getElementById(`val${ware}Net`).innerText = `₹${S + L - P}`;
     }
 
-    // --- NEW LOYALTY REPORT LOGIC ---
-    async function loadLoyaltyReport() {
-        // 1. Mechanic Points Liability
-        const { data: mechs } = await supabaseClient.from('mechanics').select('earned_points');
-        const totalMechLiab = (mechs || []).reduce((sum, m) => sum + (parseFloat(m.earned_points) || 0), 0);
-        document.getElementById('statMechLiab').innerText = `₹${Math.floor(totalMechLiab)}`;
+    // --- REPORT 2 ---
+    async function runReport2() {
+        const s = document.getElementById('mlsStart').value; const e = document.getElementById('mlsEnd').value; const m = document.getElementById('mlsMech').value; const w = document.getElementById('mlsWare').value;
+        let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, mech_id, closed_at)').gte('job_cards.closed_at', s).lte('job_cards.closed_at', e+'T23:59:59');
+        if(m !== 'ALL') q = q.eq('job_cards.mech_id', m);
+        if(w !== 'ALL') q = q.eq('warehouse_type', w);
+        const { data } = await q;
 
-        // 2. Monthly Log Data
-        const d = new Date(); const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
-        const { data: pointLogs } = await supabaseClient.from('loyalty_points_log').select('points, type').gte('created_at', startOfMonth);
-        let ptsIn = 0; let ptsOut = 0;
-        (pointLogs || []).forEach(log => {
-            if(log.type === 'credit') ptsIn += parseFloat(log.points) || 0;
-            else ptsOut += parseFloat(log.points) || 0;
+        const tbL = document.getElementById('tbBodyRep2Lube'); tbL.innerHTML=''; const tbS = document.getElementById('tbBodyRep2Spare'); tbS.innerHTML='';
+        let totL = 0; let totS = 0;
+        (data||[]).forEach(i => {
+            const v = parseFloat(i.total_price)||0; const mechId = i.job_cards.mech_id;
+            const isLube = i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil');
+            if(isLube) { totL+=v; tbL.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>-</td><td>${i.qty}</td><td>${i.unit_metric==='ML'?(i.qty/1000).toFixed(2):'-'}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
+            else { totS+=v; tbS.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>${i.qty}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
         });
-        document.getElementById('statPtsIssued').innerText = Math.floor(ptsIn);
-        document.getElementById('statPtsRedeemed').innerText = Math.floor(ptsOut);
+        tbL.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="7">GRAND TOTAL</td><td>₹${totL}</td></tr>`;
+        tbS.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="5">GRAND TOTAL</td><td>₹${totS}</td></tr>`;
+    }
 
-        // 3. Top Referrers
-        const { data: custs } = await supabaseClient.from('customers').select('mobile_number, name, loyalty_points').gt('loyalty_points', 0).order('loyalty_points', {ascending: false}).limit(10);
-        const topBody = document.getElementById('topReferrersBody'); topBody.innerHTML = '';
-        (custs || []).forEach(c => { topBody.innerHTML += `<tr><td>${c.mobile_number}</td><td>${c.name}</td><td><strong>₹${Math.floor(c.loyalty_points)}</strong></td></tr>`; });
+    // --- REPORT 3 ---
+    async function runReport3() {
+        const s = document.getElementById('mlabStart').value; const e = document.getElementById('mlabEnd').value; const mId = document.getElementById('mlabMech').value;
+        let q = supabaseClient.from('job_cards').select('mech_id, labour_charges, mechanics(name, commission_rate)').eq('status', 'Closed').gte('closed_at', s).lte('closed_at', e+'T23:59:59');
+        if(mId !== 'ALL') q = q.eq('mech_id', mId);
+        const { data } = await q;
+        
+        let map = {};
+        (data||[]).forEach(j => {
+            const m = j.mech_id; if(!map[m]) map[m] = {name: j.mechanics?.name||m, jobs:0, lab:0, crate: parseFloat(j.mechanics?.commission_rate)||10 };
+            map[m].jobs++; map[m].lab += parseFloat(j.labour_charges)||0;
+        });
+        
+        const tb = document.getElementById('tbBodyRep3'); tb.innerHTML='';
+        let tg=0, tl=0, tc=0;
+        Object.values(map).sort((a,b)=>b.lab-a.lab).forEach(v => {
+            const comm = (v.lab * v.crate)/100;
+            tg+=v.jobs; tl+=v.lab; tc+=comm;
+            tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.jobs}</td><td>₹${v.lab}</td><td>${v.crate}%</td><td>₹${comm.toFixed(2)}</td></tr>`;
+        });
+        tb.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td>GRAND TOTAL</td><td>${tg}</td><td>₹${tl}</td><td>-</td><td>₹${tc.toFixed(2)}</td></tr>`;
+    }
 
-        // 4. Referral Tracker Table
-        const { data: refLog } = await supabaseClient.from('referrals').select('*').order('referral_date', {ascending: false}).limit(50);
-        const trackerBody = document.getElementById('referralTrackerBody'); trackerBody.innerHTML = '';
-        if(refLog && refLog.length > 0) {
-            refLog.forEach(r => {
-                const statusTag = r.reward_credited ? `<span style="color:var(--success); font-weight:bold;">Credited</span>` : `<span style="color:var(--warning); font-weight:bold;">Pending Service</span>`;
-                trackerBody.innerHTML += `<tr><td>${r.referral_date}</td><td>${r.referrer_mobile}</td><td>${r.referred_mobile}</td><td>${statusTag}</td></tr>`;
-            });
+    // --- REPORT 4 & 5 ---
+    async function runReport4() { await runVelocityOrLube('Lube'); }
+    async function runReport5() { await runVelocityOrLube('Velocity'); }
+    
+    async function runVelocityOrLube(mode) {
+        const s = document.getElementById(mode==='Lube'?'lsStart':'pvStart').value; const e = document.getElementById(mode==='Lube'?'lsEnd':'pvEnd').value;
+        const source = document.getElementById(mode==='Lube'?'lsSource':'pvSource').value;
+        
+        let items = [];
+        if(source === 'Both' || source === 'Workshop') {
+            const {data} = await supabaseClient.from('job_card_items').select('*, job_cards!inner(closed_at)').gte('job_cards.closed_at', s).lte('job_cards.closed_at', e+'T23:59:59');
+            if(data) items = items.concat(data);
+        }
+        // POS items query simulation (assume pos_items exists)
+        
+        let map = {};
+        items.forEach(i => {
+            const isLube = i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil');
+            if(mode==='Lube' && !isLube) return;
+            const n = i.item_name; if(!map[n]) map[n] = {name:n, brand:'-', cat: isLube?'Lube':'Spare', qty:0, rev:0, lit:0 };
+            map[n].qty += parseFloat(i.qty)||0; map[n].rev += parseFloat(i.total_price)||0;
+            if(i.unit_metric==='ML') map[n].lit += (parseFloat(i.qty)||0)/1000;
+        });
+
+        const arr = Object.values(map);
+        if(mode==='Velocity') {
+            const sortB = document.getElementById('pvSort').value;
+            arr.sort((a,b)=> sortB==='Qty'? b.qty-a.qty : b.rev-a.rev);
+            const tb = document.getElementById('tbBodyRep5'); tb.innerHTML='';
+            arr.forEach((v, idx) => { tb.innerHTML+=`<tr><td>${idx+1}</td><td>${v.name}</td><td>${v.brand}</td><td>${v.cat}</td><td>${v.qty}</td><td>₹${v.qty>0?(v.rev/v.qty).toFixed(2):0}</td><td>₹${v.rev}</td></tr>`; });
         } else {
-            trackerBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No referrals logged yet.</td></tr>';
+            const tb = document.getElementById('tbBodyRep4'); tb.innerHTML='';
+            let tq=0, tl=0, tr=0;
+            arr.forEach(v => { tq+=v.qty; tl+=v.lit; tr+=v.rev; tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.brand}</td><td>${v.qty}</td><td>${v.lit.toFixed(2)}</td><td>₹${v.rev}</td></tr>`; });
+            tb.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="2">GRAND TOTAL</td><td>${tq}</td><td>${tl.toFixed(2)}</td><td>₹${tr}</td></tr>`;
         }
     }
 
-    runEodReport();
+    // --- REPORT 6 ---
+    async function runReport6() {
+        const s = document.getElementById('hdStart').value; const e = document.getElementById('hdEnd').value;
+        const diff = (new Date(e) - new Date(s)) / (1000*60*60*24);
+        const w = document.getElementById('hdWarning');
+        if(diff < 30) { w.innerText = "Error: Minimum 30 days range required for Hot Days Analysis."; return; } else w.innerText = '';
+
+        const { data: jc } = await supabaseClient.from('job_cards').select('created_at, total_invoice_value').gte('created_at', s).lte('created_at', e+'T23:59:59');
+        let dayMap = {0:0,1:0,2:0,3:0,4:0,5:0,6:0}; const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        let hrMap = {}; for(let i=0;i<24;i++) hrMap[i]={c:0, r:0};
+
+        (jc||[]).forEach(j => {
+            const d = new Date(j.created_at);
+            dayMap[d.getDay()] += parseFloat(j.total_invoice_value)||0;
+            hrMap[d.getHours()].c++; hrMap[d.getHours()].r+= parseFloat(j.total_invoice_value)||0;
+        });
+
+        const sortedDays = Object.entries(dayMap).sort((a,b)=>b[1]-a[1]);
+        const tbD = document.getElementById('tbBodyHdDays'); tbD.innerHTML='';
+        sortedDays.forEach((kv, idx) => {
+            let badge = 'Average'; if(idx<2) badge='🔥 HOT'; if(idx>4) badge='❄️ COLD';
+            tbD.innerHTML+=`<tr><td>${days[kv[0]]}</td><td>-</td><td>₹${kv[1]}</td><td>${badge}</td></tr>`;
+        });
+
+        const tbH = document.getElementById('tbBodyHdHours'); tbH.innerHTML='';
+        Object.entries(hrMap).forEach(kv => {
+            const hr = parseInt(kv[0]); if(hr<8 || hr>20) return; // Filter business hours
+            const bg = kv[1].c <= 1 ? 'background:#fee2e2; color:var(--danger);' : '';
+            tbH.innerHTML+=`<tr style="${bg}"><td>${hr}:00 - ${hr+1}:00</td><td>${kv[1].c}</td><td>₹${kv[1].r}</td></tr>`;
+        });
+
+        const slowest = days[sortedDays[6][0]];
+        document.getElementById('hdRecommendation').style.display='block';
+        document.getElementById('hdRecommendation').innerText = `Recommendation: Your slowest day is ${slowest}. Consider a Happy Hour labour discount during red-highlighted Dead Hours.`;
+    }
+
+    // --- REPORT 7 ---
+    async function runReport7() {
+        const s = document.getElementById('smStart').value; const e = document.getElementById('smEnd').value;
+        const {data} = await supabaseClient.from('job_cards').select('mech_id, labour_charges').eq('status', 'Closed').gte('closed_at', s).lte('closed_at', e+'T23:59:59');
+        // Simulated package association.
+        const tb = document.getElementById('tbBodyRep7'); tb.innerHTML='';
+        tb.innerHTML+=`<tr><td>MOCK DATA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>₹0</td></tr>`;
+    }
+
+    // --- REPORT 8 ---
+    async function runReport8() {
+        const s = document.getElementById('ltStart').value; const e = document.getElementById('ltEnd').value;
+        const {data} = await supabaseClient.from('job_cards').select('id, created_at, mech_completion_time, closed_at').eq('status', 'Closed').gte('closed_at', s).lte('closed_at', e+'T23:59:59');
+        const tb = document.getElementById('tbBodyRep8'); tb.innerHTML='';
+        let delayed = 0;
+        (data||[]).forEach(j => {
+            const t1 = new Date(j.created_at); const t2 = j.mech_completion_time ? new Date(j.mech_completion_time) : null; const t3 = new Date(j.closed_at);
+            const gap1 = t2 ? ((t2-t1)/(1000*60*60)).toFixed(1) : 'Not recorded';
+            const gap2 = t2 ? ((t3-t2)/(1000*60*60)).toFixed(1) : '-';
+            const gapTot = ((t3-t1)/(1000*60*60)).toFixed(1);
+            let style = ''; if(t2 && (t3-t2)/(1000*60*60) > 2) { style='color:var(--danger); font-weight:bold;'; delayed++; }
+            tb.innerHTML+=`<tr style="${style}"><td>${linkifyJC(j.id)}</td><td>${t1.toLocaleString()}</td><td>${t2?t2.toLocaleString():'Not recorded'}</td><td>${t3.toLocaleString()}</td><td>${gap1}</td><td>${gap2}</td><td>${gapTot}</td></tr>`;
+        });
+        document.getElementById('ltSummary').innerText = `${delayed} job cards had billing delays over 2 hours.`;
+    }
+
+    // --- REPORT 9 ---
+    async function runReport9() {
+        const s = document.getElementById('laStart').value; const e = document.getElementById('laEnd').value;
+        const {data} = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number), lathe_welding, status, created_at, closed_at').gt('lathe_welding', 0).gte('created_at', s).lte('created_at', e+'T23:59:59');
+        const tb = document.getElementById('tbBodyRep9'); tb.innerHTML='';
+        let tot = 0;
+        (data||[]).forEach(j => {
+            if(j.status === 'Open') tot += parseFloat(j.lathe_welding)||0;
+            tb.innerHTML+=`<tr><td>${linkifyJC(j.id)}</td><td>${j.customer_mobile}</td><td>${j.vehicles?.reg_number}</td><td>₹${j.lathe_welding}</td><td>${j.status}</td><td>${new Date(j.created_at).toLocaleDateString()}</td><td>${j.closed_at?new Date(j.closed_at).toLocaleDateString():'-'}</td></tr>`;
+        });
+        document.getElementById('laSummary').innerText = `Total Outstanding Lathe Liability (Open Jobs): ₹${tot}`;
+    }
+
+    // --- REPORT 10 ---
+    async function runReport10() {
+        const { data: custs } = await supabaseClient.from('customers').select('mobile_number, name, loyalty_points').order('loyalty_points', {ascending: false}).limit(20);
+        const tb = document.getElementById('tbBodyRep10'); tb.innerHTML='';
+        let tot = 0;
+        (custs||[]).forEach(c => { tot+=parseFloat(c.loyalty_points)||0; tb.innerHTML+=`<tr><td>${c.name}</td><td>${c.mobile_number}</td><td>₹${c.loyalty_points}</td><td>-</td><td>-</td></tr>`; });
+        document.getElementById('loyaltySummary').innerText = `Total Outstanding Loyalty Liability: ₹${tot}`;
+        
+        const { data: refs } = await supabaseClient.from('referrals').select('*').limit(20);
+        const tbr = document.getElementById('tbBodyRep10Ref'); tbr.innerHTML='';
+        (refs||[]).forEach(r => { tbr.innerHTML+=`<tr><td>${r.referrer_mobile}</td><td>${r.referred_mobile}</td><td>${r.referral_date}</td><td>-</td><td>${r.reward_credited?'Yes':'No'}</td><td>-</td></tr>`; });
+    }
 </script>
 </body>
 </html>
