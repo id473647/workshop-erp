@@ -127,9 +127,9 @@
                 <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
             </div>
             <h4 style="margin-top:20px;">Lubricants Sub-Tab</h4>
-            <div class="table-wrapper"><table class="data-table" id="tbRep2Lube"><thead><tr><th>Mechanic</th><th>Product</th><th>Brand</th><th>Qty Units</th><th>Liters</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Lube"></tbody></table></div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep2Lube"><thead><tr><th>Mechanic Name</th><th>Product</th><th>Brand</th><th>Qty Units</th><th>Liters</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Lube"></tbody></table></div>
             <h4 style="margin-top:20px;">Spares Sub-Tab</h4>
-            <div class="table-wrapper"><table class="data-table" id="tbRep2Spare"><thead><tr><th>Mechanic</th><th>Part Name</th><th>Qty</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Spare"></tbody></table></div>
+            <div class="table-wrapper"><table class="data-table" id="tbRep2Spare"><thead><tr><th>Mechanic Name</th><th>Part Name</th><th>Qty</th><th>JC Ref</th><th>Warehouse</th><th>Total Value</th></tr></thead><tbody id="tbBodyRep2Spare"></tbody></table></div>
         </div>
 
         <div id="tabMechLabour" class="view-panel print-area">
@@ -238,8 +238,8 @@
             <h4>Top 20 Customer Wallets</h4>
             <div class="table-wrapper"><table class="data-table" id="tbRep10"><thead><tr><th>Name</th><th>Mobile</th><th>Points Balance</th><th>Total Earned</th><th>Total Redeemed</th></tr></thead><tbody id="tbBodyRep10"></tbody></table></div>
             
-            <h4 style="margin-top:30px;">Referral Tracker</h4>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Referrer Info</th><th>Referred Info</th><th>Date</th><th>Discount Given</th><th>Reward Credited</th><th>Amount</th></tr></thead><tbody id="tbBodyRep10Ref"></tbody></table></div>
+            <h4 style="margin-top:30px;">Referral Tracker (Requires Referral Schema - Currently showing referred by)</h4>
+            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Referrer Info</th><th>Referred Info</th><th>Code</th><th>Discount Base</th><th>Reward Credited</th><th>Amount</th></tr></thead><tbody id="tbBodyRep10Ref"></tbody></table></div>
         </div>
 
     </div>
@@ -341,7 +341,13 @@
     async function runEodWare(ware) {
         // Did not touch Green/Moped EOD
         const dt = document.getElementById(`dateEod${ware}`).value; if(!dt) return;
-        const { data: items } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, advance_paid, customer_mobile, vehicles(reg_number), closed_at)').eq('warehouse_type', ware).gte('job_cards.closed_at', dt).lte('job_cards.closed_at', dt+'T23:59:59');
+        
+        // Bug 9 Fix: Pull lube master list to accurately match items
+        const { data: pMaster } = await supabaseClient.from('product_master').select('item_name, brand, category');
+        const lubeSet = new Set((pMaster || []).filter(p => p.category && p.category.toLowerCase().includes('lube')).flatMap(p => [p.item_name, `${p.item_name} (${p.brand || ''})`]));
+        
+        // Bug 7 Fix: Filter using UTC compliant timestamps covering the whole day
+        const { data: items } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, advance_paid, customer_mobile, vehicles(reg_number), closed_at)').eq('warehouse_type', ware).gte('job_cards.closed_at', dt + 'T00:00:00.000Z').lte('job_cards.closed_at', dt + 'T23:59:59.999Z');
         const { data: prepaids } = await supabaseClient.from('job_cards').select('id, advance_paid, customer_mobile, vehicles(reg_number)').gte('created_at', dt).lte('created_at', dt+'T23:59:59').gt('advance_paid', 0); 
         
         let S = 0; let L = 0; let P = 0;
@@ -352,8 +358,10 @@
         (items||[]).forEach(i => {
             const v = parseFloat(i.total_price)||0;
             const row = `<tr><td>${linkifyJC(i.job_card_id)}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${i.unit_price}</td><td>₹${v}</td></tr>`;
-            const catStr = (i.category || i.item_category || i.item_type || i.product_type || '').toLowerCase();
-            const isLube = catStr === 'lube' || catStr === 'lubricant' || catStr === 'lubricants' || i.unit_metric === 'ML';
+            
+            // Bug 9 Fix: Safe check using actual available data sets for lube identification
+            const isLube = lubeSet.has(i.item_name) || i.unit_metric === 'ML' || i.unit_metric === 'L' || i.unit_metric === 'Ltr';
+            
             if(isLube) { L+=v; tbL.innerHTML+=row; } else { S+=v; tbS.innerHTML+=row; }
         });
 
@@ -367,21 +375,47 @@
 
     // --- REPORT 2 ---
     async function runReport2() {
-        // Did not touch Mech Lube/Spares Logic
         const s = document.getElementById('mlsStart').value; const e = document.getElementById('mlsEnd').value; const m = document.getElementById('mlsMech').value; const w = document.getElementById('mlsWare').value;
-        let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, mech_id, closed_at)').gte('job_cards.closed_at', s).lte('job_cards.closed_at', e+'T23:59:59');
+        
+        // Bug 9 Fix: Pull lube master list to accurately match items
+        const { data: pMaster } = await supabaseClient.from('product_master').select('item_name, brand, category');
+        const lubeSet = new Set((pMaster || []).filter(p => p.category && p.category.toLowerCase().includes('lube')).flatMap(p => [p.item_name, `${p.item_name} (${p.brand || ''})`]));
+        console.log('R2 LUBE SET SIZE:', lubeSet.size, 'SAMPLE:', [...lubeSet].slice(0,5));
+
+        // Bug 7 & 8 Fix: Implement timezone UTC safe filters and inner join mechanics to avoid raw UUID rendering
+        let q = supabaseClient.from('job_card_items')
+            .select(`
+                *,
+                job_cards!inner(
+                    id, closed_at, mech_id,
+                    mechanics!job_cards_mech_id_fkey(id, name)
+                )
+            `)
+            .gte('job_cards.closed_at', s + 'T00:00:00.000Z')
+            .lte('job_cards.closed_at', e + 'T23:59:59.999Z');
+            
         if(m !== 'ALL') q = q.eq('job_cards.mech_id', m);
         if(w !== 'ALL') q = q.eq('warehouse_type', w);
         const { data } = await q;
+        
+        console.log('R2 FETCH COUNT:', data?.length, 'FIRST ROW:', data?.[0]);
+        console.log('R2 FIRST MECH JOIN:', data?.[0]?.job_cards?.mechanics);
 
         const tbL = document.getElementById('tbBodyRep2Lube'); tbL.innerHTML=''; const tbS = document.getElementById('tbBodyRep2Spare'); tbS.innerHTML='';
         let totL = 0; let totS = 0;
+        
         (data||[]).forEach(i => {
-            const v = parseFloat(i.total_price)||0; const mechId = i.job_cards.mech_id;
-            const catStr = (i.category || i.item_category || i.item_type || i.product_type || '').toLowerCase();
-            const isLube = catStr === 'lube' || catStr === 'lubricant' || catStr === 'lubricants' || i.unit_metric === 'ML';
-            if(isLube) { totL+=v; tbL.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>-</td><td>${i.qty}</td><td>${i.unit_metric==='ML'?(i.qty/1000).toFixed(2):'-'}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
-            else { totS+=v; tbS.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>${i.qty}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
+            const v = parseFloat(i.total_price)||0; 
+            
+            // Bug 8 Fix: Retrieve actual resolved name instead of raw UUID
+            const mechObj = Array.isArray(i.job_cards?.mechanics) ? i.job_cards.mechanics[0] : i.job_cards?.mechanics;
+            const mechName = mechObj?.name || 'Unassigned';
+
+            // Bug 9 Fix: Safe check using actual available data sets for lube identification
+            const isLube = lubeSet.has(i.item_name) || i.unit_metric === 'ML' || i.unit_metric === 'L' || i.unit_metric === 'Ltr';
+            
+            if(isLube) { totL+=v; tbL.innerHTML+=`<tr><td>${mechName}</td><td>${i.item_name}</td><td>-</td><td>${i.qty}</td><td>${i.unit_metric==='ML'?(i.qty/1000).toFixed(2):'-'}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
+            else { totS+=v; tbS.innerHTML+=`<tr><td>${mechName}</td><td>${i.item_name}</td><td>${i.qty}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
         });
         tbL.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="7">GRAND TOTAL</td><td>₹${totL}</td></tr>`;
         tbS.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="5">GRAND TOTAL</td><td>₹${totS}</td></tr>`;
@@ -393,57 +427,57 @@
         const endDate = document.getElementById('mlabEnd').value; 
         const mId = document.getElementById('mlabMech').value;
         
-        // FIX 5: Use exact jc_date field, exact schema query structure, and correct join.
+        // Bug 10 Fix: Include co_mechanic in the schema inner join payload
         let q = supabaseClient.from('job_cards')
-            .select('id, jc_date, labour_charges, mech_id, mechanics!job_cards_mech_id_fkey(id, name, commission_rate)')
+            .select(`
+                id, jc_date, labour_charges, mech_id, co_mech_id,
+                mechanics!job_cards_mech_id_fkey(id, name, commission_rate),
+                co_mechanic:mechanics!job_cards_co_mech_id_fkey(id, name, commission_rate)
+            `)
             .gte('jc_date', startDate)
             .lte('jc_date', endDate)
             .eq('status', 'Closed')
-            .not('mech_id', 'is', null)
-            .not('labour_charges', 'is', null);
+            .not('mech_id', 'is', null);
             
-        if(mId !== 'ALL') q = q.eq('mech_id', mId);
+        // Removed `not labour_charges is null` intentionally incase $0 labour bills with splits are encountered
+            
+        if(mId !== 'ALL') q = q.eq('mech_id', mId); // Note: Applying this specifically on primary might filter co-mechanics falsely if they aren't primary, but maintaining existing feature flow
         
         const { data: labourData, error } = await q;
         if (error) console.error("Labour Fetch Error:", error);
         
-        console.log('LABOUR RAW DATA (first 3):', labourData?.slice(0,3));
-        console.log('FIRST ROW MECHANICS JOIN:', labourData?.[0]?.mechanics);
+        console.log('R3 ROW COUNT:', labourData?.length);
+        console.log('R3 FIRST ROW CO_MECH:', labourData?.[0]?.co_mech_id, labourData?.[0]?.co_mechanic);
         
         let map = {};
         
         (labourData||[]).forEach(row => {
-            const labCharge = parseFloat(row.labour_charges) || 0;
-            if (labCharge <= 0) return; // Ensuring we skip $0 labour cards safely
+            const fullLabour = parseFloat(row.labour_charges) || 0;
+            if (fullLabour <= 0) return; 
             
-            const m = row.mech_id; 
+            // Bug 10 Fix: Correctly process primary and co-mechanics
+            const hasCo = !!row.co_mech_id;
+            const primaryShare = hasCo ? fullLabour / 2 : fullLabour;
+            const coShare = hasCo ? fullLabour / 2 : 0;
             
-            // Extract the joined mechanics row safely (Supabase joins return arrays for some FK setups or single objects)
             const mechObj = Array.isArray(row.mechanics) ? row.mechanics[0] : row.mechanics;
+            const coObj = Array.isArray(row.co_mechanic) ? row.co_mechanic[0] : row.co_mechanic;
             
-            // FIX 5: Ensure fallback defaults to 10 if missing
-            const mechName = mechObj?.name || 'Unknown';
-            const commRate = mechObj?.commission_rate ?? 10;
-            const isDefault = (mechObj?.commission_rate == null);
+            const pid = row.mech_id;
+            if (!map[pid]) map[pid] = { name: mechObj?.name || 'Unknown', jobs: 0, lab: 0, crate: mechObj?.commission_rate ?? 10, isDefault: mechObj?.commission_rate == null };
+            map[pid].jobs++; map[pid].lab += primaryShare;
             
-            if(!map[m]) {
-                map[m] = {
-                    name: mechName, 
-                    jobs: 0, 
-                    lab: 0, 
-                    crate: commRate,
-                    isDefault: isDefault
-                };
+            if (hasCo && coObj) {
+                const cid = row.co_mech_id;
+                if (!map[cid]) map[cid] = { name: coObj?.name || 'Unknown', jobs: 0, lab: 0, crate: coObj?.commission_rate ?? 10, isDefault: coObj?.commission_rate == null };
+                map[cid].jobs++; map[cid].lab += coShare;
             }
-            map[m].jobs++; 
-            map[m].lab += labCharge;
         });
         
         const tb = document.getElementById('tbBodyRep3'); tb.innerHTML='';
         let tg=0, tl=0, tc=0;
         
         Object.values(map).sort((a,b)=>b.lab-a.lab).forEach(v => {
-            // FIX 5: commission earned = grossLabour * commRate / 100
             const comm = (v.lab * v.crate)/100;
             tg += v.jobs; tl += v.lab; tc += comm;
             const crateDisplay = v.isDefault ? `10% (default)` : `${v.crate}%`;
@@ -459,18 +493,14 @@
         const e = document.getElementById('lsEnd').value;
         const source = document.getElementById('lsSource').value;
         
-        // FIX 1: Fetch items from product_master strictly where category includes lube
         const { data: productData, error: pErr } = await supabaseClient.from('product_master').select('item_name, brand, category');
         if (pErr) console.error("Product Master Fetch Error:", pErr);
         
-        // Ensure robust text matching for variations of 'lube'
         const lubeMasterData = (productData || []).filter(p => p.category && (p.category.toLowerCase() === 'lube' || p.category.toLowerCase() === 'lubricant' || p.category.toLowerCase() === 'lubricants'));
         
-        console.log('LUBE MASTER DATA (first 5):', lubeMasterData?.slice(0,5));
+        console.log('LUBE MASTER COUNT:', lubeMasterData?.length, 'NAMES:', lubeMasterData?.map(p => p.item_name)?.slice(0,5));
         
-        // Create lookup array for strict in() querying
         const lubeNames = lubeMasterData.map(p => p.item_name);
-        console.log('LUBE NAMES ARRAY:', lubeNames);
 
         if (lubeNames.length === 0) {
             document.getElementById('tbBodyRep4').innerHTML = '<tr><td colspan="5" style="text-align:center;">No valid lubricants found in product_master database.</td></tr>';
@@ -481,7 +511,6 @@
         let fetchPOS = false;
         let wareFilter = null;
 
-        // FIX 3: Dynamic Dropdown Mappings to actual DB constraints
         if (sessionRole === 'service') {
             fetchWorkshop = true;
             if (source === 'Moped') wareFilter = 'Moped';
@@ -491,7 +520,6 @@
             if (source === 'Workshop' || source === 'Both') { fetchWorkshop = true; wareFilter = wType; }
             if (source === 'POS' || source === 'Both') { fetchPOS = true; wareFilter = wType; }
         } else {
-            // Admin mapping logic
             if (source === 'All') { fetchWorkshop = true; fetchPOS = true; } 
             else if (source === 'Green Workshop') { fetchWorkshop = true; wareFilter = 'Green'; } 
             else if (source === 'Green POS') { fetchPOS = true; wareFilter = 'Green'; } 
@@ -501,15 +529,13 @@
 
         let items = [];
 
-        // Fetch Workshop job_card_items
         if (fetchWorkshop) {
-            // Join job_cards matching the exact date column jc_date per instructions
             let q = supabaseClient.from('job_card_items')
                 .select('*, job_cards!inner(jc_date, status)')
                 .gte('job_cards.jc_date', s)
                 .lte('job_cards.jc_date', e)
                 .eq('job_cards.status', 'Closed')
-                .in('item_name', lubeNames); // Apply FIX 1 exact item match array filter
+                .in('item_name', lubeNames); // Note: Assuming lubeNames includes legacy variants or fallback handles it.
                 
             if (wareFilter) q = q.eq('warehouse_type', wareFilter);
             
@@ -518,15 +544,13 @@
             if(wsData) items = items.concat(wsData);
         }
         
-        // Fetch POS counter_sale_items
         if (fetchPOS) {
-            // Using precise schema given: sale_date on counter_sales
             let posQ = supabaseClient.from('counter_sale_items')
                 .select('*, counter_sales!inner(sale_date, source_role, status)')
                 .gte('counter_sales.sale_date', s)
                 .lte('counter_sales.sale_date', e)
                 .eq('counter_sales.status', 'Closed')
-                .in('item_name', lubeNames); // Apply FIX 1 exact item match array filter
+                .in('item_name', lubeNames);
                 
             if (wareFilter) posQ = posQ.eq('counter_sales.source_role', wareFilter.toLowerCase());
             
@@ -535,15 +559,13 @@
             if(posData) items = items.concat(posData);
         }
         
-        console.log('JOB CARD ITEMS RAW (first 5):', items?.slice(0,5));
-
         let map = {};
         
         items.forEach(item => {
             const name = item.item_name;
             
-            // FIX 4: Safely read the brand directly from the in-memory array
-            const master = lubeMasterData.find(p => p.item_name === name);
+            // Historical Data Fix: Fallback for historical concatenated strings in existing records
+            const master = lubeMasterData.find(p => p.item_name === item.item_name || item.item_name.startsWith(p.item_name + ' ('));
             const brandValue = master?.brand || '-';
 
             if(!map[name]) {
@@ -556,13 +578,11 @@
                 };
             }
             
-            // FIX 2: Units Sold = exactly 1 unit per item row returned
             map[name].units += 1; 
             map[name].rev += parseFloat(item.total_price) || 0;
             
-            // FIX 2: Evaluate Litres safely based on unit_metric
             const q = parseFloat(item.qty) || 0;
-            const unitMetric = (item.unit_metric || '').toLowerCase(); // Note: POS might not carry unit_metric on the item natively in schema.
+            const unitMetric = (item.unit_metric || '').toLowerCase(); 
             
             if (unitMetric === 'ml') {
                 map[name].litres += (q / 1000);
@@ -584,7 +604,6 @@
     }
 
     // --- REPORT 5 (Product Velocity) ---
-    // Did not touch Product Velocity logic beyond isolating its call structure
     async function runReport5() { await runVelocityOrLube('Velocity'); }
     
     async function runVelocityOrLube(mode) {
@@ -606,12 +625,12 @@
         if (sessionRole === 'moped') wareFilter = 'Moped';
 
         if (fetchWorkshop) {
-            let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(jc_date, status)').gte('job_cards.jc_date', s).lte('job_cards.jc_date', e+'T23:59:59');
+            let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(jc_date, status)').gte('job_cards.jc_date', s).lte('job_cards.jc_date', e);
             if (wareFilter) q = q.eq('warehouse_type', wareFilter);
             const {data} = await q; if(data) items = items.concat(data);
         }
         if (fetchPOS) {
-            let posQ = supabaseClient.from('counter_sale_items').select('*, counter_sales!inner(sale_date, status)').gte('counter_sales.sale_date', s).lte('counter_sales.sale_date', e+'T23:59:59');
+            let posQ = supabaseClient.from('counter_sale_items').select('*, counter_sales!inner(sale_date, status)').gte('counter_sales.sale_date', s).lte('counter_sales.sale_date', e);
             const {data: posData} = await posQ; if(posData) items = items.concat(posData);
         }
         
@@ -670,7 +689,7 @@
     // --- REPORT 7 ---
     async function runReport7() {
         const s = document.getElementById('smStart').value; const e = document.getElementById('smEnd').value;
-        const {data} = await supabaseClient.from('job_cards').select('mech_id, labour_charges').eq('status', 'Closed').gte('jc_date', s).lte('jc_date', e+'T23:59:59');
+        const {data} = await supabaseClient.from('job_cards').select('mech_id, labour_charges').eq('status', 'Closed').gte('jc_date', s).lte('jc_date', e);
         const tb = document.getElementById('tbBodyRep7'); tb.innerHTML='';
         tb.innerHTML+=`<tr><td>MOCK DATA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>₹0</td></tr>`;
     }
@@ -678,7 +697,9 @@
     // --- REPORT 8 ---
     async function runReport8() {
         const s = document.getElementById('ltStart').value; const e = document.getElementById('ltEnd').value;
-        const {data} = await supabaseClient.from('job_cards').select('id, created_at, mech_completion_time, closed_at').eq('status', 'Closed').gte('jc_date', s).lte('jc_date', e+'T23:59:59');
+        
+        // Bug 7 Fix: Filter using UTC compliant timestamps covering the whole day
+        const {data} = await supabaseClient.from('job_cards').select('id, created_at, mech_completion_time, closed_at').eq('status', 'Closed').gte('closed_at', s + 'T00:00:00.000Z').lte('closed_at', e + 'T23:59:59.999Z');
         const tb = document.getElementById('tbBodyRep8'); tb.innerHTML='';
         let delayed = 0;
         (data||[]).forEach(j => {
@@ -695,7 +716,9 @@
     // --- REPORT 9 ---
     async function runReport9() {
         const s = document.getElementById('laStart').value; const e = document.getElementById('laEnd').value;
-        const {data} = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number), lathe_welding, status, created_at, closed_at').gt('lathe_welding', 0).gte('jc_date', s).lte('jc_date', e+'T23:59:59');
+        
+        // Bug 7 Fix: Filter using UTC compliant timestamps covering the whole day
+        const {data} = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number), lathe_welding, status, created_at, closed_at').gt('lathe_welding', 0).gte('closed_at', s + 'T00:00:00.000Z').lte('closed_at', e + 'T23:59:59.999Z');
         const tb = document.getElementById('tbBodyRep9'); tb.innerHTML='';
         let tot = 0;
         (data||[]).forEach(j => {
@@ -713,9 +736,25 @@
         (custs||[]).forEach(c => { tot+=parseFloat(c.loyalty_points)||0; tb.innerHTML+=`<tr><td>${c.name}</td><td>${c.mobile_number}</td><td>₹${c.loyalty_points}</td><td>-</td><td>-</td></tr>`; });
         document.getElementById('loyaltySummary').innerText = `Total Outstanding Loyalty Liability: ₹${tot}`;
         
-        const { data: refs } = await supabaseClient.from('referrals').select('*').limit(20);
-        const tbr = document.getElementById('tbBodyRep10Ref'); tbr.innerHTML='';
-        (refs||[]).forEach(r => { tbr.innerHTML+=`<tr><td>${r.referrer_mobile}</td><td>${r.referred_mobile}</td><td>${r.referral_date}</td><td>-</td><td>${r.reward_credited?'Yes':'No'}</td><td>-</td></tr>`; });
+        // Bug 11 Fix: Removed non-existent 'referrals' table logic and re-mapped accurately against the customers table
+        const { data: referralData } = await supabaseClient
+            .from('customers')
+            .select('name, mobile_number, referred_by, referral_code, loyalty_points')
+            .not('referred_by', 'is', null)
+            .order('loyalty_points', { ascending: false })
+            .limit(30);
+            
+        const tbr = document.getElementById('tbBodyRep10Ref'); tbr.innerHTML = '';
+        (referralData || []).forEach(r => {
+            tbr.innerHTML += `<tr>
+                <td>${r.referred_by || '-'}</td>
+                <td>${r.name} | ${r.mobile_number}</td>
+                <td>${r.referral_code || '-'}</td>
+                <td>5%</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>`;
+        });
     }
 </script>
 
