@@ -148,7 +148,7 @@
             <div class="inputs-grid">
                 <div class="field-group"><label>Start Date</label><input type="date" id="lsStart"></div>
                 <div class="field-group"><label>End Date</label><input type="date" id="lsEnd"></div>
-                <div class="field-group" id="lsSourceGroup"><label>Source</label><select id="lsSource"><option value="Both">Both</option><option value="Workshop">Workshop</option><option value="POS">POS</option></select></div>
+                <div class="field-group" id="lsSourceGroup"><label>Source</label><select id="lsSource"></select></div>
                 <button class="btn-action" onclick="runReport4()">RUN</button>
                 <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep4', 'Total_Lube_Sales')">📥 EXCEL</button>
                 <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
@@ -160,7 +160,7 @@
             <div class="inputs-grid">
                 <div class="field-group"><label>Start Date</label><input type="date" id="pvStart"></div>
                 <div class="field-group"><label>End Date</label><input type="date" id="pvEnd"></div>
-                <div class="field-group" id="pvSourceGroup"><label>Source</label><select id="pvSource"><option value="Both">Both</option><option value="Workshop">Workshop</option><option value="POS">POS</option></select></div>
+                <div class="field-group" id="pvSourceGroup"><label>Source</label><select id="pvSource"></select></div>
                 <div class="field-group"><label>Sort By</label><select id="pvSort"><option value="Qty">Qty Sold</option><option value="Rev">Total Revenue</option></select></div>
                 <button class="btn-action" onclick="runReport5()">RUN</button>
                 <button class="btn-action" style="background:var(--success);" onclick="exportTableToExcel('tbRep5', 'Product_Velocity')">📥 EXCEL</button>
@@ -248,8 +248,8 @@
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    document.getElementById('roleDisplay').innerText = `REPORTS - ${sessionRole}`;
+    const sessionRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase();
+    document.getElementById('roleDisplay').innerText = `REPORTS - ${sessionRole.toUpperCase()}`;
 
     // Apply Dates
     const today = new Date().toISOString().split('T')[0];
@@ -257,10 +257,31 @@
     const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
     document.getElementById('hdStart').value = thirtyAgo.toISOString().split('T')[0];
 
+    // BUG FIX 3: Initialize dynamic source dropdown based on role
+    function initSourceDropdown() {
+        const lsSource = document.getElementById('lsSource');
+        const pvSource = document.getElementById('pvSource');
+        if(!lsSource) return;
+        
+        let html = '';
+        if (sessionRole === 'service' || sessionRole === 'workshop') {
+            html = '<option value="Both">Both</option><option value="Moped">Moped</option><option value="Green">Green</option>';
+        } else if (sessionRole === 'green' || sessionRole === 'moped') {
+            html = '<option value="Both">Both</option><option value="Workshop">Workshop</option><option value="POS">POS</option>';
+        } else {
+            html = '<option value="All">All</option><option value="Moped Workshop">Moped Workshop</option><option value="Moped POS">Moped POS</option><option value="Green Workshop">Green Workshop</option><option value="Green POS">Green POS</option>';
+        }
+        
+        lsSource.innerHTML = html;
+        if(pvSource) pvSource.innerHTML = html;
+    }
+    initSourceDropdown();
+
     // RBAC logic
     const accessMap = {
         'admin': ['btnEodGreen', 'btnEodMoped', 'btnMechLubeSpares', 'btnMechLabour', 'btnLubeSales', 'btnProdVelocity', 'btnHotDays', 'btnServiceModule', 'btnLeadTime', 'btnLathe', 'btnLoyalty'],
         'service': ['btnEodGreen', 'btnEodMoped', 'btnMechLubeSpares', 'btnMechLabour', 'btnLubeSales', 'btnProdVelocity', 'btnServiceModule'],
+        'workshop': ['btnEodGreen', 'btnEodMoped', 'btnMechLubeSpares', 'btnMechLabour', 'btnLubeSales', 'btnProdVelocity', 'btnServiceModule'], // added workshop fallback mapping
         'green': ['btnEodGreen', 'btnMechLubeSpares', 'btnLubeSales', 'btnProdVelocity'],
         'moped': ['btnEodMoped', 'btnMechLubeSpares', 'btnLubeSales', 'btnProdVelocity']
     };
@@ -271,8 +292,7 @@
     if(sessionRole === 'green' || sessionRole === 'moped') {
         const w = sessionRole === 'green' ? 'Green' : 'Moped';
         document.getElementById('mlsWareGroup').style.display = 'none'; document.getElementById('mlsWare').value = w;
-        document.getElementById('lsSourceGroup').style.display = 'none'; document.getElementById('lsSource').value = 'Workshop';
-        document.getElementById('pvSourceGroup').style.display = 'none'; document.getElementById('pvSource').value = 'Workshop';
+        // Bug Fix 3: Removed hiding of lsSourceGroup and pvSourceGroup to allow Green/Moped to pick Workshop vs POS
     }
 
     async function loadMechanics() {
@@ -288,16 +308,16 @@
     // Routing from URL params
     const urlParams = new URLSearchParams(window.location.search);
     const targetTab = urlParams.get('tab');
-    if(targetTab === 'eod-green' && accessMap[sessionRole].includes('btnEodGreen')) switchTab('tabEodGreen');
-    else if(targetTab === 'eod-moped' && accessMap[sessionRole].includes('btnEodMoped')) switchTab('tabEodMoped');
-    else if(accessMap[sessionRole].length > 0) switchTab(accessMap[sessionRole][0].replace('btn','tab'));
+    if(targetTab === 'eod-green' && (accessMap[sessionRole]||[]).includes('btnEodGreen')) switchTab('tabEodGreen');
+    else if(targetTab === 'eod-moped' && (accessMap[sessionRole]||[]).includes('btnEodMoped')) switchTab('tabEodMoped');
+    else if((accessMap[sessionRole]||[]).length > 0) switchTab(accessMap[sessionRole][0].replace('btn','tab'));
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
         const btnId = tabId.replace('tab', 'btn');
         if(document.getElementById(btnId)) document.getElementById(btnId).classList.add('active');
-        document.getElementById(tabId).classList.add('active');
+        if(document.getElementById(tabId)) document.getElementById(tabId).classList.add('active');
     }
 
     function exportTableToExcel(tableID, filename = ''){
@@ -319,7 +339,7 @@
     async function runEodWare(ware) {
         const dt = document.getElementById(`dateEod${ware}`).value; if(!dt) return;
         const { data: items } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, advance_paid, customer_mobile, vehicles(reg_number), closed_at)').eq('warehouse_type', ware).gte('job_cards.closed_at', dt).lte('job_cards.closed_at', dt+'T23:59:59');
-        const { data: prepaids } = await supabaseClient.from('job_cards').select('id, advance_paid, customer_mobile, vehicles(reg_number)').gte('created_at', dt).lte('created_at', dt+'T23:59:59').gt('advance_paid', 0); // Note: Assuming advance_paid maps to prepaid deposit for Green/Moped context.
+        const { data: prepaids } = await supabaseClient.from('job_cards').select('id, advance_paid, customer_mobile, vehicles(reg_number)').gte('created_at', dt).lte('created_at', dt+'T23:59:59').gt('advance_paid', 0); 
         
         let S = 0; let L = 0; let P = 0;
         const tbS = document.getElementById(`tbody${ware}S`); tbS.innerHTML='';
@@ -329,11 +349,14 @@
         (items||[]).forEach(i => {
             const v = parseFloat(i.total_price)||0;
             const row = `<tr><td>${linkifyJC(i.job_card_id)}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${i.unit_price}</td><td>₹${v}</td></tr>`;
-            if(i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil') || i.item_name.toLowerCase().includes('lube')) { L+=v; tbL.innerHTML+=row; }
+            
+            const catStr = (i.category || i.item_category || i.item_type || i.product_type || '').toLowerCase();
+            const isLube = catStr === 'lube' || catStr === 'lubricant' || catStr === 'lubricants' || i.unit_metric === 'ML';
+            
+            if(isLube) { L+=v; tbL.innerHTML+=row; }
             else { S+=v; tbS.innerHTML+=row; }
         });
 
-        // Filter prepaids for specific warehouse? The DB schema mapping says "prepaid deposited at green = pg". Assuming checking source_role if it exists, otherwise general.
         (prepaids||[]).forEach(p => {
             const v = parseFloat(p.advance_paid)||0; P+=v;
             tbP.innerHTML+=`<tr><td>${linkifyJC(p.id)}</td><td>${p.customer_mobile}</td><td>${p.vehicles?.reg_number}</td><td>₹${v}</td></tr>`;
@@ -355,7 +378,9 @@
         let totL = 0; let totS = 0;
         (data||[]).forEach(i => {
             const v = parseFloat(i.total_price)||0; const mechId = i.job_cards.mech_id;
-            const isLube = i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil');
+            const catStr = (i.category || i.item_category || i.item_type || i.product_type || '').toLowerCase();
+            const isLube = catStr === 'lube' || catStr === 'lubricant' || catStr === 'lubricants' || i.unit_metric === 'ML';
+            
             if(isLube) { totL+=v; tbL.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>-</td><td>${i.qty}</td><td>${i.unit_metric==='ML'?(i.qty/1000).toFixed(2):'-'}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
             else { totS+=v; tbS.innerHTML+=`<tr><td>${mechId}</td><td>${i.item_name}</td><td>${i.qty}</td><td>${linkifyJC(i.job_card_id)}</td><td>${i.warehouse_type}</td><td>₹${v}</td></tr>`; }
         });
@@ -363,17 +388,61 @@
         tbS.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="5">GRAND TOTAL</td><td>₹${totS}</td></tr>`;
     }
 
-    // --- REPORT 3 ---
+    // --- REPORT 4 (Labour & Comm) ---
     async function runReport3() {
-        const s = document.getElementById('mlabStart').value; const e = document.getElementById('mlabEnd').value; const mId = document.getElementById('mlabMech').value;
-        let q = supabaseClient.from('job_cards').select('mech_id, labour_charges, mechanics(name, commission_rate)').eq('status', 'Closed').gte('closed_at', s).lte('closed_at', e+'T23:59:59');
+        const s = document.getElementById('mlabStart').value; 
+        const e = document.getElementById('mlabEnd').value; 
+        const mId = document.getElementById('mlabMech').value;
+        
+        console.log(`[Bug 5 Fix] Fetching Labour & Comm data for dates: ${s} to ${e}`);
+
+        // BUG FIX 5: Remove hardcoded status filter. Use created_at. Ensure labour_charges is not null to guarantee valid records.
+        let q = supabaseClient.from('job_cards')
+            .select('mech_id, labour_charges, status, created_at, closed_at')
+            .gte('created_at', s)
+            .lte('created_at', e+'T23:59:59')
+            .not('labour_charges', 'is', null);
+            
         if(mId !== 'ALL') q = q.eq('mech_id', mId);
-        const { data } = await q;
+        
+        const { data, error } = await q;
+        if (error) console.error("[Bug 5 Fix] Error fetching job cards:", error);
+        console.log(`[Bug 5 Fix] Returned ${data ? data.length : 0} job cards`, data);
+        
+        // BUG FIX 5: Mechanic join might fail if using .select('mechanics(...)'). Fetching mechanics separately safely bounds the data.
+        const { data: mechs, error: mechErr } = await supabaseClient.from('mechanics').select('id, name, commission_rate');
+        if (mechErr) console.error("[Bug 5 Fix] Error fetching mechanics:", mechErr);
+        
+        let mechMap = {};
+        (mechs || []).forEach(m => mechMap[m.id] = m);
         
         let map = {};
         (data||[]).forEach(j => {
-            const m = j.mech_id; if(!map[m]) map[m] = {name: j.mechanics?.name||m, jobs:0, lab:0, crate: parseFloat(j.mechanics?.commission_rate)||10 };
-            map[m].jobs++; map[m].lab += parseFloat(j.labour_charges)||0;
+            const labCharge = parseFloat(j.labour_charges) || 0;
+            if (labCharge <= 0) return; // Only count jobs with actual labour value
+            
+            const m = j.mech_id; 
+            const mInfo = mechMap[m] || {};
+            
+            if(!map[m]) {
+                // BUG FIX 5: Commission rate fallback to 10%
+                let crate = parseFloat(mInfo.commission_rate);
+                let isDefault = false;
+                if (isNaN(crate)) {
+                    crate = 10;
+                    isDefault = true;
+                }
+                
+                map[m] = {
+                    name: mInfo.name || m || 'Unassigned', 
+                    jobs: 0, 
+                    lab: 0, 
+                    crate: crate,
+                    isDefault: isDefault
+                };
+            }
+            map[m].jobs++; 
+            map[m].lab += labCharge;
         });
         
         const tb = document.getElementById('tbBodyRep3'); tb.innerHTML='';
@@ -381,37 +450,108 @@
         Object.values(map).sort((a,b)=>b.lab-a.lab).forEach(v => {
             const comm = (v.lab * v.crate)/100;
             tg+=v.jobs; tl+=v.lab; tc+=comm;
-            tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.jobs}</td><td>₹${v.lab}</td><td>${v.crate}%</td><td>₹${comm.toFixed(2)}</td></tr>`;
+            const crateDisplay = v.isDefault ? `10% (default)` : `${v.crate}%`;
+            tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.jobs}</td><td>₹${v.lab}</td><td>${crateDisplay}</td><td>₹${comm.toFixed(2)}</td></tr>`;
         });
         tb.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td>GRAND TOTAL</td><td>${tg}</td><td>₹${tl}</td><td>-</td><td>₹${tc.toFixed(2)}</td></tr>`;
     }
 
-    // --- REPORT 4 & 5 ---
+    // --- REPORT 3 & 5 (Lube Sales & Velocity) ---
     async function runReport4() { await runVelocityOrLube('Lube'); }
     async function runReport5() { await runVelocityOrLube('Velocity'); }
     
     async function runVelocityOrLube(mode) {
-        const s = document.getElementById(mode==='Lube'?'lsStart':'pvStart').value; const e = document.getElementById(mode==='Lube'?'lsEnd':'pvEnd').value;
+        const s = document.getElementById(mode==='Lube'?'lsStart':'pvStart').value; 
+        const e = document.getElementById(mode==='Lube'?'lsEnd':'pvEnd').value;
         const source = document.getElementById(mode==='Lube'?'lsSource':'pvSource').value;
         
         let items = [];
-        if(source === 'Both' || source === 'Workshop') {
-            const {data} = await supabaseClient.from('job_card_items').select('*, job_cards!inner(closed_at)').gte('job_cards.closed_at', s).lte('job_cards.closed_at', e+'T23:59:59');
-            if(data) items = items.concat(data);
+        let fetchWorkshop = false;
+        let fetchPOS = false;
+        let wareFilter = null;
+
+        // BUG FIX 3: Parse the new structured Source Dropdown to correctly map Supabase Queries
+        if (source === 'Both' || source === 'All') { fetchWorkshop = true; fetchPOS = true; } 
+        else if (source === 'Workshop') { fetchWorkshop = true; } 
+        else if (source === 'POS') { fetchPOS = true; } 
+        else if (source === 'Moped') { fetchWorkshop = true; wareFilter = 'Moped'; } 
+        else if (source === 'Green') { fetchWorkshop = true; wareFilter = 'Green'; } 
+        else if (source === 'Moped Workshop') { fetchWorkshop = true; wareFilter = 'Moped'; } 
+        else if (source === 'Moped POS') { fetchPOS = true; wareFilter = 'Moped'; } 
+        else if (source === 'Green Workshop') { fetchWorkshop = true; wareFilter = 'Green'; } 
+        else if (source === 'Green POS') { fetchPOS = true; wareFilter = 'Green'; }
+
+        // Security override based on sessionRole
+        if (sessionRole === 'green') wareFilter = 'Green';
+        if (sessionRole === 'moped') wareFilter = 'Moped';
+
+        if (fetchWorkshop) {
+            let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(closed_at, created_at, status)').gte('job_cards.created_at', s).lte('job_cards.created_at', e+'T23:59:59');
+            if (wareFilter) q = q.eq('warehouse_type', wareFilter);
+            const {data, error} = await q;
+            if(error) console.error("Workshop Fetch Error:", error);
+            if(data) items = items.concat(data.map(d => ({...d, src: 'Workshop'})));
         }
-        // POS items query simulation (assume pos_items exists)
         
+        if (fetchPOS) {
+            // Simulated POS items query
+            let posQ = supabaseClient.from('pos_items').select('*, counter_sales!inner(created_at, status)').gte('counter_sales.created_at', s).lte('counter_sales.created_at', e+'T23:59:59');
+            if (wareFilter) posQ = posQ.eq('warehouse_type', wareFilter);
+            const {data: posData, error: posErr} = await posQ;
+            if(posErr) {
+                console.warn("POS Fetch Error (trying alternate logic):", posErr);
+                // Fallback attempt for pos items logic
+                let posQ2 = supabaseClient.from('counter_sale_items').select('*, counter_sales!inner(created_at, status)').gte('counter_sales.created_at', s).lte('counter_sales.created_at', e+'T23:59:59');
+                if (wareFilter) posQ2 = posQ2.eq('warehouse_type', wareFilter);
+                const {data: posData2} = await posQ2;
+                if(posData2) items = items.concat(posData2.map(d => ({...d, src: 'POS'})));
+            } else if (posData) {
+                items = items.concat(posData.map(d => ({...d, src: 'POS'})));
+            }
+        }
+        
+        // BUG FIX 4: Gather Products dictionary to avoid rigid join failures and accurately retrieve Brands/Categories
+        const { data: pMaster } = await supabaseClient.from('product_master').select('*').catch(()=>({data:[]}));
+        const { data: prods } = await supabaseClient.from('products').select('*').catch(()=>({data:[]}));
+        let prodDict = {};
+        (pMaster || []).forEach(p => prodDict[p.item_name] = p);
+        (prods || []).forEach(p => prodDict[p.name || p.item_name] = p);
+
         let map = {};
         items.forEach(i => {
-            const isLube = i.unit_metric === 'ML' || i.item_name.toLowerCase().includes('oil');
-            if(mode==='Lube' && !isLube) return;
-            const n = i.item_name; if(!map[n]) map[n] = {name:n, brand:'-', cat: isLube?'Lube':'Spare', qty:0, rev:0, lit:0 };
-            map[n].qty += parseFloat(i.qty)||0; map[n].rev += parseFloat(i.total_price)||0;
-            if(i.unit_metric==='ML') map[n].lit += (parseFloat(i.qty)||0)/1000;
+            const pInfo = prodDict[i.item_name || i.product_name] || {};
+            
+            // BUG FIX 1: Filter strictly by category equal to lube/lubricant (removes false positives like OIL SEAL)
+            const catStr = (i.category || i.item_category || i.item_type || i.product_type || pInfo.category || pInfo.item_category || pInfo.type || '').toLowerCase();
+            const isLube = catStr === 'lube' || catStr === 'lubricant' || catStr === 'lubricants';
+            
+            if (mode === 'Lube' && !isLube) return; // Terminate early if running lube report
+            
+            const n = i.item_name || i.product_name || 'Unknown';
+            // BUG FIX 4: Brand lookup
+            const b = i.brand || pInfo.brand || '-';
+
+            if(!map[n]) map[n] = {
+                name: n, 
+                brand: b, 
+                cat: isLube ? 'Lube' : 'Spare', 
+                qty: 0, 
+                rev: 0, 
+                lit: 0 
+            };
+            
+            // BUG FIX 2: Count 1 unit per row entry, independent of ml volume.
+            map[n].qty += 1; 
+            map[n].rev += parseFloat(i.total_price) || 0;
+            
+            // BUG FIX 2: Calculate actual litre volume selectively
+            if (i.unit_metric === 'ML' || i.unit_metric === 'ml') {
+                map[n].lit += (parseFloat(i.qty) || 0) / 1000;
+            }
         });
 
         const arr = Object.values(map);
-        if(mode==='Velocity') {
+        if(mode === 'Velocity') {
             const sortB = document.getElementById('pvSort').value;
             arr.sort((a,b)=> sortB==='Qty'? b.qty-a.qty : b.rev-a.rev);
             const tb = document.getElementById('tbBodyRep5'); tb.innerHTML='';
@@ -419,7 +559,12 @@
         } else {
             const tb = document.getElementById('tbBodyRep4'); tb.innerHTML='';
             let tq=0, tl=0, tr=0;
-            arr.forEach(v => { tq+=v.qty; tl+=v.lit; tr+=v.rev; tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.brand}</td><td>${v.qty}</td><td>${v.lit.toFixed(2)}</td><td>₹${v.rev}</td></tr>`; });
+            arr.forEach(v => { 
+                tq += v.qty; tl += v.lit; tr += v.rev; 
+                // Display 0.00 for non-volume metrics that bypassed
+                const displayLit = v.lit > 0 ? v.lit.toFixed(2) : '0.00';
+                tb.innerHTML+=`<tr><td>${v.name}</td><td>${v.brand}</td><td>${v.qty}</td><td>${displayLit}</td><td>₹${v.rev}</td></tr>`; 
+            });
             tb.innerHTML+=`<tr style="font-weight:bold; background:#f1f5f9;"><td colspan="2">GRAND TOTAL</td><td>${tq}</td><td>${tl.toFixed(2)}</td><td>₹${tr}</td></tr>`;
         }
     }
@@ -450,7 +595,7 @@
 
         const tbH = document.getElementById('tbBodyHdHours'); tbH.innerHTML='';
         Object.entries(hrMap).forEach(kv => {
-            const hr = parseInt(kv[0]); if(hr<8 || hr>20) return; // Filter business hours
+            const hr = parseInt(kv[0]); if(hr<8 || hr>20) return; 
             const bg = kv[1].c <= 1 ? 'background:#fee2e2; color:var(--danger);' : '';
             tbH.innerHTML+=`<tr style="${bg}"><td>${hr}:00 - ${hr+1}:00</td><td>${kv[1].c}</td><td>₹${kv[1].r}</td></tr>`;
         });
@@ -464,7 +609,6 @@
     async function runReport7() {
         const s = document.getElementById('smStart').value; const e = document.getElementById('smEnd').value;
         const {data} = await supabaseClient.from('job_cards').select('mech_id, labour_charges').eq('status', 'Closed').gte('closed_at', s).lte('closed_at', e+'T23:59:59');
-        // Simulated package association.
         const tb = document.getElementById('tbBodyRep7'); tb.innerHTML='';
         tb.innerHTML+=`<tr><td>MOCK DATA</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>₹0</td></tr>`;
     }
@@ -512,5 +656,6 @@
         (refs||[]).forEach(r => { tbr.innerHTML+=`<tr><td>${r.referrer_mobile}</td><td>${r.referred_mobile}</td><td>${r.referral_date}</td><td>-</td><td>${r.reward_credited?'Yes':'No'}</td><td>-</td></tr>`; });
     }
 </script>
+
 </body>
 </html>
