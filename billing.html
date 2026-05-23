@@ -49,14 +49,29 @@
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; } .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
         .a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; border: 1px solid #000 !important; }
         #lockedBanner { display:none; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:16px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px; }
+        
+        #mechanic-print-ticket { display: none; }
+        
         @media print { 
+            @page { margin: 8mm; }
             body * { visibility: hidden; } 
+            
+            /* Receipt Print Logic */
             body.print-receipt #renderThermalReceiptTarget, body.print-receipt #renderThermalReceiptTarget * { visibility: visible; } 
             body.print-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
             body.print-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 300px; max-width: 300px; padding: 0; }
             body.print-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 10mm; } 
-            body.print-mechanic #mechTicketRender, body.print-mechanic #mechTicketRender * { visibility: visible; }
-            body.print-mechanic #mechTicketRender { position: absolute; left: 0; top: 0; width: 100%; max-width: 148mm; padding: 10mm; font-family: sans-serif; border: 1px solid #000; box-sizing: border-box; }
+            
+            /* Mechanic Ticket Print Logic */
+            body.print-mechanic #mechanic-print-ticket, body.print-mechanic #mechanic-print-ticket * { visibility: visible !important; }
+            body.print-mechanic #mechanic-print-ticket { 
+                display: block !important;
+                position: absolute; left: 0; top: 0; width: 100%; height: auto;
+                font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #000; background: #fff;
+                margin: 0; padding: 0; border: none;
+            }
+            .a5-page { page-break-after: always; position: relative; box-sizing: border-box; width: 100%; }
+            .a5-page:last-child { page-break-after: auto; }
         }
     </style>
 </head>
@@ -179,14 +194,109 @@
 <div id="modalPrintChoice" class="overlay-modal" style="z-index: 300;"><div class="modal-card" style="text-align:center; max-width: 400px;"><h3 style="margin-top:0; color:var(--primary);">Select Print Format</h3><div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;"><button class="btn-action btn-success" onclick="executePrint('thermal')">🖨️ THERMAL (3-Inch / Narrow)</button><button class="btn-action btn-info" onclick="executePrint('a5')">📄 A5 / A6 (Portrait Invoice)</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPrintChoice').style.display='none'">CANCEL</button></div></div></div>
 <div id="modalReceipt" class="overlay-modal"><div class="modal-card"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Job Card Document</h3><button onclick="window.location.href='index.html'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><div id="renderThermalReceiptTarget" class="receipt-container"><div class="receipt-header"><div class="receipt-logo-container"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div><div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div><div class="receipt-meta">GSTIN: 23ANAPB4613K1ZJ</div><div class="receipt-meta">Gurudwara Road, Ganj Betul</div><div class="receipt-meta">PH: 9425002214, 8989171751</div></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><div>Date: <span id="thDate">--</span></div><div>Time: <span id="thTime">--</span></div></div><div class="receipt-meta" style="margin-top:2px;">Bill Hash: <strong id="thBillNo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Client: <strong id="thClientInfo">--</strong></div><div class="receipt-meta" style="margin-top:2px;">Vehicle: <strong id="thAssetInfo">--</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="margin-top:2px;">Problem: <strong id="thProblem">--</strong></div><div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; margin-top:6px; text-transform:uppercase;">ITEMS & SERVICES</div><div id="thStackedItemsContainer"></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Spares:</span><strong id="thPartsSum">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow"><span>Auto Spares Disc:</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong></div><div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Labor:</span><strong id="thLaborSum">₹0</strong></div><div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;"><span>Lathe Work:</span><strong id="thLatheSum">₹0</strong></div><div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div><div class="receipt-meta" id="rowPointsSum" style="display:flex; justify-content:space-between; color:#0369a1; font-weight:bold; display:none;"><span>Points Used:</span><strong id="thPointsSum">₹0</strong></div><div class="receipt-meta" id="rowAdvanceSum" style="display:flex; justify-content:space-between; color:red;"><span>Less Advance:</span><strong id="thAdvanceSum">₹0</strong></div><div class="receipt-meta" id="rowPrepaidSum" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Prepaid:</span><strong id="thPrepaidSum">₹0</strong></div><div class="receipt-divider"></div><div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div><div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div><div class="receipt-meta" style="margin-top:2px; font-weight:bold;">Mode: <span id="thMode">--</span></div><div id="thSplitRow" style="display:none; font-size:0.75rem; border-top:1px dashed black; margin-top:4px; padding-top:4px;"><div style="display:flex; justify-content:space-between;"><span>Cash Rcvd:</span><strong id="thSplitCash">₹0</strong></div><div style="display:flex; justify-content:space-between;"><span>UPI Rcvd:</span><strong id="thSplitUpi">₹0</strong></div></div><div class="receipt-meta" id="thFutureAdviceRow" style="display:none; margin-top:8px; padding-top:6px; border-top:1px dashed black; color:var(--danger); font-weight:bold;">Future Advice / सुझाव:<br><span id="thFutureAdviceText" style="font-weight:normal; color:black; display:block; margin-top:2px; line-height:1.4;"></span></div><div id="receiptPromoHindi" style="font-size:0.75rem; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin-top:10px; margin-bottom:6px; text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div><div class="receipt-footer" id="receiptFooterDynamicText">Computer Generated Document.<br>Thank You.</div></div><div class="action-strip-bar"><button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN</button><button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPrintSelection()">🖨️ PRINT</button><button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button></div></div></div>
 
-<div id="mechTicketRender" style="display:none;">
-    <div style="font-size: 1.5rem; font-weight: bold; text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">MECHANIC JOB TICKET</div>
-    <div style="margin-bottom: 10px; font-size: 1.1rem; display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding-bottom: 4px;"><span><strong>Job Card No:</strong></span> <strong id="mtJc">--</strong></div>
-    <div style="margin-bottom: 10px; font-size: 1.1rem; display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding-bottom: 4px;"><span><strong>Date:</strong></span> <span id="mtDate">--</span></div>
-    <div style="margin-bottom: 10px; font-size: 1.1rem; display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding-bottom: 4px;"><span><strong>Vehicle Reg:</strong></span> <strong id="mtReg" style="font-size:1.3rem;">--</strong></div>
-    <div style="margin-bottom: 10px; font-size: 1.1rem; display: flex; justify-content: space-between; border-bottom: 1px dotted #ccc; padding-bottom: 4px;"><span><strong>Model:</strong></span> <span id="mtModel">--</span></div>
-    <div style="margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px dotted #ccc; padding-bottom: 8px;"><strong style="display:block; margin-bottom:4px; color:#444;">Customer Complaints:</strong><span id="mtProb" style="font-weight:bold;">--</span></div>
-    <div style="border: 1px dashed #000; padding: 10px; height: 180px; margin-top: 20px; font-weight: bold; color: #555;">MECHANIC NOTES / PARTS REPLACED:<br><br><br><br><br><br><br><span style="font-weight:normal; font-size:0.8rem;">Mechanic Sign: __________________</span></div>
+<div id="mechanic-print-ticket">
+    <div class="a5-page" style="padding-bottom: 20px;">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" style="height: 45px; filter: grayscale(100%); margin-bottom: 5px;">
+            <div style="font-size: 20px; font-weight: bold; text-transform: uppercase;">Mechanic Job Ticket</div>
+            <div style="border-bottom: 2px solid #000; margin-top: 5px;"></div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 1px;" id="tkFrontJc">--</div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; color: #333;">
+                <span>Created: <span id="tkFrontCreated">--</span></span>
+                <span>Printed: <span id="tkFrontPrinted">--</span></span>
+            </div>
+        </div>
+
+        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
+            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Customer & Vehicle</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Name:</strong> <span id="tkFrontCustName">--</span></span><span><strong>Mob:</strong> <span id="tkFrontCustMobile">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Vehicle:</strong> <span id="tkFrontVehModel">--</span></span><span><strong>Color:</strong> <span id="tkFrontVehColor">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Reg No:</strong> <span id="tkFrontVehReg" style="font-weight: bold; font-size: 15px;">--</span></span><span><strong>Odometer:</strong> <span id="tkFrontVehOdo">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Chassis:</strong> <span id="tkFrontVehChassis">--</span></span><span><strong>Engine:</strong> <span id="tkFrontVehEngine">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Est. Budget:</strong> <span id="tkFrontBudget" style="font-weight: bold;">--</span></span></div>
+        </div>
+
+        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
+            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Problem & Service Directives</div>
+            <div style="margin-bottom: 8px;"><strong>Customer Problem:</strong><br><span id="tkFrontProblem" style="display:block; margin-top:3px; line-height: 1.4;">--</span></div>
+            <div style="margin-bottom: 8px;"><strong>Injected Protocols:</strong><br><div id="tkFrontProtocols" style="margin-top:3px; line-height: 1.4; padding-left: 10px;"></div></div>
+            <div><strong>Future Advice / Remarks:</strong><br><span id="tkFrontAdvice" style="display:block; margin-top:3px; line-height: 1.4;">--</span></div>
+        </div>
+
+        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
+            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Assignment & Financials</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Primary Tech:</strong></span> <span id="tkFrontPMech" style="font-weight: bold;">--</span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;" id="tkFrontCMechRow"><span><strong>Co-Mechanic:</strong></span> <span id="tkFrontCMech" style="font-weight: bold;">--</span></div>
+            <div style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span>Variable Labour:</span> <span id="tkFrontVarLab">--</span></div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span>Protocol Labour:</span> <span id="tkFrontProtLab">--</span></div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Estimated Budget:</span> <span id="tkFrontFinBudget">--</span></div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; font-size: 10px; font-style: italic; color: #555; margin-bottom: 25px;">
+            Final bill amount may vary. This ticket is for internal reference only.
+        </div>
+
+        <div style="position: absolute; bottom: 0; width: 100%;">
+            <div style="border-top: 1px dashed #000; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div style="font-weight: bold;">Authorised by Service Advisor:<br><br>___________________________</div>
+                <img src="logo-green.png" onerror="this.style.display='none'" style="height: 25px; filter: grayscale(100%);">
+            </div>
+        </div>
+    </div>
+
+    <div class="a5-page" style="padding-top: 20px;">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-size: 18px; font-weight: bold; text-transform: uppercase;">PARTS & MATERIALS TRACKER</div>
+            <div style="font-size: 14px; margin-top: 4px;">
+                <strong>JC:</strong> <span id="tkBackJc">--</span> &nbsp;|&nbsp; <strong>REG:</strong> <span id="tkBackReg">--</span>
+            </div>
+            <div style="border-bottom: 2px solid #000; margin-top: 10px;"></div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 5%;">#</th>
+                    <th style="border: 1px solid #000; padding: 6px; text-align: left; width: 45%;">Part / Item Name</th>
+                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 15%;">Quantity</th>
+                    <th style="border: 1px solid #000; padding: 6px; text-align: left; width: 20%;">Source / Vendor</th>
+                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 15%;">Verified ✓</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">1</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">2</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">3</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">4</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">5</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">6</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">7</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">8</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">9</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">10</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+            </tbody>
+        </table>
+
+        <div style="margin-bottom: 20px;">
+            <div style="font-weight: bold; margin-bottom: 10px;">Mechanic Notes:</div>
+            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
+            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
+            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
+            <div style="border-bottom: 1px dotted #000; height: 26px;"></div>
+        </div>
+
+        <div style="position: absolute; bottom: 0; width: 100%;">
+            <div style="font-weight: bold; padding-bottom: 15px; display: flex; justify-content: space-between;">
+                <span>Parts physically verified by: _______________________</span>
+                <span>Date: _______________________</span>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -232,7 +342,7 @@
             activeJobContext = job; 
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; 
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; 
-            document.getElementById('prepaidPill').innerText = `Paid Advance: ₹${(parseFloat(job.advance_paid) || 0) + (parseFloat(job.prepaid_amount) || 0)}`; 
+            document.getElementById('prepaidPill').innerText = `Paid Total Adv: ₹${(parseFloat(job.advance_paid) || 0) + (parseFloat(job.prepaid_amount) || 0)}`; 
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             if (job.mech_id) document.getElementById('primaryMech').value = job.mech_id; if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
             
@@ -292,7 +402,6 @@
         }
     }
     
-    // FIX 5: Protocol Injection Implementation
     async function addFixedProtocol() { 
         const sel = document.getElementById('serviceProtocolSelect'); 
         if(!sel.value) return; 
@@ -300,21 +409,15 @@
         const pkgName = sel.value; 
         const pkgRate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0; 
         
-        // Prevent duplicate injections
         if (appliedProtocolNamesForTracking.includes(pkgName)) {
             alert("Warning: This protocol is already injected into the job card.");
             sel.value = '';
             return;
         }
 
-        // Lock dropdown while processing
         sel.disabled = true;
-        
         const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate }); 
-        
-        if (error) {
-            alert("Error injecting protocol: " + error.message);
-        }
+        if (error) alert("Error injecting protocol: " + error.message);
 
         sel.value = ''; 
         sel.disabled = false;
@@ -351,7 +454,6 @@
         compileDynamicSums(); 
     }
 
-    // FIX 2: Global Click/Escape Listeners to Close Dropdown
     document.addEventListener('click', function(e) {
         const listContainer = document.getElementById('autolist-n');
         const searchInput = document.getElementById('nPart');
@@ -380,7 +482,6 @@
         const searchTokens = searchVal.split(' ').filter(token => token.length > 0); 
         const filtered = globalCatalogCache.filter(item => { const searchableText = (item.item_name + " " + (item.brand || "")).toLowerCase(); return searchTokens.every(token => searchableText.includes(token)); }).slice(0, 10); 
         if(filtered.length > 0) { 
-            // FIX 4: Pass warehouse_type down to apply function so we can strictly detect DB Lubes
             filtered.forEach(p => { 
                 listContainer.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand || '').replace(/'/g,"\\'")}', ${p.default_price || 0}, '${p.unit_metric || 'Pcs'}', '${p.warehouse_type || 'Spare'}')"><strong>${p.item_name}</strong> <span style="color:#64748b;">(${p.brand || 'STD'})</span></div>`; 
             }); 
@@ -390,7 +491,6 @@
         } 
     }
     
-    // FIX 4: Use fetched warehouseType / DB tags to auto-select Lube securely
     function applySelectedCatalogItem(nameStr, brandStr, defaultRate, metricStr, warehouseType) { 
         document.getElementById('nPart').value = nameStr; 
         document.getElementById('nBrand').value = brandStr; 
@@ -416,10 +516,10 @@
         
         if(!error) { 
             document.getElementById('nPart').value = ''; 
-            document.getElementById('nBrand').value = ''; // FIX 3: Clear brand name
+            document.getElementById('nBrand').value = ''; 
             document.getElementById('nQty').value = '1'; 
             document.getElementById('nRate').value = '0'; 
-            document.getElementById('autolist-n').style.display = 'none'; // FIX 2: Force hide on manual enter
+            document.getElementById('autolist-n').style.display = 'none'; 
             loadInventoryLedgers(); 
         } 
     }
@@ -444,7 +544,6 @@
         const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
         const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
         
-        // FIX 1: Compute Total Labor to Check Co-Mechanic Split
         const totalLabor = l + servicePkgGrossTotal;
         const coMechVal = document.getElementById('coMech').value;
         const splitIndicator = document.getElementById('splitIndicator');
@@ -513,9 +612,77 @@
     function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
     function executePrint(mode) { document.body.classList.remove('print-mechanic'); document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') { container.classList.add('a5-mode'); } else { container.classList.remove('a5-mode'); } document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.print(); document.body.classList.remove('print-receipt'); }, 200); }
-    function printMechanicTicket() { document.body.classList.remove('print-receipt'); document.body.classList.add('print-mechanic'); document.getElementById('mtJc').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('mtDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('mtReg').innerText = activeJobContext?.vehicles?.reg_number || 'UNKNOWN'; document.getElementById('mtModel').innerText = activeJobContext?.vehicles?.make_model || 'UNKNOWN'; document.getElementById('mtProb').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance'; window.print(); setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 200); }
+    
+    // NEW PRINT MECHANIC TICKET LOGIC
+    function printMechanicTicket() { 
+        document.body.classList.remove('print-receipt'); 
+        document.body.classList.add('print-mechanic'); 
+        
+        const jcFormatted = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+        document.getElementById('tkFrontJc').innerText = jcFormatted;
+        
+        const creationDate = activeJobContext?.created_at ? new Date(activeJobContext.created_at) : new Date();
+        document.getElementById('tkFrontCreated').innerText = creationDate.toLocaleString('en-IN');
+        document.getElementById('tkFrontPrinted').innerText = new Date().toLocaleString('en-IN');
+        
+        document.getElementById('tkFrontCustName').innerText = activeCustomerName || 'Walk-in';
+        document.getElementById('tkFrontCustMobile').innerText = activeJobContext?.customer_mobile || '--';
+        
+        const budget = activeJobContext?.estimate_given || parseFloat(document.getElementById('jcEstimate')?.value) || 0;
+        document.getElementById('tkFrontBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
+        
+        const veh = activeJobContext?.vehicles || {};
+        document.getElementById('tkFrontVehModel').innerText = veh.make_model || '--';
+        document.getElementById('tkFrontVehColor').innerText = veh.color || '--';
+        document.getElementById('tkFrontVehReg').innerText = veh.reg_number || '--';
+        document.getElementById('tkFrontVehChassis').innerText = veh.chassis_number || '--';
+        document.getElementById('tkFrontVehEngine').innerText = veh.engine_number || '--';
+        document.getElementById('tkFrontVehOdo').innerText = veh.odometer ? `${veh.odometer} km` : '--';
+        
+        document.getElementById('tkFrontProblem').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance';
+        
+        const protocolContainer = document.getElementById('tkFrontProtocols');
+        let protocolHtml = '';
+        let protocolTotal = 0;
+        lineItemsLocalMemory.forEach(line => {
+            if (line.warehouse_type === 'Service') {
+                let pRate = parseFloat(line.total_price);
+                if(isNaN(pRate)) pRate = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
+                protocolHtml += `<div>- ${line.item_name}: ₹${pRate}</div>`;
+                protocolTotal += pRate;
+            }
+        });
+        protocolContainer.innerHTML = protocolHtml || '<div>No protocol assigned</div>';
+        
+        const futureAdvice = document.getElementById('vFutureAdvice').value.trim();
+        document.getElementById('tkFrontAdvice').innerText = futureAdvice || 'None';
+        
+        const pMechSel = document.getElementById('primaryMech');
+        const cMechSel = document.getElementById('coMech');
+        document.getElementById('tkFrontPMech').innerText = pMechSel.options[pMechSel.selectedIndex]?.text || '-- Unassigned --';
+        
+        const cMechRow = document.getElementById('tkFrontCMechRow');
+        if (cMechSel.value && cMechSel.value !== '') {
+            cMechRow.style.display = 'flex';
+            document.getElementById('tkFrontCMech').innerText = cMechSel.options[cMechSel.selectedIndex]?.text;
+        } else {
+            cMechRow.style.display = 'none';
+        }
+        
+        document.getElementById('tkFrontVarLab').innerText = `₹${parseFloat(document.getElementById('vLabour').value) || 0}`;
+        document.getElementById('tkFrontProtLab').innerText = `₹${protocolTotal}`;
+        document.getElementById('tkFrontFinBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
+        
+        // Populate Back Page
+        document.getElementById('tkBackJc').innerText = jcFormatted;
+        document.getElementById('tkBackReg').innerText = veh.reg_number || '--';
+        
+        window.print(); 
+        setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
+    }
 
     initializeJobContext();
 </script>
+
 </body>
 </html>
