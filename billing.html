@@ -437,6 +437,7 @@
         }); 
     }
     
+    // UPDATED FUNCTION: Fully robust payload creation for Protocols
     async function addFixedProtocol() { 
         const sel = document.getElementById('serviceProtocolSelect'); 
         if(!sel.value) return; 
@@ -451,8 +452,26 @@
         }
 
         sel.disabled = true;
-        const { error } = await supabaseClient.from('job_card_items').insert({ job_card_id: targetJobId, warehouse_type: 'Service', item_name: pkgName, qty: 1, unit_metric: 'Pkg', unit_price: pkgRate, total_price: pkgRate }); 
-        if (error) alert("Error injecting protocol: " + error.message);
+        
+        // Explicitly constructing the payload to enforce warehouse_type correctly
+        const payload = { 
+            job_card_id: targetJobId, 
+            warehouse_type: 'Service', // Explicitly setting this strictly
+            item_name: pkgName, 
+            qty: 1, 
+            unit_metric: 'Pkg', 
+            unit_price: pkgRate, 
+            total_price: pkgRate 
+        };
+        
+        console.log("Injecting Protocol Payload:", payload); // Look in F12 console
+
+        const { error } = await supabaseClient.from('job_card_items').insert(payload); 
+        
+        if (error) {
+            console.error("Supabase Error Details:", error);
+            alert("Error injecting protocol: " + error.message);
+        }
 
         sel.value = ''; 
         sel.disabled = false;
