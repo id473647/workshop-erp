@@ -1,133 +1,167 @@
+=== PROMPT 4 — FILE: brand-manager.html ===
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brand Master Console - My Care ERP</title>
+    <title>Brand & Tier Manager — My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --info: #2980b9; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
-        
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .center-home-btn { font-weight: 700; color: var(--primary); text-decoration: none; padding: 4px 12px; background: #f1f5f9; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; }
-        .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-
-        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; }
-        
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
-        input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
-        
-        .btn-action { background: var(--info); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; }
-        
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        :root { --primary: #2c3e50; --success: #27ae60; --warning: #f59e0b; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; }
+        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
+        .panel { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; }
+        .form-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; width: 100%; }
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-success { background: var(--success); }
+        .btn-primary { background: var(--primary); }
+        .btn-warning { background: var(--warning); color: black; }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; align-items: end; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: var(--primary); color: white; }
+        .locked-banner { display: none; text-align: center; padding: 50px; background: #fee2e2; color: #991b1b; font-size: 1.2rem; font-weight: bold; margin-top: 50px; border-radius: 8px; }
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 2px; padding: 16px; position: fixed; z-index: 300; left: 50%; bottom: 30px; transform: translateX(-50%); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body>
-
-<nav class="sticky-nav">
-    <a href="index.html" class="nav-anchor">← COMMAND CENTER</a>
-    <a href="index.html" class="center-home-btn">🏠 HOME</a>
-    <span class="badge-role">BRAND CONFIGURATOR</span>
-</nav>
-
-<div class="wrapper">
-    <div class="card-panel" style="border-left: 5px solid var(--info);">
-        <div class="block-title">Instantiate Global Brand Discount Mappings</div>
-        <div class="inputs-grid">
-            <div class="field-group"><label>Brand Context</label><input type="text" id="mBrand" placeholder="e.g. ANL" oninput="this.value=this.value.toUpperCase()"></div>
-            <div class="field-group"><label>Regular Disc %</label><input type="number" id="dReg" value="0" min="0" max="100"></div>
-            <div class="field-group"><label>Silver Disc %</label><input type="number" id="dSil" value="5" min="0" max="100"></div>
-            <div class="field-group"><label>Gold Disc %</label><input type="number" id="dGol" value="10" min="0" max="100"></div>
-            <div class="field-group"><label>Platinum Disc %</label><input type="number" id="dPla" value="15" min="0" max="100"></div>
-        </div>
-        <button class="btn-action" onclick="commitBrandMatrix()">SAVE GLOBAL CONFIGURATION</button>
+    <div class="nav-bar">
+        <div class="nav-links"><a onclick="window.history.back()">← BACK</a><a href="index.html">🏠 HOME</a></div>
+        <div><span style="background:var(--warning); padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; color:black;">ADMIN ROLE</span></div>
     </div>
 
-    <div class="card-panel">
-        <div class="block-title">Assign Dedicated Client-Specific Target Overrides</div>
-        <div class="inputs-grid">
-            <div class="field-group"><label>Client Phone Index</label><input type="tel" id="cMobile" placeholder="10 Digits" maxlength="10"></div>
-            <div class="field-group"><label>Brand Hash</label><input type="text" id="cBrand" placeholder="e.g. BARDHAL" oninput="this.value=this.value.toUpperCase()"></div>
-            <div class="field-group"><label>Override Deduction %</label><input type="number" id="cDisc" placeholder="Fixed Rate" min="0" max="100"></div>
-        </div>
-        <button class="btn-action" style="background:var(--success);" onclick="commitClientSpecificOverride()">APPLY TARGET MAPPING</button>
-    </div>
+    <div class="locked-banner" id="lockedBanner">ACCESS DENIED. ADMIN ROLE REQUIRED.</div>
 
-    <div class="card-panel">
-        <div class="block-title">Configured Matrix Records</div>
-        <div class="table-wrapper">
+    <div class="wrapper" id="mainWrapper" style="display:none;">
+        <div class="panel">
+            <h2>Brand & Tier Discount Manager</h2>
+            <p style="font-size:0.85rem; color:#64748b;">Set flat discount percentages off MRP for each customer tier. Use the Sync button to push calculated prices (MRP - Discount %) directly to all catalog items under that brand.</p>
+            
+            <div class="grid-row" style="background:#f0f9ff; padding:15px; border:1px solid #bae6fd; border-radius:6px;">
+                <div><label>Brand Name</label><input type="text" id="bName" class="form-control" style="text-transform:uppercase;"></div>
+                <div><label>Regular Disc %</label><input type="number" id="bReg" class="form-control" value="0"></div>
+                <div><label>Silver Disc %</label><input type="number" id="bSil" class="form-control" value="0"></div>
+                <div><label>Gold Disc %</label><input type="number" id="bGol" class="form-control" value="0"></div>
+                <div><label>Platinum Disc %</label><input type="number" id="bPla" class="form-control" value="0"></div>
+                <div><button class="btn btn-success" style="width:100%;" onclick="saveBrand()">Save Brand</button></div>
+            </div>
+
             <table>
-                <thead><tr><th>Brand Metadata</th><th>Regular</th><th>Silver</th><th>Gold</th><th>Platinum</th></tr></thead>
-                <tbody id="brandMatrixBody"></tbody>
+                <thead>
+                    <tr>
+                        <th>Brand</th>
+                        <th>Regular %</th>
+                        <th>Silver %</th>
+                        <th>Gold %</th>
+                        <th>Platinum %</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="brandTableBody"></tbody>
             </table>
         </div>
     </div>
-</div>
+    
+    <div id="toast"></div>
 
-<script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-
-    async function commitBrandMatrix() {
-        const brandCode = document.getElementById('mBrand').value.trim();
-        if(!brandCode) return alert("System Guard: Brand entry variable payload required.");
-
-        await supabaseClient.from('brand_master').upsert({
-            brand_name: brandCode,
-            disc_regular: parseFloat(document.getElementById('dReg').value) || 0,
-            disc_silver: parseFloat(document.getElementById('dSil').value) || 0,
-            disc_gold: parseFloat(document.getElementById('dGol').value) || 0,
-            disc_platinum: parseFloat(document.getElementById('dPla').value) || 0
-        });
-
-        alert(`Matrix values successfully compiled targeting brand index: ${brandCode}`);
-        loadBrandLedgers();
-    }
-
-    async function commitClientSpecificOverride() {
-        const mobile = document.getElementById('cMobile').value.trim();
-        const brand = document.getElementById('cBrand').value.trim();
-        const disc = parseFloat(document.getElementById('cDisc').value);
-
-        if(mobile.length !== 10 || !brand || isNaN(disc)) return alert("Check specific tracking parameters input fields.");
-
-        // Fetch client base profiles to update embedded tracking maps dynamically
-        const { data: cust } = await supabaseClient.from('customers').select('*').eq('mobile_number', mobile).single();
-        if(!cust) return alert("Unregistered base client index parameters.");
-
-        const mapPayload = cust.custom_brand_discounts || {};
-        mapPayload[brand] = disc;
-
-        await supabaseClient.from('customers').update({ custom_brand_discounts: mapPayload }).eq('mobile_number', mobile);
-        alert(`Fixed client override (${disc}%) successfully linked against brand code: ${brand}`);
-    }
-
-    async function loadBrandLedgers() {
-        const { data: matrix } = await supabaseClient.from('brand_master').select('*').order('brand_name');
-        const tbody = document.getElementById('brandMatrixBody'); tbody.innerHTML = '';
+    <script>
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
         
-        matrix?.forEach(row => {
-            tbody.innerHTML += `<tr>
-                <td><strong>${row.brand_name}</strong></td>
-                <td>${row.disc_regular}%</td>
-                <td>${row.disc_silver}%</td>
-                <td><strong>${row.disc_gold}%</strong></td>
-                <td><strong style="color:var(--info);">${row.disc_platinum}%</strong></td>
-            </tr>`;
-        });
-    }
+        if (localStorage.getItem('ERP_ACTIVE_ROLE') !== 'admin') {
+            document.getElementById('lockedBanner').style.display = 'block';
+        } else {
+            document.getElementById('mainWrapper').style.display = 'block';
+            loadBrands();
+        }
 
-    loadBrandLedgers();
-</script>
+        async function loadBrands() {
+            const { data } = await supabaseClient.from('brand_master').select('*').order('brand_name');
+            const tbody = document.getElementById('brandTableBody');
+            tbody.innerHTML = '';
+            (data||[]).forEach(b => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-weight:bold;">${b.brand_name}</td>
+                        <td>${b.disc_regular}%</td>
+                        <td>${b.disc_silver}%</td>
+                        <td>${b.disc_gold}%</td>
+                        <td>${b.disc_platinum}%</td>
+                        <td style="display:flex; gap:10px;">
+                            <button class="btn btn-warning" onclick="syncTierPricing('${b.brand_name}', ${b.disc_regular}, ${b.disc_silver}, ${b.disc_gold}, ${b.disc_platinum})">🔄 Sync to Catalog</button>
+                            <button class="btn btn-danger" onclick="deleteBrand('${b.brand_name}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function saveBrand() {
+            const payload = {
+                brand_name: document.getElementById('bName').value.trim().toUpperCase(),
+                disc_regular: parseFloat(document.getElementById('bReg').value)||0,
+                disc_silver: parseFloat(document.getElementById('bSil').value)||0,
+                disc_gold: parseFloat(document.getElementById('bGol').value)||0,
+                disc_platinum: parseFloat(document.getElementById('bPla').value)||0
+            };
+            if(!payload.brand_name) return;
+
+            const { error } = await supabaseClient.from('brand_master').upsert(payload, { onConflict: 'brand_name' });
+            if(error) alert('Error saving brand: ' + error.message);
+            else {
+                document.getElementById('bName').value = '';
+                loadBrands();
+                showToast('Brand saved successfully!');
+            }
+        }
+
+        async function deleteBrand(name) {
+            if(!confirm(`Delete brand rules for ${name}?`)) return;
+            await supabaseClient.from('brand_master').delete().eq('brand_name', name);
+            loadBrands();
+        }
+
+        async function syncTierPricing(brand, regDisc, silDisc, golDisc, plaDisc) {
+            if(!confirm(`WARNING: This will overwrite ALL tier prices for ALL products matching brand '${brand}' based on their current MRP. Proceed?`)) return;
+            
+            showToast('Syncing prices... Please wait.');
+            
+            // 1. Fetch all products of this brand
+            const { data: prods, error: fetchErr } = await supabaseClient.from('product_master').select('id, mrp').eq('brand', brand);
+            if(fetchErr || !prods) return alert('Failed to fetch products');
+            
+            let successCount = 0;
+            
+            // 2. Iterate and calculate new prices, then update
+            for (let p of prods) {
+                const mrp = parseFloat(p.mrp) || 0;
+                if(mrp <= 0) continue; // Skip items with no valid MRP
+                
+                const calcPrice = (disc) => Math.round(mrp * (1 - (disc/100)));
+                
+                await supabaseClient.from('product_master').update({
+                    default_price: calcPrice(regDisc),
+                    retail_price: calcPrice(regDisc), // Fallback map
+                    gold_price: calcPrice(golDisc),
+                    platinum_price: calcPrice(plaDisc)
+                }).eq('id', p.id);
+                successCount++;
+            }
+            
+            showToast(`Sync Complete! Updated ${successCount} products for ${brand}.`);
+        }
+
+        function showToast(msg) {
+            const x = document.getElementById("toast");
+            x.innerText = msg; x.className = "show";
+            setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
+        }
+    </script>
 </body>
 </html>
