@@ -1,0 +1,294 @@
+=== PROMPT 1 — FILE: product-master-console.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Catalog Console — My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        .wrapper { max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
+        .tabs { display: flex; gap: 5px; margin-top: 20px; border-bottom: 2px solid var(--border); overflow-x: auto; }
+        .tab { padding: 10px 15px; background: #e2e8f0; border-radius: 5px 5px 0 0; cursor: pointer; font-weight: bold; color: var(--primary); border: none; white-space: nowrap; }
+        .tab.active { background: var(--purple); color: white; }
+        .tab-content { display: none; background: white; padding: 20px; border: 1px solid var(--border); border-top: none; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: var(--primary); color: white; }
+        .form-control { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 0.8rem; }
+        .btn-success { background: var(--success); }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-info { background: var(--info); }
+        .btn-purple { background: var(--purple); }
+        .badge { background: var(--danger); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px; }
+        #scanner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
+        #scanner-video { width: 100%; max-width: 500px; border: 2px solid var(--success); }
+        .locked-banner { display: none; text-align: center; padding: 50px; background: #fee2e2; color: #991b1b; font-size: 1.2rem; font-weight: bold; margin-top: 50px; border-radius: 8px; }
+        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; } }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <div class="nav-links">
+            <a onclick="window.history.back()">← BACK</a>
+            <a href="index.html">🏠 HOME</a>
+        </div>
+        <div><span style="background:var(--purple); padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">ADMIN CONSOLE</span></div>
+    </div>
+
+    <div class="locked-banner" id="lockedBanner">ACCESS DENIED. ADMIN ROLE REQUIRED.</div>
+
+    <div class="wrapper" id="mainWrapper" style="display:none;">
+        <h2 style="color:var(--purple);">Product Catalog Manager</h2>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('tab-unverified')">1. Unverified Queue <span id="unvCount" class="badge">0</span></button>
+            <button class="tab" onclick="switchTab('tab-catalog')">2. Full Catalog</button>
+            <button class="tab" onclick="switchTab('tab-families')">3. Families</button>
+            <button class="tab" onclick="switchTab('tab-groups')">4. Groups</button>
+            <button class="tab" onclick="switchTab('tab-variants')">5. Fiber Variants</button>
+        </div>
+
+        <div id="tab-unverified" class="tab-content active">
+            <p>Products created during billing. Review, complete fields, and approve.</p>
+            <div id="unverifiedList"></div>
+        </div>
+
+        <div id="tab-catalog" class="tab-content">
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="catSearch" class="form-control" placeholder="Search item or brand..." onkeyup="loadCatalog()">
+                <select id="catScope" class="form-control" onchange="loadCatalog()"><option value="">All Scopes</option><option value="universal">Universal</option><option value="generic">Generic</option><option value="specific">Specific</option></select>
+                <button class="btn btn-info" onclick="bulkPrintLabels()">🏷️ Print Selected Labels</button>
+            </div>
+            <table id="catTable">
+                <thead><tr><th><input type="checkbox" id="catCheckAll" onchange="toggleAllChecks()"></th><th>Item Name</th><th>Brand</th><th>Scope</th><th>Track</th><th>MRP</th><th>Sell</th><th>Action</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="tab-families" class="tab-content">
+            <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:15px; background:var(--light); padding:10px; border:1px solid var(--border);">
+                <div><label>Family Name</label><input type="text" id="famName" class="form-control" style="text-transform:uppercase;"></div>
+                <div><label>Has Fiber Variants?</label><select id="famFiber" class="form-control"><option value="false">No</option><option value="true">Yes</option></select></div>
+                <button class="btn btn-success" onclick="createFamily()">+ Add Family</button>
+            </div>
+            <table id="famTable"><thead><tr><th>Family Name</th><th>Is Fiber?</th><th>Created At</th><th>Action</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div id="tab-groups" class="tab-content">
+            <div style="background:var(--light); padding:10px; border:1px solid var(--border); margin-bottom:15px;">
+                <h4>Create Group (Cross-Vehicle Compatibility)</h4>
+                <div style="display:flex; gap:10px; align-items:flex-end;">
+                    <div style="flex:1;"><label>Group Name (e.g. VISOR SHINE PLATFORM)</label><input type="text" id="grpName" class="form-control"></div>
+                    <div style="flex:1;"><label>Base Product ID</label><input type="text" id="grpProdId" class="form-control" placeholder="UUID of product_master"></div>
+                    <button class="btn btn-success" onclick="createGroup()">Save Group</button>
+                </div>
+            </div>
+            <div id="groupsList"></div>
+        </div>
+
+        <div id="tab-variants" class="tab-content">
+            <p>Manage color/sticker variants for Fiber items.</p>
+            <div id="variantsList"></div>
+        </div>
+    </div>
+
+    <div id="scanner-overlay"><video id="scanner-video"></video><button class="btn btn-danger" style="margin-top:20px;" onclick="closeScanner()">Cancel</button></div>
+    <div id="print-area" style="display:none;"></div>
+
+    <script>
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        let codeReader;
+
+        if (localStorage.getItem('ERP_ACTIVE_ROLE') !== 'admin') {
+            document.getElementById('lockedBanner').style.display = 'block';
+        } else {
+            document.getElementById('mainWrapper').style.display = 'block';
+            initPage();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+            if(tabId==='tab-unverified') loadUnverified();
+            if(tabId==='tab-catalog') loadCatalog();
+            if(tabId==='tab-families') loadFamilies();
+            if(tabId==='tab-groups') loadGroups();
+        }
+
+        async function initPage() { loadUnverified(); }
+
+        // --- TAB 1: Unverified ---
+        async function loadUnverified() {
+            const { data } = await supabaseClient.from('product_master').select('*').eq('catalog_status', 'unverified');
+            document.getElementById('unvCount').innerText = data ? data.length : 0;
+            const container = document.getElementById('unverifiedList');
+            container.innerHTML = '';
+            (data||[]).forEach(p => {
+                container.innerHTML += `<div style="border:1px solid var(--border); padding:10px; margin-bottom:10px; background:#f8fafc;">
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="text" id="u-name-${p.id}" value="${p.item_name}" class="form-control" style="flex:2">
+                        <input type="text" id="u-brand-${p.id}" value="${p.brand||''}" class="form-control" placeholder="Brand" style="text-transform:uppercase; flex:1">
+                        <select id="u-scope-${p.id}" class="form-control"><option value="generic">Generic</option><option value="universal">Universal</option><option value="specific">Specific</option></select>
+                        <select id="u-track-${p.id}" class="form-control"><option value="true">Track Stock</option><option value="false">Bin Item (No Stock)</option></select>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="number" id="u-mrp-${p.id}" value="${p.mrp||0}" class="form-control" placeholder="MRP" style="color:var(--mrp); font-weight:bold;">
+                        <input type="number" id="u-cost-${p.id}" value="${p.cost_price||0}" class="form-control" placeholder="Cost">
+                        <input type="number" id="u-ret-${p.id}" value="${p.retail_price||p.default_price||0}" class="form-control" placeholder="Sell">
+                        <input type="text" id="u-bar-${p.id}" value="${p.barcode_id||''}" class="form-control" placeholder="Barcode">
+                        <button class="btn btn-info" onclick="scanBarcode('u-bar-${p.id}')">📷</button>
+                    </div>
+                    <button class="btn btn-success" onclick="approveProduct('${p.id}')">✓ Approve & Go Live</button>
+                    <button class="btn btn-danger" onclick="deleteProduct('${p.id}')">✗ Delete</button>
+                </div>`;
+            });
+        }
+
+        async function approveProduct(id) {
+            const payload = {
+                item_name: document.getElementById(`u-name-${id}`).value,
+                brand: document.getElementById(`u-brand-${id}`).value.toUpperCase(),
+                scope: document.getElementById(`u-scope-${id}`).value,
+                track_stock: document.getElementById(`u-track-${id}`).value === 'true',
+                mrp: parseFloat(document.getElementById(`u-mrp-${id}`).value)||0,
+                cost_price: parseFloat(document.getElementById(`u-cost-${id}`).value)||0,
+                retail_price: parseFloat(document.getElementById(`u-ret-${id}`).value)||0,
+                barcode_id: document.getElementById(`u-bar-${id}`).value,
+                catalog_status: 'live'
+            };
+            await supabaseClient.from('product_master').update(payload).eq('id', id);
+            loadUnverified();
+        }
+
+        // --- TAB 2: Catalog ---
+        async function loadCatalog() {
+            let q = supabaseClient.from('product_master').select('*').eq('catalog_status', 'live').order('item_name').limit(100);
+            const search = document.getElementById('catSearch').value.toLowerCase();
+            const scope = document.getElementById('catScope').value;
+            if(search) q = q.ilike('item_name', `%${search}%`);
+            if(scope) q = q.eq('scope', scope);
+            
+            const { data } = await q;
+            const tbody = document.querySelector('#catTable tbody');
+            tbody.innerHTML = '';
+            (data||[]).forEach(p => {
+                tbody.innerHTML += `<tr>
+                    <td><input type="checkbox" class="cat-check" value="${p.id}" data-name="${p.item_name}" data-mrp="${p.mrp||0}" data-ret="${p.retail_price||0}" data-bar="${p.barcode_id||''}"></td>
+                    <td>${p.item_name}</td><td>${p.brand||'STD'}</td><td>${p.scope}</td>
+                    <td>${p.track_stock?'Yes':'No'}</td><td style="color:var(--mrp);">${p.mrp||0}</td><td>${p.retail_price||0}</td>
+                    <td><button class="btn btn-danger" onclick="deleteProduct('${p.id}', true)">Delete</button></td>
+                </tr>`;
+            });
+        }
+
+        function toggleAllChecks() {
+            const v = document.getElementById('catCheckAll').checked;
+            document.querySelectorAll('.cat-check').forEach(c => c.checked = v);
+        }
+
+        async function deleteProduct(id, reloadCat=false) {
+            if(!confirm('Delete this product?')) return;
+            await supabaseClient.from('product_master').delete().eq('id', id);
+            reloadCat ? loadCatalog() : loadUnverified();
+        }
+
+        // --- TAB 3: Families ---
+        async function loadFamilies() {
+            const { data } = await supabaseClient.from('product_families').select('*');
+            const tbody = document.querySelector('#famTable tbody');
+            tbody.innerHTML = '';
+            (data||[]).forEach(f => {
+                tbody.innerHTML += `<tr><td>${f.family_name}</td><td>${f.is_fiber?'Yes':'No'}</td><td>${new Date(f.created_at).toLocaleDateString()}</td>
+                    <td><button class="btn btn-danger" onclick="deleteFamily('${f.id}')">Delete</button></td></tr>`;
+            });
+        }
+        async function createFamily() {
+            const name = document.getElementById('famName').value.trim().toUpperCase();
+            const fiber = document.getElementById('famFiber').value === 'true';
+            if(!name) return;
+            await supabaseClient.from('product_families').insert({family_name: name, is_fiber: fiber});
+            document.getElementById('famName').value = '';
+            loadFamilies();
+        }
+        async function deleteFamily(id) { await supabaseClient.from('product_families').delete().eq('id',id); loadFamilies(); }
+
+        // --- TAB 4: Groups ---
+        async function loadGroups() {
+            const { data } = await supabaseClient.from('product_groups').select('*, product_group_vehicles(vehicle_model)');
+            const c = document.getElementById('groupsList');
+            c.innerHTML = '';
+            (data||[]).forEach(g => {
+                const vehs = g.product_group_vehicles.map(v=>v.vehicle_model).join(', ');
+                c.innerHTML += `<div style="border:1px solid var(--border); padding:10px; margin-bottom:10px;">
+                    <strong>${g.group_name}</strong> <span style="font-size:0.8rem; color:var(--info);">[Product ID: ${g.product_master_id}]</span><br>
+                    <span style="font-size:0.85rem;">Vehicles: ${vehs || 'None'}</span>
+                    <div style="margin-top:5px;"><button class="btn btn-danger" onclick="deleteGroup('${g.id}')">Delete Group</button></div>
+                </div>`;
+            });
+        }
+        async function createGroup() {
+            const name = document.getElementById('grpName').value;
+            const pid = document.getElementById('grpProdId').value;
+            if(!name || !pid) return;
+            await supabaseClient.from('product_groups').insert({group_name: name, product_master_id: pid});
+            document.getElementById('grpName').value=''; document.getElementById('grpProdId').value='';
+            loadGroups();
+        }
+        async function deleteGroup(id) { await supabaseClient.from('product_groups').delete().eq('id',id); loadGroups(); }
+
+        // --- Utils & Scanners ---
+        async function scanBarcode(targetId) {
+            if(!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+            document.getElementById('scanner-overlay').style.display = 'flex';
+            try {
+                const result = await codeReader.decodeFromInputVideoDevice(undefined, 'scanner-video');
+                document.getElementById(targetId).value = result.text;
+                closeScanner();
+            } catch(e) { console.error(e); }
+        }
+        function closeScanner() { if(codeReader) codeReader.reset(); document.getElementById('scanner-overlay').style.display = 'none'; }
+
+        function bulkPrintLabels() {
+            const printTarget = document.getElementById('print-area');
+            printTarget.innerHTML = '';
+            let count = 0;
+            document.querySelectorAll('.cat-check:checked').forEach(c => {
+                count++;
+                const svgId = `lbl-cat-${c.value}`;
+                printTarget.innerHTML += `<div style="width:62mm; height:38mm; border:1px solid #000; padding:2mm; box-sizing:border-box; font-family:Arial; page-break-inside:avoid;">
+                    <div style="font-size:7pt; font-weight:bold; text-align:center;">My Care Service Center</div>
+                    <div style="font-size:6pt; margin:2px 0;">${c.dataset.name.substring(0,30)}</div>
+                    <div style="font-size:6pt; color:#7c3aed;">MRP: ₹${c.dataset.mrp} | Sell: ₹${c.dataset.ret}</div>
+                    <div style="text-align:center;"><svg id="${svgId}"></svg></div>
+                </div>`;
+            });
+            if(count===0) return alert('Select items to print');
+            
+            setTimeout(() => {
+                document.querySelectorAll('.cat-check:checked').forEach(c => {
+                    const bar = c.dataset.bar || '000000';
+                    JsBarcode(`#lbl-cat-${c.value}`, bar==='000000'?'TEST':bar, {format:'CODE128', width:1.2, height:25, displayValue:true, fontSize:8, margin:0});
+                });
+                window.print();
+            }, 500);
+        }
+    </script>
+</body>
+</html>
