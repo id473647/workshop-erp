@@ -1,0 +1,229 @@
+=== PROMPT 3 — FILE: inventory-lookup.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Lookup — My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; }
+        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
+        .panel { background: white; padding: 15px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px; }
+        .form-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; width: 100%; }
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 0.85rem; }
+        .btn-success { background: var(--success); }
+        .btn-primary { background: var(--primary); }
+        .btn-info { background: var(--info); }
+        
+        .filters { display: flex; gap: 10px; margin-bottom: 20px; }
+        
+        .result-card { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin-bottom: 10px; background: #fff; }
+        .result-card img { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; margin-right: 15px; }
+        .result-info { flex: 1; }
+        .result-actions { display: flex; gap: 10px; align-items: center; }
+        .badge { padding: 3px 6px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; color: white; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 200; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto; }
+        .jc-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .jc-row:hover { background: #f0f9ff; }
+        
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 2px; padding: 16px; position: fixed; z-index: 300; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 15px; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <div class="nav-links"><a onclick="window.history.back()">← BACK</a><a href="index.html">🏠 HOME</a></div>
+        <div><span class="badge" style="background:var(--warning);" id="userRoleBadge">ROLE</span></div>
+    </div>
+
+    <div class="wrapper">
+        <div class="panel">
+            <h2>Inventory Lookup</h2>
+            <div class="filters">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search product name or brand..." style="flex:2;" autofocus>
+                <select id="vehicleFilter" class="form-control" style="flex:1;"><option value="">-- All Vehicles --</option></select>
+                <input type="text" id="custMobile" class="form-control" placeholder="Customer Mobile (Opt)" style="flex:1;">
+            </div>
+            
+            <div id="resultsContainer">
+                <p style="text-align:center; color:#64748b;">Enter at least 2 characters to search.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="jcModal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <h3 style="margin:0;">Select Open Job Card</h3>
+                <button class="btn btn-primary" onclick="closeJcModal()" style="padding:4px 8px;">×</button>
+            </div>
+            <div id="jcList">Loading...</div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+        document.getElementById('userRoleBadge').innerText = sessionRole;
+
+        let debounceTimer;
+        let globalCatalog = [];
+        let openJobCards = [];
+        let activeProductForJc = null;
+
+        async function initPage() {
+            // Load vehicles
+            const { data: vl } = await supabaseClient.from('vehicle_master').select('model_name,brand').order('brand');
+            const vf = document.getElementById('vehicleFilter');
+            (vl||[]).forEach(v => { vf.innerHTML += `<option value="${v.model_name}">${v.brand} ${v.model_name}</option>`; });
+            
+            // Load catalog
+            const { data: cat } = await supabaseClient.from('product_master').select('*');
+            globalCatalog = cat || [];
+
+            // Load open JCs for modal
+            const { data: jcs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
+            openJobCards = jcs || [];
+            
+            document.getElementById('searchInput').addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(performSearch, 300);
+            });
+            document.getElementById('vehicleFilter').addEventListener('change', performSearch);
+        }
+
+        async function performSearch() {
+            const val = document.getElementById('searchInput').value.trim().toLowerCase();
+            const veh = document.getElementById('vehicleFilter').value.toUpperCase();
+            const container = document.getElementById('resultsContainer');
+            
+            if (val.length < 2) { container.innerHTML = '<p style="text-align:center; color:#64748b;">Enter at least 2 characters to search.</p>'; return; }
+            const tokens = val.split(' ').filter(t=>t.length>0);
+
+            // Pass 1: Vehicle specific if selected
+            let results = [];
+            if (veh) {
+                const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model', veh);
+                let groupIds = (gLinks||[]).length > 0 ? (await supabaseClient.from('product_groups').select('product_master_id').in('id', gLinks.map(g=>g.group_id))).data.map(g=>g.product_master_id) : [];
+                
+                results = globalCatalog.filter(p => {
+                    const txt = (p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
+                    if (!tokens.every(t=>txt.includes(t))) return false;
+                    return p.scope==='universal' || groupIds.includes(p.id) || (p.compatibility_tags?.toUpperCase().includes(veh));
+                });
+            } else {
+                results = globalCatalog.filter(p => {
+                    const txt = (p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
+                    return tokens.every(t=>txt.includes(t));
+                });
+            }
+
+            container.innerHTML = '';
+            if(results.length === 0) { container.innerHTML = '<p style="text-align:center;">No products found.</p>'; return; }
+
+            results.slice(0, 30).forEach(p => {
+                const stkColor = p.track_stock===false ? '#94a3b8' : ((p.current_stock||0)>0 ? 'var(--success)' : 'var(--danger)');
+                const stkText = p.track_stock===false ? 'Bin Item' : `Stk: ${p.current_stock||0}`;
+                const unv = p.catalog_status==='unverified' ? `<span class="badge" style="background:var(--warning); color:black;">⚠️ Unverified</span>` : '';
+                const img = p.photo_url ? `<img src="${p.photo_url}">` : `<div style="width:48px;height:48px;background:#eee;border-radius:4px;margin-right:15px;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#888;">No Img</div>`;
+                
+                container.innerHTML += `
+                    <div class="result-card">
+                        <div style="display:flex; align-items:center; flex:1;">
+                            ${img}
+                            <div class="result-info">
+                                <div style="font-weight:bold;">${p.item_name} ${unv}</div>
+                                <div style="font-size:0.8rem; color:#64748b;">
+                                    Brand: ${p.brand||'STD'} | Scope: <span style="text-transform:capitalize;">${p.scope||'generic'}</span>
+                                </div>
+                                <div style="margin-top:4px;">
+                                    <span class="badge" style="background:${stkColor};">${stkText}</span>
+                                    <span style="color:var(--purple); font-size:0.8rem; font-weight:bold; margin-left:10px;">MRP: ₹${p.mrp||0}</span>
+                                    <span style="font-size:0.8rem; font-weight:bold; margin-left:10px;">Sell: ₹${p.retail_price||p.default_price||0}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="result-actions">
+                            <input type="number" id="qty-${p.id}" value="1" min="1" style="width:50px; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                            <button class="btn btn-primary" onclick="openJcModal('${p.id}', '${p.item_name.replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.mac||0}, ${p.retail_price||p.default_price||0})">+ Job Card</button>
+                            <button class="btn btn-success" onclick="startPosSale('${p.id}')">+ POS</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function openJcModal(id, name, mrp, mac, rate) {
+            const qty = parseFloat(document.getElementById(`qty-${id}`).value) || 1;
+            activeProductForJc = { id, name, mrp, mac, rate, qty };
+            
+            const list = document.getElementById('jcList');
+            list.innerHTML = '';
+            if(openJobCards.length === 0) { list.innerHTML = 'No open job cards found.'; }
+            
+            openJobCards.forEach(jc => {
+                const reg = jc.vehicles?.reg_number || 'UNKNOWN';
+                const mod = jc.vehicles?.make_model || '';
+                list.innerHTML += `<div class="jc-row" onclick="addToJobCard('${jc.id}', '${reg}')">
+                    <div><strong>${jc.id.split('-')[0].toUpperCase()}</strong> — ${reg} (${mod})</div>
+                    <div style="color:#888; font-size:0.8rem;">${jc.customer_mobile||''}</div>
+                </div>`;
+            });
+            document.getElementById('jcModal').style.display = 'flex';
+        }
+
+        function closeJcModal() { document.getElementById('jcModal').style.display = 'none'; activeProductForJc = null; }
+
+        async function addToJobCard(jcId, regNumber) {
+            if(!activeProductForJc) return;
+            const wh = (sessionRole==='green' || sessionRole==='admin') ? 'Green' : 'Moped';
+            
+            const payload = {
+                job_card_id: jcId,
+                warehouse_type: wh,
+                item_name: activeProductForJc.name,
+                qty: activeProductForJc.qty,
+                unit_price: activeProductForJc.rate,
+                total_price: activeProductForJc.qty * activeProductForJc.rate,
+                mrp_at_billing: activeProductForJc.mrp,
+                mac_at_billing: activeProductForJc.mac
+            };
+            
+            const { error } = await supabaseClient.from('job_card_items').insert(payload);
+            if(error) { alert('Error: ' + error.message); return; }
+            
+            closeJcModal();
+            showToast(`✓ Added ${activeProductForJc.qty}x ${activeProductForJc.name} to ${regNumber}`);
+        }
+
+        function startPosSale(pid) {
+            // Redirect to POS with product ID in query param or localStorage
+            localStorage.setItem('ERP_POS_PENDING_ITEM', pid);
+            window.location.href = 'pos-green.html';
+        }
+
+        function showToast(msg) {
+            const x = document.getElementById("toast");
+            x.innerText = msg; x.className = "show";
+            setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
+        }
+
+        initPage();
+    </script>
+</body>
+</html>
