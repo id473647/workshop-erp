@@ -1,0 +1,156 @@
+=== PROMPT 3 — FILE: workshop_expenses.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Expenses — My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; }
+        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
+        .panel { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; }
+        .form-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; width: 100%; }
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-success { background: var(--success); }
+        .btn-primary { background: var(--primary); }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: end; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <div class="nav-links"><a onclick="window.history.back()">← BACK</a><a href="index.html">🏠 HOME</a></div>
+        <div><span style="background:var(--warning); padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;" id="userRoleBadge">ROLE</span></div>
+    </div>
+
+    <div class="wrapper">
+        <div class="panel">
+            <h2>Record Expense</h2>
+            <div class="grid-row">
+                <div><label>Category</label><select id="expCat" class="form-control"><option>Lathe Work</option><option>Shop Supplies</option><option>Freight</option><option>Service</option><option>Other</option></select></div>
+                <div><label>Vendor / Party</label><select id="expVendor" class="form-control"><option value="">-- Select Vendor --</option></select></div>
+                <div><label>Amount (₹)</label><input type="number" id="expAmount" class="form-control"></div>
+                <div style="grid-column: span 2;"><label>Note / Description</label><input type="text" id="expNote" class="form-control" style="text-transform:uppercase;"></div>
+                <div><button class="btn btn-success" style="width:100%;" onclick="saveExpense()">Save Expense</button></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0;">Expense History</h2>
+                <div style="display:flex; gap:10px;">
+                    <input type="date" id="histStart" class="form-control">
+                    <input type="date" id="histEnd" class="form-control">
+                    <button class="btn btn-primary" onclick="loadHistory()">Filter</button>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Note</th><th>Warehouse</th><th>By</th><th>Amount</th><th>Action</th></tr></thead>
+                <tbody id="historyTableBody"></tbody>
+                <tfoot><tr><th colspan="6" style="text-align:right;">Total:</th><th colspan="2" id="histTotal" style="text-align:left;">₹0.00</th></tr></tfoot>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+        document.getElementById('userRoleBadge').innerText = sessionRole;
+        
+        let vendorsCache = [];
+
+        async function initPage() {
+            // Default dates to today for EOD view
+            document.getElementById('histStart').valueAsDate = new Date();
+            document.getElementById('histEnd').valueAsDate = new Date();
+
+            const { data } = await supabaseClient.from('expense_vendors').select('*').order('vendor_name');
+            vendorsCache = data || [];
+            
+            const vSelect = document.getElementById('expVendor');
+            vendorsCache.forEach(v => {
+                // Role filter for vendors
+                if ((sessionRole==='green' || sessionRole==='moped') && (v.vendor_category==='Lathe/Welding' || v.vendor_category==='Service')) return;
+                vSelect.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`;
+            });
+
+            loadHistory();
+        }
+
+        async function saveExpense() {
+            const amt = parseFloat(document.getElementById('expAmount').value);
+            if (!amt) return alert('Enter valid amount');
+            
+            const payload = {
+                expense_category: document.getElementById('expCat').value,
+                stakeholder_id: document.getElementById('expVendor').value || null,
+                amount: amt,
+                note: document.getElementById('expNote').value.toUpperCase(),
+                recorded_by: sessionRole,
+                warehouse_type: (sessionRole==='green'||sessionRole==='moped') ? sessionRole : 'service'
+            };
+
+            const { error } = await supabaseClient.from('workshop_expenses').insert(payload);
+            if (error) return alert('Error: ' + error.message);
+            
+            document.getElementById('expAmount').value = '';
+            document.getElementById('expNote').value = '';
+            loadHistory();
+        }
+
+        async function loadHistory() {
+            const start = document.getElementById('histStart').value;
+            const end = document.getElementById('histEnd').value;
+            
+            let query = supabaseClient.from('workshop_expenses').select('*, expense_vendors(vendor_name)')
+                .gte('created_at', start + 'T00:00:00Z').lte('created_at', end + 'T23:59:59Z')
+                .order('created_at', { ascending: false });
+
+            // Role filtering for view
+            if (sessionRole === 'green') query = query.eq('warehouse_type', 'green');
+            else if (sessionRole === 'moped') query = query.eq('warehouse_type', 'moped');
+            
+            const { data } = await query;
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            let tot = 0;
+            
+            (data||[]).forEach(e => {
+                tot += parseFloat(e.amount)||0;
+                const vName = e.expense_vendors?.vendor_name || '-';
+                tbody.innerHTML += `<tr>
+                    <td>${new Date(e.created_at).toLocaleString('en-IN')}</td>
+                    <td>${e.expense_category}</td>
+                    <td>${vName}</td>
+                    <td>${e.note||''}</td>
+                    <td>${e.warehouse_type||'service'}</td>
+                    <td>${e.recorded_by||''}</td>
+                    <td style="font-weight:bold;">₹${e.amount}</td>
+                    <td style="text-align:center;"><button onclick="deleteExpenseRecord('${e.id}')" style="color:var(--danger);background:none;border:none;font-weight:700;cursor:pointer;font-size:1.1rem;">×</button></td>
+                </tr>`;
+            });
+            document.getElementById('histTotal').innerText = `₹${tot.toFixed(2)}`;
+        }
+
+        async function deleteExpenseRecord(id) {
+            if (!confirm('Delete this expense? Cannot be undone.')) return;
+            const { error } = await supabaseClient.from('workshop_expenses').delete().eq('id', id);
+            if (error) alert('Delete failed: ' + error.message);
+            else loadHistory();
+        }
+
+        initPage();
+    </script>
+</body>
+</html>
