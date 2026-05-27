@@ -1,0 +1,570 @@
+=== PROMPT 1 — FILE: purchase-manager.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Manager — My Care ERP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444;
+            --purple: #8e44ad; --warning: #f59e0b; --info: #2980b9; --mrp: #7c3aed;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        .wrapper { max-width: 950px; margin: 0 auto; padding-bottom: 50px; }
+        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
+        .role-badge { background: var(--warning); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; text-transform: uppercase; font-weight: bold; }
+        .tabs { display: flex; gap: 5px; margin-top: 20px; border-bottom: 2px solid var(--border); }
+        .tab { padding: 10px 15px; background: #e2e8f0; border-radius: 5px 5px 0 0; cursor: pointer; font-weight: bold; color: var(--primary); border: none; }
+        .tab.active { background: var(--primary); color: white; }
+        .tab-content { display: none; background: white; padding: 20px; border: 1px solid var(--border); border-top: none; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-success { background: var(--success); }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-info { background: var(--info); }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; align-items: end; margin-bottom: 10px; background: var(--light); padding: 10px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: var(--primary); color: white; }
+        .mrp-field { border: 1px solid var(--mrp) !important; color: var(--mrp); font-weight: bold; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 200; }
+        .modal { background: white; padding: 20px; border-radius: 8px; width: 400px; max-width: 90%; }
+        .autocomplete-list { position: absolute; background: white; border: 1px solid #ccc; z-index: 50; max-height: 200px; overflow-y: auto; width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .autocomplete-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.8rem; }
+        .autocomplete-item:hover { background: #f1f5f9; }
+        #scanner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
+        #scanner-video { width: 100%; max-width: 500px; border: 2px solid var(--success); }
+        @media print { 
+            body * { visibility: hidden; } 
+            #print-area, #print-area * { visibility: visible; } 
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; } 
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <div class="nav-links">
+            <a onclick="window.history.back()">← BACK</a>
+            <a href="index.html">🏠 HOME</a>
+            <a href="#" onclick="logout()">LOGOUT</a>
+        </div>
+        <div>
+            <span class="role-badge" id="userRoleBadge">ROLE</span>
+        </div>
+    </div>
+
+    <div class="wrapper">
+        <h2>Purchase Manager</h2>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('tab-grn')">1. GRN / Purchase</button>
+            <button class="tab" onclick="switchTab('tab-expense')">2. Non-Stock Expense</button>
+            <button class="tab" onclick="switchTab('tab-ledger')">3. Party Ledger</button>
+            <button class="tab" onclick="switchTab('tab-returns')">4. Returns</button>
+            <button class="tab" onclick="switchTab('tab-history')">5. History</button>
+        </div>
+
+        <div id="tab-grn" class="tab-content active">
+            <div style="display:flex; gap:15px;">
+                <div class="form-group" style="flex:1;">
+                    <label>Date Received</label>
+                    <input type="date" id="grnDate" class="form-control">
+                </div>
+                <div class="form-group" style="flex:2;">
+                    <label>Party / Vendor</label>
+                    <select id="grnParty" class="form-control" onchange="fetchPartyBalance()">
+                        <option value="">-- Select Party --</option>
+                    </select>
+                    <a href="#" style="font-size:0.75rem; color:var(--info);" onclick="openPartyModal()">+ Create New Party</a>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Invoice Number</label>
+                    <input type="text" id="grnInvoiceNo" class="form-control" placeholder="Inv#">
+                </div>
+            </div>
+            <div id="grnBalanceDisplay" style="font-size:0.85rem; color:var(--primary); font-weight:bold; margin-bottom:15px;"></div>
+
+            <div id="grnItemsContainer"></div>
+            <button class="btn btn-primary" onclick="addGrnRow()" style="margin-bottom:15px;">+ Add Line Item</button>
+            
+            <div style="border-top: 2px solid var(--border); padding-top: 15px; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;">Total: ₹<span id="grnTotal">0.00</span></h3>
+                <div>
+                    <button class="btn btn-success" onclick="commitGRN()">Commit GRN</button>
+                    <button class="btn btn-info" id="btnPrintLabels" style="display:none;" onclick="printReceivedLabels()">🏷️ Print Labels</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-expense" class="tab-content">
+            <h3>Log Expense</h3>
+            <div class="grid-row" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="form-group"><label>Party/Vendor (Or Free Text)</label><input type="text" id="expParty" list="partyDatalist" class="form-control"></div>
+                <div class="form-group"><label>Date</label><input type="date" id="expDate" class="form-control"></div>
+                <div class="form-group"><label>Category</label><select id="expCategory" class="form-control"><option>Lathe Work</option><option>Shop Supplies</option><option>Freight</option><option>Service</option><option>Other</option></select></div>
+                <div class="form-group" style="grid-column: span 2;"><label>Description</label><input type="text" id="expDesc" class="form-control" style="text-transform:uppercase;"></div>
+                <div class="form-group"><label>Amount (₹)</label><input type="number" id="expAmount" class="form-control"></div>
+                <div class="form-group"><label>Payment Mode</label><select id="expPayment" class="form-control"><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
+                <div class="form-group"><label>Warehouse</label><input type="text" id="expWarehouse" class="form-control" readonly></div>
+                <div class="form-group"><button class="btn btn-success" onclick="saveExpense()">Save Expense</button></div>
+            </div>
+        </div>
+
+        <div id="tab-ledger" class="tab-content">
+            <div style="display:flex; gap:15px; margin-bottom:15px;">
+                <select id="ledgerPartySelect" class="form-control" onchange="loadLedger()"><option value="">Select Party</option></select>
+                <select id="ledgerFilter" class="form-control" onchange="loadLedger()"><option value="all">All Warehouses</option><option value="green">Green</option><option value="moped">Moped</option><option value="service">Service</option></select>
+            </div>
+            <div id="ledgerBalanceBox" style="background:#f0f9ff; padding:10px; border:1px solid #bae6fd; border-radius:5px; margin-bottom:15px; font-weight:bold;"></div>
+            <button class="btn btn-primary" onclick="document.getElementById('modalPayment').style.display='flex'">Make Payment</button>
+            <table id="ledgerTable">
+                <thead><tr><th>Date</th><th>Warehouse</th><th>Type</th><th>Ref</th><th>Amount</th><th>Balance</th><th>Note</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="tab-returns" class="tab-content">
+            <p>Select Party to view eligible invoices for return.</p>
+            <select id="returnPartySelect" class="form-control" style="max-width:300px; margin-bottom:15px;" onchange="loadReturnInvoices()"><option value="">Select Party</option></select>
+            <div id="returnInvoicesList"></div>
+            <div id="returnItemsSection" style="display:none; margin-top:15px; border:1px solid var(--border); padding:10px;">
+                <h4>Select Items to Return</h4>
+                <div id="returnItemsGrid"></div>
+                <button class="btn btn-danger" style="margin-top:10px;" onclick="commitReturn()">Commit Return</button>
+            </div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="date" id="histStart" class="form-control">
+                <input type="date" id="histEnd" class="form-control">
+                <select id="histWarehouse" class="form-control"><option value="">All Warehouses</option><option value="green">Green</option><option value="moped">Moped</option></select>
+                <button class="btn btn-primary" onclick="loadPurchaseHistory()">Filter</button>
+            </div>
+            <table id="historyTable">
+                <thead><tr><th>Date</th><th>Party</th><th>Inv#</th><th>Warehouse</th><th>Amount</th><th>Paid</th><th>Bal</th><th>By</th><th>Action</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <datalist id="partyDatalist"></datalist>
+
+    <div class="modal-overlay" id="modalParty">
+        <div class="modal">
+            <h3>Create New Party</h3>
+            <div class="form-group"><label>Party Name*</label><input type="text" id="nPName" class="form-control" style="text-transform:uppercase;"></div>
+            <div class="form-group"><label>Contact Person</label><input type="text" id="nPContact" class="form-control"></div>
+            <div class="form-group"><label>Mobile</label><input type="text" id="nPMobile" class="form-control" maxlength="10"></div>
+            <div class="form-group"><label>Address</label><input type="text" id="nPAddr" class="form-control"></div>
+            <div class="form-group"><label>GSTIN</label><input type="text" id="nPGst" class="form-control"></div>
+            <div class="form-group"><label>Opening Bal (Green)</label><input type="number" id="nPOpenG" class="form-control" value="0"></div>
+            <div class="form-group"><label>Opening Bal (Moped)</label><input type="number" id="nPOpenM" class="form-control" value="0"></div>
+            <div class="form-group"><label>Opening Bal (Service)</label><input type="number" id="nPOpenS" class="form-control" value="0"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn" onclick="document.getElementById('modalParty').style.display='none'">Cancel</button>
+                <button class="btn btn-success" onclick="saveNewParty()">Save Party</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalPayment">
+        <div class="modal">
+            <h3>Make Payment</h3>
+            <div class="form-group"><label>Amount (₹)</label><input type="number" id="payAmt" class="form-control"></div>
+            <div class="form-group"><label>Mode</label><select id="payMode" class="form-control" onchange="document.getElementById('payCheque').style.display=this.value==='Cheque'?'block':'none'"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option></select></div>
+            <input type="text" id="payCheque" class="form-control" placeholder="Cheque Number" style="display:none; margin-bottom:15px;">
+            <div class="form-group"><label>Warehouse</label><select id="payWh" class="form-control"><option value="all">All Combined</option><option value="green">Green</option><option value="moped">Moped</option><option value="service">Service</option></select></div>
+            <div class="form-group"><label>Note</label><input type="text" id="payNote" class="form-control"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn" onclick="document.getElementById('modalPayment').style.display='none'">Cancel</button>
+                <button class="btn btn-success" onclick="commitPayment()">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="scanner-overlay">
+        <video id="scanner-video"></video>
+        <button class="btn btn-danger" style="margin-top:20px;" onclick="closeScanner()">Cancel</button>
+    </div>
+    <div id="print-area" style="display:none;"></div>
+
+    <script>
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        
+        const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+        let globalCatalogCache = [];
+        let partiesCache = [];
+        let grnLines = [];
+        let codeReader;
+
+        document.getElementById('userRoleBadge').innerText = sessionRole;
+        if(sessionRole === 'admin') document.getElementById('expWarehouse').removeAttribute('readonly');
+        document.getElementById('expWarehouse').value = sessionRole === 'admin' ? 'green' : sessionRole;
+        document.getElementById('grnDate').valueAsDate = new Date();
+        document.getElementById('expDate').valueAsDate = new Date();
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function logout() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'; }
+
+        async function initPage() {
+            await Promise.all([fetchParties(), fetchCatalog()]);
+            addGrnRow();
+        }
+
+        async function fetchParties() {
+            const { data } = await supabaseClient.from('parties').select('*').order('party_name');
+            partiesCache = data || [];
+            let options = '<option value="">-- Select Party --</option>';
+            let list = '';
+            partiesCache.forEach(p => {
+                options += `<option value="${p.id}">${p.party_name}</option>`;
+                list += `<option value="${p.party_name}">`;
+            });
+            document.getElementById('grnParty').innerHTML = options;
+            document.getElementById('ledgerPartySelect').innerHTML = options;
+            document.getElementById('returnPartySelect').innerHTML = options;
+            document.getElementById('partyDatalist').innerHTML = list;
+        }
+
+        async function fetchCatalog() {
+            const { data } = await supabaseClient.from('product_master').select('*');
+            globalCatalogCache = data || [];
+        }
+
+        function openPartyModal() { document.getElementById('modalParty').style.display='flex'; }
+        
+        async function saveNewParty() {
+            const payload = {
+                party_name: document.getElementById('nPName').value.trim().toUpperCase(),
+                contact_person: document.getElementById('nPContact').value,
+                mobile: document.getElementById('nPMobile').value,
+                address: document.getElementById('nPAddr').value,
+                gstin: document.getElementById('nPGst').value
+            };
+            if(!payload.party_name) return alert('Name required');
+            const { data, error } = await supabaseClient.from('parties').insert(payload).select().single();
+            if(error) return alert('Error saving party');
+            
+            const pId = data.id;
+            const opG = parseFloat(document.getElementById('nPOpenG').value)||0;
+            const opM = parseFloat(document.getElementById('nPOpenM').value)||0;
+            const opS = parseFloat(document.getElementById('nPOpenS').value)||0;
+            
+            const obInserts = []; const legInserts = [];
+            if(opG !== 0) { obInserts.push({party_id:pId, warehouse_type:'green', opening_balance:opG}); legInserts.push({party_id:pId, entry_type:'Opening Balance', amount:opG, balance_after:opG, warehouse_type:'green'}); }
+            if(opM !== 0) { obInserts.push({party_id:pId, warehouse_type:'moped', opening_balance:opM}); legInserts.push({party_id:pId, entry_type:'Opening Balance', amount:opM, balance_after:opM, warehouse_type:'moped'}); }
+            if(opS !== 0) { obInserts.push({party_id:pId, warehouse_type:'service', opening_balance:opS}); legInserts.push({party_id:pId, entry_type:'Opening Balance', amount:opS, balance_after:opS, warehouse_type:'service'}); }
+            
+            if(obInserts.length) await supabaseClient.from('party_opening_balances').insert(obInserts);
+            if(legInserts.length) await supabaseClient.from('party_ledger').insert(legInserts);
+            
+            alert('Party created.');
+            document.getElementById('modalParty').style.display='none';
+            await fetchParties();
+            document.getElementById('grnParty').value = pId;
+            fetchPartyBalance();
+        }
+
+        async function getPartyBalance(partyId, warehouseFilter=null) {
+            const { data } = await supabaseClient.from('party_ledger').select('amount,entry_type,warehouse_type').eq('party_id', partyId);
+            let balance = 0;
+            (data||[]).forEach(e => {
+                if (warehouseFilter && e.warehouse_type!==warehouseFilter && e.warehouse_type!=='all') return;
+                if (['Purchase','Opening Balance'].includes(e.entry_type)) balance += e.amount;
+                else balance -= e.amount;
+            });
+            return balance;
+        }
+
+        async function fetchPartyBalance() {
+            const pId = document.getElementById('grnParty').value;
+            if(!pId) { document.getElementById('grnBalanceDisplay').innerHTML=''; return; }
+            const p = partiesCache.find(x=>x.id===pId);
+            const balG = await getPartyBalance(pId, 'green');
+            const balM = await getPartyBalance(pId, 'moped');
+            document.getElementById('grnBalanceDisplay').innerHTML = `Current outstanding with ${p.party_name}: ₹${balG} (Green) / ₹${balM} (Moped)`;
+        }
+
+        // GRN LOGIC
+        let rowIdx = 0;
+        function addGrnRow() {
+            const id = rowIdx++;
+            const html = `
+                <div class="grid-row" id="grnRow-${id}">
+                    <div style="grid-column: span 2; position:relative;">
+                        <label>Product</label>
+                        <input type="text" id="gProd-${id}" class="form-control" onkeyup="searchGrnProduct(${id})" placeholder="Search or Type new">
+                        <div id="gAuto-${id}" class="autocomplete-list" style="display:none;"></div>
+                    </div>
+                    <div><label>Brand</label><input type="text" id="gBrand-${id}" class="form-control" style="text-transform:uppercase;"></div>
+                    <div><label>Qty</label><input type="number" id="gQty-${id}" class="form-control" value="1" min="1" oninput="calcGrnRow(${id})"></div>
+                    <div><label>MRP (₹)</label><input type="number" id="gMrp-${id}" class="form-control mrp-field" oninput="calcGrnRow(${id})"></div>
+                    <div><label>Trade Disc %</label><input type="number" id="gDisc-${id}" class="form-control" value="0" oninput="calcGrnRow(${id})"></div>
+                    <div><label>Cost (₹)</label><input type="number" id="gCost-${id}" class="form-control" readonly></div>
+                    <div><label>Retail (₹)</label><input type="number" id="gRet-${id}" class="form-control"></div>
+                    <div style="grid-column: span 2;"><label>Barcode</label><div style="display:flex;gap:5px;"><input type="text" id="gBar-${id}" class="form-control"><button class="btn btn-info" onclick="scanBarcode('gBar-${id}')">📷</button></div></div>
+                    <div><button class="btn btn-danger" onclick="document.getElementById('grnRow-${id}').remove(); calcGrnTotal();">×</button></div>
+                    <input type="hidden" id="gPid-${id}">
+                    <input type="hidden" id="gStock-${id}">
+                    <input type="hidden" id="gMac-${id}">
+                    <input type="hidden" id="gTrack-${id}">
+                </div>
+            `;
+            document.getElementById('grnItemsContainer').insertAdjacentHTML('beforeend', html);
+        }
+
+        function searchGrnProduct(id) {
+            const val = document.getElementById(`gProd-${id}`).value.trim().toLowerCase();
+            const list = document.getElementById(`gAuto-${id}`);
+            if(val.length < 2) { list.style.display='none'; return; }
+            
+            let res = globalCatalogCache.filter(p => (p.item_name+' '+(p.brand||'')).toLowerCase().includes(val)).slice(0, 10);
+            list.innerHTML = '';
+            res.forEach(p => {
+                list.innerHTML += `<div class="autocomplete-item" onmousedown="selectGrnProduct(${id}, '${p.id}', '${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.trade_discount_percent||0}, ${p.retail_price||p.default_price||0}, ${p.current_stock||0}, ${p.mac||0}, ${p.track_stock})">
+                    ${p.item_name} <span style="color:#888;">${p.brand||''}</span> (MRP: ₹${p.mrp||0})
+                </div>`;
+            });
+            list.innerHTML += `<div class="autocomplete-item" style="color:var(--success);" onmousedown="newGrnProduct(${id}, '${val}')">➕ Create "${val}"</div>`;
+            list.style.display = 'block';
+        }
+
+        function selectGrnProduct(id, pid, name, brand, mrp, disc, ret, stock, mac, track) {
+            document.getElementById(`gProd-${id}`).value = name;
+            document.getElementById(`gBrand-${id}`).value = brand;
+            document.getElementById(`gMrp-${id}`).value = mrp;
+            document.getElementById(`gDisc-${id}`).value = disc;
+            document.getElementById(`gRet-${id}`).value = ret;
+            document.getElementById(`gPid-${id}`).value = pid;
+            document.getElementById(`gStock-${id}`).value = stock;
+            document.getElementById(`gMac-${id}`).value = mac;
+            document.getElementById(`gTrack-${id}`).value = track;
+            document.getElementById(`gAuto-${id}`).style.display = 'none';
+            calcGrnRow(id);
+        }
+
+        async function newGrnProduct(id, name) {
+            document.getElementById(`gProd-${id}`).value = name.toUpperCase();
+            document.getElementById(`gAuto-${id}`).style.display = 'none';
+            document.getElementById(`gPid-${id}`).value = 'NEW';
+            document.getElementById(`gTrack-${id}`).value = 'true';
+            document.getElementById(`gStock-${id}`).value = '0';
+            document.getElementById(`gMac-${id}`).value = '0';
+        }
+
+        function calcGrnRow(id) {
+            const mrp = parseFloat(document.getElementById(`gMrp-${id}`).value)||0;
+            const disc = parseFloat(document.getElementById(`gDisc-${id}`).value)||0;
+            const cost = mrp * (1 - disc/100);
+            document.getElementById(`gCost-${id}`).value = cost.toFixed(2);
+            if(!document.getElementById(`gRet-${id}`).value) document.getElementById(`gRet-${id}`).value = mrp;
+            calcGrnTotal();
+        }
+
+        function calcGrnTotal() {
+            let tot = 0;
+            document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                const id = row.id.split('-')[1];
+                const qty = parseFloat(document.getElementById(`gQty-${id}`).value)||0;
+                const cost = parseFloat(document.getElementById(`gCost-${id}`).value)||0;
+                tot += (qty * cost);
+            });
+            document.getElementById('grnTotal').innerText = tot.toFixed(2);
+        }
+
+        async function scanBarcode(targetId) {
+            if(!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+            document.getElementById('scanner-overlay').style.display = 'flex';
+            try {
+                const result = await codeReader.decodeFromInputVideoDevice(undefined, 'scanner-video');
+                document.getElementById(targetId).value = result.text;
+                closeScanner();
+            } catch(e) { console.error(e); }
+        }
+        function closeScanner() {
+            if(codeReader) codeReader.reset();
+            document.getElementById('scanner-overlay').style.display = 'none';
+        }
+
+        async function commitGRN() {
+            const pId = document.getElementById('grnParty').value;
+            if(!pId) return alert('Select Party');
+            const wh = sessionRole === 'admin' ? 'green' : sessionRole;
+            const total = parseFloat(document.getElementById('grnTotal').innerText);
+            if(total <= 0) return alert('Total must be > 0');
+
+            const invoiceNo = document.getElementById('grnInvoiceNo').value || `GRN-${Date.now()}`;
+            const invDate = document.getElementById('grnDate').value;
+
+            const { data: inv, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
+                vendor_id: pId, invoice_number: invoiceNo, invoice_date: invDate, total_bill_amount: total, status: 'Completed', recorded_by: sessionRole
+            }).select().single();
+            if(invErr) return alert('Error creating invoice');
+
+            const rows = document.querySelectorAll('[id^="grnRow-"]');
+            for(let r of rows) {
+                const id = r.id.split('-')[1];
+                let pid = document.getElementById(`gPid-${id}`).value;
+                const name = document.getElementById(`gProd-${id}`).value;
+                const brand = document.getElementById(`gBrand-${id}`).value;
+                const qty = parseInt(document.getElementById(`gQty-${id}`).value)||0;
+                const mrp = parseFloat(document.getElementById(`gMrp-${id}`).value)||0;
+                const disc = parseFloat(document.getElementById(`gDisc-${id}`).value)||0;
+                const cost = parseFloat(document.getElementById(`gCost-${id}`).value)||0;
+                const ret = parseFloat(document.getElementById(`gRet-${id}`).value)||0;
+                const bar = document.getElementById(`gBar-${id}`).value;
+                const track = document.getElementById(`gTrack-${id}`).value !== 'false';
+                
+                if(pid === 'NEW') {
+                    const {data:np} = await supabaseClient.from('product_master').insert({
+                        item_name: name, brand: brand, scope: 'generic', track_stock: track, catalog_status: 'live',
+                        mrp: mrp, cost_price: cost, trade_discount_percent: disc, retail_price: ret, current_stock: 0, barcode_id: bar, warehouse_type: wh
+                    }).select().single();
+                    pid = np.id;
+                }
+
+                await supabaseClient.from('purchase_invoice_items').insert({
+                    purchase_invoice_id: inv.id, product_master_id: pid, item_name: name, brand: brand,
+                    qty: qty, unit_cost: cost, total_cost: qty*cost, mrp: mrp, trade_discount_percent: disc, retail_price_set: ret, barcode_id: bar, warehouse_type: wh
+                });
+
+                if(track && pid !== 'NEW') {
+                    const oStock = parseInt(document.getElementById(`gStock-${id}`).value)||0;
+                    const oMac = parseFloat(document.getElementById(`gMac-${id}`).value)||0;
+                    const nMac = ((oStock*oMac) + (qty*cost)) / (oStock+qty);
+                    await supabaseClient.from('product_master').update({
+                        current_stock: oStock+qty, mac: nMac, mrp: mrp, cost_price: cost, retail_price: ret, barcode_id: bar||null
+                    }).eq('id', pid);
+                }
+            }
+
+            await supabaseClient.from('workshop_expenses').insert({
+                expense_category: 'Stock Purchase', stakeholder_id: pId, amount: total, note: `Inv: ${invoiceNo}`, warehouse_type: wh, recorded_by: sessionRole
+            });
+
+            const currBal = await getPartyBalance(pId, wh);
+            await supabaseClient.from('party_ledger').insert({
+                party_id: pId, entry_type: 'Purchase', amount: total, balance_after: currBal + total, warehouse_type: wh, reference_id: inv.id, reference_type: 'purchase_invoice'
+            });
+
+            alert('GRN Saved!');
+            document.getElementById('btnPrintLabels').style.display = 'block';
+            await fetchCatalog();
+            fetchPartyBalance();
+        }
+
+        function printReceivedLabels() {
+            // Simple generic label printing
+            const printTarget = document.getElementById('print-area');
+            printTarget.innerHTML = '';
+            document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                const id = row.id.split('-')[1];
+                const name = document.getElementById(`gProd-${id}`).value;
+                const qty = parseInt(document.getElementById(`gQty-${id}`).value)||0;
+                const mrp = document.getElementById(`gMrp-${id}`).value;
+                const ret = document.getElementById(`gRet-${id}`).value;
+                const bar = document.getElementById(`gBar-${id}`).value || '000000';
+                for(let i=0; i<qty; i++) {
+                    const svgId = `lbl-${id}-${i}`;
+                    printTarget.innerHTML += `<div style="width:62mm; height:38mm; border:1px solid #000; padding:2mm; box-sizing:border-box; font-family:Arial; page-break-inside:avoid;">
+                        <div style="font-size:7pt; font-weight:bold; text-align:center;">My Care Service Center</div>
+                        <div style="font-size:6pt; margin:2px 0;">${name.substring(0,30)}</div>
+                        <div style="font-size:6pt; color:#7c3aed;">MRP: ₹${mrp} | Sell: ₹${ret}</div>
+                        <div style="text-align:center;"><svg id="${svgId}"></svg></div>
+                    </div>`;
+                }
+            });
+            setTimeout(() => {
+                document.querySelectorAll('[id^="lbl-"]').forEach(svg => {
+                    JsBarcode(`#${svg.id}`, svg.id.includes('000000')?'TEST':svg.id, {format:'CODE128', width:1.2, height:25, displayValue:true, fontSize:8, margin:0});
+                });
+                window.print();
+            }, 500);
+        }
+
+        async function saveExpense() {
+            const amount = parseFloat(document.getElementById('expAmount').value);
+            if(!amount) return alert('Valid amount needed');
+            const pText = document.getElementById('expParty').value;
+            const pId = partiesCache.find(p=>p.party_name===pText)?.id;
+            const pm = document.getElementById('expPayment').value;
+            const wh = document.getElementById('expWarehouse').value;
+            
+            await supabaseClient.from('workshop_expenses').insert({
+                expense_category: document.getElementById('expCategory').value, stakeholder_id: pId||null, amount: amount, note: document.getElementById('expDesc').value, warehouse_type: wh, recorded_by: sessionRole
+            });
+
+            if(pId && pm === 'Credit') {
+                const currBal = await getPartyBalance(pId, wh);
+                await supabaseClient.from('party_ledger').insert({
+                    party_id: pId, entry_type: 'Purchase', amount: amount, balance_after: currBal + amount, warehouse_type: wh
+                });
+            }
+            alert('Expense Saved');
+            document.getElementById('expAmount').value = '';
+            document.getElementById('expDesc').value = '';
+        }
+
+        async function loadLedger() {
+            const pId = document.getElementById('ledgerPartySelect').value;
+            const wh = document.getElementById('ledgerFilter').value;
+            if(!pId) return;
+            const {data} = await supabaseClient.from('party_ledger').select('*').eq('party_id', pId).order('created_at', {ascending:false});
+            
+            const tbody = document.querySelector('#ledgerTable tbody');
+            tbody.innerHTML = '';
+            let balance = 0;
+            const viewData = data.filter(e => wh==='all' || e.warehouse_type===wh || e.warehouse_type==='all').reverse();
+            
+            viewData.forEach(e => {
+                if(['Purchase','Opening Balance'].includes(e.entry_type)) balance+=e.amount; else balance-=e.amount;
+                const color = ['Purchase'].includes(e.entry_type) ? 'var(--danger)' : 'var(--success)';
+                tbody.insertAdjacentHTML('afterbegin', `<tr>
+                    <td>${new Date(e.created_at).toLocaleDateString()}</td><td>${e.warehouse_type}</td><td>${e.entry_type}</td>
+                    <td>${e.reference_type||''}</td><td style="color:${color}; font-weight:bold;">₹${e.amount}</td>
+                    <td>₹${balance}</td><td>${e.note||''}</td>
+                </tr>`);
+            });
+            document.getElementById('ledgerBalanceBox').innerText = `Current Ledger Balance: ₹${balance}`;
+        }
+
+        async function commitPayment() {
+            const pId = document.getElementById('ledgerPartySelect').value;
+            const amt = parseFloat(document.getElementById('payAmt').value);
+            const wh = document.getElementById('payWh').value;
+            if(!pId || !amt) return alert('Party and Amount required');
+
+            await supabaseClient.from('party_payments').insert({
+                party_id: pId, amount: amt, payment_mode: document.getElementById('payMode').value, cheque_number: document.getElementById('payCheque').value, reference_note: document.getElementById('payNote').value, warehouse_type: wh, recorded_by: sessionRole
+            });
+            const currBal = await getPartyBalance(pId, wh);
+            await supabaseClient.from('party_ledger').insert({
+                party_id: pId, entry_type: 'Payment Made', amount: amt, balance_after: currBal - amt, warehouse_type: wh, note: document.getElementById('payNote').value
+            });
+            document.getElementById('modalPayment').style.display = 'none';
+            loadLedger();
+        }
+
+        initPage();
+    </script>
+</body>
+</html>
