@@ -1,4 +1,3 @@
-=== PROMPT 3 — FILE: inventory-lookup.html ===
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,12 +10,21 @@
             --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
             --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad;
         }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; padding-bottom: 50px; }
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; }
-        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
         .panel { background: white; padding: 15px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px; }
-        .form-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; width: 100%; }
+        .form-control { padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; width: 100%; font-weight:bold; color:var(--primary); }
         .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 0.85rem; }
         .btn-success { background: var(--success); }
         .btn-primary { background: var(--primary); }
@@ -30,73 +38,91 @@
         .result-actions { display: flex; gap: 10px; align-items: center; }
         .badge { padding: 3px 6px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; color: white; }
         
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 200; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 200; padding:20px; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto; }
-        .jc-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .jc-row:hover { background: #f0f9ff; }
-        
-        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 2px; padding: 16px; position: fixed; z-index: 300; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 15px; }
-        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
-        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
-        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        .jc-row { display: flex; justify-content: space-between; padding: 12px; border: 1px solid var(--border); margin-bottom:8px; border-radius:6px; cursor: pointer; transition: background 0.2s; }
+        .jc-row:hover { background: #f0f9ff; border-color: #bae6fd; }
     </style>
 </head>
 <body>
-    <div class="nav-bar">
-        <div class="nav-links"><a onclick="window.history.back()">← BACK</a><a href="index.html">🏠 HOME</a></div>
-        <div><span class="badge" style="background:var(--warning);" id="userRoleBadge">ROLE</span></div>
-    </div>
+
+    <nav class="sticky-nav">
+        <div class="logo-matrix">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care Core">
+            <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Center">
+        </div>
+        <div class="nav-actions">
+            <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+            <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+            <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+            <span id="roleDisplay" class="badge-role">GUEST</span>
+        </div>
+    </nav>
 
     <div class="wrapper">
         <div class="panel">
-            <h2>Inventory Lookup</h2>
+            <h2 style="margin-top:0; color:var(--primary);">Inventory Lookup</h2>
             <div class="filters">
                 <input type="text" id="searchInput" class="form-control" placeholder="Search product name or brand..." style="flex:2;" autofocus>
                 <select id="vehicleFilter" class="form-control" style="flex:1;"><option value="">-- All Vehicles --</option></select>
-                <input type="text" id="custMobile" class="form-control" placeholder="Customer Mobile (Opt)" style="flex:1;">
             </div>
             
             <div id="resultsContainer">
-                <p style="text-align:center; color:#64748b;">Enter at least 2 characters to search.</p>
+                <p style="text-align:center; color:#64748b; padding:40px 0;">Enter at least 2 characters to search catalog.</p>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="jcModal">
         <div class="modal-content">
-            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                <h3 style="margin:0;">Select Open Job Card</h3>
-                <button class="btn btn-primary" onclick="closeJcModal()" style="padding:4px 8px;">×</button>
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #ccc; padding-bottom:10px;">
+                <h3 style="margin:0; color:var(--primary);">Add to Job Card</h3>
+                <button class="btn btn-danger" onclick="closeJcModal()" style="padding:4px 8px;">×</button>
             </div>
+            
+            <div style="background:#f0f9ff; padding:15px; border-radius:6px; border:1px solid #bae6fd; margin-bottom:20px;">
+                <strong id="modalItemName" style="font-size:1.1rem; color:var(--info); display:block; margin-bottom:10px;">Item Name</strong>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.75rem; font-weight:bold; color:#64748b;">QUANTITY</label>
+                        <input type="number" id="modalQty" class="form-control" min="1" value="1">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.75rem; font-weight:bold; color:#64748b;">RATE / PRICE (₹)</label>
+                        <input type="number" id="modalRate" class="form-control" min="0" style="color:var(--danger);">
+                    </div>
+                </div>
+                <div style="font-size:0.75rem; color:#64748b; margin-top:8px;">*Verify quantity and rate before clicking a Job Card below.</div>
+            </div>
+
+            <h4 style="margin-top:0; color:var(--primary);">Target Job Card</h4>
             <div id="jcList">Loading...</div>
         </div>
     </div>
-
-    <div id="toast"></div>
 
     <script>
         const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
         const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        
         const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-        document.getElementById('userRoleBadge').innerText = sessionRole;
+        document.getElementById('roleDisplay').innerText = sessionRole;
 
         let debounceTimer;
         let globalCatalog = [];
         let openJobCards = [];
         let activeProductForJc = null;
 
+        function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+
         async function initPage() {
-            // Load vehicles
             const { data: vl } = await supabaseClient.from('vehicle_master').select('model_name,brand').order('brand');
             const vf = document.getElementById('vehicleFilter');
             (vl||[]).forEach(v => { vf.innerHTML += `<option value="${v.model_name}">${v.brand} ${v.model_name}</option>`; });
             
-            // Load catalog
             const { data: cat } = await supabaseClient.from('product_master').select('*');
             globalCatalog = cat || [];
 
-            // Load open JCs for modal
             const { data: jcs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
             openJobCards = jcs || [];
             
@@ -112,10 +138,9 @@
             const veh = document.getElementById('vehicleFilter').value.toUpperCase();
             const container = document.getElementById('resultsContainer');
             
-            if (val.length < 2) { container.innerHTML = '<p style="text-align:center; color:#64748b;">Enter at least 2 characters to search.</p>'; return; }
+            if (val.length < 2) { container.innerHTML = '<p style="text-align:center; color:#64748b; padding:40px 0;">Enter at least 2 characters to search.</p>'; return; }
             const tokens = val.split(' ').filter(t=>t.length>0);
 
-            // Pass 1: Vehicle specific if selected
             let results = [];
             if (veh) {
                 const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model', veh);
@@ -134,7 +159,7 @@
             }
 
             container.innerHTML = '';
-            if(results.length === 0) { container.innerHTML = '<p style="text-align:center;">No products found.</p>'; return; }
+            if(results.length === 0) { container.innerHTML = '<p style="text-align:center; padding:40px 0;">No products found matching your search.</p>'; return; }
 
             results.slice(0, 30).forEach(p => {
                 const stkColor = p.track_stock===false ? '#94a3b8' : ((p.current_stock||0)>0 ? 'var(--success)' : 'var(--danger)');
@@ -142,25 +167,27 @@
                 const unv = p.catalog_status==='unverified' ? `<span class="badge" style="background:var(--warning); color:black;">⚠️ Unverified</span>` : '';
                 const img = p.photo_url ? `<img src="${p.photo_url}">` : `<div style="width:48px;height:48px;background:#eee;border-radius:4px;margin-right:15px;display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#888;">No Img</div>`;
                 
+                const defaultRate = p.retail_price || p.default_price || 0;
+
                 container.innerHTML += `
                     <div class="result-card">
                         <div style="display:flex; align-items:center; flex:1;">
                             ${img}
                             <div class="result-info">
-                                <div style="font-weight:bold;">${p.item_name} ${unv}</div>
-                                <div style="font-size:0.8rem; color:#64748b;">
+                                <div style="font-weight:bold; font-size:1.1rem; color:var(--primary);">${p.item_name} ${unv}</div>
+                                <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
                                     Brand: ${p.brand||'STD'} | Scope: <span style="text-transform:capitalize;">${p.scope||'generic'}</span>
                                 </div>
-                                <div style="margin-top:4px;">
+                                <div style="margin-top:6px;">
                                     <span class="badge" style="background:${stkColor};">${stkText}</span>
-                                    <span style="color:var(--purple); font-size:0.8rem; font-weight:bold; margin-left:10px;">MRP: ₹${p.mrp||0}</span>
-                                    <span style="font-size:0.8rem; font-weight:bold; margin-left:10px;">Sell: ₹${p.retail_price||p.default_price||0}</span>
+                                    <span style="color:var(--purple); font-size:0.85rem; font-weight:bold; margin-left:10px;">MRP: ₹${p.mrp||0}</span>
+                                    <span style="font-size:0.85rem; font-weight:bold; margin-left:10px;">Sell: ₹${defaultRate}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="result-actions">
-                            <input type="number" id="qty-${p.id}" value="1" min="1" style="width:50px; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                            <button class="btn btn-primary" onclick="openJcModal('${p.id}', '${p.item_name.replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.mac||0}, ${p.retail_price||p.default_price||0})">+ Job Card</button>
+                            <input type="number" id="qty-${p.id}" value="1" min="1" style="width:50px; padding:8px; border:1px solid #ccc; border-radius:4px; font-weight:bold;">
+                            <button class="btn btn-primary" onclick="openJcModal('${p.id}', '${p.item_name.replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.mac||0}, ${defaultRate}, '${p.unit_metric||'Pcs'}')">+ Job Card</button>
                             <button class="btn btn-success" onclick="startPosSale('${p.id}')">+ POS</button>
                         </div>
                     </div>
@@ -168,20 +195,28 @@
             });
         }
 
-        function openJcModal(id, name, mrp, mac, rate) {
-            const qty = parseFloat(document.getElementById(`qty-${id}`).value) || 1;
-            activeProductForJc = { id, name, mrp, mac, rate, qty };
+        // BUG FIX: POPULATING THE MODAL WITH PRICE SO USER CAN CONFIRM IT
+        function openJcModal(id, name, mrp, mac, rate, metric) {
+            const listQty = parseFloat(document.getElementById(`qty-${id}`).value) || 1;
+            
+            // Store context
+            activeProductForJc = { id, name, mrp, mac, metric };
+            
+            // Set Modal UI values
+            document.getElementById('modalItemName').innerText = name;
+            document.getElementById('modalQty').value = listQty;
+            document.getElementById('modalRate').value = rate || 0;
             
             const list = document.getElementById('jcList');
             list.innerHTML = '';
-            if(openJobCards.length === 0) { list.innerHTML = 'No open job cards found.'; }
+            if(openJobCards.length === 0) { list.innerHTML = '<div style="padding:15px; text-align:center;">No open job cards found.</div>'; }
             
             openJobCards.forEach(jc => {
                 const reg = jc.vehicles?.reg_number || 'UNKNOWN';
                 const mod = jc.vehicles?.make_model || '';
                 list.innerHTML += `<div class="jc-row" onclick="addToJobCard('${jc.id}', '${reg}')">
-                    <div><strong>${jc.id.split('-')[0].toUpperCase()}</strong> — ${reg} (${mod})</div>
-                    <div style="color:#888; font-size:0.8rem;">${jc.customer_mobile||''}</div>
+                    <div><strong style="color:var(--info);">JC-${jc.id.split('-')[0].toUpperCase()}</strong> — ${reg} (${mod})</div>
+                    <div style="color:#64748b; font-size:0.85rem; font-weight:bold;">${jc.customer_mobile||''}</div>
                 </div>`;
             });
             document.getElementById('jcModal').style.display = 'flex';
@@ -191,36 +226,37 @@
 
         async function addToJobCard(jcId, regNumber) {
             if(!activeProductForJc) return;
+            
+            // BUG FIX: Fetch user-confirmed rate and qty from modal
+            const finalQty = parseFloat(document.getElementById('modalQty').value) || 1;
+            const finalRate = parseFloat(document.getElementById('modalRate').value) || 0;
+            
             const wh = (sessionRole==='green' || sessionRole==='admin') ? 'Green' : 'Moped';
             
             const payload = {
                 job_card_id: jcId,
                 warehouse_type: wh,
                 item_name: activeProductForJc.name,
-                qty: activeProductForJc.qty,
-                unit_price: activeProductForJc.rate,
-                total_price: activeProductForJc.qty * activeProductForJc.rate,
+                qty: finalQty,
+                unit_metric: activeProductForJc.metric,
+                unit_price: finalRate,
+                total_price: finalQty * finalRate,
                 mrp_at_billing: activeProductForJc.mrp,
-                mac_at_billing: activeProductForJc.mac
+                mac_at_billing: activeProductForJc.mac,
+                product_master_id: activeProductForJc.id
             };
             
             const { error } = await supabaseClient.from('job_card_items').insert(payload);
-            if(error) { alert('Error: ' + error.message); return; }
+            if(error) { alert('Database Error: ' + error.message); return; }
             
             closeJcModal();
-            showToast(`✓ Added ${activeProductForJc.qty}x ${activeProductForJc.name} to ${regNumber}`);
+            // EXPLICIT CONFIRMATION 
+            alert(`✅ SUCCESS!\n\nAdded: ${finalQty}x ${activeProductForJc.name}\nTo: ${regNumber} (JC-${jcId.split('-')[0].toUpperCase()})\nRate: ₹${finalRate}`);
         }
 
         function startPosSale(pid) {
-            // Redirect to POS with product ID in query param or localStorage
             localStorage.setItem('ERP_POS_PENDING_ITEM', pid);
             window.location.href = 'pos-green.html';
-        }
-
-        function showToast(msg) {
-            const x = document.getElementById("toast");
-            x.innerText = msg; x.className = "show";
-            setTimeout(() => { x.className = x.className.replace("show", ""); }, 3000);
         }
 
         initPage();
