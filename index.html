@@ -140,6 +140,12 @@
                 <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mPosCredit">₹0</span></div>
             </div>
         </div>
+
+        <div id="cardStockValuation" class="matrix-card" style="border-left: 4px solid var(--success); display:none;">
+            <span class="card-meta-label">Total Stock Value</span>
+            <div id="stockValContent" class="card-big-num" style="color:var(--success);">₹0</div>
+            <span id="stockValSub" class="card-sub-metric">MRP Value: ₹0</span>
+        </div>
     </div>
 
     <div class="navigation-grid">
@@ -147,7 +153,13 @@
         <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
         <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
         <a href="pos-green.html" id="navGreenPos" class="action-btn bg-retail" style="display:none;">Green POS</a>
-        <a href="purchase.html" id="navPurchase" class="action-btn" style="background:#f59e0b; display:none;">Inventory</a> <a href="utility-router.html" id="navUtility" class="action-btn bg-utility">Utility</a>
+        
+        <a href="inventory-lookup.html" id="navInventoryLookup" class="action-btn" style="background:#059669; display:none;">Stock Lookup</a>
+        <a href="product-master-console.html" id="navProductCatalog" class="action-btn" style="background:var(--purple); display:none;">Product Catalog</a>
+        
+        <a href="purchase-manager.html" id="navPurchase" class="action-btn" style="background:#f59e0b; display:none;">Purchase / GRN</a>
+        
+        <a href="utility-router.html" id="navUtility" class="action-btn bg-utility">Utility</a>
     </div>
 
     <div class="card-panel">
@@ -226,8 +238,20 @@
         if(sessionRole === 'service' || sessionRole === 'admin') document.getElementById('navNewJc').style.display = 'block';
         if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('navGreenPos').style.display = 'block';
         
-        // SHOW PURCHASE BUTTON FOR RELEVANT ROLES
+        // PURCHASE BUTTON (UPDATED HREF ABOVE)
         if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') document.getElementById('navPurchase').style.display = 'block';
+        
+        // NEW INJECTED: INVENTORY LOOKUP BUTTON
+        if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'service') {
+            document.getElementById('navInventoryLookup').style.display = 'block';
+        }
+        
+        // NEW INJECTED: ADMIN EXCLUSIVES (PRODUCT CATALOG & VALUATION)
+        if(sessionRole === 'admin') {
+            document.getElementById('navProductCatalog').style.display = 'block';
+            document.getElementById('cardStockValuation').style.display = 'block';
+            loadStockValuation(); // Trigger the backend fetch
+        }
 
         prefetchSystemMechanics();
         triggerDashboardDataAggregators();
@@ -237,6 +261,18 @@
         const { data: crew } = await supabaseClient.from('mechanics').select('*');
         crew?.forEach(m => { cachedMechanicsMap[m.id] = m.name; });
         queryMasterJobRegisters();
+    }
+    
+    // NEW INJECTED FUNCTION: Stock Valuation for Admin
+    async function loadStockValuation() {
+        const {data:prods} = await supabaseClient.from('product_master')
+            .select('current_stock,mac,mrp,retail_price')
+            .eq('track_stock',true).gt('current_stock',0);
+        const cv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mac||0)),0);
+        const mv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mrp||0)),0);
+        
+        document.getElementById('stockValContent').innerText = `₹${Math.round(cv).toLocaleString('en-IN')}`;
+        document.getElementById('stockValSub').innerText = `MRP Value: ₹${Math.round(mv).toLocaleString('en-IN')}`;
     }
 
     async function triggerDashboardDataAggregators() {
@@ -314,7 +350,6 @@
 
         let baseQuery = supabaseClient.from('job_cards').select('*, vehicles(reg_number, make_model, color)');
 
-        // REMOVED .limit(7) SO IT FETCHES ALL OPEN CARDS
         if(currentListCategory === 'Running') {
             baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false });
         } else if(currentListCategory === 'AgedOpen') {
