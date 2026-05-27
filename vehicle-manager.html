@@ -1,4 +1,3 @@
-=== PROMPT 3 — FILE: vehicle-manager.html ===
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,48 +6,91 @@
     <title>Vehicle Manager — My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; padding-bottom: 40px;}
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+        .btn-back { background: white; color: var(--primary); }
+        .btn-home { background: #f1f5f9; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; }
-        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
-        .card-panel { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; }
-        .block-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 5px; }
-        .inputs-grid { display: flex; gap: 15px; align-items: flex-end; }
-        .field-group { flex: 1; }
-        .field-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; }
-        select, input { padding: 8px; border: 1px solid var(--border); border-radius: 4px; width: 100%; box-sizing: border-box; }
+        .card-panel { background: white; padding: 20px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: end; margin-bottom:15px; background:#f0f9ff; padding:15px; border-radius:6px; border:1px solid #bae6fd;}
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+        .field-group label { font-size: 0.75rem; font-weight: bold; color:#64748b; text-transform:uppercase; }
+        select, input { padding: 10px; border: 1px solid var(--border); border-radius: 4px; width: 100%; box-sizing: border-box; font-weight:bold; color:var(--primary); }
+        
+        .btn { padding: 10px 14px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-success { background: var(--success); }
+        
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px; }
-        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
-        th { background: var(--primary); color: white; }
+        th, td { border: 1px solid var(--border); padding: 10px; text-align: left; }
+        th { background: #f8fafc; color: #64748b; text-transform:uppercase; }
+        td { border-bottom: 1px solid #f1f5f9; }
     </style>
 </head>
 <body>
-    <div class="nav-bar">
-        <div class="nav-links"><a onclick="window.history.back()">← BACK</a><a href="index.html">🏠 HOME</a></div>
-    </div>
+    <nav class="sticky-nav">
+        <div class="logo-matrix">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care Core">
+            <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Center">
+        </div>
+        <div class="nav-actions">
+            <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+            <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+            <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+            <span id="roleDisplay" class="badge-role">GUEST</span>
+        </div>
+    </nav>
 
     <div class="wrapper">
         <div class="card-panel">
-            <div class="block-title">Vehicle Master List</div>
-            <p style="font-size:0.85rem; color:#64748b;">(Existing implementation of vehicle creation and table goes here)</p>
-            <table><thead><tr><th>Brand</th><th>Model Name</th><th>Category</th></tr></thead><tbody><tr><td>HONDA</td><td>SHINE</td><td>Commuter</td></tr></tbody></table>
+            <div class="block-title">Master Vehicle Taxonomy</div>
+            <div class="inputs-grid">
+                <div class="field-group"><label>Brand</label><input type="text" id="nBrand" placeholder="e.g. HONDA" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Model Name</label><input type="text" id="nModel" placeholder="e.g. SHINE 125" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group">
+                    <label>Category Group</label>
+                    <select id="nCat">
+                        <option value="Commuter">Commuter</option>
+                        <option value="Scooter">Scooter</option>
+                        <option value="Premium">Premium/Sports</option>
+                        <option value="Electric">Electric</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" onclick="saveNewVehicleMaster()">+ Add to Master</button>
+            </div>
+            
+            <div style="overflow-x:auto; max-height:300px; overflow-y:auto; border:1px solid var(--border); border-radius:6px;">
+                <table id="masterVehTable">
+                    <thead><tr><th>Brand</th><th>Model Name</th><th>Category</th><th>Action</th></tr></thead>
+                    <tbody id="masterVehTbody"></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="card-panel" style="margin-top:20px;">
             <div class="block-title">Product Compatibility Quick-View</div>
-            <div class="inputs-grid" style="margin-bottom:12px;">
-                <div class="field-group">
-                    <label>Select Vehicle Model</label>
-                    <select id="compatVehicleSelect" onchange="loadCompatProducts()">
+            <div class="inputs-grid" style="margin-bottom:12px; background:white; border:none; padding:0;">
+                <div class="field-group" style="flex:1;">
+                    <label>Select Vehicle Model to Scan Associated Catalog Items</label>
+                    <select id="compatVehicleSelect" onchange="loadCompatProducts()" style="border-color:var(--info);">
                         <option value="">-- Select to view linked products --</option>
                     </select>
                 </div>
             </div>
-            <div id="compatProductList" style="font-size:0.85rem;color:#64748b; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); padding: 10px; border-radius: 4px;">
-                Select a vehicle to see compatible products.
+            <div id="compatProductList" style="font-size:0.85rem;color:#64748b; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); padding: 15px; border-radius: 4px; background:#f8fafc;">
+                Select a vehicle to see compatible products mapped via Tags or Product Groups.
             </div>
-            <a href="product-master-console.html" style="font-size:0.8rem;color:var(--info); display:block;margin-top:10px; font-weight:bold; text-decoration:none;">Manage groups in Product Catalog Console →</a>
+            <a href="product-master-console.html" style="font-size:0.85rem;color:var(--info); display:block;margin-top:15px; font-weight:bold; text-decoration:none;">Manage compatibility groups in Product Catalog Console →</a>
         </div>
     </div>
 
@@ -56,18 +98,56 @@
         const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
         const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
 
-        // PRESERVED EXISTING FUNCTION STUB
         function verifyManagementPrivileges() {
-            // ... auth checks ...
-            initCompatView(); // Hooking into existing auth success path as requested
+            document.getElementById('roleDisplay').innerText = sessionRole;
+            if(sessionRole !== 'admin') {
+                document.body.innerHTML = `<h2 style="text-align:center; padding:50px; color:red;">ACCESS DENIED. Admin Role Required.</h2>`;
+                return;
+            }
+            loadMasterVehicles();
+            initCompatView();
         }
 
-        // P3-FILE-D NEW SCRIPT ADDITIONS
+        function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+
+        async function loadMasterVehicles() {
+            const {data} = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
+            const tb = document.getElementById('masterVehTbody'); tb.innerHTML = '';
+            (data||[]).forEach(v => {
+                tb.innerHTML += `<tr>
+                    <td><strong style="color:var(--info);">${v.brand}</strong></td>
+                    <td style="font-weight:bold;">${v.model_name}</td>
+                    <td><span style="background:#e2e8f0; padding:2px 8px; border-radius:10px; font-size:0.75rem;">${v.category_group}</span></td>
+                    <td><button onclick="deleteMasterVeh('${v.id}')" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer;">Delete</button></td>
+                </tr>`;
+            });
+        }
+
+        async function saveNewVehicleMaster() {
+            const b = document.getElementById('nBrand').value.trim().toUpperCase();
+            const m = document.getElementById('nModel').value.trim().toUpperCase();
+            const c = document.getElementById('nCat').value;
+            if(!b || !m) return alert('Brand and Model Name required.');
+            
+            const {error} = await supabaseClient.from('vehicle_master').insert({ brand: b, model_name: m, category_group: c });
+            if(error) return alert('Error: ' + error.message);
+            
+            document.getElementById('nBrand').value = ''; document.getElementById('nModel').value = '';
+            loadMasterVehicles(); initCompatView();
+        }
+
+        async function deleteMasterVeh(id) {
+            if(!confirm('Delete this vehicle from master list?')) return;
+            await supabaseClient.from('vehicle_master').delete().eq('id', id);
+            loadMasterVehicles(); initCompatView();
+        }
+
         async function initCompatView() {
-            const {data:vl} = await supabaseClient.from('vehicle_master')
-                .select('model_name,brand').order('brand').order('model_name');
+            const {data:vl} = await supabaseClient.from('vehicle_master').select('model_name,brand').order('brand').order('model_name');
             const sel = document.getElementById('compatVehicleSelect');
+            sel.innerHTML = '<option value="">-- Select to view linked products --</option>';
             (vl||[]).forEach(v=>{
                 sel.innerHTML+=`<option value="${v.model_name}">${v.brand} ${v.model_name}</option>`;
             });
@@ -77,32 +157,24 @@
             const model = document.getElementById('compatVehicleSelect').value;
             if (!model) return;
             const container = document.getElementById('compatProductList');
-            container.innerHTML = 'Loading...';
+            container.innerHTML = 'Loading dataset...';
             
             // Group-linked products
-            const {data:gLinks} = await supabaseClient.from('product_group_vehicles')
-                .select('group_id').eq('vehicle_model',model);
+            const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model',model);
             let groupProds = [];
             if (gLinks?.length>0) {
-                const {data:grps} = await supabaseClient.from('product_groups')
-                    .select('product_master_id,group_name').in('id',gLinks.map(g=>g.group_id));
+                const {data:grps} = await supabaseClient.from('product_groups').select('product_master_id,group_name').in('id',gLinks.map(g=>g.group_id));
                 if (grps?.length>0) {
-                    const {data:prods} = await supabaseClient.from('product_master')
-                        .select('item_name,brand,current_stock,default_price')
-                        .in('id',grps.map(g=>g.product_master_id));
+                    const {data:prods} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').in('id',grps.map(g=>g.product_master_id));
                     groupProds = prods||[];
                 }
             }
             
             // Tag-linked products
-            const {data:tagProds} = await supabaseClient.from('product_master')
-                .select('item_name,brand,current_stock,default_price')
-                .ilike('compatibility_tags','%'+model+'%');
+            const {data:tagProds} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').ilike('compatibility_tags','%'+model+'%');
                 
             // Universal products
-            const {data:uniProds} = await supabaseClient.from('product_master')
-                .select('item_name,brand,current_stock,default_price')
-                .eq('scope','universal').limit(10);
+            const {data:uniProds} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').eq('scope','universal').limit(10);
                 
             const all = [...groupProds,...(tagProds||[]),...(uniProds||[])];
             
@@ -112,15 +184,13 @@
             }
             
             container.innerHTML = all.map(p=>`
-                <div style="display:flex;justify-content:space-between;padding:6px 0;
-                            border-bottom:1px solid var(--border);font-size:0.82rem;">
-                    <span><strong>${p.item_name}</strong>
+                <div style="display:flex;justify-content:space-between;padding:8px 0; border-bottom:1px solid var(--border);font-size:0.85rem;">
+                    <span><strong style="color:var(--primary);">${p.item_name}</strong>
                         <span style="color:#64748b; margin-left:6px;">${p.brand||'STD'}</span></span>
                     <span>Stk: <strong style="color:${(p.current_stock||0)>0?'var(--success)':'var(--danger)'};">${p.current_stock||0}</strong> | ₹${p.default_price||0}</span>
                 </div>`).join('');
         }
 
-        // Mock calling the preserved start function
         verifyManagementPrivileges();
     </script>
 </body>
