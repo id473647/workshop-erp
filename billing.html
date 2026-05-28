@@ -56,7 +56,7 @@
             <span id="vStatus" style="background:#fef3c7; color:#b45309; padding:4px 10px; border-radius:6px; font-size:0.8rem; border:1px solid #fde68a;">OPEN</span>
         </div>
         
-        <div class="info-grid">
+        <div id="returnRequestBanner" style="display:none; background:#fef3c7; border:1px solid #fde68a; padding:12px; border-radius:8px; margin-bottom:16px;"> <strong style="color:#b45309;">🔄 RETURN / EDIT REQUEST PENDING</strong> <div id="returnRequestDetail" style="font-size:0.85rem; color:#92400e; margin-top:4px;"></div> <div style="display:flex; gap:8px; margin-top:10px;" id="adminReturnActions" style="display:none;"> <button onclick="approveReturnRequest()" style="background:var(--success); color:white; border:none; padding:6px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">✅ APPROVE — UNLOCK FOR EDIT</button> <button onclick="rejectReturnRequest()" style="background:var(--danger); color:white; border:none; padding:6px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">✗ REJECT</button> </div> </div> <button id="btnReopenReq" style="display:none; background:#7c3aed; color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; margin-bottom:16px;" onclick="submitReturnRequest()">🔄 REQUEST RETURN / EDIT (Within 7 Days)</button> <div class="info-grid">
             <div class="info-cell"><span class="info-label">Reference ID</span><span class="info-val" id="vRef">--</span></div>
             <div class="info-cell"><span class="info-label">Vehicle</span><span class="info-val" id="vMake">--</span></div>
             <div class="info-cell"><span class="info-label">Reg No</span><span class="info-val" id="vReg">--</span></div>
@@ -98,7 +98,12 @@
             </div>
             <div class="field-group"><label>Odometer</label><input type="number" id="vOdo" placeholder="Current KMs"></div>
             
-            <div class="field-group"> <label>Next Service Due Date</label> <input type="date" id="vNextServiceDate" style="border-color:#7c3aed;"> <span style="font-size:0.65rem; color:#7c3aed; margin-top:2px; font-weight:bold;">Prints on bill & shown to customer</span> </div> </div>
+            <div class="field-group">
+                <label>Next Service Due Date</label>
+                <input type="date" id="vNextServiceDate" style="border-color:#7c3aed;">
+                <span style="font-size:0.65rem; color:#7c3aed; margin-top:2px; font-weight:bold;">Prints on bill & shown to customer</span>
+            </div>
+        </div>
 
         <div class="totals-box">
             <div class="total-row"><span>Gross Spares:</span><span class="total-val" id="tSpares">₹0.00</span></div>
@@ -108,7 +113,13 @@
             <div class="total-row"><span>Lathe/Welding:</span><span class="total-val" id="tLathe">₹0.00</span></div>
             <div class="total-row" style="color:var(--danger);"><span>Discount:</span><span class="total-val" id="tDisc">-₹0.00</span></div>
             
-            <div id="printAdviceBox" style="display:none; background:#fefce8; border:1px dashed #7c3aed; border-radius:6px; padding:10px; margin-bottom:12px; text-align:left;"> <div style="font-size:0.75rem; font-weight:bold; color:#7c3aed; margin-bottom:4px;">TECH ADVICE FOR NEXT SERVICE:</div> <div id="printAdviceText" style="font-size:0.85rem; color:#1e293b;"></div> <div id="printNextDate" style="font-size:0.8rem; font-weight:bold; color:#dc2626; margin-top:6px; display:none;"></div> </div> <div class="net-total"><span>NET PAYABLE:</span><span style="margin-left:20px;" id="tNet">₹0.00</span></div>
+            <div id="printAdviceBox" style="display:none; background:#fefce8; border:1px dashed #7c3aed; border-radius:6px; padding:10px; margin-bottom:12px; text-align:left;">
+                <div style="font-size:0.75rem; font-weight:bold; color:#7c3aed; margin-bottom:4px;">TECH ADVICE FOR NEXT SERVICE:</div>
+                <div id="printAdviceText" style="font-size:0.85rem; color:#1e293b;"></div>
+                <div id="printNextDate" style="font-size:0.8rem; font-weight:bold; color:#dc2626; margin-top:6px; display:none;"></div>
+            </div>
+            
+            <div class="net-total"><span>NET PAYABLE:</span><span style="margin-left:20px;" id="tNet">₹0.00</span></div>
             <div class="total-row" style="color:var(--success); margin-top:8px;"><span>Advance Paid:</span><span class="total-val" id="tAdv">₹0.00</span></div>
             <div class="total-row" style="font-weight:bold; font-size:1.1rem; color:var(--danger); margin-top:8px;"><span>BALANCE DUE:</span><span class="total-val" id="tBal">₹0.00</span></div>
         </div>
@@ -116,7 +127,8 @@
         <div style="display:flex; justify-content:space-between; margin-top:20px;">
             <button class="btn-action" style="background:#475569; width:auto;" onclick="triggerMechPrint()">🖨️ MECH SLIP</button>
             <div style="display:flex; gap:10px;">
-                <button class="btn-action" style="width:auto;" onclick="saveJobState(true)">💾 SAVE DRAFT</button> <button class="btn-action btn-danger" id="btnCloseJob" style="width:auto;" onclick="openSplitPayModal()">✅ SETTLE & CLOSE</button>
+                <button class="btn-action" style="width:auto;" onclick="saveJobState(true)">💾 SAVE DRAFT</button>
+                <button id="btnCancelJob" class="btn-action" style="width:auto; background:#dc2626; display:none;" onclick="cancelJobCard()">🚫 CANCEL JOB</button> <button class="btn-action btn-danger" id="btnCloseJob" style="width:auto;" onclick="openSplitPayModal()">✅ SETTLE & CLOSE</button>
             </div>
         </div>
     </div>
@@ -211,7 +223,8 @@
             <div class="field-group"><label>Cash Received (₹)</label><input type="number" id="spCash" value="0" min="0" oninput="calcSplit()"></div>
             <div class="field-group"><label>UPI / Card (₹)</label><input type="number" id="spUpi" value="0" min="0" oninput="calcSplit()"></div>
             <div class="field-group"><label>Credit Ledger (₹)</label><input type="number" id="spCredit" value="0" min="0" oninput="calcSplit()"></div>
-        </div>
+            
+            <div class="field-group" style="margin-bottom:16px;"> <label>Next Service Due Date (Optional)</label> <input type="date" id="nextServiceDate" style="border:1px solid var(--border); padding:10px; border-radius:6px; width:100%; box-sizing:border-box;"> <span style="font-size:0.7rem; color:#64748b; margin-top:2px;">Leave blank to skip. Sets a reminder on the dashboard.</span> </div> </div>
 
         <div style="background:#f8fafc; padding:12px; border-radius:6px; border:1px solid #e2e8f0; margin:16px 0; text-align:center;">
             <div style="font-size:0.8rem; color:#64748b; text-transform:uppercase; font-weight:bold;">Remaining Allocation</div>
@@ -287,6 +300,11 @@
             document.getElementById('vFutureAdvice').disabled = true;
             document.getElementById('btnCloseJob').style.display = 'none';
         }
+        
+        if (r === 'service' || r === 'admin') { // NEW
+            const cb = document.getElementById('btnCancelJob'); // NEW
+            if (cb) cb.style.display = 'inline-block'; // NEW
+        } // NEW
     }
 
     async function fetchMechanics() {
@@ -345,12 +363,30 @@
         
         document.getElementById('vFutureAdvice').value = job.future_advice || '';
         
-        if (job.next_service_date) // NEW
-            document.getElementById('vNextServiceDate').value = job.next_service_date; // NEW
+        if (job.next_service_date) 
+            document.getElementById('vNextServiceDate').value = job.next_service_date; 
             
         document.getElementById('vStatus').innerText = job.status.toUpperCase();
 
-        if (job.status === 'Closed') lockUI();
+        if (job.status === 'Closed') {
+            lockUI();
+            
+            if (job.status === 'Closed') { // NEW
+                const closedMs = new Date(job.closed_at).getTime(); // NEW
+                const nowMs = Date.now(); // NEW
+                const daysSince = (nowMs - closedMs) / 86400000; // NEW
+                const role = (activeSessionRole || '').toLowerCase(); // NEW
+
+                if (daysSince <= 7 && (role === 'service' || role === 'admin')) { // NEW
+                    const rbtn = document.getElementById('btnReopenReq'); // NEW
+                    if (rbtn) rbtn.style.display = 'inline-block'; // NEW
+                } // NEW
+
+                if (role === 'admin') { // NEW
+                    checkPendingReturnRequest(); // NEW
+                } // NEW
+            } // NEW
+        }
 
         await loadItems();
     }
@@ -358,6 +394,8 @@
     function lockUI() {
         document.getElementById('actionGrid').style.display = 'none';
         document.getElementById('btnCloseJob').style.display = 'none';
+        const cbtn = document.getElementById('btnCancelJob'); // NEW
+        if (cbtn) cbtn.style.display = 'none'; // NEW
         document.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
         document.getElementById('vStatus').style.background = '#dcfce7';
         document.getElementById('vStatus').style.color = '#15803d';
@@ -645,26 +683,25 @@
         document.getElementById('tBal').innerText = `₹${netBalanceDue.toFixed(2)}`;
     }
 
-    async function saveJobState(redirectAfter = false) {  // FIXED
-        // Calculate current totals to persist to DB // FIXED
-        let greenTotal = 0, mopedTotal = 0,          // FIXED
-            lubeTotal = 0, spareTotal = 0;             // FIXED
-        currentItems.forEach(i => {                  // FIXED
-          const amt = parseFloat(i.total_price) || 0;// FIXED
-          if (isLubeItem(i)) lubeTotal += amt;        // FIXED
-          else spareTotal += amt;                      // FIXED
-          const wh = (i.warehouse_type||'').toLowerCase(); // FIXED
-          if (wh === 'green') greenTotal += amt;      // FIXED
-          if (wh === 'moped') mopedTotal += amt;      // FIXED
-        });                                            // FIXED
+    async function saveJobState(redirectAfter = false) { 
+        let greenTotal = 0, mopedTotal = 0,          
+            lubeTotal = 0, spareTotal = 0;             
+        currentItems.forEach(i => {                  
+          const amt = parseFloat(i.total_price) || 0;
+          if (isLubeItem(i)) lubeTotal += amt;        
+          else spareTotal += amt;                      
+          const wh = (i.warehouse_type||'').toLowerCase(); 
+          if (wh === 'green') greenTotal += amt;      
+          if (wh === 'moped') mopedTotal += amt;      
+        });                                            
         const lab = parseFloat(
-          document.getElementById('vLabour').value) || 0; // FIXED
+          document.getElementById('vLabour').value) || 0; 
         const lathe = parseFloat(
-          document.getElementById('vLathe').value) || 0;  // FIXED
+          document.getElementById('vLathe').value) || 0;  
         const disc = parseFloat(
-          document.getElementById('vDisc').value) || 0;   // FIXED
-        const currentNet = spareTotal + lubeTotal            // FIXED
-          + lab + lathe - disc;                             // FIXED
+          document.getElementById('vDisc').value) || 0;   
+        const currentNet = spareTotal + lubeTotal            
+          + lab + lathe - disc;                             
 
         const payload = {
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0,
@@ -672,11 +709,11 @@
             mech_id: document.getElementById('primaryMech').value || null,
             co_mech_id: document.getElementById('coMech').value || null,
             future_advice: document.getElementById('vFutureAdvice').value,
-            total_invoice_value: currentNet,   // FIXED
-            green_total: greenTotal,           // FIXED
-            moped_total: mopedTotal,           // FIXED
-            lubricant_total: lubeTotal,        // FIXED
-            next_service_date: document.getElementById('vNextServiceDate').value || null,  // NEW
+            total_invoice_value: currentNet,   
+            green_total: greenTotal,           
+            moped_total: mopedTotal,           
+            lubricant_total: lubeTotal,        
+            next_service_date: document.getElementById('vNextServiceDate').value || null,  
         };
 
         const odo = document.getElementById('vOdo').value;
@@ -687,24 +724,23 @@
         await supabaseClient.from('job_cards').update(payload).eq('id', currentJobId);
         alert("Draft Saved.");
         
-        // Update print advice display // NEW
-        const fa = document.getElementById('vFutureAdvice').value.trim();                            // NEW
-        const nsd = document.getElementById('vNextServiceDate').value;                                  // NEW
-        const advBox = document.getElementById('printAdviceBox');        // NEW
-        const advText = document.getElementById('printAdviceText');       // NEW
-        const ndEl = document.getElementById('printNextDate');          // NEW
+        const fa = document.getElementById('vFutureAdvice').value.trim();                            
+        const nsd = document.getElementById('vNextServiceDate').value;                                  
+        const advBox = document.getElementById('printAdviceBox');        
+        const advText = document.getElementById('printAdviceText');       
+        const ndEl = document.getElementById('printNextDate');          
         
-        if (fa) {                                                     // NEW
-          advText.innerText = fa;                                     // NEW
-          advBox.style.display = 'block';                             // NEW
-          if (nsd) {                                                  // NEW
-            ndEl.style.display = 'block';                             // NEW
-            ndEl.innerText = '📅 NEXT SERVICE DUE: '                  // NEW
-              + new Date(nsd).toLocaleDateString('en-IN');            // NEW
-          }                                                           // NEW
-        }                                                             // NEW
+        if (fa) {                                                     
+          advText.innerText = fa;                                     
+          advBox.style.display = 'block';                             
+          if (nsd) {                                                  
+            ndEl.style.display = 'block';                             
+            ndEl.innerText = '📅 NEXT SERVICE DUE: '                  
+              + new Date(nsd).toLocaleDateString('en-IN');            
+          }                                                           
+        }                                                             
         
-        if (redirectAfter) window.location.href = 'index.html'; // FIXED
+        if (redirectAfter) window.location.href = 'index.html'; 
     }
 
     function openSplitPayModal() {
@@ -797,12 +833,133 @@
             status: 'Closed',
             closed_at: dt,
             payment_mode: 'Split',
-            next_service_date: document.getElementById('vNextServiceDate').value || null // NEW
+            next_service_date: document.getElementById('nextServiceDate').value || null // NEW
         }).eq('id', currentJobId);
 
         alert("Job Card Closed Successfully!");
         window.location.reload();
     }
+
+    async function cancelJobCard() { // NEW
+        if (currentJob.status === 'Closed' || currentJob.status === 'Cancelled') { // NEW
+            alert('This job card is already ' + currentJob.status); // NEW
+            return; // NEW
+        } // NEW
+
+        const reason = prompt('CANCEL JOB CARD\n\nEnter cancellation reason (required):\ne.g. Customer not available, Spare not in stock,\nMechanic unavailable...'); // NEW
+
+        if (!reason || reason.trim() === '') { // NEW
+            alert('Cancellation reason is required.'); // NEW
+            return; // NEW
+        } // NEW
+
+        const confirmed = confirm('Confirm cancellation?\n\nReason: ' + reason + '\n\nThis will mark the job card as CANCELLED.'); // NEW
+        if (!confirmed) return; // NEW
+
+        const { error } = await supabaseClient // NEW
+            .from('job_cards') // NEW
+            .update({ // NEW
+                status: 'Cancelled', // NEW
+                cancellation_reason: reason.trim().toUpperCase(), // NEW
+                closed_at: new Date().toISOString() // NEW
+            }) // NEW
+            .eq('id', currentJobId); // NEW
+
+        if (error) { // NEW
+            alert('Error: ' + error.message); // NEW
+        } else { // NEW
+            alert('Job Card cancelled successfully.\nReason: ' + reason); // NEW
+            window.location.href = 'index.html'; // NEW
+        } // NEW
+    } // NEW
+
+    async function submitReturnRequest() { // NEW
+        const desc = prompt('PRODUCT RETURN / SERVICE ISSUE\n\nDescribe the reason for reopening this job card:\n(e.g. Wrong part fitted, customer complaint,\n part needs return, service re-do required)'); // NEW
+
+        if (!desc || desc.trim() === '') { // NEW
+            alert('Description is required for return request.'); // NEW
+            return; // NEW
+        } // NEW
+
+        const { error } = await supabaseClient // NEW
+            .from('approval_requests') // NEW
+            .insert({ // NEW
+                job_card_id: currentJobId, // NEW
+                request_type: 'JC_RETURN', // NEW
+                description: desc.trim().toUpperCase(), // NEW
+                requested_by: activeSessionRole, // NEW
+                status: 'pending', // NEW
+                customer_mobile: currentJob.customer_mobile // NEW
+            }); // NEW
+
+        await supabaseClient // NEW
+            .from('job_cards') // NEW
+            .update({ // NEW
+                return_description: desc.trim().toUpperCase(), // NEW
+                return_requested_by: activeSessionRole, // NEW
+                return_requested_at: new Date().toISOString() // NEW
+            }) // NEW
+            .eq('id', currentJobId); // NEW
+
+        if (error) { // NEW
+            alert('Error submitting request: ' + error.message); // NEW
+        } else { // NEW
+            alert('Return request submitted.\nAdmin will review and approve.'); // NEW
+            document.getElementById('btnReopenReq').style.display = 'none'; // NEW
+        } // NEW
+    } // NEW
+
+    async function checkPendingReturnRequest() { // NEW
+        const { data } = await supabaseClient // NEW
+            .from('approval_requests') // NEW
+            .select('*') // NEW
+            .eq('job_card_id', currentJobId) // NEW
+            .eq('request_type', 'JC_RETURN') // NEW
+            .eq('status', 'pending') // NEW
+            .limit(1); // NEW
+
+        if (data && data.length > 0) { // NEW
+            const req = data[0]; // NEW
+            const banner = document.getElementById('returnRequestBanner'); // NEW
+            banner.style.display = 'block'; // NEW
+            document.getElementById('returnRequestDetail').innerText = 'Reason: ' + (req.description || '--') + ' | Requested by: ' + (req.requested_by || '--'); // NEW
+            const adminActs = document.getElementById('adminReturnActions'); // NEW
+            if (adminActs) adminActs.style.display = 'flex'; // NEW
+        } // NEW
+    } // NEW
+
+    async function approveReturnRequest() { // NEW
+        const { error: updReq } = await supabaseClient // NEW
+            .from('approval_requests') // NEW
+            .update({ status: 'approved' }) // NEW
+            .eq('job_card_id', currentJobId) // NEW
+            .eq('request_type', 'JC_RETURN') // NEW
+            .eq('status', 'pending'); // NEW
+
+        const { error: updJc } = await supabaseClient // NEW
+            .from('job_cards') // NEW
+            .update({ status: 'Open', closed_at: null }) // NEW
+            .eq('id', currentJobId); // NEW
+
+        if (updReq || updJc) { // NEW
+            alert('Error: ' + (updReq?.message || updJc?.message)); // NEW
+        } else { // NEW
+            alert('Job Card re-opened. Staff can now edit it.'); // NEW
+            window.location.reload(); // NEW
+        } // NEW
+    } // NEW
+
+    async function rejectReturnRequest() { // NEW
+        const reason = prompt('Reason for rejection:'); // NEW
+        if (!reason) return; // NEW
+        await supabaseClient.from('approval_requests') // NEW
+            .update({ status: 'rejected', description: (reason || '').toUpperCase() }) // NEW
+            .eq('job_card_id', currentJobId) // NEW
+            .eq('request_type', 'JC_RETURN') // NEW
+            .eq('status', 'pending'); // NEW
+        alert('Return request rejected.'); // NEW
+        window.location.reload(); // NEW
+    } // NEW
 
     function triggerMechPrint() {
         alert("In a full build, this hooks to an invisible .print-area div with the tokens. Use Ctrl+P to see native browser print behavior.");
