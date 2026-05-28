@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,8 +64,7 @@
 
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Select Vehicle</label>
-            <select id="jcVehicleSelect" onchange="toggleNewVehicleFields()">
-                <option value="">-- Enter Mobile Number First --</option>
+            <select id="jcVehicleSelect" onchange="toggleNewVehicleFields(); checkRepeatComplaint()"> <option value="">-- Enter Mobile Number First --</option>
                 <option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>
             </select>
         </div>
@@ -78,8 +78,8 @@
             </div>
         </div>
     </div>
-
-    <div class="card-panel">
+    
+    <div id="custHistoryPanel" style="display:none; background:white; padding:20px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.02);"> <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:14px;"> <span style="font-size:1.05rem; font-weight:700; color:var(--primary);"> 📋 Last 6 Months — Service History </span> <span id="custCreditBadge" style="display:none; font-size:0.9rem; font-weight:900; color:#b91c1c; background:#fee2e2; padding:6px 14px; border-radius:6px; border:1px solid #fca5a5; cursor:pointer;" onclick="window.open('utility-router.html', '_blank')" title="Click to open CRM Billing Ledger"> 💳 Credit Balance: ₹… </span> </div> <div style="overflow-x:auto; max-height:280px;"> <table style="width:100%; border-collapse:collapse; font-size:0.82rem;"> <thead> <tr style="background:#f8fafc;"> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> JC Ref </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Date </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Vehicle </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Problem </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Amount </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Status </th> </tr> </thead> <tbody id="custHistoryBody"> </tbody> </table> </div> </div> <div class="card-panel">
         <div class="block-title">Job Requirements & Assignment</div>
         
         <div class="inputs-grid" style="margin-bottom: 20px;">
@@ -95,10 +95,9 @@
 
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
-            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase()"></textarea>
-        </div>
+            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase(); checkRepeatComplaint()"></textarea> </div>
 
-        <div class="inputs-grid">
+        <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint within the last 30 days. Verify with service history above before proceeding. <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"> </div> </div> <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
             
             <div class="field-group">
@@ -163,6 +162,8 @@
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
             document.getElementById('newVehicleBlock').style.display = 'none';
             nBadge.style.display = 'none';
+            document.getElementById('custHistoryPanel').style.display = 'none'; // NEW
+            document.getElementById('custCreditBadge').style.display = 'none'; // NEW
             return;
         }
 
@@ -183,6 +184,8 @@
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         }
+        
+        loadCustomerHistory(cleanMobile); // NEW
     }
 
     function toggleNewVehicleFields() {
@@ -190,6 +193,124 @@
         if (vSelect === 'NEW') document.getElementById('newVehicleBlock').style.display = 'block';
         else document.getElementById('newVehicleBlock').style.display = 'none';
     }
+
+    async function loadCustomerHistory(mobile) { // NEW
+      const panel = document.getElementById('custHistoryPanel'); // NEW
+      const tbody = document.getElementById('custHistoryBody'); // NEW
+      const creditBadge = document.getElementById('custCreditBadge'); // NEW
+      
+      const sixMonthsAgo = new Date(); // NEW
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6); // NEW
+      const cutoff = sixMonthsAgo.toISOString().split('T')[0]; // NEW
+      
+      const { data: jcs } = await supabaseClient // NEW
+        .from('job_cards') // NEW
+        .select('id, created_at, total_invoice_value, status, problem_mentioned, vehicles(reg_number)') // NEW
+        .eq('customer_mobile', mobile) // NEW
+        .gte('created_at', cutoff) // NEW
+        .order('created_at', { ascending: false }) // NEW
+        .limit(20); // NEW
+
+      const { data: creditJc } = await supabaseClient // NEW
+        .from('job_cards') // NEW
+        .select('id, total_invoice_value') // NEW
+        .eq('customer_mobile', mobile) // NEW
+        .eq('payment_mode', 'Credit') // NEW
+        .eq('status', 'Closed'); // NEW
+
+      const { data: creditPays } = await supabaseClient // NEW
+        .from('credit_payments') // NEW
+        .select('amount_paid, job_card_id') // NEW
+        .eq('customer_mobile', mobile); // NEW
+
+      let totalCredit = 0; // NEW
+      (creditJc || []).forEach(j => { // NEW
+        const paid = (creditPays || []) // NEW
+          .filter(p => p.job_card_id === j.id) // NEW
+          .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0); // NEW
+        const out = (parseFloat(j.total_invoice_value) || 0) - paid; // NEW
+        if (out > 0) totalCredit += out; // NEW
+      }); // NEW
+
+      if (totalCredit > 0) { // NEW
+        creditBadge.style.display = 'inline-block'; // NEW
+        creditBadge.innerText = '💳 Credit Balance: ₹' + totalCredit.toFixed(2) + ' — Click to View Ledger'; // NEW
+      } else { // NEW
+        creditBadge.style.display = 'none'; // NEW
+      } // NEW
+
+      tbody.innerHTML = ''; // NEW
+      if (!jcs || jcs.length === 0) { // NEW
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">No service history in last 6 months.</td></tr>'; // NEW
+        panel.style.display = 'block'; // NEW
+        return; // NEW
+      } // NEW
+
+      jcs.forEach(j => { // NEW
+        const ref = `<a href="billing.html?id=${j.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${j.id.split('-')[0].toUpperCase()}</a>`; // NEW
+        const dt = new Date(j.created_at).toLocaleDateString('en-IN'); // NEW
+        const reg = j.vehicles?.reg_number || '--'; // NEW
+        const prob = (j.problem_mentioned || '--').substring(0, 40) + ((j.problem_mentioned||'').length > 40 ? '…' : ''); // NEW
+        const amt = '₹' + (j.total_invoice_value || 0); // NEW
+        const statusColor = j.status === 'Closed' ? '#15803d' : (j.status === 'Cancelled' ? '#b91c1c' : '#b45309'); // NEW
+        const statusBg = j.status === 'Closed' ? '#dcfce7' : (j.status === 'Cancelled' ? '#fee2e2' : '#fef3c7'); // NEW
+
+        tbody.innerHTML += `<tr> // NEW
+          <td style="padding:8px 12px;">${ref}</td> // NEW
+          <td style="padding:8px 12px;">${dt}</td> // NEW
+          <td style="padding:8px 12px;font-weight:bold;">${reg}</td> // NEW
+          <td style="padding:8px 12px;color:#64748b;">${prob}</td> // NEW
+          <td style="padding:8px 12px;font-weight:bold;">${amt}</td> // NEW
+          <td style="padding:8px 12px;"> // NEW
+            <span style="background:${statusBg}; color:${statusColor};padding:2px 8px; border-radius:4px;font-size:0.75rem; font-weight:bold;"> // NEW
+              ${j.status} // NEW
+            </span> // NEW
+          </td> // NEW
+        </tr>`; // NEW
+      }); // NEW
+
+      panel.style.display = 'block'; // NEW
+    } // NEW
+
+    async function checkRepeatComplaint() { // NEW
+      const mobile = document.getElementById('jcMobile').value.trim(); // NEW
+      const prob = document.getElementById('jcProblem').value.trim().toLowerCase(); // NEW
+      const vehicleSel = document.getElementById('jcVehicleSelect').value; // NEW
+      const flagBox = document.getElementById('warrantFlagBox'); // NEW
+      const flagDetail = document.getElementById('warrantFlagDetail'); // NEW
+
+      flagBox.style.display = 'none'; // NEW
+
+      if (!mobile || mobile.length !== 10 || vehicleSel === '' || vehicleSel === 'NEW' || prob.length < 5) return; // NEW
+
+      const thirtyDaysAgo = new Date(); // NEW
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); // NEW
+
+      const { data: recent } = await supabaseClient // NEW
+        .from('job_cards') // NEW
+        .select('id, problem_mentioned, closed_at') // NEW
+        .eq('customer_mobile', mobile) // NEW
+        .eq('vehicle_id', vehicleSel) // NEW
+        .eq('status', 'Closed') // NEW
+        .gte('closed_at', thirtyDaysAgo.toISOString()) // NEW
+        .order('closed_at', { ascending: false }) // NEW
+        .limit(5); // NEW
+
+      if (!recent || recent.length === 0) return; // NEW
+
+      const tokens = prob.split(/\s+/).filter(t => t.length > 3); // NEW
+      const match = (recent || []).find(j => { // NEW
+        const prevProb = (j.problem_mentioned || '').toLowerCase(); // NEW
+        return tokens.some(t => prevProb.includes(t)); // NEW
+      }); // NEW
+
+      if (match) { // NEW
+        flagBox.style.display = 'block'; // NEW
+        const closeDate = new Date(match.closed_at).toLocaleDateString('en-IN'); // NEW
+        const ref = 'JC-' + match.id.split('-')[0].toUpperCase(); // NEW
+        flagDetail.innerText = 'Last closed: ' + ref + ' on ' + closeDate + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"'; // NEW
+      } // NEW
+    } // NEW
 
     async function commitNewJobCard() {
         const mobile = document.getElementById('jcMobile').value.trim();
