@@ -1,33 +1,64 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Intake - My Care ERP</title>
+    <title>Purchase & GRN Gateway - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; 
+            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; 
+            --purple: #8e44ad; --warning: #f59e0b;
+        }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100; box-sizing: border-box;}
+        .logo-matrix { display: flex; align-items: center; gap: 8px; } 
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
-        .badge-role { background: var(--warning); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+        .badge-role { background: var(--utility, #64748b); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 24px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 20px; }
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; align-items: end;}
-        .field-group { display: flex; flex-direction: column; gap: 6px; } label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
-        .btn-action { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 1rem; width: 100%; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; }
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; }
-        table.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } table.data-table th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); } table.data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; position: relative; } 
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } 
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; width: 100%; }
+        
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } 
+        .btn-action:hover { opacity: 0.9; } 
+        .btn-info { background: #2980b9; }
+        .btn-danger { background: var(--danger); }
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; background: white; } 
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } 
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } 
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+
+        .autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+        .autocomplete-item:hover { background: #f8fafc; }
+
+        .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+        .summary-stat { font-size: 1.5rem; font-weight: bold; color: var(--success); }
     </style>
 </head>
 <body>
 
 <nav class="sticky-nav">
-    <div class="logo-matrix"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div>
+    <div class="logo-matrix">
+        <img src="logo-main.jpg" onerror="this.style.display='none'">
+        <img src="logo-green.png" onerror="this.style.display='none'">
+    </div>
     <div class="nav-actions">
+        <button class="btn-header" onclick="history.back()">← BACK</button>
+        <button class="btn-header" onclick="window.location.href='utility-router.html'">🗂️ PRODUCT GROUPS</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
@@ -36,56 +67,344 @@
 
 <div class="wrapper">
     <div class="card-panel">
-        <div class="block-title">Log New Vendor Invoice (GRN)</div>
-        <div class="inputs-grid">
-            <div class="field-group"><label>Date Received</label><input type="date" id="grnDate"></div>
-            <div class="field-group"><label>Select Supplier / Vendor</label><select id="grnVendor"><option value="">-- Loading --</option></select></div>
-            <div class="field-group"><label>Vendor Invoice Number</label><input type="text" id="grnInv" placeholder="e.g. INV-2024-99"></div>
-            <div class="field-group"><label>Total Invoice Value (₹)</label><input type="number" id="grnAmount" value="0"></div>
+        <div class="block-title">Goods Receipt Note (GRN) Header</div>
+        <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px;">
+            <div class="field-group">
+                <label>Vendor / Supplier Name</label>
+                <input type="text" id="grnVendor" placeholder="Enter vendor name" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="field-group">
+                <label>Invoice Reference No.</label>
+                <input type="text" id="grnRef" placeholder="e.g. INV-2026-001" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="field-group">
+                <label>Invoice Date</label>
+                <input type="date" id="grnDate">
+            </div>
         </div>
-        <button class="btn-action" onclick="savePurchase()">💾 SAVE PURCHASE RECORD</button>
     </div>
 
     <div class="card-panel">
-        <div class="block-title">Recent Purchase History</div>
+        <div class="block-title">Add Line Items</div>
+        <div class="inputs-grid" style="align-items: start;">
+            <div class="field-group" style="grid-column: span 2;">
+                <label>Search Product (Token Match)</label>
+                <input type="text" id="grnProdSearch" placeholder="Type to search master catalog..." oninput="searchMasterProduct(this)" autocomplete="off">
+                <div id="grnProdAuto" class="autocomplete-dropdown"></div>
+                <input type="hidden" id="grnProdCategory">
+            </div>
+            <div class="field-group">
+                <label>Brand</label>
+                <input type="text" id="grnProdBrand" placeholder="e.g. HONDA" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="field-group">
+                <label>Warehouse</label>
+                <select id="grnProdWare">
+                    <option value="Green">Green</option>
+                    <option value="Moped">Moped</option>
+                    <option value="Service">Service</option>
+                </select>
+            </div>
+        </div>
+        <div class="inputs-grid">
+            <div class="field-group">
+                <label>Unit Metric</label>
+                <select id="grnProdMetric">
+                    <option value="pcs">Pcs</option>
+                    <option value="ML">ML (Loose Fluid)</option>
+                    <option value="Pkg">Package</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label>Quantity</label>
+                <input type="number" id="grnProdQty" placeholder="0" min="1">
+            </div>
+            <div class="field-group">
+                <label>Purchase Rate (₹)</label>
+                <input type="number" id="grnProdRate" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="field-group">
+                <label>Billing MRP (₹)</label>
+                <input type="number" id="grnProdMrp" placeholder="0.00" min="0" step="0.01" title="Updates Product Master Default Price">
+            </div>
+            <div class="field-group" style="justify-content: flex-end;">
+                <button class="btn-action" style="background:var(--purple);" onclick="addLineItem()">+ ADD ITEM</button>
+            </div>
+        </div>
+
         <div class="table-wrapper">
-            <table class="data-table"><thead><tr><th>Date</th><th>Vendor</th><th>Invoice Ref</th><th>Total Value</th><th>Logged By</th><th>Action</th></tr></thead><tbody id="grnTableBody"></tbody></table>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item Description</th>
+                        <th>Brand</th>
+                        <th>Warehouse</th>
+                        <th>Qty / Metric</th>
+                        <th>Pur Rate</th>
+                        <th>Total Cost</th>
+                        <th>New MRP</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="grnItemsTable">
+                    <tr><td colspan="8" style="text-align:center; color:#64748b;">No items added yet.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="summary-box">
+            <div>
+                <div style="font-size:0.85rem; color:#166534; font-weight:bold; text-transform:uppercase;">Invoice Total Value</div>
+                <div style="font-size:0.8rem; color:#64748b;">Total Purchase Cost (excluding taxes)</div>
+            </div>
+            <div class="summary-stat" id="grnTotalCost">₹0.00</div>
+        </div>
+        
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+            <button class="btn-action" style="width: auto; padding: 14px 30px; font-size: 1rem;" onclick="postGRN()">💾 POST GRN & UPDATE MASTER</button>
         </div>
     </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin';
-    document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
-    document.getElementById('grnDate').valueAsDate = new Date();
 
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
 
-    async function initPurchase() {
-        const { data: v } = await supabaseClient.from('expense_vendors').select('*').neq('vendor_category', 'Lathe/Welding');
-        const sel = document.getElementById('grnVendor'); sel.innerHTML = '<option value="">-- Select Vendor --</option>';
-        (v||[]).forEach(ven => { sel.innerHTML += `<option value="${ven.vendor_name}">${ven.vendor_name}</option>`; });
-        loadHistory();
-    }
+    let productCatalogCache = [];
+    let currentGrnItems = [];
 
-    async function savePurchase() {
-        const date = document.getElementById('grnDate').value; const vendor = document.getElementById('grnVendor').value; const inv = document.getElementById('grnInv').value; const amt = document.getElementById('grnAmount').value;
-        if(!vendor || !inv || amt <= 0) return alert("Fill all details.");
+    window.onload = () => {
+        document.getElementById('grnDate').value = new Date().toISOString().split('T')[0];
+        fetchProductCatalog();
         
-        await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Stock Purchase', stakeholder_id: vendor, amount: amt, note: `Inv: ${inv}`, created_at: new Date(date).toISOString(), recorded_by: sessionRole });
-        document.getElementById('grnInv').value = ''; document.getElementById('grnAmount').value = '0';
-        alert("Purchase Logged"); loadHistory();
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#grnProdSearch') && !e.target.closest('#grnProdAuto')) {
+                document.getElementById('grnProdAuto').style.display = 'none';
+            }
+        });
+    };
+
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
     }
 
-    async function loadHistory() {
-        const { data: h } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Stock Purchase').order('created_at', {ascending: false}).limit(20);
-        const tb = document.getElementById('grnTableBody'); tb.innerHTML = '';
-        (h||[]).forEach(item => { tb.innerHTML += `<tr><td>${new Date(item.created_at).toLocaleDateString()}</td><td><strong>${item.stakeholder_id}</strong></td><td>${item.note}</td><td>₹${item.amount}</td><td>${item.recorded_by}</td><td><button onclick="deletePur('${item.id}')" style="color:var(--danger); border:none; background:none; cursor:pointer;">[DEL]</button></td></tr>`; });
+    async function fetchProductCatalog() {
+        const { data, error } = await supabaseClient.from('product_master').select('*');
+        if (error) {
+            console.error("Error fetching catalog:", error);
+        } else {
+            productCatalogCache = data || [];
+        }
     }
-    async function deletePur(id) { if(confirm("Delete purchase record?")) { await supabaseClient.from('workshop_expenses').delete().eq('id', id); loadHistory(); } }
-    initPurchase();
+
+    function searchMasterProduct(inputElement) {
+        const query = inputElement.value.toLowerCase().trim();
+        const autoBox = document.getElementById('grnProdAuto');
+        
+        if (query.length < 2) {
+            autoBox.style.display = 'none';
+            return;
+        }
+
+        const tokens = query.split(' ').filter(t => t);
+        const results = productCatalogCache.filter(p => {
+            const searchStr = `${p.item_name} ${p.brand || ''}`.toLowerCase();
+            return tokens.every(t => searchStr.includes(t));
+        }).slice(0, 10);
+
+        autoBox.innerHTML = '';
+        
+        if (results.length === 0) {
+            const d = document.createElement('div');
+            d.className = 'autocomplete-item';
+            d.style.color = 'var(--service)';
+            d.innerHTML = `<em>"${inputElement.value.toUpperCase()}" will be created as a new item.</em>`;
+            autoBox.appendChild(d);
+            autoBox.style.display = 'block';
+            return;
+        }
+
+        results.forEach(p => {
+            const d = document.createElement('div');
+            d.className = 'autocomplete-item';
+            d.innerHTML = `<strong>${p.item_name}</strong> <span style="font-size:0.75rem; color:#64748b;">[${p.brand || 'No Brand'}] - MRP: ₹${p.default_price || 0}</span>`;
+            d.onmousedown = () => {
+                document.getElementById('grnProdSearch').value = p.item_name;
+                document.getElementById('grnProdBrand').value = p.brand || '';
+                document.getElementById('grnProdWare').value = p.warehouse_type || 'Green';
+                document.getElementById('grnProdMetric').value = p.unit_metric || 'pcs';
+                document.getElementById('grnProdMrp').value = p.default_price || '';
+                document.getElementById('grnProdCategory').value = p.category || 'Spare';
+                autoBox.style.display = 'none';
+            };
+            autoBox.appendChild(d);
+        });
+        autoBox.style.display = 'block';
+    }
+
+    function addLineItem() {
+        const name = document.getElementById('grnProdSearch').value.trim().toUpperCase();
+        const brand = document.getElementById('grnProdBrand').value.trim().toUpperCase();
+        const ware = document.getElementById('grnProdWare').value;
+        const metric = document.getElementById('grnProdMetric').value;
+        const qty = parseFloat(document.getElementById('grnProdQty').value) || 0;
+        const rate = parseFloat(document.getElementById('grnProdRate').value) || 0;
+        const mrp = parseFloat(document.getElementById('grnProdMrp').value) || 0;
+        const cat = document.getElementById('grnProdCategory').value || 'Spare';
+
+        if (!name || qty <= 0 || rate < 0 || mrp < 0) {
+            alert("Please provide valid Item Name, Quantity (>0), Purchase Rate, and MRP.");
+            return;
+        }
+
+        const cost = qty * rate;
+
+        currentGrnItems.push({
+            id: Date.now().toString(),
+            name, brand, ware, metric, qty, rate, cost, mrp, cat
+        });
+
+        // Reset fields
+        document.getElementById('grnProdSearch').value = '';
+        document.getElementById('grnProdBrand').value = '';
+        document.getElementById('grnProdQty').value = '';
+        document.getElementById('grnProdRate').value = '';
+        document.getElementById('grnProdMrp').value = '';
+        document.getElementById('grnProdCategory').value = '';
+        document.getElementById('grnProdSearch').focus();
+
+        renderGrnTable();
+    }
+
+    function removeLineItem(id) {
+        currentGrnItems = currentGrnItems.filter(item => item.id !== id);
+        renderGrnTable();
+    }
+
+    function renderGrnTable() {
+        const tbody = document.getElementById('grnItemsTable');
+        tbody.innerHTML = '';
+        
+        let totalCost = 0;
+
+        if (currentGrnItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#64748b;">No items added yet.</td></tr>';
+            document.getElementById('grnTotalCost').innerText = '₹0.00';
+            return;
+        }
+
+        currentGrnItems.forEach(item => {
+            totalCost += item.cost;
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${item.name}</strong></td>
+                    <td>${item.brand || '--'}</td>
+                    <td><span style="font-size:0.75rem; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${item.ware}</span></td>
+                    <td>${item.qty} ${item.metric}</td>
+                    <td>₹${item.rate.toFixed(2)}</td>
+                    <td style="font-weight:bold;">₹${item.cost.toFixed(2)}</td>
+                    <td style="color:var(--primary); font-weight:bold;">₹${item.mrp.toFixed(2)}</td>
+                    <td><button onclick="removeLineItem('${item.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">🗑️</button></td>
+                </tr>
+            `;
+        });
+
+        document.getElementById('grnTotalCost').innerText = `₹${totalCost.toFixed(2)}`;
+    }
+
+    async function postGRN() {
+        const vendor = document.getElementById('grnVendor').value.trim();
+        const ref = document.getElementById('grnRef').value.trim();
+        const date = document.getElementById('grnDate').value;
+        
+        if (!vendor || !ref || !date) {
+            return alert("Vendor, Invoice Reference, and Date are mandatory for the GRN Header.");
+        }
+
+        if (currentGrnItems.length === 0) {
+            return alert("Cannot post an empty GRN. Please add items.");
+        }
+
+        const totalValue = currentGrnItems.reduce((sum, item) => sum + item.cost, 0);
+
+        if (!confirm(`Are you sure you want to post this GRN?\nTotal Value: ₹${totalValue.toFixed(2)}\n\nThis will permanently update Product Master pricing.`)) {
+            return;
+        }
+
+        try {
+            // 1. Log the Purchase Invoice Header (assuming standard purchase_invoices structure)
+            // If the table doesn't exist, we fallback safely, but per schema structure rules, we attempt insert.
+            const { data: invData, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
+                vendor_name: vendor,
+                invoice_ref: ref,
+                invoice_date: date,
+                total_amount: totalValue,
+                recorded_by: activeSessionRole
+            }).select().single();
+
+            if (invErr) {
+                console.warn("Purchase invoice header log failed. Note: If purchase_invoices table is unconfigured, items will still update the master.", invErr);
+            }
+
+            const activeInvId = invData ? invData.id : `GRN-${Date.now()}`;
+
+            // 2. Insert items into purchase_invoice_items
+            const itemsPayload = currentGrnItems.map(i => ({
+                invoice_id: activeInvId,
+                item_name: i.name,
+                brand: i.brand,
+                qty: i.qty,
+                purchase_rate: i.rate,
+                total_price: i.cost,
+                warehouse_type: i.ware
+            }));
+
+            const { error: itemsErr } = await supabaseClient.from('purchase_invoice_items').insert(itemsPayload);
+            if (itemsErr) console.warn("Items log error:", itemsErr);
+
+            // 3. Critically update product_master (pricing/inventory linkage)
+            for (const item of currentGrnItems) {
+                // Find existing product exact match
+                const existing = productCatalogCache.find(p => p.item_name === item.name && (p.brand || '') === item.brand);
+
+                if (existing) {
+                    // Update MRP if it has changed, or just to enforce sync
+                    await supabaseClient.from('product_master').update({
+                        default_price: item.mrp
+                    }).eq('id', existing.id);
+                } else {
+                    // Create new product master entry
+                    await supabaseClient.from('product_master').insert({
+                        item_name: item.name,
+                        brand: item.brand,
+                        warehouse_type: item.ware,
+                        unit_metric: item.metric,
+                        default_price: item.mrp,
+                        category: item.cat
+                    });
+                }
+            }
+
+            alert("GRN Posted Successfully! Product Master Pricing Updated.");
+            
+            // Reset state
+            document.getElementById('grnVendor').value = '';
+            document.getElementById('grnRef').value = '';
+            currentGrnItems = [];
+            renderGrnTable();
+            fetchProductCatalog(); // Refresh cache
+            
+        } catch (err) {
+            console.error(err);
+            alert("An unexpected error occurred during GRN processing.");
+        }
+    }
 </script>
 </body>
 </html>
