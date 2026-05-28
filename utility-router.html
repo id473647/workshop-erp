@@ -344,8 +344,7 @@
                 <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
                     <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:120px;"><label>Mobile Number</label><input type="text" value="${c.mobile_number}" readonly style="background:#f1f5f9; width:100%;"></div>
-                        <div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" style="width:100%;"></div>
-                        <div style="flex:1; min-width:120px;"><label>Tier</label>
+                        <div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" oninput="this.value=this.value.toUpperCase()" style="width:100%;"></div> <div style="flex:1; min-width:120px;"><label>Tier</label>
                             <select id="updCat_${c.mobile_number}" style="width:100%;">
                                 <option value="Regular" ${c.category==='Regular'?'selected':''}>Regular Tier</option>
                                 <option value="Silver" ${c.category==='Silver'?'selected':''}>Silver Tier</option>
@@ -469,7 +468,7 @@
 
     async function updateCustomer(mobile) {
         const data = {
-            name: document.getElementById(`updName_${mobile}`).value,
+            name: document.getElementById(`updName_${mobile}`).value.trim().toUpperCase(), // FIXED
             category: document.getElementById(`updCat_${mobile}`).value,
             address: document.getElementById(`updAddr_${mobile}`).value
         };
@@ -565,8 +564,8 @@
             });
             
             const refLink = s.src === 'JC'
-                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>`
-                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`;
+                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>` // FIXED
+                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`; // FIXED
             
             html += `<tr><td>${refLink}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`;
             if(subRows) html += `<tr><td colspan="5" style="padding:0;">${subRows}</td></tr>`;
