@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,7 +44,8 @@
         <button class="btn-header" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">GUEST</span> </div>
+        <span id="roleDisplay" class="badge-role">GUEST</span>
+    </div>
 </nav>
 
 <div class="wrapper">
@@ -134,11 +133,26 @@
                 <label>Warehouse Depot</label>
                 <select id="iWare"><option value="Green">Green</option><option value="Moped">Moped</option></select>
             </div>
-            <div class="field-group"><label>Metric</label><input type="text" id="iMetric" readonly style="background:#f1f5f9;"></div>
+            
+            <div class="field-group"> 
+                <label>Brand</label> 
+                <input type="text" id="iBrand" oninput="this.value = this.value.toUpperCase()"> 
+            </div> <div class="field-group"> 
+                <label>Category</label> 
+                <select id="iCategory" onchange="handleCategoryChange()"> <option value="Spare">Spare</option> <option value="Lube">Lube</option> </select> </div> <div class="field-group">
+                <label>Vol/Unit (ML)</label>
+                <select id="iVolMl" onchange="handleVolChange()" style="display: none;"> <option value="">-- Select Vol --</option> <option value="500">500 ml/unit</option> <option value="650">650 ml/unit</option> <option value="800">800 ml/unit</option> <option value="900">900 ml/unit</option> <option value="1000">1000 ml/unit</option> <option value="1200">1200 ml/unit</option> <option value="other">Other (custom)</option> </select> <input type="number" id="iVolMlOther" placeholder="Custom ML" style="display: none; margin-top: 5px;"> </div>
+            
             <div class="field-group"><label id="lblQty">Quantity</label><input type="number" id="iQty" value="1" min="1" step="0.01"></div>
-            <div class="field-group"><label>Vol/Unit (ML)</label><input type="number" id="iVolMl" readonly style="background:#f1f5f9;"></div>
-            <div class="field-group"><label>Unit Price (₹)</label><input type="number" id="iPrice" value="0" min="0"></div>
-        </div>
+            
+            <div class="field-group">
+                <label>Unit Price (₹)</label>
+                <input type="number" id="iPrice" value="0" min="0">
+            </div>
+            <div class="field-group">
+                <label>MRP (₹)</label> 
+                <input type="number" id="iMrp" value="" placeholder="0"> 
+            </div> </div>
         <button class="btn-action" style="margin-top:16px;" onclick="injectItem()">CONFIRM DEPLOYMENT</button>
     </div>
 </div>
@@ -186,12 +200,12 @@
 </div>
 
 <script>
-    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest'; // FIXED
-    const roleBadge = document.getElementById('roleDisplay'); // FIXED
-    if (roleBadge) roleBadge.innerText = activeSessionRole.toUpperCase();
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE'); 
+    const roleBadge = document.getElementById('roleDisplay'); 
+    if (roleBadge) roleBadge.innerText = (activeSessionRole || 'GUEST').toUpperCase();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const rawJobId = urlParams.get('id') || urlParams.get('jc'); // FIXED
+    const rawJobId = urlParams.get('id') || urlParams.get('jc'); 
 
     if (!rawJobId) {
         document.getElementById('loadingOverlay').innerHTML = `<h2 style="color:var(--danger);">Critical Error: Job Card ID Missing from URL.<br><a href="index.html" style="font-size:1rem; color:var(--primary);">Return to Dashboard</a></h2>`;
@@ -237,7 +251,7 @@
     };
 
     function applyRoleConstraints() {
-        const r = activeSessionRole.toLowerCase();
+        const r = (activeSessionRole || '').toLowerCase();
         if(r === 'green') document.getElementById('iWare').value = 'Green';
         if(r === 'moped') document.getElementById('iWare').value = 'Moped';
         if(r === 'green' || r === 'moped') {
@@ -337,7 +351,7 @@
         } else {
             currentItems.forEach(i => {
                 const volML = calcVolumeML(i);
-                let qtyDisplay = `${i.qty} ${i.unit_metric}`;
+                let qtyDisplay = `${i.qty} ${i.unit_metric || 'Pcs'}`;
                 if (volML > 0 && i.unit_metric !== 'ML') {
                     qtyDisplay += ` <span style="color:var(--purple); font-size:0.75rem; font-weight:bold;">(${volML.toFixed(0)} ML)</span>`;
                 }
@@ -367,10 +381,43 @@
         document.getElementById('iSearch').value = '';
         document.getElementById('iQty').value = 1;
         document.getElementById('iPrice').value = 0;
-        document.getElementById('iMetric').value = '';
-        document.getElementById('iVolMl').value = '';
+        
+        document.getElementById('iBrand').value = ''; // FIXED
+        document.getElementById('iMrp').value = ''; // FIXED
+        document.getElementById('iCategory').value = 'Spare'; // FIXED
+        document.getElementById('iVolMl').value = ''; // FIXED
+        document.getElementById('iVolMlOther').style.display = 'none'; // FIXED
+        document.getElementById('iVolMlOther').value = ''; // FIXED
+        
+        handleCategoryChange(); // FIXED
+        
         document.getElementById('itemModal').style.display = 'flex';
     }
+    
+    function handleCategoryChange() { // FIXED
+        const cat = document.getElementById('iCategory').value; // FIXED
+        const volSelect = document.getElementById('iVolMl'); // FIXED
+        const volOther = document.getElementById('iVolMlOther'); // FIXED
+        
+        if (cat === 'Spare') { // FIXED
+            volSelect.style.display = 'none'; // FIXED
+            volOther.style.display = 'none'; // FIXED
+        } else if (cat === 'Lube') { // FIXED
+            volSelect.style.display = 'block'; // FIXED
+            if (volSelect.value === 'other') { // FIXED
+                volOther.style.display = 'block'; // FIXED
+            } // FIXED
+        } // FIXED
+    } // FIXED
+    
+    function handleVolChange() { // FIXED
+        const val = document.getElementById('iVolMl').value; // FIXED
+        if (val === 'other') { // FIXED
+            document.getElementById('iVolMlOther').style.display = 'block'; // FIXED
+        } else { // FIXED
+            document.getElementById('iVolMlOther').style.display = 'none'; // FIXED
+        } // FIXED
+    } // FIXED
 
     function searchCatalog(inp) {
         const q = inp.value.toLowerCase().trim();
@@ -383,29 +430,58 @@
         const res = catalogCache.filter(p => {
             const str = `${p.item_name} ${p.brand||''}`.toLowerCase();
             const matchQuery = tokens.every(t => str.includes(t));
-            const matchWare = activeSessionRole.toLowerCase() === 'admin' ? true : (p.warehouse_type === w);
+            const matchWare = (activeSessionRole || '').toLowerCase() === 'admin' ? true : (p.warehouse_type === w);
             return matchQuery && matchWare;
         }).slice(0, 8);
 
         auto.innerHTML = '';
         if(res.length === 0) {
-            auto.innerHTML = `<div class="autocomplete-item" style="color:var(--danger);">No catalog match found. Ask admin to add to Product Master.</div>`;
+            auto.innerHTML = `<div class="autocomplete-item" style="color:var(--danger);">No catalog match found. It will be added as unverified.</div>`;
         } else {
             res.forEach(p => {
                 const d = document.createElement('div');
                 d.className = 'autocomplete-item';
-                d.innerHTML = `<strong>${p.item_name}</strong> <span style="font-size:0.75rem; color:#64748b;">[${p.brand||''}] MRP: ₹${p.default_price}</span>`;
+                
+                let displayLabel = `${p.item_name} ${p.brand || ''}`; // FIXED
+                if (p.category === 'Lube' && p.volume_per_unit > 0) { // FIXED
+                    displayLabel += ` ${p.volume_per_unit}ml`; // FIXED
+                } // FIXED
+                
+                d.innerHTML = `<strong>${displayLabel}</strong> <span style="font-size:0.75rem; color:#64748b;">MRP: ₹${p.mrp || 0}</span>`; // FIXED
                 d.onmousedown = () => {
                     document.getElementById('iSearch').value = p.item_name;
                     document.getElementById('iPrice').value = p.default_price || 0;
-                    document.getElementById('iMetric').value = p.unit_metric || 'pcs';
-                    document.getElementById('iVolMl').value = p.volume_ml || 0;
+                    
+                    document.getElementById('iBrand').value = p.brand || ''; // FIXED
+                    document.getElementById('iMrp').value = p.mrp || ''; // FIXED
+                    
+                    const catVal = p.category === 'Lube' ? 'Lube' : 'Spare'; // FIXED
+                    document.getElementById('iCategory').value = catVal; // FIXED
+                    
+                    const volSelect = document.getElementById('iVolMl'); // FIXED
+                    const volOther = document.getElementById('iVolMlOther'); // FIXED
+                    
+                    if (p.volume_per_unit) { // FIXED
+                        let found = false; // FIXED
+                        for (let i=0; i<volSelect.options.length; i++) { // FIXED
+                            if (volSelect.options[i].value == p.volume_per_unit) { // FIXED
+                                volSelect.selectedIndex = i; // FIXED
+                                found = true; // FIXED
+                                break; // FIXED
+                            } // FIXED
+                        } // FIXED
+                        if (!found) { // FIXED
+                            volSelect.value = 'other'; // FIXED
+                            volOther.value = p.volume_per_unit; // FIXED
+                        } // FIXED
+                    } else { // FIXED
+                        volSelect.value = ''; // FIXED
+                    } // FIXED
+                    
+                    handleCategoryChange(); // FIXED
+                    
                     auto.style.display = 'none';
-                    if (p.unit_metric === 'ML') {
-                        document.getElementById('lblQty').innerText = 'Quantity (ML)';
-                    } else {
-                        document.getElementById('lblQty').innerText = 'Quantity';
-                    }
+                    document.getElementById('lblQty').innerText = 'Quantity'; // FIXED
                 };
                 auto.appendChild(d);
             });
@@ -414,38 +490,74 @@
     }
 
     async function injectItem() {
-        const name = document.getElementById('iSearch').value.trim();
-        const ware = document.getElementById('iWare').value;
-        const metric = document.getElementById('iMetric').value || 'pcs';
-        const volMl = parseFloat(document.getElementById('iVolMl').value) || 0;
-        const qty = parseFloat(document.getElementById('iQty').value) || 0;
-        const price = parseFloat(document.getElementById('iPrice').value) || 0;
-
-        if(!name || qty <= 0) return alert("Valid Item and Quantity Required.");
+        const name = document.getElementById('iSearch').value.trim().toUpperCase(); // FIXED
+        const brand = document.getElementById('iBrand').value.trim().toUpperCase(); // FIXED
+        const ware = document.getElementById('iWare').value; // FIXED
+        const category = document.getElementById('iCategory').value; // FIXED
+        const metric = 'Pcs'; // FIXED
+        const qty = parseFloat(document.getElementById('iQty').value) || 0; // FIXED
+        const price = parseFloat(document.getElementById('iPrice').value) || 0; // FIXED
+        const mrp = parseFloat(document.getElementById('iMrp').value) || 0; // FIXED
         
-        const master = catalogCache.find(p => p.item_name === name);
-        if(!master) return alert("Item not found in master catalog. Must be added via Product Catalog first.");
+        const volSelVal = document.getElementById('iVolMl').value; // FIXED
+        const volMl = category === 'Lube' // FIXED
+            ? (volSelVal === 'other' // FIXED
+                ? (parseInt(document.getElementById('iVolMlOther').value) || 0) // FIXED
+                : (parseInt(volSelVal) || 0)) // FIXED
+            : 0; // FIXED
 
-        const payload = {
-            job_card_id: currentJobId,
-            warehouse_type: ware,
-            item_name: name,
-            qty: qty,
-            unit_metric: metric,
-            volume_ml: volMl > 0 ? volMl : null,
-            unit_price: price,
-            total_price: qty * price,
-            issued_by_id: activeSessionRole
-        };
+        if (!name || qty <= 0) return alert("Valid item name and quantity required."); // FIXED
 
-        const { error } = await supabaseClient.from('job_card_items').insert(payload);
-        if(error) {
-            console.error(error);
-            alert("Database Error: " + error.message);
-        } else {
-            document.getElementById('itemModal').style.display = 'none';
-            loadItems();
-        }
+        const existing = catalogCache.find(p => // FIXED
+            p.item_name === name && p.brand === brand); // FIXED
+        
+        if (!existing) { // FIXED
+            const upsertPayload = { // FIXED
+                item_name: name, // FIXED
+                brand: brand || 'GENERIC', // FIXED
+                warehouse_type: ware, // FIXED
+                category: category, // FIXED
+                unit_metric: 'Pcs', // FIXED
+                default_price: price, // FIXED
+                mrp: mrp, // FIXED
+                catalog_status: 'unverified' // FIXED
+            }; // FIXED
+            if (category === 'Lube' && volMl > 0) { // FIXED
+                upsertPayload.volume_per_unit = volMl; // FIXED
+            } // FIXED
+            const { data: newProd } = await supabaseClient // FIXED
+                .from('product_master') // FIXED
+                .upsert(upsertPayload, { onConflict: 'item_name,brand' }) // FIXED
+                .select().single(); // FIXED
+            if (newProd) catalogCache.push(newProd); // FIXED
+        } // FIXED
+
+        const master = catalogCache.find(p => // FIXED
+            p.item_name === name && (p.brand === brand || !brand)); // FIXED
+        
+        const insertPayload = { // FIXED
+            job_card_id: currentJobId, // FIXED
+            warehouse_type: ware, // FIXED
+            item_name: name, // FIXED
+            qty: qty, // FIXED
+            unit_metric: 'Pcs', // FIXED
+            volume_ml: volMl > 0 ? volMl : null, // FIXED
+            unit_price: price, // FIXED
+            total_price: qty * price, // FIXED
+            mrp_at_billing: mrp, // FIXED
+            mac_at_billing: master?.mac || 0, // FIXED
+            product_master_id: master?.id || null, // FIXED
+            issued_by_id: activeSessionRole // FIXED
+        }; // FIXED
+
+        const { error } = await supabaseClient // FIXED
+            .from('job_card_items').insert(insertPayload); // FIXED
+        if (error) { // FIXED
+            alert("Database Error: " + error.message); // FIXED
+        } else { // FIXED
+            document.getElementById('itemModal').style.display = 'none'; // FIXED
+            loadItems(); // FIXED
+        } // FIXED
     }
 
     function openProtocolModal() {
