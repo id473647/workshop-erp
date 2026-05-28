@@ -218,9 +218,7 @@
     }
 
     /**
-     * Calculates the total volume in ML for a job_card_items or counter_sale_items row.
-     * Handles both old format (unit_metric='ML', qty=direct ML) and
-     * new format (unit_metric='Pcs', volume_ml=per-unit volume).
+     * Calculates total volume natively, handling legacy ML and modern volume_ml inputs
      */
     function calcVolumeML(item) {
         if (item.unit_metric === 'ML') {
@@ -437,11 +435,11 @@
                     timeDisplayHtml += `<br><span style="font-size:0.7rem; color:var(--success); font-weight:bold;">Settled: ${closeDateStr}</span>`;
                 }
 
-                // FIXED: Changed parameter back to ?jc= as expected by billing.html
+                // FIXED: Changed parameter securely back to ?id= to prevent crash
                 tbody.innerHTML += `
                     <tr>
                         <td>
-                            <a class="clickable-ref" href="billing.html?jc=${job.id}">${modelDisplay}</a>
+                            <a class="clickable-ref" href="billing.html?id=${job.id}">${modelDisplay}</a>
                             <span style="font-size:0.7rem; color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span><br>
                             ${timeDisplayHtml}
                         </td>
@@ -472,7 +470,7 @@
             const { data: mLines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))')
                 .eq('warehouse_type', 'Moped').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
             
-            // FIXED: Route changed to ?jc=
+            // FIXED: Modal links also use ?id=
             container.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                     <div>
@@ -480,7 +478,7 @@
                         <div class="table-wrapper" style="margin:0; max-height:400px;">
                             <table>
                                 <thead><tr><th>Hash Ref</th><th>Component</th><th>Valuation</th></tr></thead>
-                                <tbody>${(gLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?jc=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
+                                <tbody>${(gLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
                             </table>
                         </div>
                     </div>
@@ -489,7 +487,7 @@
                         <div class="table-wrapper" style="margin:0; max-height:400px;">
                             <table>
                                 <thead><tr><th>Hash Ref</th><th>Component</th><th>Valuation</th></tr></thead>
-                                <tbody>${(mLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?jc=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
+                                <tbody>${(mLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
                             </table>
                         </div>
                     </div>
@@ -497,11 +495,11 @@
         } else if(metricType === 'GreenFlow') {
             titleDisplayStr = `Settled Lines: Green Warehouse`;
             const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))').eq('warehouse_type', 'Green').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?jc=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'MopedFlow') {
             titleDisplayStr = `Settled Lines: Moped Warehouse`;
             const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))').eq('warehouse_type', 'Moped').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?jc=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'LubeFlow') {
             titleDisplayStr = "Volumetric Fluid Dispatches (Liters)";
             
@@ -516,12 +514,12 @@
                 const volML = calcVolumeML(l);
                 const pcsDisplay = l.unit_metric === 'ML' ? '-' : (parseFloat(l.qty) || 0);
                 const volDisplay = l.volume_ml > 0 ? l.volume_ml : '-';
-                return `<tr><td><a class="clickable-ref" href="billing.html?jc=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${pcsDisplay}</td><td>${volDisplay}</td><td style="font-weight:bold; color:var(--purple);">${volML.toFixed(0)} ML</td></tr>`;
+                return `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${pcsDisplay}</td><td>${volDisplay}</td><td style="font-weight:bold; color:var(--purple);">${volML.toFixed(0)} ML</td></tr>`;
             }).join('')}</tbody></table></div>`;
         } else if(metricType === 'StaffFlow') {
             titleDisplayStr = "Technician Payable Assignments";
             const { data: jobs } = await supabaseClient.from('job_cards').select('id, mech_id, labour_charges, status').gte('closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead><tbody>${(jobs || []).map(j => `<tr><td><a class="clickable-ref" href="billing.html?jc=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead><tbody>${(jobs || []).map(j => `<tr><td><a class="clickable-ref" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}</tbody></table></div>`;
         }
 
         document.getElementById('modalMetricTitle').innerText = titleDisplayStr;
