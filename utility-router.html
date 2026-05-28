@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -117,7 +118,7 @@
             <div class="u-card" id="cardProductGroups" onclick="openWorkspaceTarget('wsProductGroups')" style="display:none; border-left:4px solid var(--purple);">
                 <h4 class="u-title">🗂️ Product Groups</h4><p class="u-desc">Create vehicle-aware product groups for smart autocomplete in billing and POS.</p>
             </div>
-        </div>
+            <div class="u-card" id="cardVehicles" onclick="openWorkspaceTarget('wsVehicles')" style="display:none; border-left:4px solid var(--moped);"> <h4 class="u-title">🏍️ Vehicle Records</h4> <p class="u-desc">Search, edit, and merge customer vehicle records. Corrections reflect across all job cards.</p> </div> </div>
     </div>
 
     <div id="wsProductGroups" class="card-panel utility-workspace">
@@ -246,7 +247,8 @@
             <table><thead><tr><th>Scheme Name</th><th>Audience & Metric</th><th>Target -> Reward</th><th>Status</th></tr></thead><tbody id="schemesTableBody"></tbody></table>
         </div>
     </div>
-</div>
+    
+    <div id="wsVehicles" class="card-panel utility-workspace"> <div class="block-title">🏍️ Customer Vehicle Records — Search, Edit & Merge Duplicates</div> <div style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.82rem; color:#92400e; font-weight:600;"> ⚠️ SAFE EDIT: Correcting a vehicle name updates it across ALL linked job cards automatically. Use MERGE to consolidate two duplicate records — all job cards from the wrong entry move to the correct one before the duplicate is safely removed. No data is lost. </div> <div class="inputs-grid" style="background:#f0f9ff; padding:16px; border-radius:8px; border:1px solid #bae6fd; margin-bottom:20px;"> <div class="field-group" style="grid-column:span 2;"> <label>Search by Reg No / Model / Customer Mobile </label> <input type="text" id="vehSearch" placeholder="e.g. 5529 or JUPITER or 9876543210" oninput="this.value=this.value.toUpperCase()"> </div> <div class="field-group"> <button class="btn-action" style="background:var(--moped);" onclick="searchVehiclesMaster()"> SEARCH </button> </div> </div> <div id="vehSearchResults"></div> <div id="vehMergePanel" style="display:none;"></div> </div> </div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
@@ -262,8 +264,9 @@
     }
 
     window.onload = () => {
-        if (['admin', 'green', 'moped'].includes(activeSessionRole)) // FIXED
-            document.getElementById('cardProductGroups').style.display = 'flex'; // FIXED
+        if (['admin', 'green', 'moped'].includes(activeSessionRole))
+            document.getElementById('cardProductGroups').style.display = 'flex';
+        if (['admin','service','green','moped'].includes(activeSessionRole)) document.getElementById('cardVehicles').style.display = 'flex'; // FIXED
         loadDailyCollection();
     };
 
@@ -275,6 +278,7 @@
         if(id === 'wsTech') loadStaffDirectoryLedgers();
         if(id === 'wsSchemes') loadSchemes();
         if(id === 'wsProductGroups') loadProductGroups();
+        if(id === 'wsVehicles') { document.getElementById('vehSearchResults').innerHTML=''; document.getElementById('vehMergePanel').style.display = 'none'; } // FIXED
     }
 
     async function loadDailyCollection() {
@@ -329,7 +333,15 @@
             html += `
             <div style="border:1px solid var(--info); border-radius:8px; margin-bottom:20px; background:white; overflow:hidden;">
                 
-                <div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0; justify-content:space-between; align-items:center;"> <div style="display:flex;"> <button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button> <button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button> </div> <span id="creditBal_${c.mobile_number}" style="font-size:0.8rem; font-weight:bold; color:#b91c1c; background:#fee2e2; padding:4px 10px; border-radius:6px; border:1px solid #fca5a5; margin-right:8px;">Credit Balance: ₹…</span> </div> <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
+                <div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0; justify-content:space-between; align-items:center;">
+                    <div style="display:flex;">
+                        <button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button>
+                        <button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button>
+                    </div>
+                    <span id="creditBal_${c.mobile_number}" style="font-size:0.8rem; font-weight:bold; color:#b91c1c; background:#fee2e2; padding:4px 10px; border-radius:6px; border:1px solid #fca5a5; margin-right:8px;">Credit Balance: ₹…</span>
+                </div>
+                
+                <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
                     <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:120px;"><label>Mobile Number</label><input type="text" value="${c.mobile_number}" readonly style="background:#f1f5f9; width:100%;"></div>
                         <div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" style="width:100%;"></div>
@@ -358,14 +370,22 @@
                         <button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN</button>
                     </div>
                     
-                    <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;"> <div style="flex:1; min-width:150px;"> <label>Opening Balance Debt (₹)</label> <input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;"> </div> <button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button> </div> <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
+                    <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:150px;">
+                            <label>Opening Balance Debt (₹)</label>
+                            <input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+                        </div>
+                        <button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button>
+                    </div>
+                    
+                    <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
                 </div>
             </div>`;
         }
         resBox.innerHTML = html;
-        for (const c of custs) { // FIXED
-            computeAndShowCreditBalance(c.mobile_number); // FIXED
-        } // FIXED
+        for (const c of custs) {
+            computeAndShowCreditBalance(c.mobile_number);
+        }
     }
 
     function switchCrmTab(mobile, tab, evt) {
@@ -377,61 +397,61 @@
         document.getElementById(`crm_${tab}_${mobile}`).classList.add('active');
     }
 
-    async function computeAndShowCreditBalance(mobile) { // FIXED
-        const { data: jc } = await supabaseClient // FIXED
-            .from('job_cards') // FIXED
-            .select('id, total_invoice_value') // FIXED
-            .eq('customer_mobile', mobile) // FIXED
-            .eq('payment_mode', 'Credit') // FIXED
-            .eq('status', 'Closed'); // FIXED
+    async function computeAndShowCreditBalance(mobile) {
+        const { data: jc } = await supabaseClient
+            .from('job_cards')
+            .select('id, total_invoice_value')
+            .eq('customer_mobile', mobile)
+            .eq('payment_mode', 'Credit')
+            .eq('status', 'Closed');
 
-        const { data: pos } = await supabaseClient // FIXED
-            .from('counter_sales') // FIXED
-            .select('id, total_amount') // FIXED
-            .eq('customer_mobile', mobile) // FIXED
-            .eq('payment_mode', 'Credit') // FIXED
-            .eq('status', 'Closed'); // FIXED
+        const { data: pos } = await supabaseClient
+            .from('counter_sales')
+            .select('id, total_amount')
+            .eq('customer_mobile', mobile)
+            .eq('payment_mode', 'Credit')
+            .eq('status', 'Closed');
 
-        const { data: pays } = await supabaseClient // FIXED
-            .from('credit_payments') // FIXED
-            .select('amount_paid, sale_id, job_card_id') // FIXED
-            .eq('customer_mobile', mobile); // FIXED
+        const { data: pays } = await supabaseClient
+            .from('credit_payments')
+            .select('amount_paid, sale_id, job_card_id')
+            .eq('customer_mobile', mobile);
 
-        let totalOut = 0; // FIXED
+        let totalOut = 0;
 
-        (jc || []).forEach(j => { // FIXED
-            const paid = (pays || []) // FIXED
-                .filter(p => p.job_card_id === j.id) // FIXED
-                .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0); // FIXED
-            const out = (parseFloat(j.total_invoice_value) || 0) - paid; // FIXED
-            if (out > 0) totalOut += out; // FIXED
-        }); // FIXED
+        (jc || []).forEach(j => {
+            const paid = (pays || [])
+                .filter(p => p.job_card_id === j.id)
+                .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(j.total_invoice_value) || 0) - paid;
+            if (out > 0) totalOut += out;
+        });
 
-        (pos || []).forEach(s => { // FIXED
-            const paid = (pays || []) // FIXED
-                .filter(p => p.sale_id === s.id) // FIXED
-                .reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0); // FIXED
-            const out = (parseFloat(s.total_amount) || 0) - paid; // FIXED
-            if (out > 0) totalOut += out; // FIXED
-        }); // FIXED
+        (pos || []).forEach(s => {
+            const paid = (pays || [])
+                .filter(p => p.sale_id === s.id)
+                .reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(s.total_amount) || 0) - paid;
+            if (out > 0) totalOut += out;
+        });
 
-        const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id); // FIXED
-        let obDebt = 0; // FIXED
-        obPays.forEach(p => { // FIXED
-            if (parseFloat(p.amount_paid) < 0) // FIXED
-                obDebt += Math.abs(parseFloat(p.amount_paid)); // FIXED
-            else obDebt -= parseFloat(p.amount_paid) || 0; // FIXED
-        }); // FIXED
-        if (obDebt > 0) totalOut += obDebt; // FIXED
+        const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id);
+        let obDebt = 0;
+        obPays.forEach(p => {
+            if (parseFloat(p.amount_paid) < 0)
+                obDebt += Math.abs(parseFloat(p.amount_paid));
+            else obDebt -= parseFloat(p.amount_paid) || 0;
+        });
+        if (obDebt > 0) totalOut += obDebt;
 
-        const el = document.getElementById(`creditBal_${mobile}`); // FIXED
-        if (el) { // FIXED
-            el.innerText = `Credit Balance: ₹${totalOut.toFixed(2)}`; // FIXED
-            el.style.background = totalOut > 0 ? '#fee2e2' : '#dcfce7'; // FIXED
-            el.style.color = totalOut > 0 ? '#b91c1c' : '#15803d'; // FIXED
-            el.style.borderColor = totalOut > 0 ? '#fca5a5' : '#bbf7d0'; // FIXED
-        } // FIXED
-    } // FIXED
+        const el = document.getElementById(`creditBal_${mobile}`);
+        if (el) {
+            el.innerText = `Credit Balance: ₹${totalOut.toFixed(2)}`;
+            el.style.background = totalOut > 0 ? '#fee2e2' : '#dcfce7';
+            el.style.color = totalOut > 0 ? '#b91c1c' : '#15803d';
+            el.style.borderColor = totalOut > 0 ? '#fca5a5' : '#bbf7d0';
+        }
+    }
 
     async function updateVehicleDetails(vid) {
         const data = {
@@ -544,11 +564,11 @@
                 <button onclick="delPay('${p.id}', '${mobile}')" style="background:none; border:none; color:var(--danger); font-size:1.1rem; cursor:pointer;">🗑️</button></span></div>`;
             });
             
-            const refLink = s.src === 'JC' // FIXED
-                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>` // FIXED
-                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`; // FIXED
+            const refLink = s.src === 'JC'
+                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>`
+                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`;
             
-            html += `<tr><td>${refLink}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`; // FIXED
+            html += `<tr><td>${refLink}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`;
             if(subRows) html += `<tr><td colspan="5" style="padding:0;">${subRows}</td></tr>`;
         });
         
@@ -697,7 +717,7 @@
         const name = document.getElementById('pgName').value.trim();
         const desc = document.getElementById('pgDesc').value.trim();
         if(!name) return;
-        const { error } = await supabaseClient.from('product_groups').insert({ group_name: name, description: desc });
+        const { error } = await supabaseClient.from('product_groups').insert({ group_name: name }); // FIXED — description column absent from live DB
         if (error) return alert("Error: " + error.message);
         document.getElementById('pgName').value = '';
         document.getElementById('pgDesc').value = '';
@@ -921,6 +941,334 @@
         if (error) alert("Error: " + error.message);
         else loadSchemes();
     }
+
+    /* ── VEHICLE SEARCH (customer vehicles table) ──── */
+    async function searchVehiclesMaster() { // FIXED
+      const q = document.getElementById('vehSearch')
+                  .value.trim();
+      const box = document.getElementById('vehSearchResults');
+      document.getElementById('vehMergePanel')
+              .style.display = 'none';
+
+      if (q.length < 2) {
+        box.innerHTML =
+          '<p style="color:#64748b;padding:8px;">'
+          + 'Type at least 2 characters.</p>';
+        return;
+      }
+      box.innerHTML =
+        '<p style="color:#64748b;padding:8px;">'
+        + 'Searching...</p>';
+
+      const { data, error } = await supabaseClient
+        .from('vehicles')
+        .select(
+          'id,reg_number,make_model,color,'
+          + 'customer_mobile,customers(name)'
+        )
+        .or(
+          'reg_number.ilike.%' + q + '%,'
+          + 'make_model.ilike.%' + q + '%,'
+          + 'customer_mobile.ilike.%' + q + '%'
+        )
+        .limit(40);
+
+      if (error) {
+        box.innerHTML =
+          '<p style="color:var(--danger);">Error: '
+          + error.message + '</p>';
+        return;
+      }
+      if (!data || data.length === 0) {
+        box.innerHTML =
+          '<p style="color:var(--danger);">'
+          + 'No vehicles found.</p>';
+        return;
+      }
+
+      let html =
+        '<div class="table-wrapper"><table>'
+        + '<thead><tr>'
+        + '<th>Reg No</th><th>Make / Model</th>'
+        + '<th>Color</th><th>Customer</th>'
+        + '<th>Mobile</th>'
+        + '<th style="min-width:160px;">Actions</th>'
+        + '</tr></thead><tbody>';
+
+      data.forEach(v => {
+        const cn = (v.customers?.name || '--')
+                   .replace(/'/g, "\\'");
+        const rid = v.id;
+        html += `<tr id="vrow_${rid}">
+          <td><input type="text" id="vreg_${rid}"
+            value="${v.reg_number||''}"
+            oninput="this.value=this.value.toUpperCase()"
+            style="width:85px;padding:5px;font-size:0.8rem;
+                   border:1px solid var(--border);
+                   border-radius:4px;font-weight:bold;">
+          </td>
+          <td><input type="text" id="vmod_${rid}"
+            value="${v.make_model||''}"
+            oninput="this.value=this.value.toUpperCase()"
+            style="width:110px;padding:5px;font-size:0.8rem;
+                   border:1px solid var(--border);
+                   border-radius:4px;font-weight:bold;">
+          </td>
+          <td><input type="text" id="vcol_${rid}"
+            value="${v.color||''}"
+            oninput="this.value=this.value.toUpperCase()"
+            style="width:70px;padding:5px;font-size:0.8rem;
+                   border:1px solid var(--border);
+                   border-radius:4px;">
+          </td>
+          <td style="font-size:0.8rem;">${cn}</td>
+          <td style="font-size:0.8rem;">
+            ${v.customer_mobile||'--'}
+          </td>
+          <td style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button onclick="saveVehicleEdit('${rid}')"
+              style="background:var(--success);color:white;
+                     border:none;padding:4px 8px;
+                     border-radius:4px;font-size:0.75rem;
+                     font-weight:bold;cursor:pointer;">
+              SAVE
+            </button>
+            <button onclick="openMergePanel('${rid}',
+              document.getElementById('vreg_${rid}').value,
+              document.getElementById('vmod_${rid}').value)"
+              style="background:var(--purple);color:white;
+                     border:none;padding:4px 8px;
+                     border-radius:4px;font-size:0.75rem;
+                     font-weight:bold;cursor:pointer;">
+              MERGE
+            </button>
+          </td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    } // FIXED
+
+    /* ── SAVE VEHICLE EDIT ────────────────────────── */
+    async function saveVehicleEdit(vid) { // FIXED
+      const reg = document.getElementById('vreg_' + vid)
+                  .value.trim().toUpperCase();
+      const mod = document.getElementById('vmod_' + vid)
+                  .value.trim().toUpperCase();
+      const col = document.getElementById('vcol_' + vid)
+                  .value.trim().toUpperCase();
+      if (!reg || !mod) {
+        alert('Reg No and Model cannot be empty.');
+        return;
+      }
+      const { error } = await supabaseClient
+        .from('vehicles')
+        .update({ reg_number: reg, make_model: mod,
+                  color: col })
+        .eq('id', vid);
+      if (error) {
+        alert('Error: ' + error.message);
+      } else {
+        const row = document.getElementById('vrow_' + vid);
+        if (row) {
+          row.style.background = '#f0fdf4';
+          setTimeout(() => { row.style.background = ''; },
+            1800);
+        }
+      }
+    } // FIXED
+
+    /* ── OPEN MERGE PANEL ─────────────────────────── */
+    // SOURCE = wrong duplicate (will be removed after merge)
+    // TARGET = correct vehicle (job cards will move here)
+    function openMergePanel(srcId, srcReg, srcMod) { // FIXED
+      const panel = document.getElementById('vehMergePanel');
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth',
+                             block: 'start' });
+      panel.innerHTML = `
+        <div style="background:#fef3c7;
+             border:1px solid #fde68a;padding:16px;
+             border-radius:8px;margin-top:16px;">
+          <h4 style="margin:0 0 8px 0;color:#b45309;">
+            🔀 MERGE DUPLICATE VEHICLE
+          </h4>
+          <p style="font-size:0.85rem;color:#92400e;
+               margin:0 0 12px 0;">
+            <strong>DUPLICATE (will be removed):</strong>
+            ${srcReg} — ${srcMod}<br>
+            All job cards from this entry will move to the
+            correct vehicle selected below.
+          </p>
+          <div class="inputs-grid" style="margin-bottom:12px;">
+            <div class="field-group" style="flex:2;
+                 position:relative;">
+              <label>Search for CORRECT vehicle
+                (merge target)</label>
+              <input type="text" id="mergeTargetSearch"
+               placeholder="Type reg no or model..."
+               oninput="this.value=this.value.toUpperCase();
+                        searchMergeTarget(this)"
+               autocomplete="off">
+              <div id="mergeTargetDrop"
+               style="position:absolute;top:100%;left:0;
+                      right:0;background:white;
+                      border:1px solid var(--border);
+                      border-radius:0 0 6px 6px;
+                      max-height:160px;overflow-y:auto;
+                      z-index:50;display:none;
+                      box-shadow:0 4px 6px rgba(0,0,0,0.08);">
+              </div>
+              <input type="hidden" id="mergeTargetId">
+              <div id="mergeTargetLabel"
+               style="font-size:0.8rem;color:var(--success);
+                      font-weight:bold;margin-top:4px;
+                      display:none;"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button
+              onclick="executeMerge('${srcId}',
+                '${srcReg}', '${srcMod}')"
+              style="background:var(--danger);color:white;
+                     border:none;padding:10px 20px;
+                     border-radius:6px;font-weight:bold;
+                     cursor:pointer;">
+              ✅ CONFIRM MERGE & REMOVE DUPLICATE
+            </button>
+            <button onclick="document.getElementById(
+                      'vehMergePanel').style.display='none'"
+              style="background:#e2e8f0;color:var(--primary);
+                     border:none;padding:10px 20px;
+                     border-radius:6px;font-weight:bold;
+                     cursor:pointer;">
+              CANCEL
+            </button>
+          </div>
+        </div>`;
+    } // FIXED
+
+    /* ── SEARCH MERGE TARGET ──────────────────────── */
+    let _mergeTimer = null;
+    async function searchMergeTarget(inp) { // FIXED
+      clearTimeout(_mergeTimer);
+      const q = inp.value.trim();
+      const drop = document.getElementById('mergeTargetDrop');
+      if (q.length < 2) { drop.style.display='none'; return; }
+      _mergeTimer = setTimeout(async () => {
+        const { data } = await supabaseClient
+          .from('vehicles')
+          .select('id,reg_number,make_model,customer_mobile')
+          .or(
+            'reg_number.ilike.%' + q + '%,'
+            + 'make_model.ilike.%' + q + '%'
+          )
+          .limit(15);
+        drop.innerHTML = '';
+        (data||[]).forEach(v => {
+          const d = document.createElement('div');
+          d.style.cssText =
+            'padding:8px 12px;cursor:pointer;font-size:0.82rem;'
+            + 'border-bottom:1px solid #f1f5f9;';
+          d.innerHTML =
+            '<strong>' + v.reg_number + '</strong> — '
+            + (v.make_model||'')
+            + ' <span style="color:#64748b;font-size:0.75rem;">'
+            + (v.customer_mobile||'') + '</span>';
+          d.onmousedown = () => {
+            document.getElementById('mergeTargetId').value
+              = v.id;
+            document.getElementById('mergeTargetSearch').value
+              = v.reg_number + ' — ' + (v.make_model||'');
+            const lbl =
+              document.getElementById('mergeTargetLabel');
+            lbl.style.display = 'block';
+            lbl.innerText = '✅ Target: ' + v.reg_number
+              + ' — ' + (v.make_model||'');
+            drop.style.display = 'none';
+          };
+          drop.appendChild(d);
+        });
+        drop.style.display =
+          (data && data.length) ? 'block' : 'none';
+      }, 250);
+    } // FIXED
+
+    /* ── EXECUTE MERGE ────────────────────────────── */
+    // 1. Re-point all job_cards from sourceId to targetId
+    // 2. Delete now-orphaned source vehicle record
+    async function executeMerge(srcId, srcReg, srcMod) { // FIXED
+      const tgtId =
+        document.getElementById('mergeTargetId').value.trim();
+      const tgtLabel =
+        document.getElementById('mergeTargetSearch')
+                .value.trim();
+
+      if (!tgtId) {
+        alert('Please select the correct target vehicle first.');
+        return;
+      }
+      if (tgtId === srcId) {
+        alert('Source and target cannot be the same vehicle.');
+        return;
+      }
+
+      const confirmed = confirm(
+        'MERGE CONFIRMATION\n\n'
+        + 'DUPLICATE (will be removed):\n'
+        + srcReg + ' — ' + srcMod + '\n\n'
+        + 'CORRECT TARGET (all job cards move here):\n'
+        + tgtLabel + '\n\n'
+        + 'This cannot be undone. Proceed?'
+      );
+      if (!confirmed) return;
+
+      // Count job cards on source
+      const { data: jcList, error: jcErr } =
+        await supabaseClient
+          .from('job_cards')
+          .select('id')
+          .eq('vehicle_id', srcId);
+      if (jcErr) {
+        alert('Error reading job cards: ' + jcErr.message);
+        return;
+      }
+
+      // Re-point all job cards to correct target
+      if (jcList && jcList.length > 0) {
+        const { error: upErr } = await supabaseClient
+          .from('job_cards')
+          .update({ vehicle_id: tgtId })
+          .eq('vehicle_id', srcId);
+        if (upErr) {
+          alert('Error re-linking job cards: ' + upErr.message);
+          return;
+        }
+      }
+
+      // Delete the now-orphaned duplicate
+      const { error: delErr } = await supabaseClient
+        .from('vehicles')
+        .delete()
+        .eq('id', srcId);
+      if (delErr) {
+        alert('Job cards moved but could not remove duplicate: '
+          + delErr.message);
+        return;
+      }
+
+      const moved = jcList ? jcList.length : 0;
+      alert(
+        '✅ Merge complete.\n'
+        + moved + ' job card(s) re-linked to correct vehicle.\n'
+        + 'Duplicate record removed.'
+      );
+      document.getElementById('vehMergePanel')
+              .style.display = 'none';
+      searchVehiclesMaster(); // Refresh results
+    } // FIXED
+
 </script>
 </body>
 </html>
