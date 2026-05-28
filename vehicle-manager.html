@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,12 +103,26 @@
 
         function verifyManagementPrivileges() {
             document.getElementById('roleDisplay').innerText = sessionRole;
-            if(sessionRole !== 'admin') {
-                document.body.innerHTML = `<h2 style="text-align:center; padding:50px; color:red;">ACCESS DENIED. Admin Role Required.</h2>`;
-                return;
-            }
+            const allowedRoles = ['admin','service','green','moped']; // FIXED
+            if (!allowedRoles.includes(sessionRole)) { // FIXED
+                document.body.innerHTML = `<h2 style="text-align:center;padding:50px; color:red;">ACCESS DENIED. Login Required.</h2>`; // FIXED
+                return; // FIXED
+            } // FIXED
             loadMasterVehicles();
             initCompatView();
+            
+            if (sessionRole !== 'admin') { // FIXED
+                ['nBrand','nModel','nCat'].forEach(id => { // FIXED
+                    const el = document.getElementById(id); // FIXED
+                    if (el) el.disabled = true; // FIXED
+                }); // FIXED
+                const addBtn = document.querySelector('button.btn.btn-success'); // FIXED
+                if (addBtn) { // FIXED
+                    addBtn.disabled = true; // FIXED
+                    addBtn.style.opacity = '0.4'; // FIXED
+                    addBtn.title = 'Admin access required to add vehicles'; // FIXED
+                } // FIXED
+            } // FIXED
         }
 
         function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
@@ -120,8 +135,7 @@
                     <td><strong style="color:var(--info);">${v.brand}</strong></td>
                     <td style="font-weight:bold;">${v.model_name}</td>
                     <td><span style="background:#e2e8f0; padding:2px 8px; border-radius:10px; font-size:0.75rem;">${v.category_group}</span></td>
-                    <td><button onclick="deleteMasterVeh('${v.id}')" style="background:none; border:none; color:var(--danger); font-weight:bold; cursor:pointer;">Delete</button></td>
-                </tr>`;
+                    <td>${sessionRole === 'admin' ? `<button onclick="deleteMasterVeh('${v.id}')" style="background:none;border:none; color:var(--danger);font-weight:bold; cursor:pointer;">Delete</button>` : '<span style="color:#94a3b8;font-size:0.75rem;">View Only</span>'}</td> </tr>`;
             });
         }
 
