@@ -97,7 +97,8 @@
                 <select id="coMech"><option value="">-- Optional --</option></select>
             </div>
             <div class="field-group"><label>Odometer</label><input type="number" id="vOdo" placeholder="Current KMs"></div>
-        </div>
+            
+            <div class="field-group"> <label>Next Service Due Date</label> <input type="date" id="vNextServiceDate" style="border-color:#7c3aed;"> <span style="font-size:0.65rem; color:#7c3aed; margin-top:2px; font-weight:bold;">Prints on bill & shown to customer</span> </div> </div>
 
         <div class="totals-box">
             <div class="total-row"><span>Gross Spares:</span><span class="total-val" id="tSpares">₹0.00</span></div>
@@ -106,7 +107,8 @@
             <div class="total-row"><span>Variable Labour:</span><span class="total-val" id="tLabour">₹0.00</span></div>
             <div class="total-row"><span>Lathe/Welding:</span><span class="total-val" id="tLathe">₹0.00</span></div>
             <div class="total-row" style="color:var(--danger);"><span>Discount:</span><span class="total-val" id="tDisc">-₹0.00</span></div>
-            <div class="net-total"><span>NET PAYABLE:</span><span style="margin-left:20px;" id="tNet">₹0.00</span></div>
+            
+            <div id="printAdviceBox" style="display:none; background:#fefce8; border:1px dashed #7c3aed; border-radius:6px; padding:10px; margin-bottom:12px; text-align:left;"> <div style="font-size:0.75rem; font-weight:bold; color:#7c3aed; margin-bottom:4px;">TECH ADVICE FOR NEXT SERVICE:</div> <div id="printAdviceText" style="font-size:0.85rem; color:#1e293b;"></div> <div id="printNextDate" style="font-size:0.8rem; font-weight:bold; color:#dc2626; margin-top:6px; display:none;"></div> </div> <div class="net-total"><span>NET PAYABLE:</span><span style="margin-left:20px;" id="tNet">₹0.00</span></div>
             <div class="total-row" style="color:var(--success); margin-top:8px;"><span>Advance Paid:</span><span class="total-val" id="tAdv">₹0.00</span></div>
             <div class="total-row" style="font-weight:bold; font-size:1.1rem; color:var(--danger); margin-top:8px;"><span>BALANCE DUE:</span><span class="total-val" id="tBal">₹0.00</span></div>
         </div>
@@ -342,6 +344,10 @@
         if(job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
         
         document.getElementById('vFutureAdvice').value = job.future_advice || '';
+        
+        if (job.next_service_date) // NEW
+            document.getElementById('vNextServiceDate').value = job.next_service_date; // NEW
+            
         document.getElementById('vStatus').innerText = job.status.toUpperCase();
 
         if (job.status === 'Closed') lockUI();
@@ -670,6 +676,7 @@
             green_total: greenTotal,           // FIXED
             moped_total: mopedTotal,           // FIXED
             lubricant_total: lubeTotal,        // FIXED
+            next_service_date: document.getElementById('vNextServiceDate').value || null,  // NEW
         };
 
         const odo = document.getElementById('vOdo').value;
@@ -679,6 +686,24 @@
 
         await supabaseClient.from('job_cards').update(payload).eq('id', currentJobId);
         alert("Draft Saved.");
+        
+        // Update print advice display // NEW
+        const fa = document.getElementById('vFutureAdvice').value.trim();                            // NEW
+        const nsd = document.getElementById('vNextServiceDate').value;                                  // NEW
+        const advBox = document.getElementById('printAdviceBox');        // NEW
+        const advText = document.getElementById('printAdviceText');       // NEW
+        const ndEl = document.getElementById('printNextDate');          // NEW
+        
+        if (fa) {                                                     // NEW
+          advText.innerText = fa;                                     // NEW
+          advBox.style.display = 'block';                             // NEW
+          if (nsd) {                                                  // NEW
+            ndEl.style.display = 'block';                             // NEW
+            ndEl.innerText = '📅 NEXT SERVICE DUE: '                  // NEW
+              + new Date(nsd).toLocaleDateString('en-IN');            // NEW
+          }                                                           // NEW
+        }                                                             // NEW
+        
         if (redirectAfter) window.location.href = 'index.html'; // FIXED
     }
 
@@ -771,7 +796,8 @@
         await supabaseClient.from('job_cards').update({
             status: 'Closed',
             closed_at: dt,
-            payment_mode: 'Split'
+            payment_mode: 'Split',
+            next_service_date: document.getElementById('vNextServiceDate').value || null // NEW
         }).eq('id', currentJobId);
 
         alert("Job Card Closed Successfully!");
