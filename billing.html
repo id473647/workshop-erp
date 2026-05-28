@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,8 +46,7 @@
         <button class="btn-header" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">GUEST</span>
-    </div>
+        <span id="roleDisplay" class="badge-role">GUEST</span> </div>
 </nav>
 
 <div class="wrapper">
@@ -185,15 +186,12 @@
 </div>
 
 <script>
-    // -------------------------------------------------------------
-    // 1. FAIL-SAFE INITIALIZATION & URL PARSING
-    // -------------------------------------------------------------
-    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    const roleBadge = document.getElementById('roleDisplay');
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest'; // FIXED
+    const roleBadge = document.getElementById('roleDisplay'); // FIXED
     if (roleBadge) roleBadge.innerText = activeSessionRole.toUpperCase();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const rawJobId = urlParams.get('id') || urlParams.get('jc');
+    const rawJobId = urlParams.get('id') || urlParams.get('jc'); // FIXED
 
     if (!rawJobId) {
         document.getElementById('loadingOverlay').innerHTML = `<h2 style="color:var(--danger);">Critical Error: Job Card ID Missing from URL.<br><a href="index.html" style="font-size:1rem; color:var(--primary);">Return to Dashboard</a></h2>`;
@@ -203,9 +201,6 @@
     const currentJobId = rawJobId;
     const jcHash = currentJobId.split('-')[0].toUpperCase();
 
-    // -------------------------------------------------------------
-    // 2. SUPABASE SETUP & VARIABLES
-    // -------------------------------------------------------------
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -217,11 +212,14 @@
     let protocolsCache = [];
     let netBalanceDue = 0;
 
-    // Lube Volume Logic
     function calcVolumeML(item) {
         if (item.unit_metric === 'ML') return parseFloat(item.qty) || 0;
         if (item.volume_ml != null && item.volume_ml > 0) return (parseFloat(item.qty) || 0) * parseFloat(item.volume_ml);
         return 0;
+    }
+
+    function isLubeItem(item) {
+        return item.unit_metric === 'ML' || (item.volume_ml != null && item.volume_ml > 0);
     }
 
     function executeSessionTermination() {
@@ -303,7 +301,7 @@
         
         document.getElementById('vLabour').value = job.labour_charges || 0;
         document.getElementById('vLathe').value = job.lathe_welding || 0;
-        document.getElementById('vDisc').value = 0; // Fresh input for manual discounts
+        document.getElementById('vDisc').value = 0; 
         
         if(job.mech_id) document.getElementById('primaryMech').value = job.mech_id;
         if(job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
@@ -365,7 +363,6 @@
         loadItems();
     }
 
-    // Modal Logic
     function openItemModal() {
         document.getElementById('iSearch').value = '';
         document.getElementById('iQty').value = 1;
@@ -527,7 +524,6 @@
         alert("Draft Saved.");
     }
 
-    // Split Payment Logic
     function openSplitPayModal() {
         document.getElementById('spBal').innerText = `₹${netBalanceDue.toFixed(2)}`;
         document.getElementById('spPointsAvail').innerText = currentCustomer.loyalty_points || 0;
@@ -575,7 +571,7 @@
         
         document.getElementById('btnFinalClose').innerText = 'PROCESSING...';
         
-        await saveJobState(); // Save labour/lathe logic first
+        await saveJobState(); 
         
         const w = parseFloat(document.getElementById('spWallet').value) || 0;
         const c = parseFloat(document.getElementById('spCash').value) || 0;
@@ -583,17 +579,16 @@
         const cr = parseFloat(document.getElementById('spCredit').value) || 0;
         const net = parseFloat(document.getElementById('tNet').innerText.replace('₹','')) || 0;
         const disc = parseFloat(document.getElementById('vDisc').value) || 0;
-        const finalDisc = disc + w; // Wallet redemptions technically act as a discount on the final invoice
+        const finalDisc = disc + w; 
         
         const dt = new Date().toISOString();
         
-        // 1. Log to Invoice Table
         const invPayload = {
             job_card_id: currentJobId,
             customer_mobile: currentJob.customer_mobile,
             total_amount: net,
             discount_applied: finalDisc,
-            payment_mode: 'Split', // Indicate split payload
+            payment_mode: 'Split', 
             cash_amount: c,
             upi_amount: u,
             credit_amount: cr,
@@ -601,23 +596,20 @@
         };
         await supabaseClient.from('invoices').insert(invPayload);
 
-        // 2. Log Credit Ledger if applicable
         if (cr > 0) {
             await supabaseClient.from('credit_payments').insert({
                 job_card_id: currentJobId,
                 customer_mobile: currentJob.customer_mobile,
-                amount_paid: -cr, // Negative indicates debt
+                amount_paid: -cr, 
                 payment_mode: 'Job Card Credit',
                 paid_by_role: activeSessionRole
             });
         }
         
-        // 3. Update Customer Wallet
         if (w > 0 && currentCustomer.mobile_number) {
             await supabaseClient.rpc('deduct_loyalty_points', { target_mobile: currentCustomer.mobile_number, points_to_deduct: w });
         }
 
-        // 4. Update Job Card Status
         await supabaseClient.from('job_cards').update({
             status: 'Closed',
             closed_at: dt,
