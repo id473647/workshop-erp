@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,8 +114,7 @@
         <div style="display:flex; justify-content:space-between; margin-top:20px;">
             <button class="btn-action" style="background:#475569; width:auto;" onclick="triggerMechPrint()">🖨️ MECH SLIP</button>
             <div style="display:flex; gap:10px;">
-                <button class="btn-action" style="width:auto;" onclick="saveJobState()">💾 SAVE DRAFT</button>
-                <button class="btn-action btn-danger" id="btnCloseJob" style="width:auto;" onclick="openSplitPayModal()">✅ SETTLE & CLOSE</button>
+                <button class="btn-action" style="width:auto;" onclick="saveJobState(true)">💾 SAVE DRAFT</button> <button class="btn-action btn-danger" id="btnCloseJob" style="width:auto;" onclick="openSplitPayModal()">✅ SETTLE & CLOSE</button>
             </div>
         </div>
     </div>
@@ -568,7 +568,7 @@
             mrp_at_billing: mrp, 
             mac_at_billing: master?.mac || 0, 
             product_master_id: master?.id || null, 
-            issued_by_id: null // FIXED — role string is not a valid UUID
+            issued_by_id: null 
         }; 
 
         const { error } = await supabaseClient 
@@ -602,7 +602,7 @@
             unit_metric: 'Pkg',
             unit_price: rate,
             total_price: rate,
-            issued_by_id: null // FIXED — role string is not a valid UUID
+            issued_by_id: null 
         };
 
         await supabaseClient.from('job_card_items').insert(payload);
@@ -639,13 +639,37 @@
         document.getElementById('tBal').innerText = `₹${netBalanceDue.toFixed(2)}`;
     }
 
-    async function saveJobState() {
+    async function saveJobState(redirectAfter = false) {  // FIXED
+        // Calculate current totals to persist to DB // FIXED
+        let greenTotal = 0, mopedTotal = 0,          // FIXED
+            lubeTotal = 0, spareTotal = 0;             // FIXED
+        currentItems.forEach(i => {                  // FIXED
+          const amt = parseFloat(i.total_price) || 0;// FIXED
+          if (isLubeItem(i)) lubeTotal += amt;        // FIXED
+          else spareTotal += amt;                      // FIXED
+          const wh = (i.warehouse_type||'').toLowerCase(); // FIXED
+          if (wh === 'green') greenTotal += amt;      // FIXED
+          if (wh === 'moped') mopedTotal += amt;      // FIXED
+        });                                            // FIXED
+        const lab = parseFloat(
+          document.getElementById('vLabour').value) || 0; // FIXED
+        const lathe = parseFloat(
+          document.getElementById('vLathe').value) || 0;  // FIXED
+        const disc = parseFloat(
+          document.getElementById('vDisc').value) || 0;   // FIXED
+        const currentNet = spareTotal + lubeTotal            // FIXED
+          + lab + lathe - disc;                             // FIXED
+
         const payload = {
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0,
             lathe_welding: parseFloat(document.getElementById('vLathe').value) || 0,
             mech_id: document.getElementById('primaryMech').value || null,
             co_mech_id: document.getElementById('coMech').value || null,
             future_advice: document.getElementById('vFutureAdvice').value,
+            total_invoice_value: currentNet,   // FIXED
+            green_total: greenTotal,           // FIXED
+            moped_total: mopedTotal,           // FIXED
+            lubricant_total: lubeTotal,        // FIXED
         };
 
         const odo = document.getElementById('vOdo').value;
@@ -655,6 +679,7 @@
 
         await supabaseClient.from('job_cards').update(payload).eq('id', currentJobId);
         alert("Draft Saved.");
+        if (redirectAfter) window.location.href = 'index.html'; // FIXED
     }
 
     function openSplitPayModal() {
