@@ -1,40 +1,68 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Floor Billing Console - My Care ERP</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)"></script>
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js](https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js)"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad; --warning: #f59e0b;}
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items:center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
+        .nav-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: white; color: var(--primary); }
+        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
         .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left:8px; }
+        
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; cursor: pointer; transition: color 0.2s; } .plate-header:hover { color: var(--info); text-decoration: underline; }
+        .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; cursor: pointer; transition: color 0.2s; } 
+        .plate-header:hover { color: var(--info); text-decoration: underline; }
         .meta-text { font-size: 0.85rem; color: #64748b; }
         .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; display: inline-block; }
         .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
-        .inline-add-strip > div:nth-child(1) { flex: 2 1 180px; position: relative; } .inline-add-strip > input:nth-child(2) { flex: 1 1 90px; } .inline-add-strip > input:nth-child(3) { flex: 0.8 1 70px; } .inline-add-strip > select:nth-child(4) { flex: 1 1 80px; font-weight:bold; } .inline-add-strip > input:nth-child(5) { flex: 0.5 1 60px; } .inline-add-strip > input:nth-child(6) { flex: 0.5 1 60px; } .inline-add-strip > select:nth-child(7) { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
+        
+        .inline-add-strip > div:nth-child(1) { flex: 2 1 160px; position: relative; } /* Part */
+        .inline-add-strip > input:nth-child(2) { flex: 1 1 80px; } /* Brand */
+        .inline-add-strip > input:nth-child(3) { flex: 0.8 1 60px; } /* MRP */
+        .inline-add-strip > select#nType { flex: 1 1 70px; font-weight:bold; } /* Type */
+        .inline-add-strip > select#nVolume { flex: 1 1 70px; font-weight:bold; color:var(--info); }
+        .inline-add-strip > input#nVolumeOther { flex: 0.8 1 50px; }
+        .inline-add-strip > div#qtyWrap { flex: 0.6 1 50px; }
+        .inline-add-strip > input#nRate { flex: 0.8 1 60px; }
+        .inline-add-strip > select#nIssuer { flex: 1.2 1 100px; }
+
         .btn-add-line { background: var(--success); color: white; border: none; width: 40px; height: 40px; border-radius: 6px; font-weight: 700; font-size: 1.3rem; cursor: pointer; flex: none; display: flex; align-items: center; justify-content: center; }
         .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; min-width: 350px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
-        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; } .autocomplete-item:hover { background: #f0f7ff; }
+        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; } 
+        .autocomplete-item:hover { background: #f0f7ff; }
+        
         .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; border-bottom: 1px solid var(--border); } td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } 
+        th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; border-bottom: 1px solid var(--border); } 
+        td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .inline-input { width: 85px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; text-align: center; }
         .pill-warehouse { padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: white; }
         .ware-green { background: var(--success); } .ware-moped { background: var(--moped); } .ware-service { background: var(--service); }
         .row-destroyer { color: var(--danger); font-weight: 700; cursor: pointer; border: none; background: none; font-size: 1.2rem; }
+        
         .parameter-matrix { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box; }
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; } .field-group { display: flex; flex-direction: column; gap: 4px; } .field-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; } .field-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; color: var(--primary); }
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; } 
+        .field-group { display: flex; flex-direction: column; gap: 4px; } 
+        .field-group label { font-size: 0.75rem; font-weight: 700; color: #64748b; } 
+        .field-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; color: var(--primary); }
+        
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0 16px 0; }
         .settle-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
-        .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; }
+        .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; } 
+        .btn-action:hover { opacity: 0.9; }
         .btn-cash { background: #16a34a; } .btn-upi { background: #2563eb; } .btn-credit { background: #d97706; } .btn-save { background: #475569; } .btn-split { background: var(--purple); } .btn-cancel { background: var(--danger); }
+        
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         
@@ -44,22 +72,27 @@
         .receipt-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 12px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.8rem; line-height: 1.2; }
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; } .receipt-logo-container img { height: 30px; filter: grayscale(100%); }
-        .receipt-shop-title { font-size: 1.1rem; font-weight: bold; margin: 2px 0; } .receipt-meta { font-size: 0.75rem; margin: 1px 0; } .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
-        .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; } .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; } .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; } .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; } .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
-        .action-strip-bar { display: flex; gap: 8px; margin-top: auto; } .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
+        .receipt-shop-title { font-size: 1.1rem; font-weight: bold; margin: 2px 0; } 
+        .receipt-meta { font-size: 0.75rem; margin: 1px 0; } 
+        .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
+        .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; } 
+        .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; } 
+        .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; } 
+        .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; } 
+        .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
+        .action-strip-bar { display: flex; gap: 8px; margin-top: auto; } 
+        .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
         .a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; border: 1px solid #000 !important; }
-        #lockedBanner { display:none; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:16px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px; }
         
+        #lockedBanner { display:none; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:16px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px; }
         #mechanic-print-ticket { display: none; }
         
-        /* New concession distribution block styles */
         #serviceDiscBlock { display: none; background: #fffbeb; padding: 12px; border-radius: 6px; border: 1px solid #fde68a; margin-top: 10px; grid-column: 1 / -1; }
         .dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
         .dist-field { display: flex; flex-direction: column; gap: 2px; }
         .dist-field label { font-size: 0.7rem; color: #92400e; }
         .dist-field input { border: 1px solid #fcd34d; padding: 8px; }
 
-        /* PROMPT 2: MULTI-ENTITY STYLES */
         .me-section { background: white; color: black; font-family: 'Courier New', monospace; padding: 10px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 0.78rem; line-height: 1.3; margin-bottom: 8px; }
         .me-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 6px; margin-bottom: 6px; }
         .me-gst { font-size: 0.65rem; }
@@ -74,13 +107,11 @@
             @page { margin: 8mm; }
             body * { visibility: hidden; } 
             
-            /* Receipt Print Logic */
             body.print-receipt #renderThermalReceiptTarget, body.print-receipt #renderThermalReceiptTarget * { visibility: visible; } 
             body.print-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
             body.print-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 300px; max-width: 300px; padding: 0; }
             body.print-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 10mm; } 
 
-            /* PROMPT 2: Multi Entity Print Logic */
             body.print-multi #multiEntityReceiptTarget, body.print-multi #multiEntityReceiptTarget * { visibility: visible; }
             body.print-multi #multiEntityReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; }
             body.print-multi #renderThermalReceiptTarget { display: none !important; }
@@ -88,7 +119,6 @@
             body.print-landscape #multiEntityReceiptTarget { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; width: 148mm; }
             body.print-landscape .me-summary { grid-column: 1 / -1; }
             
-            /* Mechanic Ticket Print Logic */
             body.print-mechanic #mechanic-print-ticket, body.print-mechanic #mechanic-print-ticket * { visibility: visible !important; }
             body.print-mechanic #mechanic-print-ticket { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #000; background: #fff; margin: 0; padding: 0; border: none; }
             .a5-page { page-break-after: always; position: relative; box-sizing: border-box; width: 100%; }
@@ -99,11 +129,17 @@
 <body>
 
 <nav class="sticky-nav">
-    <div style="display:flex; gap:12px; align-items:center;">
-        <a href="index.html" class="nav-anchor">← CONSOLE</a>
-        <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:4px 10px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🖨️ PRINT MECHANIC TICKET</button>
+    <div class="logo-matrix">
+        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care System">
+        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Center">
     </div>
-    <span id="roleTag" class="badge-role">GUEST</span>
+    <div class="nav-actions">
+        <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
+        <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:4px 10px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🖨️ PRINT MECHANIC TICKET</button>
+        <span id="roleTag" class="badge-role">GUEST</span>
+    </div>
 </nav>
 
 <div class="container">
@@ -140,11 +176,28 @@
             </div>
             <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
             
-            <input type="number" id="nMrp" placeholder="MRP (₹)" value="0" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
+            <input type="number" id="nMrp" placeholder="0" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
 
-            <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="Spare">Spare (Pcs)</option><option value="Lube">Lube (ML)</option></select>
-            <input type="number" id="nQty" placeholder="Qty / ML" value="1" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
-            <input type="number" id="nRate" placeholder="Rate (₹)" value="0" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;" onchange="toggleVolumeDropdown(this)">
+                <option value="Spare">Spare</option>
+                <option value="Lube">Lube</option>
+            </select>
+            
+            <select id="nVolume" style="display:none; padding:8px; border-radius:4px; border:1px solid var(--info);" onchange="checkOtherVolume(this)">
+                <option value="500">500ml</option>
+                <option value="650">650ml</option>
+                <option value="800">800ml</option>
+                <option value="900">900ml</option>
+                <option value="1000" selected>1000ml</option>
+                <option value="1200">1200ml</option>
+                <option value="Other">Other</option>
+            </select>
+            <input type="number" id="nVolumeOther" style="display:none; padding:8px; border-radius:4px; border:1px solid var(--border);" placeholder="ML">
+
+            <div id="qtyWrap" style="position:relative; display:flex;">
+                <input type="number" id="nQty" placeholder="Qty" value="1" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border); width:100%; box-sizing:border-box;">
+            </div>
+            <input type="number" id="nRate" placeholder="0" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
             <select id="nIssuer" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="">+ Issued By (Staff)</option></select>
             <button class="btn-add-line" onclick="pushItemToJobCard()">+</button>
         </div>
@@ -406,21 +459,58 @@
 
 <script>
     const urlParams = new URLSearchParams(window.location.search); const targetJobId = urlParams.get('id');
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "[https://jycoirrphpvxkrwrjcwf.supabase.co](https://jycoirrphpvxkrwrjcwf.supabase.co)"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
 
     let lineItemsLocalMemory = []; let globalCatalogCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
-    let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
-    
+    let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0;
+    let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
+
     // PROMPT 2 GLOBALS
-    window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false; let activeCustomerProfile = { category: 'Regular' };
+    window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false;
+    window._pendingVolume = null;
+    let activeCustomerProfile = { category: 'Regular' };
 
     // Track internally separated totals to push to db
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
+    
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
+    }
 
-    function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
+    /**
+     * Calculates the total volume in ML for a job_card_items row.
+     * Handles both old format (unit_metric='ML', qty=direct ML) and
+     * new format (unit_metric='Pcs', volume_ml=per-unit volume).
+     */
+    function calcVolumeML(item) {
+        if (item.unit_metric === 'ML') {
+            return parseFloat(item.qty) || 0;
+        }
+        if (item.volume_ml > 0) {
+            return (parseFloat(item.qty) || 0) * item.volume_ml;
+        }
+        return 0;
+    }
+
+    /**
+     * Returns true if this item is a lubricant (old or new format).
+     */
+    function isLubeItem(item) {
+        return item.unit_metric === 'ML' || (item.volume_ml != null && item.volume_ml > 0);
+    }
+
+    function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
+    let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only';
+    function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : '');
+    if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : '');
+    if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : '');
+    if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : '');
+    return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : '');
+    } return helper(num) + ' Rupees Only'; }
 
     async function editVehicleReg() {
         if(!activeJobContext || !activeJobContext.vehicle_id) return;
@@ -433,17 +523,17 @@
 
     async function initializeJobContext() {
         if (sessionRole === 'green' || sessionRole === 'moped') { 
-            document.getElementById('draftActionBlock').style.display = 'block'; 
+            document.getElementById('draftActionBlock').style.display = 'block';
             document.getElementById('vAdvance').disabled = true;
             document.getElementById('vAdvance').style.background = '#f1f5f9';
         } else { 
-            document.getElementById('settlementActionBlock').style.display = 'grid'; 
+            document.getElementById('settlementActionBlock').style.display = 'grid';
             document.getElementById('vPrepaid').disabled = true;
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
-        if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
+        if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex';
+            document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
 
-        // Fix 3 Step 5: Toggle concession block based on role
         if (sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('serviceDiscBlock').style.display = 'block';
             document.getElementById('simpleDiscBlock').style.display = 'none';
@@ -453,7 +543,8 @@
         }
 
         const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
-        let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By (Staff)</option>';
+        let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>';
+        let issuerOpt = '<option value="">+ Issued By (Staff)</option>';
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt; 
 
@@ -461,39 +552,40 @@
         if(job) {
             activeJobContext = job; 
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; 
-            document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; 
+            document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
             document.getElementById('prepaidPill').innerText = `Paid Total Adv: ₹${(parseFloat(job.advance_paid) || 0) + (parseFloat(job.prepaid_amount) || 0)}`; 
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             if (job.mech_id) document.getElementById('primaryMech').value = job.mech_id; if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
             
             document.getElementById('vLabour').value = parseFloat(job.labour_charges) || 0; 
-            document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0; 
+            document.getElementById('vLathe').value = parseFloat(job.lathe_welding) || 0;
             document.getElementById('vLatheNotes').value = job.external_work_notes || ''; 
             document.getElementById('vFutureAdvice').value = job.future_advice || ''; 
             document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
             document.getElementById('vPrepaid').value = parseFloat(job.prepaid_amount) || 0;
-
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
             if (job.customer_mobile) fetchCustomerContext(job);
-            
             fetchApplicableProtocols(job.vehicles?.category_group); loadInventoryLedgers();
 
             if(job.status === 'Closed' || job.status === 'Cancelled') {
                 document.getElementById('lockedStatusWord').innerText = job.status.toUpperCase();
-                if(job.status === 'Cancelled' && job.cancellation_reason) { document.getElementById('lockReasonDisplay').style.display = 'block'; document.getElementById('lockReasonText').innerText = job.cancellation_reason; }
+                if(job.status === 'Cancelled' && job.cancellation_reason) { document.getElementById('lockReasonDisplay').style.display = 'block'; document.getElementById('lockReasonText').innerText = job.cancellation_reason;
+                }
                 lockUserInterface();
             }
         }
     }
 
     function lockUserInterface() {
-        document.getElementById('lockedBanner').style.display = 'block'; document.getElementById('uiPartEntryBlock').style.display = 'none'; document.getElementById('uiProtocolEntryBlock').style.display = 'none'; document.getElementById('settlementActionBlock').style.display = 'none'; document.getElementById('draftActionBlock').style.display = 'none'; document.getElementById('columnDestroyer').style.display = 'none';
+        document.getElementById('lockedBanner').style.display = 'block';
+        document.getElementById('uiPartEntryBlock').style.display = 'none'; document.getElementById('uiProtocolEntryBlock').style.display = 'none'; document.getElementById('settlementActionBlock').style.display = 'none'; document.getElementById('draftActionBlock').style.display = 'none'; document.getElementById('columnDestroyer').style.display = 'none';
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = true; el.style.background = '#f1f5f9'; });
         if(sessionRole === 'admin') document.getElementById('btnUnlockAdmin').style.display = 'inline-block';
     }
 
     function unlockForEdit() {
-        document.getElementById('lockedBanner').style.display = 'none'; document.getElementById('adminEditBlock').style.display = 'block'; document.getElementById('uiPartEntryBlock').style.display = 'flex'; document.getElementById('uiProtocolEntryBlock').style.display = 'block'; document.getElementById('columnDestroyer').style.display = 'table-cell'; document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = false; el.style.background = 'white'; });
+        document.getElementById('lockedBanner').style.display = 'none'; document.getElementById('adminEditBlock').style.display = 'block';
+        document.getElementById('uiPartEntryBlock').style.display = 'flex'; document.getElementById('uiProtocolEntryBlock').style.display = 'block'; document.getElementById('columnDestroyer').style.display = 'table-cell'; document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = false; el.style.background = 'white'; });
     }
 
     async function cancelJobCard() {
@@ -506,40 +598,40 @@
     }
 
     async function fetchCustomerContext(job) { 
-        const { data: custData } = await supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single(); 
+        const { data: custData } = await supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single();
         if (custData) { 
             activeCustomerProfile = custData;
             activeCustomerName = custData.name; 
             activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; 
             customerWalletBalance = parseFloat(custData.loyalty_points) || 0; 
-            if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); } 
+            if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block';
+            document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); } 
         } 
-        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); 
-        if(subs && subs.length > 0) { document.getElementById('receiptPromoHindi').style.display = 'none'; } else { document.getElementById('receiptPromoHindi').style.display = 'block'; } 
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
+        if(subs && subs.length > 0) { document.getElementById('receiptPromoHindi').style.display = 'none'; } else { document.getElementById('receiptPromoHindi').style.display = 'block';
+        } 
     }
     
     async function fetchApplicableProtocols(catGroup) { 
-        const sel = document.getElementById('serviceProtocolSelect'); 
+        const sel = document.getElementById('serviceProtocolSelect');
         sel.innerHTML = '<option value="">+ Inject Fixed Protocol Module...</option>'; 
         let query = supabaseClient.from('service_packages').select('*').eq('is_active', true).order('base_rate');
         if (catGroup && catGroup !== 'Unclassified' && catGroup !== '') { 
-            query = query.eq('vehicle_category', catGroup); 
+            query = query.eq('vehicle_category', catGroup);
         }
         
-        const { data: pkgs } = await query; 
+        const { data: pkgs } = await query;
         pkgs?.forEach(p => { 
             sel.innerHTML += `<option value="${p.package_name}" data-rate="${p.base_rate}">${p.package_name} - ₹${p.base_rate}</option>`; 
-        }); 
+        });
     }
     
-    // UPDATED FUNCTION: Fully robust payload creation for Protocols
     async function addFixedProtocol() { 
-        const sel = document.getElementById('serviceProtocolSelect'); 
+        const sel = document.getElementById('serviceProtocolSelect');
         if(!sel.value) return; 
         
         const pkgName = sel.value; 
-        const pkgRate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0; 
-        
+        const pkgRate = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-rate')) || 0;
         if (appliedProtocolNamesForTracking.includes(pkgName)) {
             alert("Warning: This protocol is already injected into the job card.");
             sel.value = '';
@@ -547,22 +639,18 @@
         }
 
         sel.disabled = true;
-        
-        // Explicitly constructing the payload to enforce warehouse_type correctly
         const payload = { 
             job_card_id: targetJobId, 
-            warehouse_type: 'Service', // Explicitly setting this strictly
+            warehouse_type: 'Service',
             item_name: pkgName, 
             qty: 1, 
             unit_metric: 'Pkg', 
             unit_price: pkgRate, 
             total_price: pkgRate 
         };
-        
-        console.log("Injecting Protocol Payload:", payload); // Look in F12 console
+        console.log("Injecting Protocol Payload:", payload); 
 
-        const { error } = await supabaseClient.from('job_card_items').insert(payload); 
-        
+        const { error } = await supabaseClient.from('job_card_items').insert(payload);
         if (error) {
             console.error("Supabase Error Details:", error);
             alert("Error injecting protocol: " + error.message);
@@ -573,31 +661,31 @@
         loadInventoryLedgers(); 
     }
     
-    async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true }); lineItemsLocalMemory = items || []; renderDynamicTable(); }
+    async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true });
+        lineItemsLocalMemory = items || []; renderDynamicTable(); }
     
     function renderDynamicTable() { 
-        const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; 
+        const tbody = document.getElementById('lineItemsContainer');
+        tbody.innerHTML = ''; 
         const pList = document.getElementById('activeProtocolsList'); pList.innerHTML = ''; 
-        appliedProtocolNamesForTracking = []; 
-        const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; 
-        
+        appliedProtocolNamesForTracking = [];
+        const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none';
         lineItemsLocalMemory.forEach((line, idx) => { 
             const dropAuth = (!isLocked) && (sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase()); 
             let evaluatedLineTotal = parseFloat(line.total_price); 
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
             const issuerName = line.mechanics?.name || '--'; 
-            
+      
             if(line.warehouse_type === 'Service') { 
                 appliedProtocolNamesForTracking.push(line.item_name); 
                 const dropBtn = dropAuth ? `<button onclick="dropActiveRow('${line.id}')" title="Remove Module">X</button>` : ''; 
                 pList.innerHTML += `<div class="protocol-pill"><span>🏷️ ${line.item_name} : Rs.${evaluatedLineTotal.toFixed(0)}</span>${dropBtn}</div>`; 
             } else { 
                 const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; 
-                const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; 
-                tbody.innerHTML += `<tr><td><span class="pill-warehouse ware-${line.warehouse_type.toLowerCase()}">${line.warehouse_type}</span></td><td><strong>${line.item_name}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td><input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; 
+                const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : '';
+                tbody.innerHTML += `<tr><td><span class="pill-warehouse ware-${line.warehouse_type.toLowerCase()}">${line.warehouse_type}</span></td><td><strong>${line.item_name}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td><input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`;
             } 
-        }); 
-        
+        });
         if (appliedProtocolNamesForTracking.length === 0) pList.innerHTML = '<span style="font-size:0.8rem; color:#94a3b8;">No fixed protocols active.</span>';
         document.getElementById('protocolLabel').innerText = appliedProtocolNamesForTracking.length > 0 ? `Protocols: ${appliedProtocolNamesForTracking.join(', ')}` : `Protocols: Standard Variable Labor`; 
         compileDynamicSums(); 
@@ -610,7 +698,6 @@
             listContainer.style.display = 'none';
         }
     });
-
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             const listContainer = document.getElementById('autolist-n');
@@ -618,7 +705,32 @@
         }
     });
 
-    // PROMPT 2: ADVANCED VEHICLE AWARE AUTOCOMPLETE
+    function toggleVolumeDropdown(selectEl) {
+        const volSel = document.getElementById('nVolume');
+        const volOther = document.getElementById('nVolumeOther');
+        const qtyInput = document.getElementById('nQty');
+        
+        if(selectEl.value === 'Spare') {
+            volSel.style.display = 'none';
+            volOther.style.display = 'none';
+            const tag = document.getElementById('volTag');
+            if (tag) tag.remove();
+            qtyInput.placeholder = "Qty";
+        } else {
+            if(!window._pendingVolume) {
+                volSel.style.display = 'block';
+                if(volSel.value === 'Other') volOther.style.display = 'block';
+            }
+            qtyInput.placeholder = "Pcs";
+        }
+    }
+
+    function checkOtherVolume(selectEl) {
+        const volOther = document.getElementById('nVolumeOther');
+        if(selectEl.value === 'Other') volOther.style.display = 'block';
+        else volOther.style.display = 'none';
+    }
+
     async function queryCatalogAutocomplete(inputRef) {
         const searchVal = inputRef.value.trim().toLowerCase();
         const listContainer = document.getElementById('autolist-n');
@@ -626,8 +738,7 @@
         if (searchVal.length < 2) { listContainer.style.display='none'; return; }
         const tokens = searchVal.split(' ').filter(t=>t.length>0);
         const vehicleModel = activeJobContext?.vehicles?.make_model?.toUpperCase()||null;
-
-        // PASS 1 — vehicle shortlist
+        
         let results = [];
         if (vehicleModel) {
             const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model', vehicleModel);
@@ -643,7 +754,6 @@
             });
         }
 
-        // PASS 2 — global fallback
         if (results.length===0) {
             results = globalCatalogCache.filter(p => {
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
@@ -651,16 +761,22 @@
             });
         }
         results = results.slice(0,10);
-
+        
         results.forEach(p => {
             const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`;
             const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : '';
+            
+            const isLubeCat = p.category === 'Lube';
+            const hasVol = p.volume_per_unit > 0;
+            const displayName = (isLubeCat && hasVol) ? `${p.item_name} ${p.volume_per_unit}ml` : p.item_name;
+
             listContainer.innerHTML += `
-                <div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})">
-                    <div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div>
+                <div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0}, ${p.volume_per_unit||null})">
+                    <div><strong>${displayName}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div>
                     <div style="display:flex;gap:6px;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div>
                 </div>`;
         });
+        
         listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onmousedown="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add as Unverified</div>`;
         listContainer.style.display = results.length>0||true ? 'block':'none';
     }
@@ -674,16 +790,37 @@
         window._pendingItemUnverified = true;
     }
     
-    // PROMPT 2: ADVANCED APPLY ITEM LOGIC
-    function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) {
+    function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac, volPerUnit) {
         document.getElementById('nPart').value = name;
         document.getElementById('nBrand').value = brand;
-        document.getElementById('nRate').value = mrpVal; 
+        document.getElementById('nRate').value = defRate; 
         if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal;
         document.getElementById('nType').value = cat==='Lube'?'Lube':'Spare';
         document.getElementById('autolist-n').style.display = 'none';
-        window._pid = pid; window._pmac = mac; window._pmrp = mrpVal;
+        window._pid = pid;
+        window._pmac = mac; window._pmrp = mrpVal;
         window._pendingItemUnverified = false;
+        window._pendingVolume = volPerUnit || null;
+
+        const qtyInput = document.getElementById('nQty');
+        if (cat === 'Lube' && volPerUnit > 0) {
+            document.getElementById('nVolume').style.display = 'none';
+            document.getElementById('nVolumeOther').style.display = 'none';
+            qtyInput.placeholder = "Pcs";
+            qtyInput.min = "1";
+            let tag = document.getElementById('volTag');
+            if(!tag) {
+                tag = document.createElement('span');
+                tag.id = 'volTag';
+                tag.style.cssText = 'font-size:0.7rem; color:var(--purple); font-weight:bold; position:absolute; right:10px; top:-15px;';
+                qtyInput.parentElement.appendChild(tag);
+            }
+            tag.innerText = `🧴 Each: ${volPerUnit}ml`;
+        } else {
+            const tag = document.getElementById('volTag');
+            if (tag) tag.remove();
+            qtyInput.placeholder = "Qty";
+        }
         
         const cat2 = typeof activeCustomerProfile !== 'undefined' ? (activeCustomerProfile?.category||'Regular') : 'Regular';
         if ((cat2==='Gold'||cat2==='Platinum')) {
@@ -694,7 +831,8 @@
                     const disc = Math.round((1-tp/mrpVal)*100);
                     let b = document.getElementById('tierBadge');
                     if (!b) {
-                        b=document.createElement('div'); b.id='tierBadge';
+                        b=document.createElement('div');
+                        b.id='tierBadge';
                         b.style.cssText='font-size:0.75rem;color:#7c3aed;font-weight:700;margin-top:2px;';
                         document.getElementById('nRate').insertAdjacentElement('afterend',b);
                     }
@@ -730,60 +868,81 @@
     
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
-    // PROMPT 2: ADVANCED PUSH LOGIC
     async function pushItemToJobCard() { 
-        const partStr = document.getElementById('nPart').value.trim(); 
+        const partStr = document.getElementById('nPart').value.trim();
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
         const typeSelect = document.getElementById('nType').value; 
-        const qVal = parseFloat(document.getElementById('nQty').value) || 1; 
+        const qVal = parseFloat(document.getElementById('nQty').value) || 1;
         const rVal = parseFloat(document.getElementById('nRate').value) || 0; 
         const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal;
         const issuerId = document.getElementById('nIssuer').value || null; 
         
-        if(!partStr) return; if(typeSelect === 'Lube' && qVal < 50) { return alert("Lubricants must be entered in ML. Cannot enter less than 50 ML."); } 
-        const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; 
-        const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; 
-        const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
-        const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase(); 
+        if(!partStr) return;
         
-        // Handle Unverified Mocking
+        const isLube = typeSelect === 'Lube';
+        let volumeML = 0;
+        if (isLube) {
+            if (window._pendingVolume) {
+                volumeML = window._pendingVolume;
+            } else {
+                const selVal = document.getElementById('nVolume').value;
+                if (selVal === 'Other') {
+                    volumeML = parseInt(document.getElementById('nVolumeOther').value) || 0;
+                } else {
+                    volumeML = parseInt(selVal) || 0;
+                }
+            }
+        }
+        
+        const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green';
+        const metricTarget = isLube ? 'Pcs' : 'Pcs'; 
+        const calcInitialCost = qVal * rVal; 
+        const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase();
+        
         if (window._pendingItemUnverified) {
-            await supabaseClient.from('product_master').insert({
+            const upsertPayload = {
                 item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
-            });
+            };
+            if (isLube && volumeML > 0) upsertPayload.volume_per_unit = volumeML;
+            await supabaseClient.from('product_master').insert(upsertPayload);
         } else {
-            supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name,brand' }).then(); 
+            supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name,brand' }).then();
         }
         
         const { error } = await supabaseClient.from('job_card_items').insert({ 
             job_card_id: targetJobId, warehouse_type: wareTarget, item_name: cleanName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId,
-            mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null
-        }); 
+            mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null, volume_ml: isLube ? volumeML : null
+        });
         
         if(!error) { 
-            window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0;
-            if(document.getElementById('tierBadge')) document.getElementById('tierBadge').remove();
-            if(document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none';
+            window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingVolume = null;
+            if(document.getElementById('tierBadge')) document.getElementById('tierBadge').remove(); 
+            if(document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; 
+            const tag = document.getElementById('volTag'); if (tag) tag.remove();
 
             document.getElementById('nPart').value = ''; 
             document.getElementById('nBrand').value = ''; 
-            if(document.getElementById('nMrp')) document.getElementById('nMrp').value = '0';
+            if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; 
             document.getElementById('nQty').value = '1'; 
-            document.getElementById('nRate').value = '0'; 
+            document.getElementById('nRate').value = ''; 
+            document.getElementById('nVolume').style.display = 'none';
+            document.getElementById('nVolumeOther').style.display = 'none';
+            document.getElementById('nQty').placeholder = "Qty";
             document.getElementById('autolist-n').style.display = 'none'; 
-            loadInventoryLedgers(); 
+            loadInventoryLedgers();
         } 
     }
     
-    async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
+    async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price);
+        await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable();
+    }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
     function compileDynamicSums() { 
-        partsGrossTotal = 0; servicePkgGrossTotal = 0; 
+        partsGrossTotal = 0;
+        servicePkgGrossTotal = 0; 
         
-        let greenNet = 0; let mopedNet = 0; let serviceNet = 0;
-        let lubeNet = 0; 
-        
+        let greenNet = 0; let mopedNet = 0; let serviceNet = 0; let lubeNet = 0;
         lineItemsLocalMemory.forEach(line => { 
             let rowNet = parseFloat(line.total_price); 
             if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
@@ -794,18 +953,15 @@
             
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
 
-            if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr') {
-                lubeNet += rowNet;
-            }
+            if (isLubeItem(line)) lubeNet += rowNet;
         }); 
         
-        let autoPartsDiscountValue = 0; 
+        let autoPartsDiscountValue = 0;
         if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } 
         
         let l = parseFloat(document.getElementById('vLabour').value) || 0; 
         let t = parseFloat(document.getElementById('vLathe').value) || 0; 
         let d = 0;
-        
         if (sessionRole === 'service' || sessionRole === 'admin') {
             const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
             const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0;
@@ -824,42 +980,30 @@
             mopedNet = Math.max(0, mopedNet - discMoped);
             l = Math.max(0, l - discLabour);
             t = Math.max(0, t - discLathe);
-
-            d = 0; 
-            partsGrossTotal = greenNet + mopedNet; 
+            d = 0; partsGrossTotal = greenNet + mopedNet; 
         } else {
             d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
             if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
             else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
         }
         
-        internalGreenNet = greenNet;
-        internalMopedNet = mopedNet;
-        internalLabourNet = l;
-        internalLatheNet = t;
-        internalLubeNet = lubeNet; 
+        internalGreenNet = greenNet; internalMopedNet = mopedNet; internalLabourNet = l; internalLatheNet = t; internalLubeNet = lubeNet; 
 
-        const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
+        const a = parseFloat(document.getElementById('vAdvance').value) || 0;
         const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
         
         const totalLabor = l + servicePkgGrossTotal;
         const coMechVal = document.getElementById('coMech').value;
         const splitIndicator = document.getElementById('splitIndicator');
-        
-        if (coMechVal) {
-            splitIndicator.style.display = 'block';
-            splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`;
-        } else {
-            splitIndicator.style.display = 'none';
-        }
+        if (coMechVal) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`;
+        } else { splitIndicator.style.display = 'none'; }
 
-        const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
-        
+        const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d;
         let pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; 
         const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
         if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); document.getElementById('vPointsUsed').value = pUsed; } 
         
-        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
+        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed);
     }
     
     function openSplitPaymentModal() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; document.getElementById('splitTotalDisplay').innerText = netVal; document.getElementById('splitCashInput').value = netVal; document.getElementById('splitUpiInput').value = 0; document.getElementById('modalSplitPayment').style.display = 'flex'; }
@@ -868,27 +1012,13 @@
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
-        
         console.log('SETTLEMENT lubricant_total:', internalLubeNet, 'green:', internalGreenNet, 'moped:', internalMopedNet);
 
         const updates = { 
-            total_invoice_value: netVal, 
-            labour_charges: internalLabourNet, 
-            lathe_welding: internalLatheNet, 
-            lubricant_total: internalLubeNet, 
-            external_work_notes: document.getElementById('vLatheNotes').value.trim(), 
-            future_advice: document.getElementById('vFutureAdvice').value.trim(), 
-            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, 
-            prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
-            payment_mode: modeTarget, 
-            status: statusTarget, 
-            mech_id: document.getElementById('primaryMech').value || null, 
-            co_mech_id: document.getElementById('coMech').value || null,
-            green_total: internalGreenNet, 
-            moped_total: internalMopedNet  
+            total_invoice_value: netVal, labour_charges: internalLabourNet, lathe_welding: internalLatheNet, lubricant_total: internalLubeNet, external_work_notes: document.getElementById('vLatheNotes').value.trim(), future_advice: document.getElementById('vFutureAdvice').value.trim(), 
+            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
+            payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null, green_total: internalGreenNet, moped_total: internalMopedNet  
         };
-        
-        // PROMPT 2 FIX: Always stamp closed_at when settling to Closed
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
         
@@ -901,48 +1031,76 @@
             const coMechId = document.getElementById('coMech').value;
             const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
             const ledgerEntries = [];
-            if (primaryMechId) {
-                ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` });
-            }
-            if (hasCo && coMechId) {
-                ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` });
-            }
-            if (ledgerEntries.length > 0) {
-                console.log('STAFF LEDGER ENTRIES:', ledgerEntries);
-                await supabaseClient.from('staff_ledger').insert(ledgerEntries);
+            if (primaryMechId) { ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` }); }
+            if (hasCo && coMechId) { ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` }); }
+            if (ledgerEntries.length > 0) { await supabaseClient.from('staff_ledger').insert(ledgerEntries); }
+            
+            // Engine Warranty Logic
+            if (appliedProtocolNamesForTracking.some(name => /FULL.*ENGINE.*RESTORATION/i.test(name))) {
+                const closedAt = activeJobContext.closed_at ? new Date(activeJobContext.closed_at) : new Date();
+                const d1 = new Date(closedAt); d1.setDate(d1.getDate() + 21);
+                const d2 = new Date(d1); d2.setDate(d2.getDate() + 40);
+                
+                let endOfMonth = new Date(closedAt.getFullYear(), closedAt.getMonth() + 1, 0);
+                let remainingDays = Math.max(0, Math.floor((endOfMonth - closedAt) / (1000 * 60 * 60 * 24)));
+                let interval = Math.floor(remainingDays / 4);
+                
+                const d3 = new Date(closedAt); d3.setDate(d3.getDate() + interval * 1);
+                const d4 = new Date(closedAt); d4.setDate(d4.getDate() + interval * 2);
+                const d5 = new Date(closedAt); d5.setDate(d5.getDate() + interval * 3);
+                const d6 = new Date(closedAt); d6.setDate(d6.getDate() + interval * 4);
+                
+                const dates = [d1, d2, d3, d4, d5, d6];
+                const finalDates = dates.map(d => {
+                    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+                    return d.toISOString().split('T')[0];
+                });
+
+                const isFreeArr = [true, true, false, true, false, true];
+                const vouchersBatch = [];
+                const prefix = `EW-${targetJobId.split('-')[0].toUpperCase()}`;
+                for(let n=1; n<=6; n++) {
+                    vouchersBatch.push({
+                        job_card_id: targetJobId,
+                        customer_mobile: activeJobContext.customer_mobile,
+                        vehicle_reg: activeJobContext.vehicles?.reg_number,
+                        voucher_code: `${prefix}-${n}`,
+                        service_number: n,
+                        scheduled_date: finalDates[n-1],
+                        is_free: isFreeArr[n-1]
+                    });
+                }
+
+                await supabaseClient.from('engine_warranty_vouchers').insert(vouchersBatch);
+                await supabaseClient.from('amc_subscriptions').insert({
+                    customer_mobile: activeJobContext.customer_mobile,
+                    vehicle_reg: activeJobContext.vehicles?.reg_number,
+                    plan_type: 'EngineWarranty',
+                    expires_at: new Date(closedAt.setFullYear(closedAt.getFullYear() + 1)).toISOString(),
+                    services_remaining: 6,
+                    is_active: true
+                });
+                alert(`✅ Engine Warranty Activated — 6 Service Vouchers Generated for ${activeJobContext.vehicles?.reg_number}`);
             }
         }
 
         if(!error) { 
             if(statusTarget === 'Closed') { 
-                populateReceiptDocument(modeTarget, netVal, updates); 
-                if(modeTarget === 'Credit') { 
-                    document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; 
-                } else { 
-                    document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; 
-                } 
-            } else { 
-                alert("Operational draft saved safely."); window.location.href = 'index.html'; 
-            } 
-        } else { 
-            alert("Database Error: " + error.message); 
-        }
+                populateReceiptDocument(modeTarget, netVal, updates);
+                if(modeTarget === 'Credit') { document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>";
+                } else { document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } 
+            } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } 
+        } else { alert("Database Error: " + error.message); }
     }
 
-    // PROMPT 2: MULTI ENTITY BUILDER & SAVINGS SUMMARY HOOK
     function populateReceiptDocument(paymentMode, finalNet, scopeVals) { 
-        // 1. Check Multi-Entity First
         const mopedAmt = parseFloat(scopeVals.moped_total) || 0;
         const greenAmt = parseFloat(scopeVals.green_total) || 0;
         const labourAmt = (parseFloat(scopeVals.labour_charges) || 0) + (parseFloat(scopeVals.lathe_welding) || 0) + servicePkgGrossTotal;
+        if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; }
 
-        if (mopedAmt > 0) {
-            renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt);
-            return; // EXIT — run multi-entity instead
-        }
-
-        // 2. Fallback to existing single entity receipt
-        const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; 
+        const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`;
+        document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; 
         
         let totalMrpValue = 0; let totalActualValue = 0;
 
@@ -957,46 +1115,46 @@
             } else { 
                 const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); 
                 const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
-                container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; 
-            } 
-        }); 
+                
+                const displayLubeInfo = line.volume_ml > 0 
+                    ? `<div style="font-size:0.65rem;color:#7c3aed;">${line.volume_ml}ml × ${line.qty} pcs = ${line.qty * line.volume_ml}ml</div>`
+                    : (line.unit_metric === 'ML' ? `<div style="font-size:0.65rem;color:#7c3aed;">${line.qty}ml</div>` : '');
 
-        // Add Savings Summary if applicable
+                container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${displayLubeInfo}${mrpLine}</div>`;
+            } 
+        });
         const totalSavings = totalMrpValue - totalActualValue;
         if (totalSavings > 0) {
             const savingsEl = document.getElementById('receiptSavingsSummary');
             savingsEl.style.display = 'block';
-            savingsEl.innerHTML = `
-                <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;">
-                    <span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;">
-                    <span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span>
-                </div>`;
+            savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;"><span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span></div>`;
         }
         
-        document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`; 
+        document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`;
         let autoPartsDiscountValue = 0; 
         if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } 
         
-        document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`; 
+        document.getElementById('thLaborSum').innerText = `₹${scopeVals.labour_charges + servicePkgGrossTotal}`;
         const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } 
         
-        const dDisc = document.getElementById('rowDiscSum'); 
-        const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; 
+        const dDisc = document.getElementById('rowDiscSum');
+        const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0;
         if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; } 
         
-        const dAdv = document.getElementById('rowAdvanceSum'); if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; } 
-        const dPre = document.getElementById('rowPrepaidSum'); if (scopeVals.prepaid_amount > 0) { dPre.style.display = 'flex'; document.getElementById('thPrepaidSum').innerText = `₹${scopeVals.prepaid_amount}`; } else { dPre.style.display = 'none'; } 
+        const dAdv = document.getElementById('rowAdvanceSum');
+        if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; } 
+        const dPre = document.getElementById('rowPrepaidSum');
+        if (scopeVals.prepaid_amount > 0) { dPre.style.display = 'flex'; document.getElementById('thPrepaidSum').innerText = `₹${scopeVals.prepaid_amount}`; } else { dPre.style.display = 'none'; } 
         
-        document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); 
-        if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } 
+        document.getElementById('thNet').innerText = `₹${finalNet}`;
+        document.getElementById('thWords').innerText = convertNumberToWords(finalNet); 
+        if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`;
+        } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } 
         if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } 
 
         document.getElementById('modalReceipt').style.display = 'flex';
     }
 
-    // PROMPT 2: MULTI ENTITY RENDERER
     function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) {
         const hasMyCare = greenAmt>0 || labourAmt>0;
         const myCareSub = greenAmt + labourAmt;
@@ -1004,13 +1162,11 @@
         const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green');
         const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped');
         const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service');
-
         const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
         const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN');
         const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
         const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`;
         const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`;
-
         function buildLineHTML(lines) {
             return lines.map(l=>{
                 const nm=l.item_name.length>22?l.item_name.substring(0,20)+'..':l.item_name;
@@ -1018,63 +1174,20 @@
                 const mrpSnap=parseFloat(l.mrp_at_billing)||0;
                 const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty);
                 const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
+                
+                const displayLubeInfo = l.volume_ml > 0 
+                    ? `<div style="font-size:0.65rem;color:#7c3aed;">${l.volume_ml}ml × ${l.qty} pcs = ${l.qty * l.volume_ml}ml</div>`
+                    : (l.unit_metric === 'ML' ? `<div style="font-size:0.65rem;color:#7c3aed;">${l.qty}ml</div>` : '');
+
                 return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;">
-                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;">
-                        <strong>${nm}</strong><strong>₹${tp}</strong>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;">
-                        <span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span>
-                    </div>${mrpLine}</div>`;
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${displayLubeInfo}${mrpLine}</div>`;
             }).join('');
         }
 
-        const myCareHTML = hasMyCare ? `
-            <div class="me-section">
-                <div class="me-header">
-                    <strong>My Care Service Center</strong><br>
-                    <span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br>
-                    <span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span>
-                </div>
-                <div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div>
-                <div class="me-meta">Client: ${custInfo}</div>
-                <div class="me-meta">Vehicle: ${vehInfo}</div>
-                <div class="me-divider"></div>
-                ${buildLineHTML(greenLines)}
-                ${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[Service] ${l.item_name}</strong> ₹${l.total_price}</div>`).join('')}
-                ${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}
-                <div class="me-divider"></div>
-                <div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div>
-            </div>` : '';
-
-        const mopedHTML = `
-            <div class="me-section">
-                <div class="me-header">
-                    <strong>Moped House</strong><br>
-                    <span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br>
-                    <span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span>
-                </div>
-                <div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div>
-                <div class="me-meta">Client: ${custInfo}</div>
-                <div class="me-meta">Vehicle: ${vehInfo}</div>
-                <div class="me-divider"></div>
-                ${buildLineHTML(mopedLines)}
-                <div class="me-divider"></div>
-                <div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div>
-            </div>`;
-
-        const summaryHTML = `
-            <div class="me-summary">
-                <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>
-                ${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}
-                <div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>
-                <div style="border-top:1px solid #000;margin:4px 0;"></div>
-                <div class="me-sum-row" style="font-size:1rem;">
-                    <strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong>
-                </div>
-                <div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div>
-                <div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div>
-            </div>`;
-
+        const myCareHTML = hasMyCare ? ` <div class="me-section"> <div class="me-header"> <strong>My Care Service Center</strong><br> <span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br> <span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span> </div> <div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div> <div class="me-meta">Client: ${custInfo}</div> <div class="me-meta">Vehicle: ${vehInfo}</div> <div class="me-divider"></div> ${buildLineHTML(greenLines)} ${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[Service] ${l.item_name}</strong> ₹${l.total_price}</div>`).join('')} ${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''} <div class="me-divider"></div> <div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div> </div>` : '';
+        const mopedHTML = ` <div class="me-section"> <div class="me-header"> <strong>Moped House</strong><br> <span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br> <span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span> </div> <div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div> <div class="me-meta">Client: ${custInfo}</div> <div class="me-meta">Vehicle: ${vehInfo}</div> <div class="me-divider"></div> ${buildLineHTML(mopedLines)} <div class="me-divider"></div> <div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div> </div>`;
+        const summaryHTML = ` <div class="me-summary"> <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div> ${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''} <div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div> <div style="border-top:1px solid #000;margin:4px 0;"></div> <div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div> <div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div> <div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div> </div>`;
         document.getElementById('multiEntityReceiptTarget').innerHTML = myCareHTML + mopedHTML + summaryHTML;
         document.getElementById('modalReceipt').style.display = 'flex';
         document.getElementById('renderThermalReceiptTarget').style.display = 'none';
@@ -1085,7 +1198,7 @@
     function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
     function executePrint(mode) { 
-        document.body.className = ''; 
+        document.body.className = '';
         const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none';
         
         if (isMulti) {
@@ -1097,12 +1210,12 @@
             if (mode === 'a5') container.classList.add('a5-mode'); else container.classList.remove('a5-mode');
         }
         
-        document.getElementById('modalPrintChoice').style.display = 'none'; 
+        document.getElementById('modalPrintChoice').style.display = 'none';
         setTimeout(() => { window.print(); document.body.className = ''; }, 200); 
     }
     
     function printMechanicTicket() { 
-        document.body.classList.remove('print-receipt', 'print-multi'); 
+        document.body.classList.remove('print-receipt', 'print-multi');
         document.body.classList.add('print-mechanic'); 
         
         const jcFormatted = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
@@ -1114,10 +1227,8 @@
         
         document.getElementById('tkFrontCustName').innerText = activeCustomerName || 'Walk-in';
         document.getElementById('tkFrontCustMobile').innerText = activeJobContext?.customer_mobile || '--';
-        
         const budget = activeJobContext?.estimate_given || parseFloat(document.getElementById('jcEstimate')?.value) || 0;
         document.getElementById('tkFrontBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
-        
         const veh = activeJobContext?.vehicles || {};
         document.getElementById('tkFrontVehModel').innerText = veh.make_model || '--';
         document.getElementById('tkFrontVehColor').innerText = veh.color || '--';
@@ -1125,7 +1236,6 @@
         document.getElementById('tkFrontVehChassis').innerText = veh.chassis_number || '--';
         document.getElementById('tkFrontVehEngine').innerText = veh.engine_number || '--';
         document.getElementById('tkFrontVehOdo').innerText = veh.odometer ? `${veh.odometer} km` : '--';
-        
         document.getElementById('tkFrontProblem').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance';
         
         const protocolContainer = document.getElementById('tkFrontProtocols');
