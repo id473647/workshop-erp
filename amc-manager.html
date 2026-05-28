@@ -3,26 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AMC & Offer Portal - My Care ERP</title>
+    <title>AMC Manager - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --accent: #d97706; --warning: #f59e0b;}
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        :root { 
+            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; 
+            --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; 
+            --text: #1e293b; --danger: #ef4444; --purple: #8e44ad; --warning: #f59e0b;
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
         
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
+        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items:center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100; }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; }
+        .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary);}
+        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background: #f1f5f9; color: var(--primary); }
         .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .badge-role { background: var(--accent); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+        .badge-role { background: var(--utility, #64748b); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
 
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
-        .btn-action { background: var(--success); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 700; cursor: pointer; display: block; width: 100%; text-align: center; }
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; margin-top: 10px; } table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; } .status-pill { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; }
+        .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .tab-bar { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; gap: 4px; }
+        .tab-btn { padding: 12px 20px; border: none; background: none; font-size: 0.95rem; font-weight: bold; color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; align-items: end; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid var(--border); }
+        .field-group { display: flex; flex-direction: column; gap: 4px; } 
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } 
+        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .btn-action { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: opacity 0.15s; } 
+        .btn-action:hover { opacity: 0.9; } 
+        
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; background: white; } 
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } 
+        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } 
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+        
+        .warn-msg { display: none; color: var(--danger); font-size: 0.8rem; font-weight: bold; background: #fee2e2; padding: 8px 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #fca5a5; }
     </style>
 </head>
 <body>
@@ -33,83 +54,399 @@
         <img src="logo-green.png" onerror="this.style.display='none'">
     </div>
     <div class="nav-actions">
-        <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
+        <button class="btn-header" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">ADMIN</span>
+        <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
 </nav>
 
 <div class="wrapper">
-    <div class="card-panel" style="border-left: 5px solid var(--accent);">
-        <div class="block-title">Instantiate Annual Maintenance Contract (AMC)</div>
-        <div class="inputs-grid">
-            <div class="field-group"><label>Customer Mobile Target</label><input type="tel" id="amcMobile" placeholder="10 Digits" maxlength="10"></div>
-            <div class="field-group"><label>Vehicle Reg Plate</label><input type="text" id="amcReg" placeholder="e.g. MP-04-XX-0000"></div>
-            <div class="field-group">
-                <label>Subscription Tier Selection</label>
-                <select id="amcTier">
-                    <option value="Silver">Standard Silver (3 Washes / 3 Services)</option>
-                    <option value="Gold">Gold Fleet (5 Comprehensive Services)</option>
-                    <option value="Platinum">Platinum Shield (Unlimited Checkups)</option>
-                </select>
-            </div>
-            <div class="field-group"><label>Contract Duration</label><select id="amcDuration"><option value="1">1 Year Coverage</option></select></div>
-        </div>
-        <button class="btn-action" style="background:var(--accent);" onclick="instantiateAmcSubscription()">INITIALIZE SUBSCRIPTION PLAN</button>
-    </div>
-
     <div class="card-panel">
-        <div class="block-title">Active Contract Ledgers</div>
-        <div class="table-wrapper">
-            <table><thead><tr><th>Target Plate</th><th>Client Contact</th><th>Tier Scope</th><th>Remaining Quotas</th><th>Expiry</th><th>Contract State</th></tr></thead><tbody id="amcRegisterBody"></tbody></table>
+        <div class="block-title">AMC Management & Tracking</div>
+        
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab(event, 'tabPanch')">पांच पर एक फ्री (Panch Par Ek Free)</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tabPrepaid')">Prepaid AMC</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tabEngine')">Engine Warranty Tracker</button>
         </div>
+        
+        <div id="tabPanch" class="tab-content active">
+            <div class="inputs-grid">
+                <div class="field-group">
+                    <label>Customer Mobile</label>
+                    <input type="text" id="panchMobile" placeholder="10-digit mobile" maxlength="10" onkeyup="checkPanchEligibility()">
+                </div>
+                <div class="field-group">
+                    <label>Registration Fee</label>
+                    <input type="text" value="₹10" readonly style="background:#f1f5f9; color:#475569; font-weight:bold;">
+                </div>
+                <div class="field-group" style="justify-content: flex-end;">
+                    <button class="btn-action" id="btnPanchReg" onclick="registerPanch()" disabled style="opacity: 0.5;">REGISTER</button>
+                </div>
+            </div>
+            <div id="panchWarn" class="warn-msg"></div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th>Customer</th>
+                            <th>Services Done</th>
+                            <th>Reward</th>
+                            <th>Expiry</th>
+                            <th>Days Left</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbPanch">
+                        <tr><td colspan="6" style="text-align:center;">Loading records...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="tabPrepaid" class="tab-content">
+            <div class="inputs-grid">
+                <div class="field-group">
+                    <label>Customer Mobile</label>
+                    <input type="text" id="preMobile" placeholder="10-digit mobile" maxlength="10" onkeyup="if(this.value.length === 10) loadPrepaidVehicles()">
+                </div>
+                <div class="field-group">
+                    <label>Target Vehicle Reg</label>
+                    <select id="preVeh"><option value="">-- Enter Mobile First --</option></select>
+                </div>
+                <div class="field-group">
+                    <label>Amount Paid (₹)</label>
+                    <input type="number" id="preAmt" placeholder="Enter Amount" min="1">
+                </div>
+                <div class="field-group" style="justify-content: flex-end;">
+                    <button class="btn-action" style="background:var(--primary);" onclick="issuePrepaid()">ISSUE AMC</button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vehicle Reg</th>
+                            <th>Customer</th>
+                            <th>Paid (₹)</th>
+                            <th>Services Remaining</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbPrepaid">
+                        <tr><td colspan="5" style="text-align:center;">Loading records...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="tabEngine" class="tab-content">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vehicle Reg</th>
+                            <th>Customer</th>
+                            <th>JC Ref</th>
+                            <th>Service #1</th>
+                            <th>Service #2</th>
+                            <th>Service #3</th>
+                            <th>Service #4</th>
+                            <th>Service #5</th>
+                            <th>Service #6</th>
+                            <th>Guarantee Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbEngine">
+                        <tr><td colspan="10" style="text-align:center;">Loading Engine Warranties...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
     </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    document.getElementById('roleDisplay').innerText = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toUpperCase();
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+    
+    const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+    document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
 
-    async function instantiateAmcSubscription() {
-        const mob = document.getElementById('amcMobile').value.trim(); const reg = document.getElementById('amcReg').value.trim().toUpperCase(); const tier = document.getElementById('amcTier').value;
-        if(mob.length < 10 || !reg) return alert("System Guard: Check required primary indices.");
-        const expiryDate = new Date(); expiryDate.setFullYear(expiryDate.getFullYear() + 1); const resolvedExpiryString = expiryDate.toISOString().split('T')[0];
-        const baseServices = tier === 'Gold' ? 5 : (tier === 'Platinum' ? 10 : 3);
-        const { error } = await supabaseClient.from('amc_contracts').insert({ customer_mobile: mob, vehicle_reg: reg, tier_level: tier, expiry_date: resolvedExpiryString, remaining_washes: baseServices, remaining_services: baseServices, is_active: true });
-        if(error) alert("Database Insertion Abortion:\n" + error.message); else { alert(`Subscription contract securely logged to: ${reg}`); loadContractLedgers(); }
+    window.onload = () => {
+        loadPanchList();
+    };
+
+    function executeSessionTermination() {
+        localStorage.removeItem('ERP_ACTIVE_ROLE');
+        window.location.href = 'login.html';
     }
 
-    async function loadContractLedgers() {
-        // We will fetch more to process the dates, but display top 20
-        const { data: contracts } = await supabaseClient.from('amc_contracts').select('*').order('activation_date', { ascending: false }).limit(20);
-        const tbody = document.getElementById('amcRegisterBody'); tbody.innerHTML = '';
+    function switchTab(e, tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        if(e && e.currentTarget) e.currentTarget.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
         
-        if(contracts && contracts.length > 0) {
-            contracts.forEach(plan => { 
-                const endD = new Date(plan.expiry_date);
-                const nowD = new Date();
-                const diffTime = endD - nowD;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                let statusWord = 'Active';
-                let statusPillStyle = 'background:#dcfce7; color:#15803d;'; // Green
-
-                if (!plan.is_active || diffDays < 0) {
-                    statusWord = 'Expired';
-                    statusPillStyle = 'background:#fee2e2; color:#b91c1c;'; // Red
-                } else if (diffDays <= 30) {
-                    statusWord = 'Expiring Soon';
-                    statusPillStyle = 'background:#fef3c7; color:#b45309;'; // Yellow/Warning
-                }
-
-                tbody.innerHTML += `<tr><td><strong>${plan.vehicle_reg}</strong></td><td>${plan.customer_mobile}</td><td><strong>${plan.tier_level}</strong></td><td>Washes: ${plan.remaining_washes} | Services: ${plan.remaining_services}</td><td>${plan.expiry_date}</td><td><span class="status-pill" style="${statusPillStyle}">${statusWord}</span></td></tr>`; 
-            });
-        } else { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px; color:#94a3b8;">No active annual maintenance profiles detected.</td></tr>'; }
+        if (tabId === 'tabPanch') loadPanchList();
+        if (tabId === 'tabPrepaid') loadPrepaidList();
+        if (tabId === 'tabEngine') loadEngineList();
     }
-    loadContractLedgers();
+
+    /* === TAB 1: PANCH PAR EK FREE === */
+    async function checkPanchEligibility() {
+        const mobile = document.getElementById('panchMobile').value.trim();
+        const warnLabel = document.getElementById('panchWarn');
+        const btn = document.getElementById('btnPanchReg');
+        
+        if (mobile.length !== 10) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            warnLabel.style.display = 'none';
+            return;
+        }
+
+        const { data, error } = await supabaseClient.from('vehicles').select('id, reg_number').eq('customer_mobile', mobile);
+        if (error) {
+            console.error(error);
+            return;
+        }
+        
+        if (!data || data.length < 2) {
+            warnLabel.style.display = 'block';
+            warnLabel.innerText = "⚠️ Customer must have at least 2 mapped vehicles.";
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        } else {
+            warnLabel.style.display = 'none';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
+
+    async function registerPanch() {
+        const mobile = document.getElementById('panchMobile').value.trim();
+        if (mobile.length !== 10) return alert("Valid 10 digit mobile required.");
+        
+        const expDate = new Date();
+        expDate.setFullYear(expDate.getFullYear() + 2);
+        
+        const { error: insErr } = await supabaseClient.from('amc_subscriptions').insert({
+            customer_mobile: mobile,
+            vehicle_reg: '*', 
+            plan_type: 'PanchParEkFree',
+            services_completed: 0,
+            reward_unlocked: false,
+            expires_at: expDate.toISOString().split('T')[0],
+            is_active: true
+        });
+        
+        if (insErr) return alert("Database Error: " + insErr.message);
+        
+        const { error: expErr } = await supabaseClient.from('workshop_expenses').insert({
+            expense_category: 'AMC Collection',
+            amount: 10,
+            note: 'Panch Par Ek Free Registration',
+            recorded_by: activeSessionRole
+        });
+        
+        if (expErr) console.error("Expense error: ", expErr.message);
+        
+        alert("Successfully registered Panch Par Ek Free!");
+        document.getElementById('panchMobile').value = '';
+        checkPanchEligibility(); // reset button state
+        loadPanchList();
+    }
+
+    async function loadPanchList() {
+        const { data, error } = await supabaseClient.from('amc_subscriptions')
+            .select('*')
+            .eq('plan_type', 'PanchParEkFree')
+            .order('created_at', { ascending: false });
+        
+        if (error) return console.error(error);
+        
+        const tbody = document.getElementById('tbPanch');
+        tbody.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            return tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">No active profiles found.</td></tr>';
+        }
+        
+        data.forEach(row => {
+            const diffTime = new Date(row.expires_at) - new Date();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const isActive = (diffDays > 0 && row.is_active);
+            const styleColor = isActive ? 'color:var(--text);' : 'color:var(--danger);';
+            
+            tbody.innerHTML += `
+            <tr style="${styleColor}">
+                <td>* (Multi-Veh)</td>
+                <td>${row.customer_mobile || '--'}</td>
+                <td>${row.services_completed || 0} / 5</td>
+                <td>${row.reward_unlocked ? '✅ Unlocked' : '⏳ Pending'}</td>
+                <td>${new Date(row.expires_at).toLocaleDateString()}</td>
+                <td>${diffDays > 0 ? diffDays : 0} days</td>
+            </tr>`;
+        });
+    }
+
+    /* === TAB 2: PREPAID AMC === */
+    async function loadPrepaidVehicles() {
+        const mobile = document.getElementById('preMobile').value.trim();
+        const sel = document.getElementById('preVeh');
+        sel.innerHTML = '<option value="">-- Select Vehicle --</option>';
+        if (mobile.length !== 10) return;
+        
+        const { data, error } = await supabaseClient.from('vehicles').select('reg_number').eq('customer_mobile', mobile);
+        if (error) return console.error(error);
+        
+        (data || []).forEach(v => {
+            sel.innerHTML += `<option value="${v.reg_number}">${v.reg_number}</option>`;
+        });
+    }
+
+    async function issuePrepaid() {
+        const mobile = document.getElementById('preMobile').value.trim();
+        const veh = document.getElementById('preVeh').value;
+        const amt = parseFloat(document.getElementById('preAmt').value) || 0;
+        
+        if (mobile.length !== 10 || !veh || amt <= 0) return alert("Ensure all fields are accurately filled.");
+        
+        const { error: insErr } = await supabaseClient.from('amc_subscriptions').insert({
+            customer_mobile: mobile,
+            vehicle_reg: veh,
+            plan_type: 'PrepaidAMC',
+            services_remaining: 4,
+            amount_paid: amt,
+            is_active: true
+        });
+        
+        if (insErr) return alert("Database Error: " + insErr.message);
+        
+        const { error: expErr } = await supabaseClient.from('workshop_expenses').insert({
+            expense_category: 'AMC Collection',
+            amount: amt,
+            note: `Prepaid AMC Registration - ${veh}`,
+            recorded_by: activeSessionRole
+        });
+        
+        if (expErr) console.error("Expense logging error: ", expErr.message);
+        
+        alert("Prepaid AMC Issued Successfully!");
+        document.getElementById('preMobile').value = '';
+        document.getElementById('preVeh').innerHTML = '<option value="">-- Enter Mobile First --</option>';
+        document.getElementById('preAmt').value = '';
+        loadPrepaidList();
+    }
+
+    async function loadPrepaidList() {
+        const { data, error } = await supabaseClient.from('amc_subscriptions')
+            .select('*')
+            .eq('plan_type', 'PrepaidAMC')
+            .order('created_at', { ascending: false });
+            
+        if (error) return console.error(error);
+        
+        const tbody = document.getElementById('tbPrepaid');
+        tbody.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            return tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No prepaid contracts issued yet.</td></tr>';
+        }
+        
+        data.forEach(row => {
+            const isAct = row.is_active && (row.services_remaining > 0);
+            tbody.innerHTML += `
+            <tr>
+                <td><strong>${row.vehicle_reg || '--'}</strong></td>
+                <td>${row.customer_mobile || '--'}</td>
+                <td>₹${row.amount_paid || 0}</td>
+                <td>${row.services_remaining || 0}</td>
+                <td>${isAct ? '<span style="color:var(--success);font-weight:bold;">Active</span>' : '<span style="color:var(--danger);font-weight:bold;">Consumed/Inactive</span>'}</td>
+            </tr>`;
+        });
+    }
+
+    /* === TAB 3: ENGINE WARRANTY TRACKER === */
+    async function loadEngineList() {
+        const { data: subs, error: subErr } = await supabaseClient.from('amc_subscriptions')
+            .select('*')
+            .eq('plan_type', 'EngineWarranty')
+            .order('created_at', { ascending: false });
+            
+        if (subErr) {
+            console.error(subErr);
+            return;
+        }
+        
+        const { data: vouchers, error: vouchErr } = await supabaseClient.from('engine_warranty_vouchers')
+            .select('*')
+            .order('service_number', { ascending: true });
+            
+        if (vouchErr) {
+            console.error(vouchErr);
+            return;
+        }
+        
+        const tbody = document.getElementById('tbEngine');
+        tbody.innerHTML = '';
+        
+        if (!subs || subs.length === 0) {
+            return tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#64748b;">No Engine Warranties currently active.</td></tr>';
+        }
+        
+        const today = new Date();
+        
+        subs.forEach(sub => {
+            const subVouchers = (vouchers || []).filter(v => v.customer_mobile === sub.customer_mobile && v.vehicle_reg === sub.vehicle_reg);
+            
+            let jcRef = "N/A";
+            let status = "Active";
+            let vCells = "";
+            
+            for (let i = 1; i <= 6; i++) {
+                const v = subVouchers.find(x => x.service_number === i);
+                if (v) {
+                    if (i === 1 && v.job_card_id) {
+                        jcRef = `JC-${v.job_card_id.split('-')[0].toUpperCase()}`;
+                    }
+                    
+                    const sDate = new Date(v.scheduled_date);
+                    const diffDays = (today - sDate) / (1000 * 60 * 60 * 24);
+                    
+                    if (v.is_redeemed) {
+                        vCells += `<td>${sDate.toLocaleDateString()}<br><span style="color:var(--success); font-weight:bold;">✅</span></td>`;
+                    } else {
+                        if (diffDays > 15) {
+                            status = "Lapsed";
+                            vCells += `<td>${sDate.toLocaleDateString()}<br><span style="color:var(--danger); font-weight:bold;">❌ Missed</span></td>`;
+                        } else {
+                            vCells += `<td>${sDate.toLocaleDateString()}<br><span style="color:var(--warning); font-weight:bold;">⏳ Pending</span></td>`;
+                        }
+                    }
+                } else {
+                    vCells += `<td style="color:#cbd5e1;">--</td>`;
+                }
+            }
+            
+            const statStyle = status === 'Active' ? 'color:var(--success);font-weight:bold;' : 'color:var(--danger);font-weight:bold;';
+            
+            tbody.innerHTML += `
+            <tr>
+                <td><strong>${sub.vehicle_reg || '--'}</strong></td>
+                <td>${sub.customer_mobile || '--'}</td>
+                <td style="color:var(--primary); font-weight:bold;">${jcRef}</td>
+                ${vCells}
+                <td style="${statStyle}">${status}</td>
+            </tr>`;
+        });
+    }
 </script>
 </body>
 </html>
