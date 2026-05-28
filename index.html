@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,7 +149,7 @@
         </div>
     </div>
 
-    <div class="navigation-grid">
+    <div id="nextServiceAlertBox" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:18px; margin-bottom:20px;"> <div style="font-size:0.95rem; font-weight:700; color:#b45309; margin-bottom:10px;"> 🔔 Next Service Due — Overdue Vehicles </div> <div id="nextServiceAlertList" style="font-size:0.85rem;"></div> </div> <div class="navigation-grid">
         <a href="new-jobcard.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
         <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
         <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
@@ -217,6 +218,55 @@
         window.location.href = 'login.html';
     }
 
+    async function loadNextServiceAlerts() { // NEW
+        const r = sessionRole; // NEW
+        if (r !== 'service' && r !== 'admin') return; // NEW
+
+        const today = new Date().toISOString().split('T')[0]; // NEW
+
+        const { data } = await supabaseClient // NEW
+            .from('job_cards') // NEW
+            .select('id, next_service_date, customer_mobile,' // NEW
+                + ' vehicles(reg_number, make_model)') // NEW
+            .eq('status', 'Closed') // NEW
+            .not('next_service_date', 'is', null) // NEW
+            .lte('next_service_date', today) // NEW
+            .order('next_service_date', { ascending: true }) // NEW
+            .limit(10); // NEW
+
+        if (!data || data.length === 0) return; // NEW
+
+        const box = document.getElementById('nextServiceAlertBox'); // NEW
+        const list = document.getElementById('nextServiceAlertList'); // NEW
+        box.style.display = 'block'; // NEW
+
+        list.innerHTML = data.map(j => { // NEW
+            const reg = j.vehicles?.reg_number || '--'; // NEW
+            const model = j.vehicles?.make_model || ''; // NEW
+            const dueDate = j.next_service_date; // NEW
+            const daysOver = Math.floor( // NEW
+                (new Date() - new Date(dueDate)) / 86400000); // NEW
+            return '<div style="display:flex;' // NEW
+                + 'justify-content:space-between;' // NEW
+                + 'align-items:center;padding:8px 0;' // NEW
+                + 'border-bottom:1px solid #fde68a;">' // NEW
+                + '<div><strong style="color:var(--primary);">' // NEW
+                + reg + '</strong>' // NEW
+                + '<span style="color:#64748b;margin-left:6px;' // NEW
+                + 'font-size:0.8rem;">' + model + '</span><br>' // NEW
+                + '<span style="font-size:0.75rem;color:#64748b;">' // NEW
+                + (j.customer_mobile || '') + '</span></div>' // NEW
+                + '<div style="text-align:right;">' // NEW
+                + '<span style="background:#fee2e2;color:#b91c1c;' // NEW
+                + 'padding:2px 8px;border-radius:4px;' // NEW
+                + 'font-size:0.75rem;font-weight:bold;">' // NEW
+                + daysOver + ' days overdue</span><br>' // NEW
+                + '<span style="font-size:0.7rem;color:#92400e;">' // NEW
+                + 'Due: ' + dueDate + '</span></div>' // NEW
+                + '</div>'; // NEW
+        }).join(''); // NEW
+    } // NEW
+
     /**
      * Calculates total volume natively, handling legacy ML and modern volume_ml inputs
      */
@@ -232,6 +282,7 @@
 
     window.onload = () => {
         enforceRbacVisibilityConstraints();
+        loadNextServiceAlerts(); // NEW
     };
 
     function enforceRbacVisibilityConstraints() {
@@ -285,11 +336,9 @@
     }
     
     async function loadStockValuation() {
-        const { data:prods, error } = await supabaseClient.from('product_master')
+        const {data:prods} = await supabaseClient.from('product_master')
             .select('current_stock,mac,mrp,retail_price')
             .eq('track_stock',true).gt('current_stock',0);
-        if(error) { console.error("Stock Fetch Error:", error); return; }
-            
         const cv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mac||0)),0);
         const mv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mrp||0)),0);
         
@@ -337,7 +386,6 @@
             });
         }
 
-        // Use precise JS calculation for Lube Flow instead of RPC
         fetchDailyLubeFlow(dateStringToday);
 
         if(sessionRole === 'green' || sessionRole === 'admin') {
@@ -435,7 +483,6 @@
                     timeDisplayHtml += `<br><span style="font-size:0.7rem; color:var(--success); font-weight:bold;">Settled: ${closeDateStr}</span>`;
                 }
 
-                // FIXED: Changed parameter securely back to ?id= to prevent crash
                 tbody.innerHTML += `
                     <tr>
                         <td>
@@ -470,7 +517,6 @@
             const { data: mLines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))')
                 .eq('warehouse_type', 'Moped').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
             
-            // FIXED: Modal links also use ?id=
             container.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                     <div>
