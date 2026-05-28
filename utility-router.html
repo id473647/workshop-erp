@@ -120,7 +120,6 @@
         </div>
     </div>
 
-    <!-- Product Groups Workspace (U2) -->
     <div id="wsProductGroups" class="card-panel utility-workspace">
         <div class="block-title">Product Group Management</div>
         
@@ -171,7 +170,6 @@
         </div>
     </div>
 
-    <!-- CRM Tabbed Interface (U1) -->
     <div id="wsCustomers" class="card-panel utility-workspace">
         <div class="block-title">Customer Relationship Manager</div>
         <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px;">
@@ -181,7 +179,6 @@
         <div id="crmResults" style="margin-top:20px;"></div>
     </div>
 
-    <!-- Inventory Brand Discount Tier Rules -->
     <div id="wsInv" class="card-panel utility-workspace">
         <div class="block-title">Brand Discount Tier Rules</div>
         <div class="inputs-grid" style="background:#fefce8; padding:16px; border-radius:8px; border:1px solid #fef08a;">
@@ -194,7 +191,6 @@
         <div class="table-wrapper"><table class="data-table"><thead><tr><th>Brand</th><th>Regular %</th><th>Silver %</th><th>Gold %</th><th>Action</th></tr></thead><tbody id="brandTableBody"></tbody></table></div>
     </div>
 
-    <!-- Static Service Protocols -->
     <div id="wsSrv" class="card-panel utility-workspace">
         <div class="block-title">Static Service Protocols</div>
         <div class="inputs-grid" style="background:#f0fdf4; padding:16px; border-radius:8px; border:1px solid #bbf7d0;">
@@ -206,7 +202,6 @@
         <div class="table-wrapper"><table class="data-table"><thead><tr><th>Protocol Name</th><th>Vehicle Category Segment</th><th>Fixed Rate</th><th>Action</th></tr></thead><tbody id="srvTableBody"></tbody></table></div>
     </div>
 
-    <!-- Enterprise Staff & Payroll Directory -->
     <div id="wsTech" class="card-panel utility-workspace">
         <div class="block-title">Enterprise Staff & Payroll Directory</div>
         <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
@@ -231,7 +226,6 @@
         </div>
     </div>
 
-    <!-- Gamification & Scheme Engine -->
     <div id="wsSchemes" class="card-panel utility-workspace">
         <div class="block-title">Gamification & Scheme Engine</div>
         <div style="background:#fffbeb; border:1px solid #fde68a; padding:16px; border-radius:8px; margin-bottom:20px;">
@@ -268,7 +262,8 @@
     }
 
     window.onload = () => {
-        if(activeSessionRole === 'admin') document.getElementById('cardProductGroups').style.display = 'flex';
+        if (['admin', 'green', 'moped'].includes(activeSessionRole)) // FIXED
+            document.getElementById('cardProductGroups').style.display = 'flex'; // FIXED
         loadDailyCollection();
     };
 
@@ -333,12 +328,8 @@
             
             html += `
             <div style="border:1px solid var(--info); border-radius:8px; margin-bottom:20px; background:white; overflow:hidden;">
-                <div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0;">
-                    <button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button>
-                    <button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button>
-                </div>
                 
-                <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
+                <div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0; justify-content:space-between; align-items:center;"> <div style="display:flex;"> <button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button> <button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button> </div> <span id="creditBal_${c.mobile_number}" style="font-size:0.8rem; font-weight:bold; color:#b91c1c; background:#fee2e2; padding:4px 10px; border-radius:6px; border:1px solid #fca5a5; margin-right:8px;">Credit Balance: ₹…</span> </div> <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
                     <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
                         <div style="flex:1; min-width:120px;"><label>Mobile Number</label><input type="text" value="${c.mobile_number}" readonly style="background:#f1f5f9; width:100%;"></div>
                         <div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" style="width:100%;"></div>
@@ -355,11 +346,6 @@
                         <div style="flex:1; display:flex; align-items:flex-end; min-width:150px;"><button class="btn-action" onclick="updateCustomer('${c.mobile_number}')">SAVE PROFILE</button></div>
                     </div>
                     
-                    <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:16px; display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:150px;"><label>Opening Balance Debt (₹)</label><input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%;"></div>
-                        <div style="flex:1; min-width:150px;"><button class="btn-action" style="background:#d97706;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET BALANCE</button></div>
-                    </div>
-                    
                     <h4 style="margin:0 0 8px 0; color:var(--primary);">Mapped Vehicles</h4>
                     ${vHtml}
                 </div>
@@ -372,11 +358,14 @@
                         <button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN</button>
                     </div>
                     
-                    <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
+                    <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;"> <div style="flex:1; min-width:150px;"> <label>Opening Balance Debt (₹)</label> <input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;"> </div> <button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button> </div> <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
                 </div>
             </div>`;
         }
         resBox.innerHTML = html;
+        for (const c of custs) { // FIXED
+            computeAndShowCreditBalance(c.mobile_number); // FIXED
+        } // FIXED
     }
 
     function switchCrmTab(mobile, tab, evt) {
@@ -387,6 +376,62 @@
         container.querySelectorAll('.crm-tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById(`crm_${tab}_${mobile}`).classList.add('active');
     }
+
+    async function computeAndShowCreditBalance(mobile) { // FIXED
+        const { data: jc } = await supabaseClient // FIXED
+            .from('job_cards') // FIXED
+            .select('id, total_invoice_value') // FIXED
+            .eq('customer_mobile', mobile) // FIXED
+            .eq('payment_mode', 'Credit') // FIXED
+            .eq('status', 'Closed'); // FIXED
+
+        const { data: pos } = await supabaseClient // FIXED
+            .from('counter_sales') // FIXED
+            .select('id, total_amount') // FIXED
+            .eq('customer_mobile', mobile) // FIXED
+            .eq('payment_mode', 'Credit') // FIXED
+            .eq('status', 'Closed'); // FIXED
+
+        const { data: pays } = await supabaseClient // FIXED
+            .from('credit_payments') // FIXED
+            .select('amount_paid, sale_id, job_card_id') // FIXED
+            .eq('customer_mobile', mobile); // FIXED
+
+        let totalOut = 0; // FIXED
+
+        (jc || []).forEach(j => { // FIXED
+            const paid = (pays || []) // FIXED
+                .filter(p => p.job_card_id === j.id) // FIXED
+                .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0); // FIXED
+            const out = (parseFloat(j.total_invoice_value) || 0) - paid; // FIXED
+            if (out > 0) totalOut += out; // FIXED
+        }); // FIXED
+
+        (pos || []).forEach(s => { // FIXED
+            const paid = (pays || []) // FIXED
+                .filter(p => p.sale_id === s.id) // FIXED
+                .reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0); // FIXED
+            const out = (parseFloat(s.total_amount) || 0) - paid; // FIXED
+            if (out > 0) totalOut += out; // FIXED
+        }); // FIXED
+
+        const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id); // FIXED
+        let obDebt = 0; // FIXED
+        obPays.forEach(p => { // FIXED
+            if (parseFloat(p.amount_paid) < 0) // FIXED
+                obDebt += Math.abs(parseFloat(p.amount_paid)); // FIXED
+            else obDebt -= parseFloat(p.amount_paid) || 0; // FIXED
+        }); // FIXED
+        if (obDebt > 0) totalOut += obDebt; // FIXED
+
+        const el = document.getElementById(`creditBal_${mobile}`); // FIXED
+        if (el) { // FIXED
+            el.innerText = `Credit Balance: ₹${totalOut.toFixed(2)}`; // FIXED
+            el.style.background = totalOut > 0 ? '#fee2e2' : '#dcfce7'; // FIXED
+            el.style.color = totalOut > 0 ? '#b91c1c' : '#15803d'; // FIXED
+            el.style.borderColor = totalOut > 0 ? '#fca5a5' : '#bbf7d0'; // FIXED
+        } // FIXED
+    } // FIXED
 
     async function updateVehicleDetails(vid) {
         const data = {
@@ -437,6 +482,7 @@
         if (document.getElementById(`crm_ledg_${mobile}`).classList.contains('active')) {
             loadCrmLedger(mobile);
         }
+        computeAndShowCreditBalance(mobile);
     }
 
     async function loadCrmLedger(mobile) {
@@ -498,7 +544,11 @@
                 <button onclick="delPay('${p.id}', '${mobile}')" style="background:none; border:none; color:var(--danger); font-size:1.1rem; cursor:pointer;">🗑️</button></span></div>`;
             });
             
-            html += `<tr><td>${s.ref}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`;
+            const refLink = s.src === 'JC' // FIXED
+                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>` // FIXED
+                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`; // FIXED
+            
+            html += `<tr><td>${refLink}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`; // FIXED
             if(subRows) html += `<tr><td colspan="5" style="padding:0;">${subRows}</td></tr>`;
         });
         
@@ -541,7 +591,10 @@
         if(!confirm("Delete this payment? This will restore the debt balance.")) return;
         const { error } = await supabaseClient.from('credit_payments').delete().eq('id', id);
         if (error) alert("Error: " + error.message);
-        else loadCrmLedger(mobile);
+        else {
+            loadCrmLedger(mobile);
+            computeAndShowCreditBalance(mobile);
+        }
     }
 
     async function applyCreditPayment(mobile) {
@@ -599,6 +652,7 @@
             else {
                 alert('Payment Applied Successfully (FIFO)');
                 loadCrmLedger(mobile);
+                computeAndShowCreditBalance(mobile);
             }
         }
     }
