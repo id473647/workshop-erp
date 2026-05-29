@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -149,7 +148,14 @@
         </div>
     </div>
 
-    <div id="nextServiceAlertBox" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:18px; margin-bottom:20px;"> <div style="font-size:0.95rem; font-weight:700; color:#b45309; margin-bottom:10px;"> 🔔 Next Service Due — Overdue Vehicles </div> <div id="nextServiceAlertList" style="font-size:0.85rem;"></div> </div> <div class="navigation-grid">
+    <div id="nextServiceAlertBox" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:18px; margin-bottom:20px;"> 
+        <div style="font-size:0.95rem; font-weight:700; color:#b45309; margin-bottom:10px;"> 
+            🔔 Next Service Due — Overdue Vehicles 
+        </div> 
+        <div id="nextServiceAlertList" style="font-size:0.85rem;"></div> 
+    </div> 
+
+    <div class="navigation-grid">
         <a href="new-jobcard.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
         <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
         <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
@@ -218,54 +224,54 @@
         window.location.href = 'login.html';
     }
 
-    async function loadNextServiceAlerts() { // NEW
-        const r = sessionRole; // NEW
-        if (r !== 'service' && r !== 'admin') return; // NEW
+    async function loadNextServiceAlerts() { 
+        const r = sessionRole; 
+        if (r !== 'service' && r !== 'admin') return; 
 
-        const today = new Date().toISOString().split('T')[0]; // NEW
+        const today = new Date().toISOString().split('T')[0]; 
 
-        const { data } = await supabaseClient // NEW
-            .from('job_cards') // NEW
-            .select('id, next_service_date, customer_mobile,' // NEW
-                + ' vehicles(reg_number, make_model)') // NEW
-            .eq('status', 'Closed') // NEW
-            .not('next_service_date', 'is', null) // NEW
-            .lte('next_service_date', today) // NEW
-            .order('next_service_date', { ascending: true }) // NEW
-            .limit(10); // NEW
+        const { data } = await supabaseClient 
+            .from('job_cards') 
+            .select('id, next_service_date, customer_mobile,' 
+                + ' vehicles(reg_number, make_model)') 
+            .eq('status', 'Closed') 
+            .not('next_service_date', 'is', null) 
+            .lte('next_service_date', today) 
+            .order('next_service_date', { ascending: true }) 
+            .limit(10); 
 
-        if (!data || data.length === 0) return; // NEW
+        if (!data || data.length === 0) return; 
 
-        const box = document.getElementById('nextServiceAlertBox'); // NEW
-        const list = document.getElementById('nextServiceAlertList'); // NEW
-        box.style.display = 'block'; // NEW
+        const box = document.getElementById('nextServiceAlertBox'); 
+        const list = document.getElementById('nextServiceAlertList'); 
+        box.style.display = 'block'; 
 
-        list.innerHTML = data.map(j => { // NEW
-            const reg = j.vehicles?.reg_number || '--'; // NEW
-            const model = j.vehicles?.make_model || ''; // NEW
-            const dueDate = j.next_service_date; // NEW
-            const daysOver = Math.floor( // NEW
-                (new Date() - new Date(dueDate)) / 86400000); // NEW
-            return '<div style="display:flex;' // NEW
-                + 'justify-content:space-between;' // NEW
-                + 'align-items:center;padding:8px 0;' // NEW
-                + 'border-bottom:1px solid #fde68a;">' // NEW
-                + '<div><strong style="color:var(--primary);">' // NEW
-                + reg + '</strong>' // NEW
-                + '<span style="color:#64748b;margin-left:6px;' // NEW
-                + 'font-size:0.8rem;">' + model + '</span><br>' // NEW
-                + '<span style="font-size:0.75rem;color:#64748b;">' // NEW
-                + (j.customer_mobile || '') + '</span></div>' // NEW
-                + '<div style="text-align:right;">' // NEW
-                + '<span style="background:#fee2e2;color:#b91c1c;' // NEW
-                + 'padding:2px 8px;border-radius:4px;' // NEW
-                + 'font-size:0.75rem;font-weight:bold;">' // NEW
-                + daysOver + ' days overdue</span><br>' // NEW
-                + '<span style="font-size:0.7rem;color:#92400e;">' // NEW
-                + 'Due: ' + dueDate + '</span></div>' // NEW
-                + '</div>'; // NEW
-        }).join(''); // NEW
-    } // NEW
+        list.innerHTML = data.map(j => { 
+            const reg = j.vehicles?.reg_number || '--'; 
+            const model = j.vehicles?.make_model || ''; 
+            const dueDate = j.next_service_date; 
+            const daysOver = Math.floor( 
+                (new Date() - new Date(dueDate)) / 86400000); 
+            return '<div style="display:flex;' 
+                + 'justify-content:space-between;' 
+                + 'align-items:center;padding:8px 0;' 
+                + 'border-bottom:1px solid #fde68a;">' 
+                + '<div><strong style="color:var(--primary);">' 
+                + reg + '</strong>' 
+                + '<span style="color:#64748b;margin-left:6px;' 
+                + 'font-size:0.8rem;">' + model + '</span><br>' 
+                + '<span style="font-size:0.75rem;color:#64748b;">' 
+                + (j.customer_mobile || '') + '</span></div>' 
+                + '<div style="text-align:right;">' 
+                + '<span style="background:#fee2e2;color:#b91c1c;' 
+                + 'padding:2px 8px;border-radius:4px;' 
+                + 'font-size:0.75rem;font-weight:bold;">' 
+                + daysOver + ' days overdue</span><br>' 
+                + '<span style="font-size:0.7rem;color:#92400e;">' 
+                + 'Due: ' + dueDate + '</span></div>' 
+                + '</div>'; 
+        }).join(''); 
+    } 
 
     /**
      * Calculates total volume natively, handling legacy ML and modern volume_ml inputs
@@ -282,7 +288,7 @@
 
     window.onload = () => {
         enforceRbacVisibilityConstraints();
-        loadNextServiceAlerts(); // NEW
+        loadNextServiceAlerts(); 
     };
 
     function enforceRbacVisibilityConstraints() {
@@ -347,42 +353,51 @@
     }
 
     async function triggerDashboardDataAggregators() {
+        // Safe numerical extractor to handle Supabase RPC variations (arrays vs objects vs null)
+        const safeNum = (data, key) => {
+            if (!data) return 0;
+            const row = Array.isArray(data) ? data[0] : data;
+            return row ? (parseFloat(row[key]) || 0) : 0;
+        };
+
         supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Green', target_date: dateStringToday }).then(({ data }) => {
-            if(data) {
-                if(document.getElementById('cardCombinedFlow').style.display === 'block') {
-                    document.getElementById('mGrnNet').innerText = `₹${Math.round(data.total_flow)}`;
-                    document.getElementById('mGrnPaid').innerText = `₹${Math.round(data.paid_flow)}`;
-                } else if(document.getElementById('cardGreenFlow').style.display === 'block') {
-                    document.getElementById('mGreenFlowSingle').innerText = `₹${Math.round(data.total_flow)}`;
-                    document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
-                }
+            const total = safeNum(data, 'total_flow');
+            const paid = safeNum(data, 'paid_flow');
+            
+            if(document.getElementById('cardCombinedFlow').style.display === 'block') {
+                document.getElementById('mGrnNet').innerText = `₹${Math.round(total)}`;
+                document.getElementById('mGrnPaid').innerText = `₹${Math.round(paid)}`;
+            } else if(document.getElementById('cardGreenFlow').style.display === 'block') {
+                document.getElementById('mGreenFlowSingle').innerText = `₹${Math.round(total)}`;
+                document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(paid)}`;
             }
         });
         
         supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Moped', target_date: dateStringToday }).then(({ data }) => {
-            if(data) {
-                if(document.getElementById('cardCombinedFlow').style.display === 'block') {
-                    document.getElementById('mMopNet').innerText = `₹${Math.round(data.total_flow)}`;
-                    document.getElementById('mMopPaid').innerText = `₹${Math.round(data.paid_flow)}`;
-                } else if(document.getElementById('cardMopedFlow').style.display === 'block') {
-                    document.getElementById('mMopedFlowSingle').innerText = `₹${Math.round(data.total_flow)}`;
-                    document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
-                }
+            const total = safeNum(data, 'total_flow');
+            const paid = safeNum(data, 'paid_flow');
+
+            if(document.getElementById('cardCombinedFlow').style.display === 'block') {
+                document.getElementById('mMopNet').innerText = `₹${Math.round(total)}`;
+                document.getElementById('mMopPaid').innerText = `₹${Math.round(paid)}`;
+            } else if(document.getElementById('cardMopedFlow').style.display === 'block') {
+                document.getElementById('mMopedFlowSingle').innerText = `₹${Math.round(total)}`;
+                document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(paid)}`;
             }
         });
 
         if(sessionRole === 'service' || sessionRole === 'admin') {
             supabaseClient.rpc('get_daily_jc_payments', { target_date: dateStringToday }).then(({ data }) => {
-                if(data) {
-                    document.getElementById('mJcCash').innerText = `₹${Math.round(data.cash_total)}`;
-                    document.getElementById('mJcUpi').innerText = `₹${Math.round(data.upi_total)}`;
-                }
+                const cash = safeNum(data, 'cash_total');
+                const upi = safeNum(data, 'upi_total');
+                document.getElementById('mJcCash').innerText = `₹${Math.round(cash)}`;
+                document.getElementById('mJcUpi').innerText = `₹${Math.round(upi)}`;
             });
             supabaseClient.rpc('get_daily_staff_payable', { target_date: dateStringToday }).then(({ data }) => {
-                if(data) {
-                    document.getElementById('mStaffPaid').innerText = `₹${Math.round(data.paid_labor)}`;
-                    document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(data.total_labor)}`;
-                }
+                const paid = safeNum(data, 'paid_labor');
+                const total = safeNum(data, 'total_labor');
+                document.getElementById('mStaffPaid').innerText = `₹${Math.round(paid)}`;
+                document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(total)}`;
             });
         }
 
@@ -390,11 +405,12 @@
 
         if(sessionRole === 'green' || sessionRole === 'admin') {
             supabaseClient.rpc('get_daily_pos_sales', { target_date: dateStringToday }).then(({ data }) => {
-                if(data) {
-                    document.getElementById('mPosCash').innerText = `₹${Math.round(data.cash_total)}`;
-                    document.getElementById('mPosUpi').innerText = `₹${Math.round(data.upi_total)}`;
-                    document.getElementById('mPosCredit').innerText = `₹${Math.round(data.credit_total)}`;
-                }
+                const cash = safeNum(data, 'cash_total');
+                const upi = safeNum(data, 'upi_total');
+                const credit = safeNum(data, 'credit_total');
+                document.getElementById('mPosCash').innerText = `₹${Math.round(cash)}`;
+                document.getElementById('mPosUpi').innerText = `₹${Math.round(upi)}`;
+                document.getElementById('mPosCredit').innerText = `₹${Math.round(credit)}`;
             });
         }
     }
