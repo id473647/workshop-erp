@@ -148,13 +148,6 @@
         </div>
     </div>
 
-    <div id="nextServiceAlertBox" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:18px; margin-bottom:20px;"> 
-        <div style="font-size:0.95rem; font-weight:700; color:#b45309; margin-bottom:10px;"> 
-            🔔 Next Service Due — Overdue Vehicles 
-        </div> 
-        <div id="nextServiceAlertList" style="font-size:0.85rem;"></div> 
-    </div> 
-
     <div class="navigation-grid">
         <a href="new-jobcard.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
         <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
@@ -217,79 +210,6 @@
     const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     let currentListCategory = 'Running';
     let cachedMechanicsMap = {};
-    const dateStringToday = new Date().toISOString().split('T')[0];
-
-    function executeSessionTermination() {
-        localStorage.removeItem('ERP_ACTIVE_ROLE');
-        window.location.href = 'login.html';
-    }
-
-    async function loadNextServiceAlerts() { 
-        const r = sessionRole; 
-        if (r !== 'service' && r !== 'admin') return; 
-
-        const today = new Date().toISOString().split('T')[0]; 
-
-        const { data } = await supabaseClient 
-            .from('job_cards') 
-            .select('id, next_service_date, customer_mobile,' 
-                + ' vehicles(reg_number, make_model)') 
-            .eq('status', 'Closed') 
-            .not('next_service_date', 'is', null) 
-            .lte('next_service_date', today) 
-            .order('next_service_date', { ascending: true }) 
-            .limit(10); 
-
-        if (!data || data.length === 0) return; 
-
-        const box = document.getElementById('nextServiceAlertBox'); 
-        const list = document.getElementById('nextServiceAlertList'); 
-        box.style.display = 'block'; 
-
-        list.innerHTML = data.map(j => { 
-            const reg = j.vehicles?.reg_number || '--'; 
-            const model = j.vehicles?.make_model || ''; 
-            const dueDate = j.next_service_date; 
-            const daysOver = Math.floor( 
-                (new Date() - new Date(dueDate)) / 86400000); 
-            return '<div style="display:flex;' 
-                + 'justify-content:space-between;' 
-                + 'align-items:center;padding:8px 0;' 
-                + 'border-bottom:1px solid #fde68a;">' 
-                + '<div><strong style="color:var(--primary);">' 
-                + reg + '</strong>' 
-                + '<span style="color:#64748b;margin-left:6px;' 
-                + 'font-size:0.8rem;">' + model + '</span><br>' 
-                + '<span style="font-size:0.75rem;color:#64748b;">' 
-                + (j.customer_mobile || '') + '</span></div>' 
-                + '<div style="text-align:right;">' 
-                + '<span style="background:#fee2e2;color:#b91c1c;' 
-                + 'padding:2px 8px;border-radius:4px;' 
-                + 'font-size:0.75rem;font-weight:bold;">' 
-                + daysOver + ' days overdue</span><br>' 
-                + '<span style="font-size:0.7rem;color:#92400e;">' 
-                + 'Due: ' + dueDate + '</span></div>' 
-                + '</div>'; 
-        }).join(''); 
-    } 
-
-    /**
-     * Calculates total volume natively, handling legacy ML and modern volume_ml inputs
-     */
-    function calcVolumeML(item) {
-        if (item.unit_metric === 'ML') {
-            return parseFloat(item.qty) || 0;
-        }
-        if (item.volume_ml != null && item.volume_ml > 0) {
-            return (parseFloat(item.qty) || 0) * parseFloat(item.volume_ml);
-        }
-        return 0;
-    }
-
-    window.onload = () => {
-        enforceRbacVisibilityConstraints();
-        loadNextServiceAlerts(); 
-    };
 
     function enforceRbacVisibilityConstraints() {
         document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
@@ -318,16 +238,19 @@
         if(sessionRole === 'service' || sessionRole === 'admin') document.getElementById('navNewJc').style.display = 'block';
         if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('navGreenPos').style.display = 'block';
         
+        // PURCHASE BUTTON (UPDATED HREF ABOVE)
         if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') document.getElementById('navPurchase').style.display = 'block';
         
+        // NEW INJECTED: INVENTORY LOOKUP BUTTON
         if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'service') {
             document.getElementById('navInventoryLookup').style.display = 'block';
         }
         
+        // NEW INJECTED: ADMIN EXCLUSIVES (PRODUCT CATALOG & VALUATION)
         if(sessionRole === 'admin') {
             document.getElementById('navProductCatalog').style.display = 'block';
             document.getElementById('cardStockValuation').style.display = 'block';
-            loadStockValuation(); 
+            loadStockValuation(); // Trigger the backend fetch
         }
 
         prefetchSystemMechanics();
@@ -335,12 +258,12 @@
     }
 
     async function prefetchSystemMechanics() {
-        const { data: crew, error } = await supabaseClient.from('mechanics').select('*');
-        if(error) console.error("Mechanic prefetch error:", error);
+        const { data: crew } = await supabaseClient.from('mechanics').select('*');
         crew?.forEach(m => { cachedMechanicsMap[m.id] = m.name; });
         queryMasterJobRegisters();
     }
     
+    // NEW INJECTED FUNCTION: Stock Valuation for Admin
     async function loadStockValuation() {
         const {data:prods} = await supabaseClient.from('product_master')
             .select('current_stock,mac,mrp,retail_price')
@@ -353,96 +276,68 @@
     }
 
     async function triggerDashboardDataAggregators() {
-        // Safe numerical extractor to handle Supabase RPC variations (arrays vs objects vs null)
-        const safeNum = (data, key) => {
-            if (!data) return 0;
-            const row = Array.isArray(data) ? data[0] : data;
-            return row ? (parseFloat(row[key]) || 0) : 0;
-        };
+        const dateStringToday = new Date().toISOString().split('T')[0];
 
         supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Green', target_date: dateStringToday }).then(({ data }) => {
-            const total = safeNum(data, 'total_flow');
-            const paid = safeNum(data, 'paid_flow');
-            
-            if(document.getElementById('cardCombinedFlow').style.display === 'block') {
-                document.getElementById('mGrnNet').innerText = `₹${Math.round(total)}`;
-                document.getElementById('mGrnPaid').innerText = `₹${Math.round(paid)}`;
-            } else if(document.getElementById('cardGreenFlow').style.display === 'block') {
-                document.getElementById('mGreenFlowSingle').innerText = `₹${Math.round(total)}`;
-                document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(paid)}`;
+            if(data) {
+                if(document.getElementById('cardCombinedFlow').style.display === 'block') {
+                    document.getElementById('mGrnNet').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mGrnPaid').innerText = `₹${Math.round(data.paid_flow)}`;
+                } else if(document.getElementById('cardGreenFlow').style.display === 'block') {
+                    document.getElementById('mGreenFlowSingle').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
+                }
             }
         });
         
         supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Moped', target_date: dateStringToday }).then(({ data }) => {
-            const total = safeNum(data, 'total_flow');
-            const paid = safeNum(data, 'paid_flow');
-
-            if(document.getElementById('cardCombinedFlow').style.display === 'block') {
-                document.getElementById('mMopNet').innerText = `₹${Math.round(total)}`;
-                document.getElementById('mMopPaid').innerText = `₹${Math.round(paid)}`;
-            } else if(document.getElementById('cardMopedFlow').style.display === 'block') {
-                document.getElementById('mMopedFlowSingle').innerText = `₹${Math.round(total)}`;
-                document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(paid)}`;
+            if(data) {
+                if(document.getElementById('cardCombinedFlow').style.display === 'block') {
+                    document.getElementById('mMopNet').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mMopPaid').innerText = `₹${Math.round(data.paid_flow)}`;
+                } else if(document.getElementById('cardMopedFlow').style.display === 'block') {
+                    document.getElementById('mMopedFlowSingle').innerText = `₹${Math.round(data.total_flow)}`;
+                    document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(data.paid_flow)}`;
+                }
             }
         });
 
         if(sessionRole === 'service' || sessionRole === 'admin') {
             supabaseClient.rpc('get_daily_jc_payments', { target_date: dateStringToday }).then(({ data }) => {
-                const cash = safeNum(data, 'cash_total');
-                const upi = safeNum(data, 'upi_total');
-                document.getElementById('mJcCash').innerText = `₹${Math.round(cash)}`;
-                document.getElementById('mJcUpi').innerText = `₹${Math.round(upi)}`;
+                if(data) {
+                    document.getElementById('mJcCash').innerText = `₹${Math.round(data.cash_total)}`;
+                    document.getElementById('mJcUpi').innerText = `₹${Math.round(data.upi_total)}`;
+                }
             });
             supabaseClient.rpc('get_daily_staff_payable', { target_date: dateStringToday }).then(({ data }) => {
-                const paid = safeNum(data, 'paid_labor');
-                const total = safeNum(data, 'total_labor');
-                document.getElementById('mStaffPaid').innerText = `₹${Math.round(paid)}`;
-                document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(total)}`;
+                if(data) {
+                    document.getElementById('mStaffPaid').innerText = `₹${Math.round(data.paid_labor)}`;
+                    document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(data.total_labor)}`;
+                }
             });
         }
 
-        fetchDailyLubeFlow(dateStringToday);
+        supabaseClient.rpc('get_daily_lube_flow', { target_date: dateStringToday }).then(({ data }) => {
+            if(data) {
+                document.getElementById('mLubeGreen').innerText = `Grn: ${data.green_liters.toFixed(2)} L`;
+                document.getElementById('mLubeMoped').innerText = `Mop: ${data.moped_liters.toFixed(2)} L`;
+            }
+        });
 
         if(sessionRole === 'green' || sessionRole === 'admin') {
             supabaseClient.rpc('get_daily_pos_sales', { target_date: dateStringToday }).then(({ data }) => {
-                const cash = safeNum(data, 'cash_total');
-                const upi = safeNum(data, 'upi_total');
-                const credit = safeNum(data, 'credit_total');
-                document.getElementById('mPosCash').innerText = `₹${Math.round(cash)}`;
-                document.getElementById('mPosUpi').innerText = `₹${Math.round(upi)}`;
-                document.getElementById('mPosCredit').innerText = `₹${Math.round(credit)}`;
+                if(data) {
+                    document.getElementById('mPosCash').innerText = `₹${Math.round(data.cash_total)}`;
+                    document.getElementById('mPosUpi').innerText = `₹${Math.round(data.upi_total)}`;
+                    document.getElementById('mPosCredit').innerText = `₹${Math.round(data.credit_total)}`;
+                }
             });
         }
-    }
-
-    async function fetchDailyLubeFlow(dateTarget) {
-        const { data: items, error } = await supabaseClient
-            .from('job_card_items')
-            .select('warehouse_type, qty, unit_metric, volume_ml')
-            .gte('created_at', dateTarget + 'T00:00:00.000Z')
-            .lte('created_at', dateTarget + 'T23:59:59.999Z');
-
-        if (error) {
-            console.error("Error fetching lube flow:", error);
-            return;
-        }
-
-        let greenML = 0; let mopedML = 0;
-        (items || []).forEach(item => {
-            const vol = calcVolumeML(item);
-            if (vol > 0) {
-                if (item.warehouse_type === 'Green') greenML += vol;
-                if (item.warehouse_type === 'Moped') mopedML += vol;
-            }
-        });
-        
-        document.getElementById('mLubeGreen').innerText = `Grn: ${(greenML / 1000).toFixed(2)} L`;
-        document.getElementById('mLubeMoped').innerText = `Mop: ${(mopedML / 1000).toFixed(2)} L`;
     }
 
     function switchListCategory(categoryStr) {
         document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-        if (event && event.target) event.target.classList.add('active');
+        event.target.classList.add('active');
         currentListCategory = categoryStr;
         queryMasterJobRegisters();
     }
@@ -540,7 +435,7 @@
                         <div class="table-wrapper" style="margin:0; max-height:400px;">
                             <table>
                                 <thead><tr><th>Hash Ref</th><th>Component</th><th>Valuation</th></tr></thead>
-                                <tbody>${(gLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
+                                <tbody>${(gLines || []).map(l => `<tr><td><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
                             </table>
                         </div>
                     </div>
@@ -549,7 +444,7 @@
                         <div class="table-wrapper" style="margin:0; max-height:400px;">
                             <table>
                                 <thead><tr><th>Hash Ref</th><th>Component</th><th>Valuation</th></tr></thead>
-                                <tbody>${(mLines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank"><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span></a><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
+                                <tbody>${(mLines || []).map(l => `<tr><td><span style="font-size:0.7rem; color:#888;">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</span><br><b>${l.job_cards?.vehicles?.reg_number || ''}</b></td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody>
                             </table>
                         </div>
                     </div>
@@ -557,36 +452,27 @@
         } else if(metricType === 'GreenFlow') {
             titleDisplayStr = `Settled Lines: Green Warehouse`;
             const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))').eq('warehouse_type', 'Green').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'MopedFlow') {
             titleDisplayStr = `Settled Lines: Moped Warehouse`;
             const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, vehicles(reg_number))').eq('warehouse_type', 'Moped').eq('job_cards.status', 'Closed').gte('job_cards.closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Chassis</th><th>Component</th><th>Valuation</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td>${l.job_cards?.vehicles?.reg_number || ''}</td><td>${l.item_name}</td><td>₹${l.total_price}</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'LubeFlow') {
             titleDisplayStr = "Volumetric Fluid Dispatches (Liters)";
-            
-            const { data: lines, error } = await supabaseClient.from('job_card_items')
-                .select('*, job_cards!inner(id, vehicles(reg_number))')
-                .or('unit_metric.eq.ML,volume_ml.gt.0')
-                .gte('created_at', dateTarget);
-                
-            if(error) console.error("Error displaying Lube Flow: ", error);
-
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Depot</th><th>Fluid Parameters</th><th>Pcs</th><th>Vol/Unit (ML)</th><th>Total ML</th></tr></thead><tbody>${(lines || []).map(l => {
-                const volML = calcVolumeML(l);
-                const pcsDisplay = l.unit_metric === 'ML' ? '-' : (parseFloat(l.qty) || 0);
-                const volDisplay = l.volume_ml > 0 ? l.volume_ml : '-';
-                return `<tr><td><a class="clickable-ref" href="billing.html?id=${l.job_cards?.id}" target="_blank">JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</a></td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${pcsDisplay}</td><td>${volDisplay}</td><td style="font-weight:bold; color:var(--purple);">${volML.toFixed(0)} ML</td></tr>`;
-            }).join('')}</tbody></table></div>`;
+            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, vehicles(reg_number))').eq('unit_metric', 'ML').gte('created_at', dateTarget);
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Depot</th><th>Fluid Parameters</th><th>Dispatched Volume</th></tr></thead><tbody>${(lines || []).map(l => `<tr><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()}</td><td><strong>${l.warehouse_type}</strong></td><td>${l.item_name}</td><td>${l.qty} ML</td></tr>`).join('')}</tbody></table></div>`;
         } else if(metricType === 'StaffFlow') {
             titleDisplayStr = "Technician Payable Assignments";
             const { data: jobs } = await supabaseClient.from('job_cards').select('id, mech_id, labour_charges, status').gte('closed_at', dateTarget);
-            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead><tbody>${(jobs || []).map(j => `<tr><td><a class="clickable-ref" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}</tbody></table></div>`;
+            container.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>Hash Ref</th><th>Assigned Crew</th><th>Labor Sum</th><th>Payment State</th></tr></thead><tbody>${(jobs || []).map(j => `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${cachedMechanicsMap[j.mech_id] || 'Unassigned'}</td><td>₹${j.labour_charges}</td><td>${j.status}</td></tr>`).join('')}</tbody></table></div>`;
         }
 
         document.getElementById('modalMetricTitle').innerText = titleDisplayStr;
         document.getElementById('modalMetricDetails').style.display = 'flex';
     }
+
+    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+    enforceRbacVisibilityConstraints();
 </script>
 </body>
 </html>
