@@ -251,13 +251,22 @@
     function waTicket() { const layoutTarget = document.getElementById('ticketRender'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Payout_Ticket.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
     async function generateDailyLedger() {
-        const targetDate = document.getElementById('dlStart').value; document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
+        const targetDate = document.getElementById('dlStart').value; 
+        document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
         
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, cash_amount, upi_amount, total_invoice_value, advance_paid, prepaid_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        const { data: jobs, error: jobsErr } = await supabaseClient.from('job_cards')
+            .select('id, payment_mode, total_invoice_value, advance_paid, prepaid_amount, invoices(cash_amount, upi_amount)')
+            .eq('status', 'Closed')
+            .gte('closed_at', targetDate)
+            .lte('closed_at', targetDate + 'T23:59:59');
+            
         const { data: advances } = await supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
         const { data: prepaids } = await supabaseClient.from('job_cards').select('id, prepaid_amount').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('prepaid_amount', 0);
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, cash_amount, upi_amount, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        const { data: pos, error: posErr } = await supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+
+        if (jobsErr) console.error("Job Cards fetch error:", jobsErr.message);
+        if (posErr) console.error("POS fetch error:", posErr.message);
 
         let sumGrossCash = 0; let sumGrossUpi = 0; let sumAdvances = 0; let sumPrepaids = 0; let sumExp = 0;
         
@@ -268,54 +277,49 @@
         const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
 
         (jobs || []).forEach(j => { 
-            if (j.payment_mode === 'Cash') { 
-                const v = parseFloat(j.cash_amount) || parseFloat(j.total_invoice_value) || 0;
-                sumGrossCash += v; tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (j.payment_mode === 'UPI') { 
-                const v = parseFloat(j.upi_amount) || parseFloat(j.total_invoice_value) || 0;
-                sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (j.payment_mode && j.payment_mode.includes('Split')) { 
-                // NEW SPLIT EXTRACTION LOGIC
-                let cVal = parseFloat(j.cash_amount) || 0;
-                let uVal = parseFloat(j.upi_amount) || 0;
+            let cVal = 0, uVal = 0;
+            const v = parseFloat(j.total_invoice_value) || 0;
+            
+            if (j.invoices && j.invoices.length > 0) {
+                cVal = parseFloat(j.invoices[0].cash_amount) || 0;
+                uVal = parseFloat(j.invoices[0].upi_amount) || 0;
+            } else if (j.payment_mode === 'Cash') {
+                cVal = v;
+            } else if (j.payment_mode === 'UPI') {
+                uVal = v;
+            } else if (j.payment_mode && j.payment_mode.includes('Split')) {
+                const splitMatch = j.payment_mode.match(/Cash[:\s]*₹?([\d.]+)/i);
+                const splitMatchUpi = j.payment_mode.match(/UPI[:\s]*₹?([\d.]+)/i);
+                if (splitMatch) cVal = parseFloat(splitMatch[1]) || 0;
+                if (splitMatchUpi) uVal = parseFloat(splitMatchUpi[1]) || 0;
+            }
 
-                // Fallback for older strings before proper schema columns were added
-                if(cVal === 0 && uVal === 0) {
-                    const splitMatch = j.payment_mode.match(/Cash[:\s]*₹?([\d.]+)/i);
-                    const splitMatchUpi = j.payment_mode.match(/UPI[:\s]*₹?([\d.]+)/i);
-                    if (splitMatch) cVal = parseFloat(splitMatch[1]) || 0;
-                    if (splitMatchUpi) uVal = parseFloat(splitMatchUpi[1]) || 0;
-                }
-
-                sumGrossCash += cVal; sumGrossUpi += uVal;
-                if(cVal > 0) tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                if(uVal > 0) tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
-            } 
+            sumGrossCash += cVal; sumGrossUpi += uVal;
+            if(cVal > 0) tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} ${j.payment_mode==='Cash'?'':'(Split Cash)'}</td><td>₹${cVal}</td></tr>`;
+            if(uVal > 0) tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} ${j.payment_mode==='UPI'?'':'(Split UPI)'}</td><td>₹${uVal}</td></tr>`;
         });
         
         (pos || []).forEach(p => { 
-            if (p.payment_mode === 'Cash') { 
-                const v = parseFloat(p.cash_amount) || parseFloat(p.total_amount) || 0;
-                sumGrossCash += v; tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (p.payment_mode === 'UPI') { 
-                const v = parseFloat(p.upi_amount) || parseFloat(p.total_amount) || 0;
-                sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (p.payment_mode && p.payment_mode.includes('Split')) {
-                // NEW SPLIT EXTRACTION LOGIC
-                let cVal = parseFloat(p.cash_amount) || 0;
-                let uVal = parseFloat(p.upi_amount) || 0;
+            let cVal = parseFloat(p.cash_amount) || 0;
+            let uVal = parseFloat(p.upi_amount) || 0;
+            const v = parseFloat(p.total_amount) || 0;
 
-                if(cVal === 0 && uVal === 0) {
+            if (cVal === 0 && uVal === 0) {
+                if (p.payment_mode === 'Cash') {
+                    cVal = v;
+                } else if (p.payment_mode === 'UPI') {
+                    uVal = v;
+                } else if (p.payment_mode && p.payment_mode.includes('Split')) {
                     const splitMatch = p.payment_mode.match(/Cash[:\s]*₹?([\d.]+)/i);
                     const splitMatchUpi = p.payment_mode.match(/UPI[:\s]*₹?([\d.]+)/i);
                     if (splitMatch) cVal = parseFloat(splitMatch[1]) || 0;
                     if (splitMatchUpi) uVal = parseFloat(splitMatchUpi[1]) || 0;
                 }
-
-                sumGrossCash += cVal; sumGrossUpi += uVal;
-                if(cVal > 0) tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                if(uVal > 0) tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
             }
+
+            sumGrossCash += cVal; sumGrossUpi += uVal;
+            if(cVal > 0) tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} ${p.payment_mode==='Cash'?'':'(Split Cash)'}</td><td>₹${cVal}</td></tr>`;
+            if(uVal > 0) tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} ${p.payment_mode==='UPI'?'':'(Split UPI)'}</td><td>₹${uVal}</td></tr>`;
         });
         
         (advances || []).forEach(a => { const v = parseFloat(a.advance_paid) || 0; sumAdvances += v; sumGrossCash += v; tbAdv.innerHTML += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; });
@@ -376,14 +380,14 @@
                     const commissionRate = parseFloat(mechanicObj.commission_rate) || 10;
                     
                     const { data: jobsPrimary } = await supabaseClient.from('job_cards')
-                        .select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)')
+                        .select('id, closed_at, labour_charges, co_mech_id, job_card_items(warehouse_type, total_price)')
                         .eq('mech_id', target)
                         .eq('status', 'Closed')
                         .gte('closed_at', startStr)
                         .lte('closed_at', endStr + 'T23:59:59');
                         
                     const { data: jobsCo } = await supabaseClient.from('job_cards')
-                        .select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)')
+                        .select('id, closed_at, labour_charges, co_mech_id, job_card_items(warehouse_type, total_price)')
                         .eq('co_mech_id', target)
                         .eq('status', 'Closed')
                         .gte('closed_at', startStr)
@@ -397,15 +401,8 @@
                             }); 
                         } 
                         const totalLab = (parseFloat(j.labour_charges) || 0) + pkgLabor; 
-                        
-                        // If it's a co-mechanic job (or they are primary but there IS a co-mech), they get half the yield.
-                        // Wait, if they are primary and there is a co_mech_id, they get 50%. If they are co_mech, they get 50%.
-                        // Because this query is explicitly for them, we apply 50% if there is ANY co_mech involved.
                         const shareRatio = (j.co_mech_id != null) ? 0.5 : 1; 
-                        
                         const mechanicYieldShare = totalLab * shareRatio;
-                        
-                        // Calculate actual commission earned
                         const commissionEarned = Math.round(mechanicYieldShare * (commissionRate / 100));
                         
                         if (commissionEarned > 0) {
