@@ -44,6 +44,15 @@
         td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
         
         .warn-msg { display: none; color: var(--danger); font-size: 0.8rem; font-weight: bold; background: #fee2e2; padding: 8px 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #fca5a5; }
+
+        @media print {
+            @page { size: A5; margin: 10mm; }
+            body * { visibility: hidden; }
+            #printWarrantyArea, #printWarrantyArea * { visibility: visible; }
+            #printWarrantyArea { position: absolute; left: 0; top: 0; width: 100%; box-sizing: border-box; background: white; color: black; font-family: 'Segoe UI', sans-serif; }
+            .sticky-nav, .tab-bar, .card-panel { display: none !important; }
+        }
+        .print-only { display: none; }
     </style>
 </head>
 <body>
@@ -144,6 +153,20 @@
         </div>
         
         <div id="tabEngine" class="tab-content">
+            <div class="inputs-grid" style="border-color:#bae6fd; background:#f0f9ff;">
+                <div class="field-group">
+                    <label>Customer Mobile</label>
+                    <input type="text" id="engMobile" placeholder="10-digit mobile" maxlength="10" onkeyup="if(this.value.length === 10) loadEngineVehicles()">
+                </div>
+                <div class="field-group">
+                    <label>Target Vehicle</label>
+                    <select id="engVeh"><option value="">-- Enter Mobile First --</option></select>
+                </div>
+                <div class="field-group" style="justify-content: flex-end;">
+                    <button class="btn-action" style="background:var(--info);" onclick="verifyAndRegisterEngineWarranty()">VERIFY & REGISTER</button>
+                </div>
+            </div>
+
             <div class="table-wrapper">
                 <table>
                     <thead>
@@ -158,10 +181,10 @@
                             <th>Service #5</th>
                             <th>Service #6</th>
                             <th>Guarantee Status</th>
-                        </tr>
+                            <th>Action</th> </tr>
                     </thead>
                     <tbody id="tbEngine">
-                        <tr><td colspan="10" style="text-align:center;">Loading Engine Warranties...</td></tr>
+                        <tr><td colspan="11" style="text-align:center;">Loading Engine Warranties...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -169,6 +192,8 @@
         
     </div>
 </div>
+
+<div id="printWarrantyArea" class="print-only"></div>
 
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
@@ -373,7 +398,186 @@
         });
     }
 
-    /* === TAB 3: ENGINE WARRANTY TRACKER === */
+    /* === TAB 3: ENGINE WARRANTY TRACKER & REGISTRATION === */
+    
+    async function loadEngineVehicles() {
+        const mobile = document.getElementById('engMobile').value.trim();
+        const sel = document.getElementById('engVeh');
+        sel.innerHTML = '<option value="">-- Select Vehicle --</option>';
+        if (mobile.length !== 10) return;
+        
+        const { data, error } = await supabaseClient.from('vehicles').select('id, reg_number').eq('customer_mobile', mobile);
+        if (error) return console.error(error);
+        
+        (data || []).forEach(v => {
+            sel.innerHTML += `<option value="${v.id}" data-reg="${v.reg_number}">${v.reg_number}</option>`;
+        });
+    }
+
+    async function verifyAndRegisterEngineWarranty() {
+        const mobile = document.getElementById('engMobile').value.trim();
+        const vehSel = document.getElementById('engVeh');
+        const vehId = vehSel.value;
+        const vehReg = vehSel.options[vehSel.selectedIndex]?.getAttribute('data-reg');
+
+        if (mobile.length !== 10 || !vehId) return alert("Ensure mobile and vehicle are selected.");
+
+        const { data: jcs, error } = await supabaseClient
+            .from('job_cards')
+            .select('id, created_at, closed_at, customer_mobile, mech_id, co_mech_id, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name), job_card_items(warehouse_type, item_name)')
+            .eq('customer_mobile', mobile)
+            .eq('vehicle_id', vehId)
+            .eq('status', 'Closed');
+
+        if (error) return alert("Error fetching history: " + error.message);
+
+        let matchingJc = null;
+        for (const jc of (jcs || [])) {
+            const hasRestore = (jc.job_card_items || []).some(item =>
+                item.warehouse_type === 'Service' &&
+                (item.item_name.toUpperCase().includes('ENGINE RESTORE') || item.item_name.toUpperCase().includes('ENGINE RESTORATION'))
+            );
+            if (hasRestore) {
+                matchingJc = jc;
+                break;
+            }
+        }
+
+        if (!matchingJc) {
+            alert("⚠️ No Engine Restoration service found for this vehicle. Warranty cannot be issued.");
+            return;
+        }
+
+        // Check if already issued
+        const { data: exist } = await supabaseClient.from('amc_subscriptions')
+            .select('id')
+            .eq('job_card_id', matchingJc.id)
+            .eq('plan_type', 'EngineWarranty');
+
+        if (exist && exist.length > 0) {
+            alert("Engine Warranty already issued for this Job Card!");
+            return;
+        }
+
+        const jcRef = `JC-${matchingJc.id.split('-')[0].toUpperCase()}`;
+        if (!confirm(`Engine Restoration found in ${jcRef}. Proceed with warranty registration?`)) return;
+
+        const cDate = new Date(matchingJc.closed_at || matchingJc.created_at);
+        const vouchers = [];
+        const offsets = [15, 45, 75, 105, 135, 165];
+        
+        for (let i = 0; i < 6; i++) {
+            const sDate = new Date(cDate);
+            sDate.setDate(sDate.getDate() + offsets[i]);
+            vouchers.push({
+                customer_mobile: mobile,
+                vehicle_reg: vehReg,
+                service_number: i + 1,
+                scheduled_date: sDate.toISOString().split('T')[0],
+                is_redeemed: false,
+                job_card_id: matchingJc.id
+            });
+        }
+
+        // Insert Subscription
+        const { error: insErr1 } = await supabaseClient.from('amc_subscriptions').insert({
+            customer_mobile: mobile,
+            vehicle_reg: vehReg,
+            plan_type: 'EngineWarranty',
+            is_active: true,
+            job_card_id: matchingJc.id
+        });
+
+        if (insErr1) return alert("Error issuing warranty: " + insErr1.message);
+
+        // Insert Vouchers
+        const { error: insErr2 } = await supabaseClient.from('engine_warranty_vouchers').insert(vouchers);
+        
+        if (insErr2) return alert("Error issuing vouchers: " + insErr2.message);
+
+        alert("Engine Warranty Registered Successfully!");
+        document.getElementById('engMobile').value = '';
+        document.getElementById('engVeh').innerHTML = '<option value="">-- Enter Mobile First --</option>';
+        loadEngineList();
+    }
+
+    async function printEngineWarranty(jcId) {
+        const { data: jc, error } = await supabaseClient
+            .from('job_cards')
+            .select('id, created_at, closed_at, customer_mobile, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name)')
+            .eq('id', jcId)
+            .single();
+            
+        if (error || !jc) return alert("Error fetching JC details for print.");
+
+        const { data: cust } = await supabaseClient.from('customers').select('name').eq('mobile_number', jc.customer_mobile).single();
+        const { data: inv } = await supabaseClient.from('invoices').select('id').eq('job_card_id', jcId).single();
+        const { data: vouchers } = await supabaseClient.from('engine_warranty_vouchers').select('service_number, scheduled_date').eq('job_card_id', jcId).order('service_number', {ascending: true});
+
+        const jcRef = `JC-${jcId.split('-')[0].toUpperCase()}`;
+        const invRef = inv ? `INV-${inv.id.split('-')[0].toUpperCase()}` : jcRef;
+        const custName = cust ? cust.name : '--';
+        const mechName = jc.mechanics?.name || '--';
+        const coMechName = jc.co_mechanics?.name || 'N/A';
+
+        let vRows = '';
+        (vouchers || []).forEach(v => {
+            vRows += `<tr>
+                <td style="padding:6px; border:1px solid #ccc; font-weight:bold;">Service #${v.service_number}</td>
+                <td style="padding:6px; border:1px solid #ccc;">${new Date(v.scheduled_date).toLocaleDateString('en-IN')}</td>
+                <td style="padding:6px; border:1px solid #ccc; width:70px; text-align:center;">[ &nbsp; &nbsp; ]</td>
+            </tr>`;
+        });
+
+        const printDiv = document.getElementById('printWarrantyArea');
+        printDiv.innerHTML = `
+            <div style="text-align:center; margin-bottom:15px; border-bottom:2px solid black; padding-bottom:10px;">
+                <div style="display:flex; justify-content:center; gap:10px; margin-bottom:10px;">
+                    <img src="logo-main.jpg" style="height:40px; object-fit:contain;" onerror="this.style.display='none'">
+                    <img src="logo-green.png" style="height:40px; object-fit:contain;" onerror="this.style.display='none'">
+                </div>
+                <h2 style="margin:0; font-size:16px;">MY CARE — ENGINE WARRANTY CERTIFICATE</h2>
+            </div>
+            
+            <table style="width:100%; font-size:12px; margin-bottom:15px; border-collapse:collapse;">
+                <tr><td style="padding:4px;"><strong>Vehicle:</strong> ${jc.vehicles?.make_model || '--'}</td><td style="padding:4px;"><strong>Reg No:</strong> ${jc.vehicles?.reg_number || '--'}</td></tr>
+                <tr><td style="padding:4px;"><strong>Customer:</strong> ${custName}</td><td style="padding:4px;"><strong>Mobile:</strong> ${jc.customer_mobile}</td></tr>
+                <tr><td style="padding:4px;"><strong>Mechanic:</strong> ${mechName}</td><td style="padding:4px;"><strong>Co-Mechanic:</strong> ${coMechName}</td></tr>
+                <tr><td style="padding:4px;"><strong>JC Created:</strong> ${new Date(jc.created_at).toLocaleDateString('en-IN')}</td><td style="padding:4px;"><strong>JC Closed:</strong> ${new Date(jc.closed_at || jc.created_at).toLocaleDateString('en-IN')}</td></tr>
+                <tr><td style="padding:4px;"><strong>Invoice Ref:</strong> ${invRef}</td><td style="padding:4px;"><strong>Invoice Amount:</strong> ₹${jc.total_invoice_value || 0}</td></tr>
+            </table>
+            
+            <h3 style="font-size:14px; margin-bottom:8px;">Service Schedule</h3>
+            <table style="width:100%; font-size:12px; margin-bottom:15px; border-collapse:collapse; border:1px solid #ccc; text-align:left;">
+                <tr>
+                    <th style="padding:6px; border:1px solid #ccc; background:#f0f0f0;">Service</th>
+                    <th style="padding:6px; border:1px solid #ccc; background:#f0f0f0;">Scheduled Date</th>
+                    <th style="padding:6px; border:1px solid #ccc; background:#f0f0f0;">Completed Stamp</th>
+                </tr>
+                ${vRows}
+            </table>
+            
+            <h3 style="font-size:12px; margin-bottom:8px;">Terms & Conditions / नियम व शर्तें</h3>
+            <ul style="font-size:11px; margin:0; padding-left:20px; margin-bottom:25px;">
+                <li>यह वारंटी केवल इंजन रिस्टोरेशन कार्य पर लागू है।<br><i>(This warranty covers engine restoration work only.)</i></li>
+                <li>वारंटी की अवधि 6 सर्विस या 180 दिन (जो पहले हो) तक मान्य है।<br><i>(Valid for 6 services or 180 days, whichever comes first.)</i></li>
+                <li>प्रत्येक सर्विस निर्धारित तिथि से 15 दिन के भीतर करानी अनिवार्य है, अन्यथा वारंटी स्वतः समाप्त हो जाएगी।<br><i>(Each service must be completed within 15 days of scheduled date.)</i></li>
+                <li>केवल My Care अधिकृत केंद्र पर ही सर्विस मान्य होगी।</li>
+                <li>बाहरी छेड़छाड़, दुर्घटना या गलत ईंधन के कारण हुई क्षति पर वारंटी लागू नहीं होगी।<br><i>(Tampering, accidents, or wrong fuel usage voids the warranty.)</i></li>
+            </ul>
+            
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:50px;">
+                <div>Customer Signature: _________________</div>
+                <div>Authorized By: _________________</div>
+            </div>
+            <div style="font-size:10px; text-align:center; margin-top:30px; color:#666;">Printed on: ${new Date().toLocaleString('en-IN')}</div>
+        `;
+        
+        setTimeout(() => {
+            window.print();
+        }, 200); // Tiny delay to ensure DOM and images render correctly before triggering OS print dialog
+    }
+
     async function loadEngineList() {
         const { data: subs, error: subErr } = await supabaseClient.from('amc_subscriptions')
             .select('*')
@@ -398,7 +602,7 @@
         tbody.innerHTML = '';
         
         if (!subs || subs.length === 0) {
-            return tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#64748b;">No Engine Warranties currently active.</td></tr>';
+            return tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#64748b;">No Engine Warranties currently active.</td></tr>';
         }
         
         const today = new Date();
@@ -444,6 +648,9 @@
                 <td style="color:var(--primary); font-weight:bold;">${jcRef}</td>
                 ${vCells}
                 <td style="${statStyle}">${status}</td>
+                <td>
+                    <button class="btn-action" style="padding:6px 10px; font-size:0.75rem;" onclick="printEngineWarranty('${sub.job_card_id}')">🖨️ PRINT</button>
+                </td>
             </tr>`;
         });
     }
