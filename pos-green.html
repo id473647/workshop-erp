@@ -83,11 +83,7 @@
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
         .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; }
-        .btn-cash { background: #16a34a; }
-        .btn-upi { background: #2563eb; }
-        .btn-credit { background: #d97706; }
-        .btn-save { background: #475569; }
-
+        
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         
@@ -215,12 +211,12 @@
             <div id="dynamicRowsContainer">
                 <div class="inline-add-strip inline-item-row" data-index="0">
                     <div class="name-wrap">
-                        <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, 0)" onblur="hideAutocomplete(0)">
+                        <input type="text" placeholder="Product Name" class="i-name" oninput="queryCatalogAutocomplete(this, 0)" onblur="hideAutocomplete(0)">
                         <div id="autolist-0" class="autocomplete-container"></div>
                     </div>
-                    <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(0)">
+                    <input type="text" placeholder="Brand" class="i-brand" value="" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(0)">
                     
-                    <input type="number" class="i-mrp" value="" min="0" placeholder="0" style="border-color:#7c3aed; color:#7c3aed;">
+                    <input type="number" class="i-mrp" value="" min="0" placeholder="MRP" style="border-color:#7c3aed; color:#7c3aed;">
                     
                     <select class="i-cat" onchange="toggleVolumeDropdown(this, 0)">
                         <option value="Spare">Spare</option>
@@ -239,10 +235,10 @@
                     <input type="number" class="i-vol-other" style="display:none;" placeholder="ML">
 
                     <div class="qty-wrap">
-                        <input type="number" class="i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+                        <input type="number" class="i-qty" value="" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
                     </div>
-                    <input type="number" class="i-rate" value="" min="0" placeholder="0" oninput="compileDynamicInvoicerSums()">
-                    <input type="number" class="i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+                    <input type="number" class="i-rate" value="" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+                    <input type="number" class="i-disc" value="" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
  
                     <button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none; border:none; color:var(--danger); font-size:1.2rem; cursor:pointer; font-weight:bold;">×</button>
                 </div>
@@ -258,11 +254,14 @@
         <div class="valuation-banner">NET PAYABLE: ₹<span id="posActiveAggregate">0</span></div>
 
         <div class="block-title" style="font-size:0.85rem; color:#64748b; margin-bottom:8px;">Settlement Routings</div>
-        <div class="settle-matrix">
-            <button class="btn-action btn-cash" onclick="commitInvoiceExecution('Cash', 'Closed')">CASH SETTLEMENT</button>
-            <button class="btn-action btn-upi" onclick="commitInvoiceExecution('UPI', 'Closed')">UPI / CARD TRANSFER</button>
-            <button class="btn-action btn-credit" onclick="commitInvoiceExecution('Credit', 'Closed')">CREDIT EXTENSION</button>
-            <button class="btn-action btn-save" onclick="commitInvoiceExecution('Pending', 'Open')">HOLD ACTIVE DRAFT</button>
+        <div class="inputs-grid" style="background:#fefce8; padding:16px; border-radius:8px; border:1px solid #fef08a;">
+            <div class="field-group"><label>Cash Received (₹)</label><input type="number" id="posCash" placeholder="0" min="0" oninput="calcPosSettle()"></div>
+            <div class="field-group"><label>UPI / Card (₹)</label><input type="number" id="posUpi" placeholder="0" min="0" oninput="calcPosSettle()"></div>
+            <div class="field-group"><label>Balance Due (₹)</label><input type="text" id="posBal" value="0" readonly style="background:#f1f5f9; font-weight:bold; color:var(--danger);"></div>
+        </div>
+        <div class="settle-matrix" style="margin-top:10px;">
+            <button class="btn-action" style="background:var(--success);" onclick="commitInvoiceExecution('Closed')">COMPLETE TRANSACTION</button>
+            <button class="btn-action" style="background:var(--primary);" onclick="commitInvoiceExecution('Open')">HOLD ACTIVE DRAFT</button>
         </div>
     </div>
 </div>
@@ -329,10 +328,11 @@
 
         <div id="settlementModifierInterface" style="display:none; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:12px;">
             <div style="font-size:0.75rem; font-weight:bold; color:var(--success); margin-bottom:6px;">Execute Final Ledger Settlement</div>
-            <div style="display:flex; gap:8px;">
-                <select id="thConvertMode" style="flex:1; padding:6px; font-size:0.8rem;"><option value="Cash">Settle via Cash</option><option value="UPI">Settle via UPI</option></select>
-                <button onclick="commitPosSettlement()" style="background:var(--success); color:white; border:none; padding:0 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem;">AUTHORIZE PAYMENT</button>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                <input type="number" id="thSettleCash" placeholder="Cash (₹)" min="0" style="padding:6px; font-size:0.8rem;">
+                <input type="number" id="thSettleUpi" placeholder="UPI/Card (₹)" min="0" style="padding:6px; font-size:0.8rem;">
             </div>
+            <button onclick="commitPosSettlement()" style="background:var(--success); color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.8rem; width:100%;">AUTHORIZE PAYMENT</button>
         </div>
 
         <div class="action-strip-bar">
@@ -381,6 +381,7 @@
     let evaluatedPhoneContext = null; let targetInspectionRecordId = null; let inspectedRecordObject = null;
     let targetCustomerProfile = null; let globalCatalogCache = []; let rowSequenceIndex = 1;
     let currentPosTabMode = 'AgedCredit';
+    let posCheckoutCompleted = false; // Flag to reload on Print exit
     
     let currentCreditLedgerMobile = null;
     let activeUnsettledInvoices = [];
@@ -389,22 +390,13 @@
 
     /**
      * Calculates the total volume in ML for a job_card_items or counter_sale_items row.
-     * Handles both old format (unit_metric='ML', qty=direct ML) and
-     * new format (unit_metric='Pcs', volume_ml=per-unit volume).
      */
     function calcVolumeML(item) {
-        if (item.unit_metric === 'ML') {
-            return parseFloat(item.qty) || 0;
-        }
-        if (item.volume_ml > 0) {
-            return (parseFloat(item.qty) || 0) * item.volume_ml;
-        }
+        if (item.unit_metric === 'ML') return parseFloat(item.qty) || 0;
+        if (item.volume_ml > 0) return (parseFloat(item.qty) || 0) * item.volume_ml;
         return 0;
     }
 
-    /**
-     * Returns true if this item is a lubricant (old or new format).
-     */
     function isLubeItem(item) {
         return item.unit_metric === 'ML' || (item.volume_ml != null && item.volume_ml > 0);
     }
@@ -777,11 +769,11 @@
         node.setAttribute('data-index', rowSequenceIndex);
         node.innerHTML = `
             <div class="name-wrap">
-                <input type="text" placeholder="Part Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})">
+                <input type="text" placeholder="Product Name" class="i-name" oninput="queryCatalogAutocomplete(this, ${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})">
                 <div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div>
             </div>
-            <input type="text" placeholder="Brand Name" class="i-brand" value="STANDARD" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
-            <input type="number" class="i-mrp" value="" min="0" placeholder="0" style="border-color:#7c3aed; color:#7c3aed;">
+            <input type="text" placeholder="Brand Name" class="i-brand" value="" oninput="this.value=this.value.toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})">
+            <input type="number" class="i-mrp" value="" min="0" placeholder="MRP" style="border-color:#7c3aed; color:#7c3aed;">
             <select class="i-cat" onchange="toggleVolumeDropdown(this, ${rowSequenceIndex})">
                 <option value="Spare">Spare</option>
                 <option value="Lube">Lube</option>
@@ -797,10 +789,10 @@
             </select>
             <input type="number" class="i-vol-other" style="display:none;" placeholder="ML">
             <div class="qty-wrap">
-                <input type="number" class="i-qty" value="1" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
+                <input type="number" class="i-qty" value="" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()">
             </div>
-            <input type="number" class="i-rate" value="" min="0" placeholder="0" oninput="compileDynamicInvoicerSums()">
-            <input type="number" class="i-disc" value="0" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="i-rate" value="" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()">
+            <input type="number" class="i-disc" value="" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()">
             <button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none; border:none; color:var(--danger); font-size:1.2rem; cursor:pointer; font-weight:bold;">×</button>`;
         stack.appendChild(node);
         rowSequenceIndex++;
@@ -814,7 +806,7 @@
     function compileDynamicInvoicerSums() {
         let itemsGrossAggregate = 0;
         document.querySelectorAll('.inline-item-row').forEach(row => {
-            const q = parseFloat(row.querySelector('.i-qty').value) || 0;
+            const q = parseFloat(row.querySelector('.i-qty').value) || 1; // Fallback internally to 1
             const r = parseFloat(row.querySelector('.i-rate').value) || 0;
             const dPerc = parseFloat(row.querySelector('.i-disc').value) || 0;
             const rawLineVal = q * r; 
@@ -822,22 +814,59 @@
         });
         const globalDeduction = parseFloat(document.getElementById('globalDeductionRupees').value) || 0;
         document.getElementById('posActiveAggregate').innerText = Math.round(itemsGrossAggregate - globalDeduction);
+        calcPosSettle();
     }
 
-    async function commitInvoiceExecution(modeTarget, statusTarget) {
-        const finalNetValuation = document.getElementById('posActiveAggregate').innerText;
+    function calcPosSettle() {
+        const total = parseFloat(document.getElementById('posActiveAggregate').innerText) || 0;
+        const c = parseFloat(document.getElementById('posCash').value) || 0;
+        const u = parseFloat(document.getElementById('posUpi').value) || 0;
+        let bal = total - (c + u);
+        if (bal < 0) bal = 0;
+        document.getElementById('posBal').value = bal.toFixed(2);
+    }
+
+    async function commitInvoiceExecution(statusTarget) {
+        const finalNetValuation = parseFloat(document.getElementById('posActiveAggregate').innerText) || 0;
+        if(finalNetValuation <= 0 && statusTarget === 'Closed') return alert("Invoice valuation must be > 0 to close.");
+
+        const c = parseFloat(document.getElementById('posCash').value) || 0;
+        const u = parseFloat(document.getElementById('posUpi').value) || 0;
+        let cr = finalNetValuation - (c + u);
+        if(cr < 0) cr = 0;
+
+        let detectedMode = 'Split';
+        if (statusTarget === 'Open') {
+            detectedMode = 'Pending';
+        } else {
+            let activeChannels = 0;
+            if (c > 0) activeChannels++;
+            if (u > 0) activeChannels++;
+            if (cr > 0) activeChannels++;
+
+            if (activeChannels <= 1) {
+                if (c > 0) detectedMode = 'Cash';
+                else if (u > 0) detectedMode = 'UPI';
+                else if (cr > 0) detectedMode = 'Credit';
+                else detectedMode = 'Cash';
+            }
+        }
+
         const mappedClientName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
         const cashierId = document.getElementById('posCashierSelect').value || null;
         
         const { data: finalRecord, error } = await supabaseClient.from('counter_sales').insert({
-            customer_mobile: evaluatedPhoneContext, 
+            customer_mobile: evaluatedPhoneContext || null, 
             customer_name: enforceTitleCaseNomenclature(mappedClientName), 
             total_amount: finalNetValuation, 
-            payment_mode: modeTarget, 
+            payment_mode: detectedMode, 
+            cash_amount: statusTarget === 'Closed' ? c : 0,
+            upi_amount: statusTarget === 'Closed' ? u : 0,
+            credit_amount: statusTarget === 'Closed' ? cr : 0,
             status: statusTarget, 
             source_role: activeRole,
-            sold_by_id: cashierId, 
+            sold_by_id: cashierId || null, 
             closed_at: statusTarget === 'Closed' ? new Date().toISOString() : null
         }).select().single();
         
@@ -873,7 +902,7 @@
                     }
                 }
 
-                if(rawSpec) {
+                if(rawSpec && rScalar > 0) {
                     const cleanSpec = enforceTitleCaseNomenclature(rawSpec);
                     const cleanBrand = rawBrand.toUpperCase();
                     const rawLineTotal = qScalar * rScalar; 
@@ -917,8 +946,24 @@
                 }
             }
             if(itemPromises.length > 0) await Promise.all(itemPromises);
-            alert(`Task closed successfully via routing: ${modeTarget}`); 
-            window.location.reload(); 
+
+            if (statusTarget === 'Closed' && cr > 0 && evaluatedPhoneContext) {
+                await supabaseClient.from('credit_payments').insert({
+                    customer_mobile: evaluatedPhoneContext,
+                    sale_id: finalRecord.id,
+                    amount_paid: -cr,
+                    payment_mode: 'POS Credit',
+                    paid_by_role: activeRole
+                });
+            }
+
+            if (statusTarget === 'Closed') {
+                posCheckoutCompleted = true; // Signals modal close to reload page
+                await instantiateInspectionScope(finalRecord.id);
+            } else {
+                alert('Draft Saved Successfully.');
+                window.location.reload(); 
+            }
         }
     }
 
@@ -938,7 +983,7 @@
             document.getElementById('thClientInfo').innerText = `${record.customer_mobile || ''} | ${record.customer_name || 'Walk-in'}`;
             document.getElementById('thNet').innerText = `₹${record.total_amount}`;
             document.getElementById('thWords').innerText = convertNumberToWords(record.total_amount);
-            document.getElementById('thMode').innerText = record.payment_mode || 'Cash';
+            document.getElementById('thMode').innerText = record.payment_mode || 'Pending';
             
             const isUnsettled = record.status === 'Open' || record.payment_mode === 'Credit';
             document.getElementById('settlementModifierInterface').style.display = isUnsettled ? 'block' : 'none';
@@ -1024,28 +1069,62 @@
     }
 
     async function commitPosSettlement() {
-        const nextMode = document.getElementById('thConvertMode').value;
+        const total = parseFloat(inspectedRecordObject.total_amount) || 0;
+        const c = parseFloat(document.getElementById('thSettleCash').value) || 0;
+        const u = parseFloat(document.getElementById('thSettleUpi').value) || 0;
+        let cr = total - (c + u);
+        if (cr < 0) cr = 0;
+
+        let detectedMode = 'Split';
+        let activeChannels = 0;
+        if (c > 0) activeChannels++;
+        if (u > 0) activeChannels++;
+        if (cr > 0) activeChannels++;
+
+        if (activeChannels <= 1) {
+            if (c > 0) detectedMode = 'Cash';
+            else if (u > 0) detectedMode = 'UPI';
+            else if (cr > 0) detectedMode = 'Credit';
+            else detectedMode = 'Cash';
+        }
+
         const currentIsoDate = new Date().toISOString();
         
         await supabaseClient.from('counter_sales').update({ 
-            payment_mode: nextMode, status: 'Closed', closed_at: currentIsoDate 
+            payment_mode: detectedMode, 
+            cash_amount: c,
+            upi_amount: u,
+            credit_amount: cr,
+            status: 'Closed', 
+            closed_at: currentIsoDate 
         }).eq('id', targetInspectionRecordId);
         
-        inspectedRecordObject.payment_mode = nextMode;
+        if (cr > 0 && inspectedRecordObject.customer_mobile) {
+            await supabaseClient.from('credit_payments').insert({
+                customer_mobile: inspectedRecordObject.customer_mobile,
+                sale_id: targetInspectionRecordId,
+                amount_paid: -cr,
+                payment_mode: 'POS Credit',
+                paid_by_role: localStorage.getItem('ERP_ACTIVE_ROLE') || 'green'
+            });
+        }
+
+        inspectedRecordObject.payment_mode = detectedMode;
         inspectedRecordObject.status = 'Closed'; 
         inspectedRecordObject.closed_at = currentIsoDate;
         
-        document.getElementById('thMode').innerText = nextMode;
+        document.getElementById('thMode').innerText = detectedMode;
         document.getElementById('thDate').innerText = new Date().toLocaleDateString('en-IN');
         document.getElementById('thTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
         document.getElementById('settlementModifierInterface').style.display = 'none';
         
-        alert(`Record cleanly settled inside today's ledger via: ${nextMode}`);
+        alert(`Record cleanly settled via: ${detectedMode}`);
         queryPosHistoryEngine();
     }
 
     function closeInspectionModal() { 
         document.getElementById('modalInspectInvoice').style.display = 'none';
+        if (posCheckoutCompleted) window.location.reload();
     }
 
     function dispatchWhatsAppImageReceipt() {
