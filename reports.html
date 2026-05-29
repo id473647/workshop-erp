@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -607,7 +606,7 @@
         const m = document.getElementById('mlabMech').value;
 
         let q = supabaseClient.from('job_cards')
-            .select('id, jc_date, labour_charges, mech_id, co_mech_id, mechanics!job_cards_mech_id_fkey(id, name, commission_rate)')
+            .select('id, jc_date, labour_charges, mech_id, co_mech_id, mechanics!job_cards_mech_id_fkey(id, name, commission_rate), co_mechanics:mechanics!job_cards_co_mech_id_fkey(id, name, commission_rate)')
             .gte('closed_at', s + 'T00:00:00') 
             .lte('closed_at', e + 'T23:59:59') 
             .eq('status', 'Closed')
@@ -625,6 +624,7 @@
             const primaryShare = hasCo ? lab / 2 : lab;
             const coShare = hasCo ? lab / 2 : 0;
             
+            // Primary Mechanic Process
             const pid = row.mech_id;
             const mechObj = row.mechanics;
             
@@ -632,6 +632,16 @@
                 if (!map[pid]) map[pid] = { name: mechObj?.name || 'Unknown', jobs: 0, lab: 0, crate: mechObj?.commission_rate ?? 10, isDefault: mechObj?.commission_rate == null };
                 map[pid].jobs++;
                 map[pid].lab += primaryShare;
+            }
+
+            // Co-Mechanic Process
+            const coId = row.co_mech_id;
+            const coObj = row.co_mechanics;
+            
+            if (coId && (m === 'ALL' || m === coId)) {
+                if (!map[coId]) map[coId] = { name: coObj?.name || 'Unknown', jobs: 0, lab: 0, crate: coObj?.commission_rate ?? 10, isDefault: coObj?.commission_rate == null };
+                map[coId].jobs++;
+                map[coId].lab += coShare;
             }
         });
 
