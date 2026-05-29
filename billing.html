@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -701,7 +700,7 @@
         const disc = parseFloat(
           document.getElementById('vDisc').value) || 0;   
         const currentNet = spareTotal + lubeTotal            
-          + lab + lathe - disc;                             
+          + lab + lathe - disc;                              
 
         const payload = {
             labour_charges: parseFloat(document.getElementById('vLabour').value) || 0,
@@ -727,18 +726,18 @@
         const fa = document.getElementById('vFutureAdvice').value.trim();                            
         const nsd = document.getElementById('vNextServiceDate').value;                                  
         const advBox = document.getElementById('printAdviceBox');        
-        const advText = document.getElementById('printAdviceText');       
+        const advText = document.getElementById('printAdviceText');        
         const ndEl = document.getElementById('printNextDate');          
         
-        if (fa) {                                                     
-          advText.innerText = fa;                                     
-          advBox.style.display = 'block';                             
+        if (fa) {                                                      
+          advText.innerText = fa;                                      
+          advBox.style.display = 'block';                              
           if (nsd) {                                                  
-            ndEl.style.display = 'block';                             
+            ndEl.style.display = 'block';                              
             ndEl.innerText = '📅 NEXT SERVICE DUE: '                  
               + new Date(nsd).toLocaleDateString('en-IN');            
-          }                                                           
-        }                                                             
+          }                                                            
+        }                                                              
         
         if (redirectAfter) window.location.href = 'index.html'; 
     }
@@ -802,12 +801,29 @@
         
         const dt = new Date().toISOString();
         
+        // --- SMART PAYMENT MODE DETECTION ---
+        let activeChannels = 0;
+        if (c > 0) activeChannels++;
+        if (u > 0) activeChannels++;
+        if (cr > 0) activeChannels++;
+        if (w > 0) activeChannels++;
+
+        let detectedMode = 'Split'; // Default
+        
+        if (activeChannels === 1) {
+            if (c > 0) detectedMode = 'Cash';
+            else if (u > 0) detectedMode = 'UPI';
+            else if (cr > 0) detectedMode = 'Credit';
+            else if (w > 0) detectedMode = 'Wallet';
+        }
+        // ------------------------------------
+        
         const invPayload = {
             job_card_id: currentJobId,
             customer_mobile: currentJob.customer_mobile,
             total_amount: net,
             discount_applied: finalDisc,
-            payment_mode: 'Split', 
+            payment_mode: detectedMode, // Dynamically applied
             cash_amount: c,
             upi_amount: u,
             credit_amount: cr,
@@ -832,7 +848,7 @@
         await supabaseClient.from('job_cards').update({
             status: 'Closed',
             closed_at: dt,
-            payment_mode: 'Split',
+            payment_mode: detectedMode, // Dynamically applied
             next_service_date: document.getElementById('nextServiceDate').value || null // NEW
         }).eq('id', currentJobId);
 
