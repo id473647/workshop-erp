@@ -462,7 +462,13 @@
                 let delBtn = '';
                 if (currentJob.status !== 'Closed') {
                     const w = (i.warehouse_type || '').toLowerCase();
-                    if (r === 'service' && (w === 'green' || w === 'moped')) {
+                    let canDelete = true;
+                    if (r === 'service' && w !== 'service') canDelete = false;
+                    if (r === 'green' && w !== 'green') canDelete = false;
+                    if (r === 'moped' && w !== 'moped') canDelete = false;
+                    if (r === 'admin') canDelete = true;
+
+                    if (!canDelete) {
                         delBtn = `<span style="font-size:0.7rem; color:#94a3b8;">Locked</span>`;
                     } else {
                         delBtn = `<button onclick="removeItem('${i.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>`;
@@ -603,9 +609,16 @@
     }
 
     async function injectItem() {
+        const r = (activeSessionRole || '').toLowerCase();
+        if (r === 'service') return alert('Service login cannot insert inventory products.');
+
         const name = document.getElementById('iSearch').value.trim().toUpperCase(); 
         const brand = document.getElementById('iBrand').value.trim().toUpperCase(); 
         const ware = document.getElementById('iWare').value; 
+        
+        if (r === 'green' && ware.toLowerCase() !== 'green') return alert("Green login can only insert from Green warehouse.");
+        if (r === 'moped' && ware.toLowerCase() !== 'moped') return alert("Moped login can only insert from Moped warehouse.");
+
         const category = document.getElementById('iCategory').value; 
         const metric = 'Pcs'; 
         const qty = parseFloat(document.getElementById('iQty').value) || 0; 
@@ -680,6 +693,9 @@
     }
 
     async function injectProtocol() {
+        const r = (activeSessionRole || '').toLowerCase();
+        if (r === 'green' || r === 'moped') return alert('Inventory login cannot insert service protocols.');
+
         const sel = document.getElementById('pSelect');
         const name = sel.options[sel.selectedIndex]?.text.split(' (')[0];
         const rate = parseFloat(document.getElementById('pRate').value) || 0;
@@ -866,6 +882,8 @@
             else if (u > 0) detectedMode = 'UPI';
             else if (cr > 0) detectedMode = 'Credit';
             else if (w > 0) detectedMode = 'Wallet';
+        } else if (activeChannels > 1) {
+            detectedMode = `Split (Cash: ₹${c}, UPI: ₹${u})`;
         }
         // ------------------------------------
         
