@@ -111,11 +111,19 @@
         </div>
 
         <div id="panelCross" class="view-panel">
-            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Target Stakeholder</label><select id="clStakeholder" onchange="generateCrossLedger()"><option value="">-- Select Target --</option></select></div>
+            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px; align-items: start;">
+                <div class="field-group" style="flex:2;">
+                    <label>Target Stakeholder(s)</label>
+                    <select id="clStakeholder" multiple style="min-height: 80px;" onchange="generateCrossLedger()">
+                        </select>
+                    <span style="font-size: 0.65rem; color: #64748b;">Hold Ctrl/Cmd to select multiple</span>
+                </div>
                 <div class="field-group"><label>Start Horizon</label><input type="date" id="clStart" onchange="generateCrossLedger()"></div>
                 <div class="field-group"><label>End Horizon</label><input type="date" id="clEnd" onchange="generateCrossLedger()"></div>
-                <div style="display:flex; gap:8px;"><button class="btn-action btn-info" onclick="exportViewToJpg('exportCrossTarget', 'Cross_Ledger')">📤 EXPORT JPG</button><button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button></div>
+                <div style="display:flex; flex-direction: column; gap:8px;">
+                    <button class="btn-action btn-info" onclick="exportViewToJpg('exportCrossTarget', 'Cross_Ledger')">📤 EXPORT JPG</button>
+                    <button class="btn-action" style="background:var(--primary);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
             </div>
 
             <div id="exportCrossTarget" style="padding:10px; background:white;">
@@ -179,7 +187,7 @@
     async function initializeLedgerEnvironment() {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('dlStart').value = today; document.getElementById('clStart').value = today; document.getElementById('clEnd').value = today;
-        const { data: m } = await supabaseClient.from('mechanics').select('id, name'); globalMechanics = m || [];
+        const { data: m } = await supabaseClient.from('mechanics').select('id, name, commission_rate'); globalMechanics = m || [];
         await fetchExternalVendors();
     }
 
@@ -190,7 +198,7 @@
 
     function populateCrossLedgerDropdown() {
         const cTarget = document.getElementById('clStakeholder');
-        cTarget.innerHTML = `<option value="">-- Select Target --</option><option value="MasterLathe">Master Lathe Account (Aggregate)</option><option value="GREEN WAREHOUSE">Green Spares Link</option><option value="MOPED WAREHOUSE">Moped Spares Link</option>`;
+        cTarget.innerHTML = `<option value="MasterLathe">Master Lathe Account (Aggregate)</option><option value="GREEN WAREHOUSE">Green Spares Link</option><option value="MOPED WAREHOUSE">Moped Spares Link</option>`;
         globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Staff: ${mech.name}</option>`; });
         globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
     }
@@ -245,10 +253,10 @@
     async function generateDailyLedger() {
         const targetDate = document.getElementById('dlStart').value; document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
         
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value, advance_paid, prepaid_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, cash_amount, upi_amount, total_invoice_value, advance_paid, prepaid_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         const { data: advances } = await supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
         const { data: prepaids } = await supabaseClient.from('job_cards').select('id, prepaid_amount').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('prepaid_amount', 0);
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, cash_amount, upi_amount, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
 
         let sumGrossCash = 0; let sumGrossUpi = 0; let sumAdvances = 0; let sumPrepaids = 0; let sumExp = 0;
@@ -260,40 +268,53 @@
         const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
 
         (jobs || []).forEach(j => { 
-            const v = parseFloat(j.total_invoice_value) || 0; 
             if (j.payment_mode === 'Cash') { 
+                const v = parseFloat(j.cash_amount) || parseFloat(j.total_invoice_value) || 0;
                 sumGrossCash += v; tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
             } else if (j.payment_mode === 'UPI') { 
+                const v = parseFloat(j.upi_amount) || parseFloat(j.total_invoice_value) || 0;
                 sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
             } else if (j.payment_mode && j.payment_mode.includes('Split')) { 
-                const splitMatch = j.payment_mode.match(/Split \(Cash: ₹([\d.]+), UPI: ₹([\d.]+)\)/);
-                if (splitMatch) {
-                    const cVal = parseFloat(splitMatch[1]) || 0;
-                    const uVal = parseFloat(splitMatch[2]) || 0;
-                    sumGrossCash += cVal; sumGrossUpi += uVal;
-                    if(cVal > 0) tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                    if(uVal > 0) tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
-                } else {
-                    tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode}</td></tr>`; 
+                // NEW SPLIT EXTRACTION LOGIC
+                let cVal = parseFloat(j.cash_amount) || 0;
+                let uVal = parseFloat(j.upi_amount) || 0;
+
+                // Fallback for older strings before proper schema columns were added
+                if(cVal === 0 && uVal === 0) {
+                    const splitMatch = j.payment_mode.match(/Cash[:\s]*₹?([\d.]+)/i);
+                    const splitMatchUpi = j.payment_mode.match(/UPI[:\s]*₹?([\d.]+)/i);
+                    if (splitMatch) cVal = parseFloat(splitMatch[1]) || 0;
+                    if (splitMatchUpi) uVal = parseFloat(splitMatchUpi[1]) || 0;
                 }
+
+                sumGrossCash += cVal; sumGrossUpi += uVal;
+                if(cVal > 0) tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
+                if(uVal > 0) tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
             } 
         });
         
         (pos || []).forEach(p => { 
-            const v = parseFloat(p.total_amount) || 0; 
             if (p.payment_mode === 'Cash') { 
+                const v = parseFloat(p.cash_amount) || parseFloat(p.total_amount) || 0;
                 sumGrossCash += v; tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
             } else if (p.payment_mode === 'UPI') { 
+                const v = parseFloat(p.upi_amount) || parseFloat(p.total_amount) || 0;
                 sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
             } else if (p.payment_mode && p.payment_mode.includes('Split')) {
-                const splitMatch = p.payment_mode.match(/Split \(Cash: ₹([\d.]+), UPI: ₹([\d.]+)\)/);
-                if (splitMatch) {
-                    const cVal = parseFloat(splitMatch[1]) || 0;
-                    const uVal = parseFloat(splitMatch[2]) || 0;
-                    sumGrossCash += cVal; sumGrossUpi += uVal;
-                    if(cVal > 0) tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                    if(uVal > 0) tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
+                // NEW SPLIT EXTRACTION LOGIC
+                let cVal = parseFloat(p.cash_amount) || 0;
+                let uVal = parseFloat(p.upi_amount) || 0;
+
+                if(cVal === 0 && uVal === 0) {
+                    const splitMatch = p.payment_mode.match(/Cash[:\s]*₹?([\d.]+)/i);
+                    const splitMatchUpi = p.payment_mode.match(/UPI[:\s]*₹?([\d.]+)/i);
+                    if (splitMatch) cVal = parseFloat(splitMatch[1]) || 0;
+                    if (splitMatchUpi) uVal = parseFloat(splitMatchUpi[1]) || 0;
                 }
+
+                sumGrossCash += cVal; sumGrossUpi += uVal;
+                if(cVal > 0) tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
+                if(uVal > 0) tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
             }
         });
         
@@ -322,31 +343,97 @@
     function exportEODToJpg() { const layoutTarget = document.getElementById('exportDailyTarget'); html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `EOD_Register_${document.getElementById('dlStart').value}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
     async function generateCrossLedger() {
-        const target = document.getElementById('clStakeholder').value; const startStr = document.getElementById('clStart').value; const endStr = document.getElementById('clEnd').value;
-        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); tbody.innerHTML = ''; if(!target) return;
+        const targetSelect = document.getElementById('clStakeholder');
+        const selectedTargets = Array.from(targetSelect.selectedOptions).map(opt => opt.value).filter(val => val !== "");
+        const startStr = document.getElementById('clStart').value; 
+        const endStr = document.getElementById('clEnd').value;
+        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); 
+        
+        tbody.innerHTML = ''; 
+        if(selectedTargets.length === 0) return;
+        
         let totalCredit = 0; let totalDebit = 0;
 
-        if (target === 'MasterLathe') {
-            const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-            (jobs || []).forEach(j => { const v = parseFloat(j.lathe_welding) || 0; totalCredit += v; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Charge Generated)</td><td>₹${v}</td><td>--</td></tr>`; });
-            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const vend = globalVendors.find(vd => vd.id === e.stakeholder_id); const vendName = vend ? vend.vendor_name : 'Unknown Vendor'; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Paid to: ${vendName} - ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`; });
+        for (const target of selectedTargets) {
+            if (target === 'MasterLathe') {
+                const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59');
+                const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+                (jobs || []).forEach(j => { const v = parseFloat(j.lathe_welding) || 0; totalCredit += v; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Charge Generated)</td><td style="color:var(--info); font-weight:bold;">₹${v}</td><td>--</td></tr>`; });
+                (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const vend = globalVendors.find(vd => vd.id === e.stakeholder_id); const vendName = vend ? vend.vendor_name : 'Unknown Vendor'; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Paid to: ${vendName} - ${e.note || ''}</td><td>--</td><td style="color:var(--danger); font-weight:bold;">₹${v}</td></tr>`; });
+            }
+            else if (target === 'GREEN WAREHOUSE' || target === 'MOPED WAREHOUSE') {
+                const shortTarget = target === 'GREEN WAREHOUSE' ? 'Green' : 'Moped';
+                const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').eq('warehouse_type', shortTarget).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
+                const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+                (lines || []).forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; const d = l.job_cards?.closed_at ? new Date(l.job_cards.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()} (${shortTarget} Parts Issued)</td><td style="color:var(--info); font-weight:bold;">₹${v}</td><td>--</td></tr>`; });
+                (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Cash Transferred to ${shortTarget}: ${e.note || ''}</td><td>--</td><td style="color:var(--danger); font-weight:bold;">₹${v}</td></tr>`; });
+            }
+            else {
+                const mechanicObj = globalMechanics.find(m => m.id === target);
+                const isMechanic = !!mechanicObj;
+                
+                if(isMechanic) { 
+                    const commissionRate = parseFloat(mechanicObj.commission_rate) || 10;
+                    
+                    const { data: jobsPrimary } = await supabaseClient.from('job_cards')
+                        .select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)')
+                        .eq('mech_id', target)
+                        .eq('status', 'Closed')
+                        .gte('closed_at', startStr)
+                        .lte('closed_at', endStr + 'T23:59:59');
+                        
+                    const { data: jobsCo } = await supabaseClient.from('job_cards')
+                        .select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)')
+                        .eq('co_mech_id', target)
+                        .eq('status', 'Closed')
+                        .gte('closed_at', startStr)
+                        .lte('closed_at', endStr + 'T23:59:59');
+
+                    const processJobForCommission = (j, isCo) => {
+                        let pkgLabor = 0; 
+                        if(j.job_card_items) { 
+                            j.job_card_items.forEach(item => { 
+                                if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; 
+                            }); 
+                        } 
+                        const totalLab = (parseFloat(j.labour_charges) || 0) + pkgLabor; 
+                        
+                        // If it's a co-mechanic job (or they are primary but there IS a co-mech), they get half the yield.
+                        // Wait, if they are primary and there is a co_mech_id, they get 50%. If they are co_mech, they get 50%.
+                        // Because this query is explicitly for them, we apply 50% if there is ANY co_mech involved.
+                        const shareRatio = (j.co_mech_id != null) ? 0.5 : 1; 
+                        
+                        const mechanicYieldShare = totalLab * shareRatio;
+                        
+                        // Calculate actual commission earned
+                        const commissionEarned = Math.round(mechanicYieldShare * (commissionRate / 100));
+                        
+                        if (commissionEarned > 0) {
+                            totalCredit += commissionEarned; 
+                            const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; 
+                            const roleTag = isCo ? 'Co-Mech' : 'Lead';
+                            tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (${mechanicObj.name} - ${roleTag} Comm @ ${commissionRate}%)</td><td style="color:var(--info); font-weight:bold;">₹${commissionEarned}</td><td>--</td></tr>`; 
+                        }
+                    };
+
+                    (jobsPrimary || []).forEach(j => processJobForCommission(j, false));
+                    (jobsCo || []).forEach(j => processJobForCommission(j, true));
+                }
+                
+                const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+                const targetDisplayLabel = mechanicObj ? mechanicObj.name : 'Target';
+                (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Payout to ${targetDisplayLabel}: ${e.note || ''}</td><td>--</td><td style="color:var(--danger); font-weight:bold;">₹${v}</td></tr>`; });
+            }
         }
-        else if (target === 'GREEN WAREHOUSE' || target === 'MOPED WAREHOUSE') {
-            const shortTarget = target === 'GREEN WAREHOUSE' ? 'Green' : 'Moped';
-            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').eq('warehouse_type', shortTarget).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-            (lines || []).forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; const d = l.job_cards?.closed_at ? new Date(l.job_cards.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v}</td><td>--</td></tr>`; });
-            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Cash Transferred: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`; });
-        }
-        else {
-            const isMechanic = globalMechanics.some(m => m.id === target);
-            if(isMechanic) { const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59'); (jobs || []).forEach(j => { let pkgLabor = 0; if(j.job_card_items) { j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); } const v = (parseFloat(j.labour_charges) || 0) + pkgLabor; totalCredit += v; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`; }); }
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
-            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`; });
-        }
-        document.getElementById('clCredit').innerText = `₹${totalCredit}`; document.getElementById('clDebit').innerText = `₹${totalDebit}`; const net = totalCredit - totalDebit; const netNode = document.getElementById('clNetBalance'); netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
+
+        document.getElementById('clCredit').innerText = `₹${totalCredit}`; 
+        document.getElementById('clDebit').innerText = `₹${totalDebit}`; 
+        const net = totalCredit - totalDebit; 
+        const netNode = document.getElementById('clNetBalance'); 
+        netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; 
+        netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
     }
+
     function exportViewToJpg(targetContainerId, fileNamePrefix) { const layoutTarget = document.getElementById(targetContainerId); html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
     initializeLedgerEnvironment();
