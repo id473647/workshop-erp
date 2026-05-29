@@ -28,7 +28,20 @@
         .autocomplete-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); } .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; } .autocomplete-item:hover { background: #f8fafc; }
         #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--light); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: var(--primary); }
         .print-area { display: none; }
-        @media print { body * { visibility: hidden; } .print-area, .print-area * { visibility: visible; } .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 15px; } .print-area h2 { margin-top:0; color: #000; } .print-area table { border: 1px solid #000; margin-bottom: 10px; } .print-area th, .print-area td { border: 1px solid #ccc; padding: 5px; color: #000; } .print-mechanic { display: block !important; } }
+        
+        @media print { 
+            body * { visibility: hidden; } 
+            
+            body.print-mechanic .print-area, body.print-mechanic .print-area * { visibility: visible; } 
+            body.print-mechanic .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 15px; } 
+            body.print-mechanic .print-area h2 { margin-top:0; color: #000; } 
+            body.print-mechanic .print-area table { border: 1px solid #000; margin-bottom: 10px; } 
+            body.print-mechanic .print-area th, body.print-mechanic .print-area td { border: 1px solid #ccc; padding: 5px; color: #000; } 
+            body.print-mechanic .print-mechanic { display: block !important; } 
+            
+            body.print-receipt #renderThermalReceiptTarget, body.print-receipt #renderThermalReceiptTarget * { visibility: visible; }
+            body.print-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; max-width: 148mm; padding: 10mm; background: white; margin: 0; }
+        }
     </style>
 </head>
 <body>
@@ -72,8 +85,8 @@
         </div>
 
         <div class="inputs-grid" id="actionGrid">
-            <button class="btn-action btn-info" onclick="openItemModal()">+ ADD PART / LUBE</button>
-            <button class="btn-action" style="background:var(--purple);" onclick="openProtocolModal()">+ FIXED PROTOCOL</button>
+            <button id="btnAddPart" class="btn-action btn-info" onclick="openItemModal()">+ ADD PART / LUBE</button>
+            <button id="btnAddProtocol" class="btn-action" style="background:var(--purple);" onclick="openProtocolModal()">+ FIXED PROTOCOL</button>
         </div>
 
         <div class="table-wrapper">
@@ -234,6 +247,21 @@
     </div>
 </div>
 
+<div id="modalPrintReceipt" class="overlay-modal">
+    <div class="modal-card" style="max-width: 650px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
+            <h3 style="margin:0; color:var(--primary);">Final Customer Invoice</h3>
+            <button onclick="closeReceiptModal()" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        <div id="renderThermalReceiptTarget" style="background: white; color: black; padding: 15px; font-family: 'Segoe UI', sans-serif;">
+        </div>
+        <div class="action-strip-bar" style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn-action" style="flex:1; background:var(--primary);" onclick="triggerReceiptPrint()">🖨️ PRINT INVOICE</button>
+            <button class="btn-action" style="flex:1; background:#25d366;" onclick="dispatchWhatsAppImageReceipt()">💬 WHATSAPP</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE'); 
     const roleBadge = document.getElementById('roleDisplay'); 
@@ -289,6 +317,7 @@
         const r = (activeSessionRole || '').toLowerCase();
         if(r === 'green') document.getElementById('iWare').value = 'Green';
         if(r === 'moped') document.getElementById('iWare').value = 'Moped';
+        
         if(r === 'green' || r === 'moped') {
             document.getElementById('iWare').disabled = true;
             document.getElementById('vLabour').disabled = true;
@@ -298,12 +327,20 @@
             document.getElementById('coMech').disabled = true;
             document.getElementById('vFutureAdvice').disabled = true;
             document.getElementById('btnCloseJob').style.display = 'none';
+            
+            const btnProt = document.getElementById('btnAddProtocol');
+            if(btnProt) btnProt.style.display = 'none';
         }
         
-        if (r === 'service' || r === 'admin') { // NEW
-            const cb = document.getElementById('btnCancelJob'); // NEW
-            if (cb) cb.style.display = 'inline-block'; // NEW
-        } // NEW
+        if (r === 'service') {
+            const btnPart = document.getElementById('btnAddPart');
+            if(btnPart) btnPart.style.display = 'none';
+        }
+        
+        if (r === 'service' || r === 'admin') { 
+            const cb = document.getElementById('btnCancelJob'); 
+            if (cb) cb.style.display = 'inline-block'; 
+        } 
     }
 
     async function fetchMechanics() {
@@ -370,21 +407,21 @@
         if (job.status === 'Closed') {
             lockUI();
             
-            if (job.status === 'Closed') { // NEW
-                const closedMs = new Date(job.closed_at).getTime(); // NEW
-                const nowMs = Date.now(); // NEW
-                const daysSince = (nowMs - closedMs) / 86400000; // NEW
-                const role = (activeSessionRole || '').toLowerCase(); // NEW
+            if (job.status === 'Closed') {
+                const closedMs = new Date(job.closed_at).getTime(); 
+                const nowMs = Date.now(); 
+                const daysSince = (nowMs - closedMs) / 86400000; 
+                const role = (activeSessionRole || '').toLowerCase(); 
 
-                if (daysSince <= 7 && (role === 'service' || role === 'admin')) { // NEW
-                    const rbtn = document.getElementById('btnReopenReq'); // NEW
-                    if (rbtn) rbtn.style.display = 'inline-block'; // NEW
-                } // NEW
+                if (daysSince <= 7 && (role === 'service' || role === 'admin')) { 
+                    const rbtn = document.getElementById('btnReopenReq'); 
+                    if (rbtn) rbtn.style.display = 'inline-block'; 
+                } 
 
-                if (role === 'admin') { // NEW
-                    checkPendingReturnRequest(); // NEW
-                } // NEW
-            } // NEW
+                if (role === 'admin') { 
+                    checkPendingReturnRequest(); 
+                } 
+            } 
         }
 
         await loadItems();
@@ -393,8 +430,8 @@
     function lockUI() {
         document.getElementById('actionGrid').style.display = 'none';
         document.getElementById('btnCloseJob').style.display = 'none';
-        const cbtn = document.getElementById('btnCancelJob'); // NEW
-        if (cbtn) cbtn.style.display = 'none'; // NEW
+        const cbtn = document.getElementById('btnCancelJob'); 
+        if (cbtn) cbtn.style.display = 'none'; 
         document.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
         document.getElementById('vStatus').style.background = '#dcfce7';
         document.getElementById('vStatus').style.color = '#15803d';
@@ -410,6 +447,8 @@
     function renderItems() {
         const tb = document.getElementById('tbItems');
         tb.innerHTML = '';
+        const r = (activeSessionRole || '').toLowerCase();
+
         if(currentItems.length === 0) {
             tb.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">No allocations yet.</td></tr>';
         } else {
@@ -420,6 +459,16 @@
                     qtyDisplay += ` <span style="color:var(--purple); font-size:0.75rem; font-weight:bold;">(${volML.toFixed(0)} ML)</span>`;
                 }
 
+                let delBtn = '';
+                if (currentJob.status !== 'Closed') {
+                    const w = (i.warehouse_type || '').toLowerCase();
+                    if (r === 'service' && (w === 'green' || w === 'moped')) {
+                        delBtn = `<span style="font-size:0.7rem; color:#94a3b8;">Locked</span>`;
+                    } else {
+                        delBtn = `<button onclick="removeItem('${i.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>`;
+                    }
+                }
+
                 tb.innerHTML += `
                     <tr>
                         <td><span style="font-size:0.7rem; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${i.warehouse_type}</span></td>
@@ -427,7 +476,7 @@
                         <td>${qtyDisplay}</td>
                         <td>₹${i.unit_price}</td>
                         <td style="font-weight:bold;">₹${i.total_price}</td>
-                        <td>${currentJob.status !== 'Closed' ? `<button onclick="removeItem('${i.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>` : ''}</td>
+                        <td>${delBtn}</td>
                     </tr>
                 `;
             });
@@ -682,7 +731,7 @@
         document.getElementById('tBal').innerText = `₹${netBalanceDue.toFixed(2)}`;
     }
 
-    async function saveJobState(redirectAfter = false) { 
+    async function saveJobState(redirectAfter = false, isClosing = false) { 
         let greenTotal = 0, mopedTotal = 0,          
             lubeTotal = 0, spareTotal = 0;             
         currentItems.forEach(i => {                  
@@ -721,7 +770,6 @@
         }
 
         await supabaseClient.from('job_cards').update(payload).eq('id', currentJobId);
-        alert("Draft Saved.");
         
         const fa = document.getElementById('vFutureAdvice').value.trim();                            
         const nsd = document.getElementById('vNextServiceDate').value;                                  
@@ -739,7 +787,10 @@
           }                                                            
         }                                                              
         
-        if (redirectAfter) window.location.href = 'index.html'; 
+        if (!isClosing) {
+            alert("Draft Saved.");
+            if (redirectAfter) window.location.href = 'index.html'; 
+        }
     }
 
     function openSplitPayModal() {
@@ -789,7 +840,7 @@
         
         document.getElementById('btnFinalClose').innerText = 'PROCESSING...';
         
-        await saveJobState(); 
+        await saveJobState(false, true); // Avoid intermediate alert popup
         
         const w = parseFloat(document.getElementById('spWallet').value) || 0;
         const c = parseFloat(document.getElementById('spCash').value) || 0;
@@ -849,136 +900,266 @@
             status: 'Closed',
             closed_at: dt,
             payment_mode: detectedMode, // Dynamically applied
-            next_service_date: document.getElementById('nextServiceDate').value || null // NEW
+            next_service_date: document.getElementById('nextServiceDate').value || null
         }).eq('id', currentJobId);
 
-        alert("Job Card Closed Successfully!");
+        document.getElementById('splitPayModal').style.display = 'none';
+        buildAndShowReceipt();
+    }
+
+    function buildAndShowReceipt() {
+        const rt = document.getElementById('renderThermalReceiptTarget');
+        const jcRef = `JC-${jcHash}`;
+        const d = new Date().toLocaleDateString('en-IN');
+        const t = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+        const cName = currentCustomer.name || 'Walk-in';
+        const cMob = currentJob.customer_mobile || '--';
+        const reg = currentJob.vehicles?.reg_number || '--';
+        const mod = currentJob.vehicles?.make_model || '--';
+        const mechSel = document.getElementById('primaryMech');
+        const mech = mechSel.options[mechSel.selectedIndex]?.text || '--';
+        const odo = document.getElementById('vOdo').value || '--';
+
+        let trs = '';
+        currentItems.forEach(i => {
+            const volML = calcVolumeML(i);
+            let qtyDisplay = `${i.qty} ${i.unit_metric || 'Pcs'}`;
+            if (volML > 0 && i.unit_metric !== 'ML') {
+                qtyDisplay += ` <span style="font-size:0.7rem;">(${volML.toFixed(0)} ML)</span>`;
+            }
+            trs += `<tr>
+                <td style="padding:6px 4px; border-bottom:1px dashed #ccc;">${i.item_name}</td>
+                <td style="padding:6px 4px; border-bottom:1px dashed #ccc;">${qtyDisplay}</td>
+                <td style="padding:6px 4px; border-bottom:1px dashed #ccc;">₹${i.unit_price}</td>
+                <td style="padding:6px 4px; border-bottom:1px dashed #ccc; font-weight:bold;">₹${i.total_price}</td>
+            </tr>`;
+        });
+
+        // add labour & lathe if any
+        const lab = parseFloat(document.getElementById('vLabour').value) || 0;
+        if(lab > 0) trs += `<tr><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">Variable Labour</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">-</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">₹${lab}</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc; font-weight:bold;">₹${lab}</td></tr>`;
+        
+        const lathe = parseFloat(document.getElementById('vLathe').value) || 0;
+        if(lathe > 0) trs += `<tr><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">Lathe / Welding</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">-</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc;">₹${lathe}</td><td style="padding:6px 4px; border-bottom:1px dashed #ccc; font-weight:bold;">₹${lathe}</td></tr>`;
+
+        const net = document.getElementById('tNet').innerText;
+        const disc = document.getElementById('tDisc').innerText;
+        const adv = document.getElementById('tAdv').innerText;
+        const bal = document.getElementById('tBal').innerText;
+        
+        const nsd = document.getElementById('vNextServiceDate').value;
+        let nsdHtml = '';
+        if (nsd) {
+            nsdHtml = `<div style="text-align:center; font-weight:bold; margin-top:15px; color:#d97706; border:1px dashed #d97706; padding:5px;">📅 Next Service Due: ${new Date(nsd).toLocaleDateString('en-IN')}</div>`;
+        }
+
+        rt.innerHTML = `
+            <div style="text-align:center; margin-bottom:15px; border-bottom:2px solid black; padding-bottom:10px;">
+                <div style="display:flex; justify-content:center; gap:10px; margin-bottom:10px;">
+                    <img src="logo-main.jpg" style="height:40px; object-fit:contain;" onerror="this.style.display='none'">
+                    <img src="logo-green.png" style="height:40px; object-fit:contain;" onerror="this.style.display='none'">
+                </div>
+                <h2 style="margin:0; font-size:18px;">MY CARE SERVICE CENTER</h2>
+                <div style="font-size:12px;">GSTIN: 23ANAPB4613K1ZJ | Gurudwara Road, Ganj Betul</div>
+                <div style="font-size:12px;">Phone: 9425002214, 8989171751</div>
+            </div>
+            <table style="width:100%; font-size:12px; margin-bottom:15px;">
+                <tr>
+                    <td style="width:50%;"><strong>Bill No:</strong> ${jcRef}</td>
+                    <td style="width:50%; text-align:right;"><strong>Date:</strong> ${d} ${t}</td>
+                </tr>
+                <tr>
+                    <td><strong>Customer:</strong> ${cName}</td>
+                    <td style="text-align:right;"><strong>Mobile:</strong> ${cMob}</td>
+                </tr>
+                <tr>
+                    <td><strong>Vehicle:</strong> ${mod} (${reg})</td>
+                    <td style="text-align:right;"><strong>Odometer:</strong> ${odo} KMs</td>
+                </tr>
+                <tr>
+                    <td><strong>Mechanic:</strong> ${mech}</td>
+                    <td style="text-align:right;"></td>
+                </tr>
+            </table>
+            <table style="width:100%; font-size:12px; border-collapse:collapse; margin-bottom:15px;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding:6px 4px; text-align:left; border-bottom:2px solid #000; border-top:2px solid #000;">Description</th>
+                        <th style="padding:6px 4px; text-align:left; border-bottom:2px solid #000; border-top:2px solid #000;">Qty</th>
+                        <th style="padding:6px 4px; text-align:left; border-bottom:2px solid #000; border-top:2px solid #000;">Rate</th>
+                        <th style="padding:6px 4px; text-align:left; border-bottom:2px solid #000; border-top:2px solid #000;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>${trs}</tbody>
+            </table>
+            <table style="width:100%; font-size:12px; border-top:2px solid #000; padding-top:8px;">
+                <tr><td style="text-align:right; width:75%; padding:3px;"><strong>Discount:</strong></td><td style="text-align:right; color:red; padding:3px;">${disc}</td></tr>
+                <tr><td style="text-align:right; width:75%; padding:3px;"><strong>Advance Paid:</strong></td><td style="text-align:right; color:green; padding:3px;">${adv}</td></tr>
+                <tr><td style="text-align:right; width:75%; font-size:16px; padding:5px 3px;"><strong>NET PAYABLE:</strong></td><td style="text-align:right; font-size:16px; font-weight:bold; padding:5px 3px;">${net}</td></tr>
+            </table>
+            ${nsdHtml}
+            <div style="text-align:center; font-size:11px; margin-top:25px; font-style:italic; border-top:1px dashed #ccc; padding-top:10px;">
+                Thank you for trusting My Care. Drive safe!
+            </div>
+        `;
+        
+        document.getElementById('modalPrintReceipt').style.display = 'flex';
+        lockUI();
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('modalPrintReceipt').style.display = 'none';
         window.location.reload();
     }
 
-    async function cancelJobCard() { // NEW
-        if (currentJob.status === 'Closed' || currentJob.status === 'Cancelled') { // NEW
-            alert('This job card is already ' + currentJob.status); // NEW
-            return; // NEW
-        } // NEW
+    function dispatchWhatsAppImageReceipt() {
+        const layoutTarget = document.getElementById('renderThermalReceiptTarget');
+        const origBorder = layoutTarget.style.border; 
+        layoutTarget.style.border = 'none';
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            layoutTarget.style.border = origBorder;
+            canvas.toBlob(blob => {
+                const targetBlobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = targetBlobUrl; 
+                a.download = `Invoice_${currentJobId.split('-')[0].toUpperCase()}.jpg`;
+                a.click(); 
+                URL.revokeObjectURL(targetBlobUrl);
+            }, 'image/jpeg', 0.95);
+        });
+    }
 
-        const reason = prompt('CANCEL JOB CARD\n\nEnter cancellation reason (required):\ne.g. Customer not available, Spare not in stock,\nMechanic unavailable...'); // NEW
+    async function cancelJobCard() { 
+        if (currentJob.status === 'Closed' || currentJob.status === 'Cancelled') { 
+            alert('This job card is already ' + currentJob.status); 
+            return; 
+        } 
 
-        if (!reason || reason.trim() === '') { // NEW
-            alert('Cancellation reason is required.'); // NEW
-            return; // NEW
-        } // NEW
+        const reason = prompt('CANCEL JOB CARD\n\nEnter cancellation reason (required):\ne.g. Customer not available, Spare not in stock,\nMechanic unavailable...'); 
 
-        const confirmed = confirm('Confirm cancellation?\n\nReason: ' + reason + '\n\nThis will mark the job card as CANCELLED.'); // NEW
-        if (!confirmed) return; // NEW
+        if (!reason || reason.trim() === '') { 
+            alert('Cancellation reason is required.'); 
+            return; 
+        } 
 
-        const { error } = await supabaseClient // NEW
-            .from('job_cards') // NEW
-            .update({ // NEW
-                status: 'Cancelled', // NEW
-                cancellation_reason: reason.trim().toUpperCase(), // NEW
-                closed_at: new Date().toISOString() // NEW
-            }) // NEW
-            .eq('id', currentJobId); // NEW
+        const confirmed = confirm('Confirm cancellation?\n\nReason: ' + reason + '\n\nThis will mark the job card as CANCELLED.'); 
+        if (!confirmed) return; 
 
-        if (error) { // NEW
-            alert('Error: ' + error.message); // NEW
-        } else { // NEW
-            alert('Job Card cancelled successfully.\nReason: ' + reason); // NEW
-            window.location.href = 'index.html'; // NEW
-        } // NEW
-    } // NEW
+        const { error } = await supabaseClient 
+            .from('job_cards') 
+            .update({ 
+                status: 'Cancelled', 
+                cancellation_reason: reason.trim().toUpperCase(), 
+                closed_at: new Date().toISOString() 
+            }) 
+            .eq('id', currentJobId); 
 
-    async function submitReturnRequest() { // NEW
-        const desc = prompt('PRODUCT RETURN / SERVICE ISSUE\n\nDescribe the reason for reopening this job card:\n(e.g. Wrong part fitted, customer complaint,\n part needs return, service re-do required)'); // NEW
+        if (error) { 
+            alert('Error: ' + error.message); 
+        } else { 
+            alert('Job Card cancelled successfully.\nReason: ' + reason); 
+            window.location.href = 'index.html'; 
+        } 
+    } 
 
-        if (!desc || desc.trim() === '') { // NEW
-            alert('Description is required for return request.'); // NEW
-            return; // NEW
-        } // NEW
+    async function submitReturnRequest() { 
+        const desc = prompt('PRODUCT RETURN / SERVICE ISSUE\n\nDescribe the reason for reopening this job card:\n(e.g. Wrong part fitted, customer complaint,\n part needs return, service re-do required)'); 
 
-        const { error } = await supabaseClient // NEW
-            .from('approval_requests') // NEW
-            .insert({ // NEW
-                job_card_id: currentJobId, // NEW
-                request_type: 'JC_RETURN', // NEW
-                description: desc.trim().toUpperCase(), // NEW
-                requested_by: activeSessionRole, // NEW
-                status: 'pending', // NEW
-                customer_mobile: currentJob.customer_mobile // NEW
-            }); // NEW
+        if (!desc || desc.trim() === '') { 
+            alert('Description is required for return request.'); 
+            return; 
+        } 
 
-        await supabaseClient // NEW
-            .from('job_cards') // NEW
-            .update({ // NEW
-                return_description: desc.trim().toUpperCase(), // NEW
-                return_requested_by: activeSessionRole, // NEW
-                return_requested_at: new Date().toISOString() // NEW
-            }) // NEW
-            .eq('id', currentJobId); // NEW
+        const { error } = await supabaseClient 
+            .from('approval_requests') 
+            .insert({ 
+                job_card_id: currentJobId, 
+                request_type: 'JC_RETURN', 
+                description: desc.trim().toUpperCase(), 
+                requested_by: activeSessionRole, 
+                status: 'pending', 
+                customer_mobile: currentJob.customer_mobile 
+            }); 
 
-        if (error) { // NEW
-            alert('Error submitting request: ' + error.message); // NEW
-        } else { // NEW
-            alert('Return request submitted.\nAdmin will review and approve.'); // NEW
-            document.getElementById('btnReopenReq').style.display = 'none'; // NEW
-        } // NEW
-    } // NEW
+        await supabaseClient 
+            .from('job_cards') 
+            .update({ 
+                return_description: desc.trim().toUpperCase(), 
+                return_requested_by: activeSessionRole, 
+                return_requested_at: new Date().toISOString() 
+            }) 
+            .eq('id', currentJobId); 
 
-    async function checkPendingReturnRequest() { // NEW
-        const { data } = await supabaseClient // NEW
-            .from('approval_requests') // NEW
-            .select('*') // NEW
-            .eq('job_card_id', currentJobId) // NEW
-            .eq('request_type', 'JC_RETURN') // NEW
-            .eq('status', 'pending') // NEW
-            .limit(1); // NEW
+        if (error) { 
+            alert('Error submitting request: ' + error.message); 
+        } else { 
+            alert('Return request submitted.\nAdmin will review and approve.'); 
+            document.getElementById('btnReopenReq').style.display = 'none'; 
+        } 
+    } 
 
-        if (data && data.length > 0) { // NEW
-            const req = data[0]; // NEW
-            const banner = document.getElementById('returnRequestBanner'); // NEW
-            banner.style.display = 'block'; // NEW
-            document.getElementById('returnRequestDetail').innerText = 'Reason: ' + (req.description || '--') + ' | Requested by: ' + (req.requested_by || '--'); // NEW
-            const adminActs = document.getElementById('adminReturnActions'); // NEW
-            if (adminActs) adminActs.style.display = 'flex'; // NEW
-        } // NEW
-    } // NEW
+    async function checkPendingReturnRequest() { 
+        const { data } = await supabaseClient 
+            .from('approval_requests') 
+            .select('*') 
+            .eq('job_card_id', currentJobId) 
+            .eq('request_type', 'JC_RETURN') 
+            .eq('status', 'pending') 
+            .limit(1); 
 
-    async function approveReturnRequest() { // NEW
-        const { error: updReq } = await supabaseClient // NEW
-            .from('approval_requests') // NEW
-            .update({ status: 'approved' }) // NEW
-            .eq('job_card_id', currentJobId) // NEW
-            .eq('request_type', 'JC_RETURN') // NEW
-            .eq('status', 'pending'); // NEW
+        if (data && data.length > 0) { 
+            const req = data[0]; 
+            const banner = document.getElementById('returnRequestBanner'); 
+            banner.style.display = 'block'; 
+            document.getElementById('returnRequestDetail').innerText = 'Reason: ' + (req.description || '--') + ' | Requested by: ' + (req.requested_by || '--'); 
+            const adminActs = document.getElementById('adminReturnActions'); 
+            if (adminActs) adminActs.style.display = 'flex'; 
+        } 
+    } 
 
-        const { error: updJc } = await supabaseClient // NEW
-            .from('job_cards') // NEW
-            .update({ status: 'Open', closed_at: null }) // NEW
-            .eq('id', currentJobId); // NEW
+    async function approveReturnRequest() { 
+        const { error: updReq } = await supabaseClient 
+            .from('approval_requests') 
+            .update({ status: 'approved' }) 
+            .eq('job_card_id', currentJobId) 
+            .eq('request_type', 'JC_RETURN') 
+            .eq('status', 'pending'); 
 
-        if (updReq || updJc) { // NEW
-            alert('Error: ' + (updReq?.message || updJc?.message)); // NEW
-        } else { // NEW
-            alert('Job Card re-opened. Staff can now edit it.'); // NEW
-            window.location.reload(); // NEW
-        } // NEW
-    } // NEW
+        const { error: updJc } = await supabaseClient 
+            .from('job_cards') 
+            .update({ status: 'Open', closed_at: null }) 
+            .eq('id', currentJobId); 
 
-    async function rejectReturnRequest() { // NEW
-        const reason = prompt('Reason for rejection:'); // NEW
-        if (!reason) return; // NEW
-        await supabaseClient.from('approval_requests') // NEW
-            .update({ status: 'rejected', description: (reason || '').toUpperCase() }) // NEW
-            .eq('job_card_id', currentJobId) // NEW
-            .eq('request_type', 'JC_RETURN') // NEW
-            .eq('status', 'pending'); // NEW
-        alert('Return request rejected.'); // NEW
-        window.location.reload(); // NEW
-    } // NEW
+        if (updReq || updJc) { 
+            alert('Error: ' + (updReq?.message || updJc?.message)); 
+        } else { 
+            alert('Job Card re-opened. Staff can now edit it.'); 
+            window.location.reload(); 
+        } 
+    } 
+
+    async function rejectReturnRequest() { 
+        const reason = prompt('Reason for rejection:'); 
+        if (!reason) return; 
+        await supabaseClient.from('approval_requests') 
+            .update({ status: 'rejected', description: (reason || '').toUpperCase() }) 
+            .eq('job_card_id', currentJobId) 
+            .eq('request_type', 'JC_RETURN') 
+            .eq('status', 'pending'); 
+        alert('Return request rejected.'); 
+        window.location.reload(); 
+    } 
 
     function triggerMechPrint() {
         alert("In a full build, this hooks to an invisible .print-area div with the tokens. Use Ctrl+P to see native browser print behavior.");
+        document.body.classList.add('print-mechanic');
+        document.body.classList.remove('print-receipt');
+        window.print();
+    }
+    
+    function triggerReceiptPrint() {
+        document.body.classList.add('print-receipt');
+        document.body.classList.remove('print-mechanic');
         window.print();
     }
 </script>
