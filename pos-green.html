@@ -81,7 +81,7 @@
         .autocomplete-item:hover { background: #f0f7ff; }
 
         .valuation-banner { background: var(--success); color: white; padding: 16px; border-radius: 8px; font-size: 1.4rem; font-weight: 700; text-align: center; margin: 20px 0; }
-        .settle-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .settle-matrix { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; }
         
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
@@ -104,7 +104,15 @@
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; }
         .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
 
-        @media print { body * { visibility: hidden; } #renderThermalReceiptTarget, #renderThermalReceiptTarget * { visibility: visible; } #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; } }
+        /* Print Specifics (Bug 5) */
+        @media print {
+            body.print-pos-receipt * { visibility: hidden; }
+            body.print-pos-receipt #renderThermalReceiptTarget,
+            body.print-pos-receipt #renderThermalReceiptTarget * { visibility: visible; }
+            body.print-pos-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
+            body.print-pos-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 80mm; max-width: 80mm; padding: 0; }
+            body.print-pos-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 8mm; }
+        }
         
         .status-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
     </style>
@@ -142,6 +150,8 @@
             </div>
         </div>
         <div id="creditAlertBox" class="credit-alert">⚠️ WARNING: ACTIVE UNSETTLED DEBT HISTORY DETECTED ON ACCOUNT</div>
+
+        <div id="posCreditBalanceBadge" style="display:none; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; margin-top:8px; align-items:center; font-weight:600;"></div>
 
         <div id="recentSalesBlock" style="display:none; margin-top:16px;">
             <div class="block-title" style="font-size:0.85rem; color:#64748b;">Recent Mapped Encounters</div>
@@ -259,9 +269,11 @@
             <div class="field-group"><label>UPI / Card (₹)</label><input type="number" id="posUpi" placeholder="0" min="0" oninput="calcPosSettle()"></div>
             <div class="field-group"><label>Balance Due (₹)</label><input type="text" id="posBal" value="0" readonly style="background:#f1f5f9; font-weight:bold; color:var(--danger);"></div>
         </div>
+        
         <div class="settle-matrix" style="margin-top:10px;">
             <button class="btn-action" style="background:var(--success);" onclick="commitInvoiceExecution('Closed')">COMPLETE TRANSACTION</button>
             <button class="btn-action" style="background:var(--primary);" onclick="commitInvoiceExecution('Open')">HOLD ACTIVE DRAFT</button>
+            <button class="btn-action" style="background:var(--danger);" onclick="commitCreditBillExecution()">💳 CREDIT BILL</button>
         </div>
     </div>
 </div>
@@ -280,11 +292,14 @@
                     <img src="logo-green.png" onerror="this.style.display='none'">
                 </div>
                 <div id="thermalShopName" class="receipt-shop-title">Green Scooter Center</div>
-                <div id="thermalGst" class="receipt-meta">GSTIN: 23BCVPB4126J1ZM</div>
                 <div class="receipt-meta">Gurudwara Road, Ganj Betul</div>
                 <div class="receipt-meta">PH: 9425002214, 8989171751, 9691600001</div>
             </div>
             
+            <div id="thCreditHeader" style="display:none; text-align:center; background:#fee2e2; color:#991b1b; font-weight:800; font-size:0.9rem; padding:4px; border:2px solid #991b1b; margin-bottom:6px; letter-spacing:1px;">
+                ★ CREDIT BILL ★
+            </div>
+
             <div class="receipt-meta" style="display:flex; justify-content:space-between;">
                 <div>Date: <span id="thDate">--</span></div>
                 <div>Time: <span id="thTime">--</span></div>
@@ -321,8 +336,25 @@
             </div>
             
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">
-                Settlement Route: <span id="thMode">--</span>
+                Payment Mode: <span id="thMode">--</span>
             </div>
+            
+            <div id="thPaymentBreakdown" style="display:none; margin-top:2px; font-size:0.72rem; background:#f8fafc; padding:4px 6px; border-radius:4px;">
+                <div id="thCashLine" style="display:none; display:flex; justify-content:space-between;">
+                    <span>Cash Paid:</span><span id="thCashAmt">₹0</span>
+                </div>
+                <div id="thUpiLine" style="display:none; display:flex; justify-content:space-between;">
+                    <span>UPI / Card Paid:</span><span id="thUpiAmt">₹0</span>
+                </div>
+                <div id="thCreditLine" style="display:none; display:flex; justify-content:space-between; color:#dc2626; font-weight:bold;">
+                    <span>Credit Outstanding:</span><span id="thCreditAmt">₹0</span>
+                </div>
+            </div>
+
+            <div class="receipt-meta" style="font-size:0.65rem; text-align:center; margin-top:4px; color:#64748b;">
+                All prices are <strong>GST Inclusive</strong> | GSTIN: <span id="thGstDisplay">--</span>
+            </div>
+
             <div class="receipt-footer">Computer Generated Document.<br>Thank You.</div>
         </div>
 
@@ -336,8 +368,21 @@
         </div>
 
         <div class="action-strip-bar">
-            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="window.print()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPosPrintSelection()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:#0ea5e9; color:white;" onclick="savePosReceiptAsJpg()">📥 SAVE JPG</button>
             <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WHATSAPP</button>
+            <button id="btnEditDraftModal" class="btn-ui-action" style="background:var(--warning); color:white; display:none;" onclick="loadDraftForEditing()">✏️ EDIT DRAFT</button>
+        </div>
+    </div>
+</div>
+
+<div id="modalPosPrintChoice" class="overlay-modal" style="z-index:400;">
+    <div class="modal-card" style="text-align:center; max-width:380px;">
+        <h3 style="margin-top:0; color:var(--primary);">Select Print Format</h3>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+            <button class="btn-action" style="background:var(--success);" onclick="executePosReceipt('thermal')">🖨️ THERMAL (3-Inch Roll Paper)</button>
+            <button class="btn-action" style="background:var(--info);" onclick="executePosReceipt('a5')">📄 A5 / A6 (Standard Invoice)</button>
+            <button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPosPrintChoice').style.display='none'">CANCEL</button>
         </div>
     </div>
 </div>
@@ -378,6 +423,9 @@
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+    // Bug 1: Track if we are editing an existing draft
+    let activeDraftRecordId = null;
+
     let evaluatedPhoneContext = null; let targetInspectionRecordId = null; let inspectedRecordObject = null;
     let targetCustomerProfile = null; let globalCatalogCache = []; let rowSequenceIndex = 1;
     let currentPosTabMode = 'AgedCredit';
@@ -388,9 +436,6 @@
     
     document.getElementById('roleDisplay').innerText = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'GUEST').toUpperCase();
 
-    /**
-     * Calculates the total volume in ML for a job_card_items or counter_sale_items row.
-     */
     function calcVolumeML(item) {
         if (item.unit_metric === 'ML') return parseFloat(item.qty) || 0;
         if (item.volume_ml > 0) return (parseFloat(item.qty) || 0) * item.volume_ml;
@@ -407,7 +452,13 @@
     }
 
     async function initPosTerminal() {
-        const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
+        // Bug 7: Sold By Dropdown Filter - In Spare Parts and Workshop Managers Only
+        const { data: staffList } = await supabaseClient.from('mechanics')
+            .select('id, name, staff_role')
+            .eq('is_active', true)
+            .in('staff_role', ['Spare Parts Staff', 'Workshop Manager'])
+            .order('name');
+
         let staffOpt = '<option value="">👤 Sold By (Select Staff)</option>';
         staffList?.forEach(s => {
             staffOpt += `<option value="${s.id}">${s.name} (${s.staff_role})</option>`;
@@ -454,6 +505,9 @@
     }
 
     async function queryPosHistoryEngine() {
+        // Bug 1: Reset draft active ID when history tab is refreshed
+        activeDraftRecordId = null;
+
         const phoneVal = document.getElementById('fPhone').value.trim().toLowerCase();
         const minVal = parseFloat(document.getElementById('fMin').value);
         const maxVal = parseFloat(document.getElementById('fMax').value);
@@ -519,12 +573,41 @@
         }
     }
 
+    // Bug 4: Customer Credit Balance Display feature
+    async function displayCustomerCreditBalance(mobile, customerName) {
+        if (!mobile) return;
+        const creditBalanceBadge = document.getElementById('posCreditBalanceBadge');
+        if (!creditBalanceBadge) return;
+
+        const { data: payments } = await supabaseClient.from('credit_payments')
+            .select('amount_paid')
+            .eq('customer_mobile', mobile);
+
+        if (!payments) { creditBalanceBadge.style.display = 'none'; return; }
+
+        // Sum all entries: negative = credit issued, positive = payment received
+        const netSumOfPayments = payments.reduce((acc, p) => acc + (parseFloat(p.amount_paid) || 0), 0);
+        const outstanding = Math.round(-netSumOfPayments); // flip sign: positive = money owed
+
+        if (outstanding > 0) {
+            creditBalanceBadge.style.display = 'inline-flex';
+            creditBalanceBadge.innerHTML = `⚠️ Credit Due: <strong style="margin-left:4px;">₹${outstanding}</strong> <span style="font-size:0.7rem; margin-left:4px;">(click to view ledger)</span>`;
+            creditBalanceBadge.onclick = () => {
+                // Navigate to CRM page with mobile pre-filled
+                window.open(`utility-router.html?tab=wsCustomers&mobile=${mobile}`, '_blank');
+            };
+        } else {
+            creditBalanceBadge.style.display = 'none';
+        }
+    }
+
     async function processAutonomousPhoneSearch(phoneStringVal) {
         const cleanStr = phoneStringVal.trim();
         if(cleanStr.length !== 10) {
             document.getElementById('masterHistoryBlock').style.display = 'block';
             document.getElementById('recentSalesBlock').style.display = 'none';
             document.getElementById('creditAlertBox').style.display = 'none'; 
+            document.getElementById('posCreditBalanceBadge').style.display = 'none'; // Bug 4 hide
             document.getElementById('accountCategoryDisplay').style.display = 'none';
             document.getElementById('terminalName').value = ''; 
             document.getElementById('terminalTagsWrapper').innerHTML = ''; 
@@ -572,6 +655,9 @@
                     </tr>`;
                 });
             }
+            // Bug 4 logic init here
+            await displayCustomerCreditBalance(evaluatedPhoneContext, cData.name);
+
             transitionFlowPanels('transactionInvoicerFlow'); prefetchCentralCatalog();
         } else { 
             transitionFlowPanels('profileSetupFlow'); document.getElementById('newAccName').focus();
@@ -605,7 +691,6 @@
         globalCatalogCache = master || []; 
     }
 
-    // ADVANCED VEHICLE AWARE AUTOCOMPLETE INJECTED
     async function queryCatalogAutocomplete(inputRef, targetIdx) {
         const searchVal = inputRef.value.trim().toLowerCase();
         const listContainer = document.getElementById(`autolist-${targetIdx}`);
@@ -826,7 +911,190 @@
         document.getElementById('posBal').value = bal.toFixed(2);
     }
 
+    // Bug 1 Helper: Function to load existing draft back to the form editor
+    async function loadDraftForEditing() {
+        const draftId = targetInspectionRecordId;
+        activeDraftRecordId = draftId;
+        closeInspectionModal();
+        
+        if (inspectedRecordObject.customer_mobile) {
+             document.getElementById('terminalMobile').value = inspectedRecordObject.customer_mobile;
+             await processAutonomousPhoneSearch(inspectedRecordObject.customer_mobile);
+        } else {
+             document.getElementById('terminalMobile').value = '';
+             await processAutonomousPhoneSearch('');
+        }
+        
+        document.getElementById('dynamicRowsContainer').innerHTML = '';
+        rowSequenceIndex = 0;
+        const { data: items } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', draftId);
+        
+        (items || []).forEach(item => {
+            pushRuntimeStackRow();
+            const row = document.querySelector(`.inline-item-row[data-index="${rowSequenceIndex - 1}"]`);
+            
+            let parsedName = item.item_name || ''; let parsedBrand = "";
+            if (parsedName.includes('(')) { 
+                const parts = parsedName.split('('); 
+                parsedName = parts[0].trim(); 
+                parsedBrand = parts[1].replace(')','').trim(); 
+            }
+            
+            row.querySelector('.i-name').value = parsedName;
+            row.querySelector('.i-brand').value = parsedBrand;
+            row.querySelector('.i-qty').value = item.qty;
+            row.querySelector('.i-rate').value = item.unit_price;
+            row.querySelector('.i-mrp').value = item.mrp_at_billing || item.unit_price;
+            
+            const isLubeRow = item.volume_ml > 0 || item.unit_metric === 'ML';
+            row.querySelector('.i-cat').value = isLubeRow ? 'Lube' : 'Spare';
+            
+            if (isLubeRow && item.volume_ml > 0) {
+               row._pendingVolume = item.volume_ml;
+               toggleVolumeDropdown(row.querySelector('.i-cat'), rowSequenceIndex - 1);
+            }
+            row._pid = item.product_master_id;
+        });
+        
+        compileDynamicInvoicerSums();
+        transitionFlowPanels('transactionInvoicerFlow');
+    }
+
+    // Bug 3: Credit Bill Handler
+    async function commitCreditBillExecution() {
+        if (!evaluatedPhoneContext) {
+            return alert("Credit bills require a registered customer mobile number.\nPlease search for the customer before proceeding.");
+        }
+        const finalNetValuation = parseFloat(document.getElementById('posActiveAggregate').innerText) || 0;
+        if (finalNetValuation <= 0) return alert("Invoice value must be greater than 0 to create a credit bill.");
+
+        const confirmCredit = confirm(`Create CREDIT BILL of ₹${finalNetValuation} for ${document.getElementById('terminalName').value || 'this customer'}?\n\nThis amount will be added to the customer's outstanding credit balance.`);
+        if (!confirmCredit) return;
+
+        // Force cash and UPI to zero, full amount as credit
+        document.getElementById('posCash').value = 0;
+        document.getElementById('posUpi').value = 0;
+        await commitInvoiceExecution('Closed');
+    }
+
     async function commitInvoiceExecution(statusTarget) {
+        // --- DRAFT SAVE LOGIC (statusTarget === 'Open') Bug 1 Fix ---
+        if (statusTarget === 'Open') {
+            const hasValidItems = Array.from(document.querySelectorAll('.inline-item-row')).some(row => {
+                const nm = row.querySelector('.i-name').value.trim();
+                const rt = parseFloat(row.querySelector('.i-rate').value) || 0;
+                return nm.length > 0 && rt > 0;
+            });
+            if (!hasValidItems) return alert("Cannot save an empty draft. Please add at least one item.");
+
+            if (activeDraftRecordId) {
+                // UPDATE existing draft
+                const finalNetValuationUpdate = parseFloat(document.getElementById('posActiveAggregate').innerText) || 0;
+                const mappedClientNameUpdate = document.getElementById('terminalName').value.trim();
+                const activeRoleUpdate = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
+                const cashierIdUpdate = document.getElementById('posCashierSelect').value || null;
+
+                const { error: updErr } = await supabaseClient.from('counter_sales').update({
+                    customer_mobile: evaluatedPhoneContext || null,
+                    customer_name: enforceTitleCaseNomenclature(mappedClientNameUpdate),
+                    total_amount: finalNetValuationUpdate,
+                    payment_mode: 'Pending',
+                    cash_amount: 0,
+                    upi_amount: 0,
+                    credit_amount: 0,
+                    status: 'Open',
+                    source_role: activeRoleUpdate,
+                    sold_by_id: cashierIdUpdate || null,
+                }).eq('id', activeDraftRecordId);
+
+                if (updErr) return alert("Draft Update Error:\n" + updErr.message);
+
+                await supabaseClient.from('counter_sale_items').delete().eq('sale_id', activeDraftRecordId);
+
+                const itemPromises = [];
+                const rowNodes = document.querySelectorAll('.inline-item-row');
+                for (let i = 0; i < rowNodes.length; i++) {
+                    const row = rowNodes[i];
+                    const rawSpec = row.querySelector('.i-name').value.trim(); 
+                    const rawBrand = row.querySelector('.i-brand').value.trim() || 'STANDARD';
+                    const qScalar = parseFloat(row.querySelector('.i-qty').value) || 1;
+                    const rScalar = parseFloat(row.querySelector('.i-rate').value) || 0; 
+                    const dPercentage = parseFloat(row.querySelector('.i-disc').value) || 0;
+                    const mrpScalar = parseFloat(row.querySelector('.i-mrp').value) || rScalar;
+                    
+                    const typeVal = row.querySelector('.i-cat').value;
+                    const isLube = typeVal === 'Lube';
+                    let volumeML = 0;
+                    
+                    if (isLube) {
+                        if (row._pendingVolume) {
+                            volumeML = row._pendingVolume;
+                        } else {
+                            const selVal = row.querySelector('.i-vol').value;
+                            if (selVal === 'Other') {
+                                volumeML = parseInt(row.querySelector('.i-vol-other').value) || 0;
+                            } else {
+                                volumeML = parseInt(selVal) || 0;
+                            }
+                        }
+                    }
+
+                    if (rawSpec && rScalar > 0) {
+                        const cleanSpec = enforceTitleCaseNomenclature(rawSpec);
+                        const cleanBrand = rawBrand.toUpperCase();
+                        const rawLineTotal = qScalar * rScalar; 
+                        const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
+
+                        // Bug 2: Fix unhandled product master error inside Draft Update
+                        if (row._pendingItemUnverified) {
+                            const upsertData = { 
+                                item_name: cleanSpec, 
+                                brand: cleanBrand, 
+                                warehouse_type: 'Green', 
+                                default_price: rScalar, 
+                                mrp: mrpScalar, 
+                                catalog_status: 'unverified',
+                                category: typeVal
+                            };
+                            if (isLube && volumeML > 0) upsertData.volume_per_unit = volumeML;
+                            const { error: pmErr } = await supabaseClient.from('product_master')
+                                .upsert(upsertData, { onConflict: 'item_name,brand', ignoreDuplicates: false });
+                            if (pmErr) console.warn('Product master upsert warning:', pmErr.message);
+                        }
+
+                        itemPromises.push(supabaseClient.from('counter_sale_items').insert({ 
+                            sale_id: activeDraftRecordId, 
+                            item_name: `${cleanSpec} (${cleanBrand})`, 
+                            qty: qScalar, 
+                            unit_price: rScalar, 
+                            total_price: finalNetTotal,
+                            mrp_at_billing: mrpScalar, 
+                            mac_at_billing: row._pmac || 0, 
+                            product_master_id: row._pid || null,
+                            unit_metric: isLube ? 'ML' : 'Pcs', // Bug 2 ML Fix
+                            volume_ml: isLube ? volumeML : null
+                        }));
+                    }
+                }
+
+                // Bug 2: Safe Promise All inside Draft branch
+                if (itemPromises.length > 0) {
+                    const itemResults = await Promise.allSettled(itemPromises);
+                    const failedItems = itemResults.filter(r => r.status === 'rejected');
+                    if (failedItems.length > 0) {
+                        console.error('Item insert failures:', failedItems);
+                        return alert(`Transaction Header updated but ${failedItems.length} item(s) failed to record. Please contact admin.`);
+                    }
+                }
+
+                alert('Draft Updated Successfully.');
+                activeDraftRecordId = null;
+                window.location.reload();
+                return; // End of Update Draft branch
+            }
+        }
+        // --- END DRAFT SAVE LOGIC ---
+
         const finalNetValuation = parseFloat(document.getElementById('posActiveAggregate').innerText) || 0;
         if(finalNetValuation <= 0 && statusTarget === 'Closed') return alert("Invoice valuation must be > 0 to close.");
 
@@ -839,16 +1107,19 @@
         if (statusTarget === 'Open') {
             detectedMode = 'Pending';
         } else {
+            // Bug 2: Re-evaluate mode after credit clamping
             let activeChannels = 0;
             if (c > 0) activeChannels++;
             if (u > 0) activeChannels++;
             if (cr > 0) activeChannels++;
 
-            if (activeChannels <= 1) {
+            if (activeChannels === 1) {
                 if (c > 0) detectedMode = 'Cash';
                 else if (u > 0) detectedMode = 'UPI';
                 else if (cr > 0) detectedMode = 'Credit';
                 else detectedMode = 'Cash';
+            } else if (activeChannels > 1) {
+                detectedMode = 'Split';
             }
         }
 
@@ -908,7 +1179,7 @@
                     const rawLineTotal = qScalar * rScalar; 
                     const finalNetTotal = rawLineTotal - (rawLineTotal * (dPercentage / 100));
 
-                    // HANDLE UNVERIFIED CREATION
+                    // Bug 2: HANDLE UNVERIFIED CREATION safely
                     if(row._pendingItemUnverified) {
                         const upsertData = { 
                             item_name: cleanSpec, 
@@ -920,7 +1191,9 @@
                             category: typeVal
                         };
                         if (isLube && volumeML > 0) upsertData.volume_per_unit = volumeML;
-                        await supabaseClient.from('product_master').insert(upsertData);
+                        const { error: pmErr } = await supabaseClient.from('product_master')
+                            .upsert(upsertData, { onConflict: 'item_name,brand', ignoreDuplicates: false });
+                        if (pmErr) console.warn('Product master upsert warning:', pmErr.message);
                     } else {
                         supabaseClient.from('product_master').upsert({ 
                             item_name: cleanSpec, 
@@ -940,12 +1213,21 @@
                         mrp_at_billing: mrpScalar, 
                         mac_at_billing: row._pmac || 0, 
                         product_master_id: row._pid || null,
-                        unit_metric: isLube ? 'Pcs' : 'Pcs',
+                        unit_metric: isLube ? 'ML' : 'Pcs', // Bug 2 ML Fix
                         volume_ml: isLube ? volumeML : null
                     }));
                 }
             }
-            if(itemPromises.length > 0) await Promise.all(itemPromises);
+            
+            // Bug 2: Safe Promise All handling
+            if (itemPromises.length > 0) {
+                const itemResults = await Promise.allSettled(itemPromises);
+                const failedItems = itemResults.filter(r => r.status === 'rejected');
+                if (failedItems.length > 0) {
+                    console.error('Item insert failures:', failedItems);
+                    return alert(`Transaction Header saved but ${failedItems.length} item(s) failed to record. Please contact admin. Ref: ${finalRecord.id.split('-')[0].toUpperCase()}`);
+                }
+            }
 
             if (statusTarget === 'Closed' && cr > 0 && evaluatedPhoneContext) {
                 await supabaseClient.from('credit_payments').insert({
@@ -958,7 +1240,7 @@
             }
 
             if (statusTarget === 'Closed') {
-                posCheckoutCompleted = true; // Signals modal close to reload page
+                posCheckoutCompleted = true; 
                 await instantiateInspectionScope(finalRecord.id);
             } else {
                 alert('Draft Saved Successfully.');
@@ -972,8 +1254,8 @@
         const { data: record } = await supabaseClient.from('counter_sales').select('*').eq('id', id).single();
         if(record) {
             inspectedRecordObject = record;
-            const isWorkshopSource = record.source_role === 'service' || record.source_role === 'moped';
-            document.getElementById('thermalShopName').innerText = isWorkshopSource ? "My Care Service" : "Green Scooter Center";
+            const isWorkshopSrc = record.source_role === 'service' || record.source_role === 'moped';
+            document.getElementById('thermalShopName').innerText = isWorkshopSrc ? "My Care Service" : "Green Scooter Center";
             
             const dateSource = record.status === 'Closed' && record.closed_at ? new Date(record.closed_at) : new Date(record.created_at);
             document.getElementById('thDate').innerText = dateSource.toLocaleDateString('en-IN');
@@ -983,10 +1265,41 @@
             document.getElementById('thClientInfo').innerText = `${record.customer_mobile || ''} | ${record.customer_name || 'Walk-in'}`;
             document.getElementById('thNet').innerText = `₹${record.total_amount}`;
             document.getElementById('thWords').innerText = convertNumberToWords(record.total_amount);
-            document.getElementById('thMode').innerText = record.payment_mode || 'Pending';
+            
+            // Bug 6: Payment breakdown display logic
+            const cashAmt = parseFloat(record.cash_amount) || 0;
+            const upiAmt = parseFloat(record.upi_amount) || 0;
+            const creditAmt = parseFloat(record.credit_amount) || 0;
+            const payMode = record.payment_mode || '';
+            document.getElementById('thMode').innerText = payMode === 'Pending' ? 'Pending' : payMode;
+            
+            document.getElementById('thGstDisplay').innerText = isWorkshopSrc ? '23ANAPB4613K1ZJ' : '23BCVPB4126J1ZM';
+            document.getElementById('thCreditHeader').style.display = payMode === 'Credit' ? 'block' : 'none';
+
+            const breakdownDiv = document.getElementById('thPaymentBreakdown');
+            if (payMode === 'Split' || payMode === 'Credit' || (cashAmt > 0 && upiAmt > 0) || creditAmt > 0) {
+                breakdownDiv.style.display = 'block';
+                if (cashAmt > 0) {
+                    document.getElementById('thCashLine').style.display = 'flex';
+                    document.getElementById('thCashAmt').innerText = `₹${cashAmt}`;
+                } else { document.getElementById('thCashLine').style.display = 'none'; }
+                if (upiAmt > 0) {
+                    document.getElementById('thUpiLine').style.display = 'flex';
+                    document.getElementById('thUpiAmt').innerText = `₹${upiAmt}`;
+                } else { document.getElementById('thUpiLine').style.display = 'none'; }
+                if (creditAmt > 0) {
+                    document.getElementById('thCreditLine').style.display = 'flex';
+                    document.getElementById('thCreditAmt').innerText = `₹${creditAmt}`;
+                } else { document.getElementById('thCreditLine').style.display = 'none'; }
+            } else {
+                breakdownDiv.style.display = 'none';
+            }
             
             const isUnsettled = record.status === 'Open' || record.payment_mode === 'Credit';
             document.getElementById('settlementModifierInterface').style.display = isUnsettled ? 'block' : 'none';
+
+            // Bug 1 Helper: Show Edit Draft Button for Open Status
+            document.getElementById('btnEditDraftModal').style.display = record.status === 'Open' ? 'block' : 'none';
 
             await refreshInspectionLineItems();
             document.getElementById('modalInspectInvoice').style.display = 'flex';
@@ -1125,6 +1438,45 @@
     function closeInspectionModal() { 
         document.getElementById('modalInspectInvoice').style.display = 'none';
         if (posCheckoutCompleted) window.location.reload();
+    }
+
+    // Bug 5: Print & Export Handlers
+    function triggerPosPrintSelection() {
+        document.getElementById('modalPosPrintChoice').style.display = 'flex';
+    }
+
+    function executePosReceipt(mode) {
+        document.getElementById('modalPosPrintChoice').style.display = 'none';
+        document.body.className = '';
+        document.body.classList.add('print-pos-receipt');
+        const container = document.getElementById('renderThermalReceiptTarget');
+        if (mode === 'a5') {
+            container.classList.add('a5-mode');
+        } else {
+            container.classList.remove('a5-mode');
+        }
+        setTimeout(() => {
+            window.print();
+            document.body.className = '';
+            container.classList.remove('a5-mode');
+        }, 200);
+    }
+
+    function savePosReceiptAsJpg() {
+        const layoutTarget = document.getElementById('renderThermalReceiptTarget');
+        const origBorder = layoutTarget.style.border;
+        layoutTarget.style.border = 'none';
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            layoutTarget.style.border = origBorder;
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Invoice_POS_${(targetInspectionRecordId || 'UNKNOWN').split('-')[0].toUpperCase()}.jpg`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }, 'image/jpeg', 0.95);
+        });
     }
 
     function dispatchWhatsAppImageReceipt() {
