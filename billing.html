@@ -35,6 +35,7 @@
         .settle-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; }
         .btn-cash { background: #16a34a; } .btn-upi { background: #2563eb; } .btn-credit { background: #d97706; } .btn-save { background: #475569; } .btn-split { background: var(--purple); } .btn-cancel { background: var(--danger); }
+        .btn-success { background: #16a34a; } .btn-info { background: #2563eb; } .btn-purple { background: #7c3aed; }
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 550px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
         
@@ -52,14 +53,14 @@
         
         #mechanic-print-ticket { display: none; }
         
-        /* New concession distribution block styles */
+        /* Concession distribution block styles */
         #serviceDiscBlock { display: none; background: #fffbeb; padding: 12px; border-radius: 6px; border: 1px solid #fde68a; margin-top: 10px; grid-column: 1 / -1; }
         .dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
         .dist-field { display: flex; flex-direction: column; gap: 2px; }
         .dist-field label { font-size: 0.7rem; color: #92400e; }
         .dist-field input { border: 1px solid #fcd34d; padding: 8px; }
 
-        /* PROMPT 2: MULTI-ENTITY STYLES */
+        /* MULTI-ENTITY STYLES */
         .me-section { background: white; color: black; font-family: 'Courier New', monospace; padding: 10px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 0.78rem; line-height: 1.3; margin-bottom: 8px; }
         .me-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 6px; margin-bottom: 6px; }
         .me-gst { font-size: 0.65rem; }
@@ -80,7 +81,7 @@
             body.print-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 300px; max-width: 300px; padding: 0; }
             body.print-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 10mm; } 
 
-            /* PROMPT 2: Multi Entity Print Logic */
+            /* Multi Entity Print Logic */
             body.print-multi #multiEntityReceiptTarget, body.print-multi #multiEntityReceiptTarget * { visibility: visible; }
             body.print-multi #multiEntityReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; }
             body.print-multi #renderThermalReceiptTarget { display: none !important; }
@@ -135,16 +136,16 @@
     <div class="inline-add-strip-wrapper" id="uiPartEntryBlock">
         <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
             <div style="position:relative;">
-                <input type="text" id="nPart" placeholder="Part Description" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" autocomplete="off">
+                <input type="text" id="nPart" placeholder="Part Description" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
                 <div id="autolist-n" class="autocomplete-container"></div>
             </div>
             <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
             
-            <input type="number" id="nMrp" placeholder="MRP (₹)" value="0" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
+            <input type="number" id="nMrp" placeholder="MRP" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
 
             <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="Spare">Spare (Pcs)</option><option value="Lube">Lube (ML)</option></select>
-            <input type="number" id="nQty" placeholder="Qty / ML" value="1" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
-            <input type="number" id="nRate" placeholder="Rate (₹)" value="0" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <input type="number" id="nQty" placeholder="Qty / ML" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <input type="number" id="nRate" placeholder="Rate (₹)" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
             <select id="nIssuer" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="">+ Issued By (Staff)</option></select>
             <button class="btn-add-line" onclick="pushItemToJobCard()">+</button>
         </div>
@@ -292,9 +293,9 @@
         </div>
         
         <div class="action-strip-bar no-print">
-            <button class="btn-ui-action" style="background:#f1f5f9; color:var(--primary); border:1px solid var(--border);" onclick="window.location.href='index.html'">🏠 RETURN</button>
-            <button class="btn-ui-action" style="background:var(--primary); color:white;" onclick="triggerPrintSelection()">🖨️ PRINT</button>
-            <button class="btn-ui-action" style="background:#25d366; color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button>
+            <button class="btn-ui-action" style="background:#64748b; color:white; font-weight:700;" onclick="window.location.href='index.html'">↩️ RETURN</button>
+            <button class="btn-ui-action" style="background:#2563eb; color:white; font-weight:700;" onclick="triggerPrintSelection()">🖨️ PRINT</button>
+            <button class="btn-ui-action" style="background:#25d366; color:white; font-weight:700;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button>
         </div>
     </div>
 </div>
@@ -618,13 +619,24 @@
         }
     });
 
+    function hideAutoSuggestions() {
+        setTimeout(() => {
+            const auto = document.getElementById('autolist-n');
+            if (auto) auto.style.display = 'none';
+        }, 200);
+    }
+
     // PROMPT 2: ADVANCED VEHICLE AWARE AUTOCOMPLETE
     async function queryCatalogAutocomplete(inputRef) {
-        const searchVal = inputRef.value.trim().toLowerCase();
+        const q = inputRef.value.toUpperCase().trim();
+        inputRef.value = q;
         const listContainer = document.getElementById('autolist-n');
         listContainer.innerHTML = '';
-        if (searchVal.length < 2) { listContainer.style.display='none'; return; }
-        const tokens = searchVal.split(' ').filter(t=>t.length>0);
+        listContainer.style.display = 'none';
+        
+        if (q.length < 2) return;
+        
+        const tokens = q.split(' ').filter(t=>t.length>0);
         const vehicleModel = activeJobContext?.vehicles?.make_model?.toUpperCase()||null;
 
         // PASS 1 — vehicle shortlist
@@ -638,7 +650,7 @@
             }
             results = globalCatalogCache.filter(p => {
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
-                if (!tokens.every(t=>txt.includes(t))) return false;
+                if (!tokens.every(t=>txt.includes(t.toLowerCase()))) return false;
                 return p.scope==='universal' || groupIds.includes(p.id) || (p.compatibility_tags?.toUpperCase().split(',').map(s=>s.trim()).includes(vehicleModel));
             });
         }
@@ -647,7 +659,7 @@
         if (results.length===0) {
             results = globalCatalogCache.filter(p => {
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
-                return tokens.every(t=>txt.includes(t));
+                return tokens.every(t=>txt.includes(t.toLowerCase()));
             });
         }
         results = results.slice(0,10);
@@ -735,7 +747,7 @@
         const partStr = document.getElementById('nPart').value.trim(); 
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
         const typeSelect = document.getElementById('nType').value; 
-        const qVal = parseFloat(document.getElementById('nQty').value) || 1; 
+        const qVal = parseFloat(document.getElementById('nQty').value) || 0; 
         const rVal = parseFloat(document.getElementById('nRate').value) || 0; 
         const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal;
         const issuerId = document.getElementById('nIssuer').value || null; 
@@ -767,9 +779,9 @@
 
             document.getElementById('nPart').value = ''; 
             document.getElementById('nBrand').value = ''; 
-            if(document.getElementById('nMrp')) document.getElementById('nMrp').value = '0';
-            document.getElementById('nQty').value = '1'; 
-            document.getElementById('nRate').value = '0'; 
+            if(document.getElementById('nMrp')) document.getElementById('nMrp').value = '';
+            document.getElementById('nQty').value = ''; 
+            document.getElementById('nRate').value = ''; 
             document.getElementById('autolist-n').style.display = 'none'; 
             loadInventoryLedgers(); 
         } 
@@ -862,8 +874,36 @@
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
     }
     
-    function openSplitPaymentModal() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; document.getElementById('splitTotalDisplay').innerText = netVal; document.getElementById('splitCashInput').value = netVal; document.getElementById('splitUpiInput').value = 0; document.getElementById('modalSplitPayment').style.display = 'flex'; }
-    function calcSplit() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; let upi = netVal - cash; if (upi < 0) upi = 0; document.getElementById('splitUpiInput').value = upi; }
+    function openSplitPaymentModal() { 
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; 
+        document.getElementById('splitTotalDisplay').innerText = netVal; 
+        document.getElementById('splitCashInput').value = netVal; 
+        document.getElementById('splitUpiInput').value = 0; 
+        document.getElementById('modalSplitPayment').style.display = 'flex'; 
+        calcSplit();
+    }
+    
+    function calcSplit() { 
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; 
+        let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; 
+        let upi = netVal - cash; 
+        if (upi < 0) upi = 0; 
+        document.getElementById('splitUpiInput').value = parseFloat(upi.toFixed(2)); 
+        
+        const sum = cash + parseFloat(document.getElementById('splitUpiInput').value);
+        const remaining = Math.round((netVal - sum) * 100) / 100;
+        const btn = document.querySelector('#modalSplitPayment .btn-success');
+        if (btn) {
+            if (Math.abs(remaining) < 0.01) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            }
+        }
+    }
+    
     function confirmSplitPayment() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; let upi = parseFloat(document.getElementById('splitUpiInput').value) || 0; if ((cash + upi) !== netVal) return alert("Split amounts must equal Net Payable!"); isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi; commitInvoiceSettlement(`Split (Cash: ₹${cash}, UPI: ₹${upi})`, 'Closed'); document.getElementById('modalSplitPayment').style.display = 'none'; }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
