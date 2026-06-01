@@ -628,8 +628,14 @@
 
     // PROMPT 2: ADVANCED VEHICLE AWARE AUTOCOMPLETE
     async function queryCatalogAutocomplete(inputRef) {
-        const q = inputRef.value.toUpperCase().trim();
-        inputRef.value = q;
+        const upperVal = inputRef.value.toUpperCase();
+    if (inputRef.value !== upperVal) {
+        // Preserve cursor position when correcting case
+        const cursorPos = inputRef.selectionStart;
+        inputRef.value = upperVal;
+        inputRef.setSelectionRange(cursorPos, cursorPos);
+    }
+    const q = upperVal.trim();   // local trim only for search, not field
         const listContainer = document.getElementById('autolist-n');
         listContainer.innerHTML = '';
         listContainer.style.display = 'none';
