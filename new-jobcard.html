@@ -59,13 +59,15 @@
         <div class="inputs-grid" style="margin-bottom:0;">
             <div class="field-group">
                 <label>Customer Mobile Number <span style="color:var(--danger);">*</span></label>
-                <!-- REGEX HYGIENE: Strip spaces from mobile inputs -->
-                <input type="tel" id="jcMobile" placeholder="10 Digits" maxlength="10" autofocus oninput="this.value=this.value.replace(/\s+/g, ''); processCustomerLookup(this.value)">
+                <input type="tel" id="jcMobile" placeholder="10 Digits" maxlength="10" autofocus oninput="this.value=(this.value||'').replace(/\s+/g, ''); processCustomerLookup(this.value)">
             </div>
             <div class="field-group">
                 <label>Customer Name <span id="newCustBadge" class="new-badge" style="display:none;">NEW CUSTOMER</span></label>
-                <!-- REGEX HYGIENE: Auto capitalize and trim -->
-                <input type="text" id="jcName" placeholder="Full Name" oninput="this.value=this.value.toUpperCase().replace(/^\s+/,'')">
+                <input type="text" id="jcName" placeholder="Full Name" oninput="this.value=(this.value||'').toUpperCase().replace(/^\s+/,'')">
+            </div>
+            <div class="field-group" id="openingBalGroup" style="display:none;">
+                <label>Opening Balance (₹)</label>
+                <input type="number" id="jcOpeningBal" placeholder="Prior Debt (If Any)" min="0" value="0">
             </div>
         </div>
         
@@ -74,7 +76,7 @@
         </div>
 
         <div id="custHistoryPanel" style="display:none; margin-top:20px;"> 
-            <label style="display:block; margin-bottom:6px;">📋 Last 4 Enterprise Transactions</label>
+            <label style="display:block; margin-bottom:6px;">📋 Last 4 Workshop Transactions</label>
             <div style="overflow-x:auto; border:1px solid var(--border); border-radius:6px;"> 
                 <table class="data-table"> 
                     <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead> 
@@ -91,13 +93,12 @@
             </select>
         </div>
 
-        <!-- NEW SPLIT BRAND/MODEL UI -->
         <div id="newVehicleBlock" style="display:none; background:#f1f5f9; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <h4 style="margin:0 0 12px 0; color:var(--info); font-size:0.9rem;">Register New Asset</h4>
             <div class="inputs-grid" style="margin-bottom:0;">
                 <div class="field-group">
                     <label>Registration Plate</label>
-                    <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=this.value.toUpperCase().replace(/\s+/g, '')">
+                    <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=(this.value||'').toUpperCase().replace(/\s+/g, '')">
                 </div>
                 <div class="field-group">
                     <label>Brand</label>
@@ -109,7 +110,7 @@
                 </div>
                 <div class="field-group">
                     <label>Color</label>
-                    <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=this.value.toUpperCase()">
+                    <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=(this.value||'').toUpperCase()">
                 </div>
                 <div class="field-group">
                     <label>Odometer (KM)</label>
@@ -127,14 +128,14 @@
         </div>
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
-            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase(); checkRepeatComplaint()"></textarea> 
+            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea> 
         </div>
         <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> 
             ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint recently. <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"> </div> 
         </div> 
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
-            <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=(this.value||'').toUpperCase()"></div>
             <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
                 <label>Workshop Advance Collected (₹)</label>
                 <input type="number" id="jcAdvance" value="0" min="0">
@@ -163,7 +164,6 @@
         const pSel = document.getElementById('intakePrimaryMech'); const cSel = document.getElementById('intakeCoMech');
         (staff || []).forEach(m => { pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
 
-        // Database pre-fetch for Brand/Model Dropdowns
         const { data: vMaster } = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
         globalVehicleMaster = vMaster || [];
         const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
@@ -184,21 +184,25 @@
         const cleanMobile = mobileStr.trim();
         const vSelect = document.getElementById('jcVehicleSelect');
         const nBadge = document.getElementById('newCustBadge');
+        const obGroup = document.getElementById('openingBalGroup');
         
         if (cleanMobile.length !== 10) {
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
             document.getElementById('newVehicleBlock').style.display = 'none';
             nBadge.style.display = 'none';
+            obGroup.style.display = 'none';
             document.getElementById('custHistoryPanel').style.display = 'none'; 
             document.getElementById('creditAlertBox').style.display = 'none'; 
             return;
         }
 
-        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).single();
+        // FIXED: Using maybeSingle() prevents fatal error PGRST116 when customer doesn't exist
+        const { data: cust, error } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).maybeSingle();
         
         if (cust) {
             nBadge.style.display = 'none';
+            obGroup.style.display = 'none';
             document.getElementById('jcName').value = cust.name;
             vSelect.innerHTML = '';
             (cust.vehicles || []).forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.brand || ''} ${v.make_model || ''})</option>`; });
@@ -206,6 +210,7 @@
             toggleNewVehicleFields();
         } else {
             nBadge.style.display = 'inline-block';
+            obGroup.style.display = 'flex';
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
@@ -218,7 +223,7 @@
         else document.getElementById('newVehicleBlock').style.display = 'none';
     }
 
-    // UNIFIED CREDIT ENGINE
+    // FIXED: Bulletproof Unified Credit Engine
     async function loadIdenticalTwinIntakeData(mobile) {
         const alertBox = document.getElementById('creditAlertBox');
         
@@ -227,29 +232,37 @@
         const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile);
 
         let totalOut = 0;
+
+        // 1. Job Cards Debt (Strict isolation)
         (jc || []).filter(j => j.payment_mode === 'Credit').forEach(j => {
-            const paid = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
-            const out = (parseFloat(j.total_invoice_value) || 0) - paid;
+            const linkedPayments = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(j.total_invoice_value) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
+        // 2. POS Debt (Strict isolation)
         (pos || []).filter(s => s.payment_mode === 'Credit').forEach(s => {
-            const paid = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
-            const out = (parseFloat(s.total_amount) || 0) - paid;
+            const linkedPayments = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(s.total_amount) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
+        // 3. Unlinked Manual Entries (e.g., Opening Balance debt or free payments)
         (pays || []).filter(p => !p.sale_id && !p.job_card_id).forEach(p => {
-            if(parseFloat(p.amount_paid) < 0) totalOut += Math.abs(parseFloat(p.amount_paid));
-            else totalOut -= parseFloat(p.amount_paid) || 0;
+            const amt = parseFloat(p.amount_paid) || 0;
+            if (amt < 0) totalOut += Math.abs(amt); // Negative means debt added manually
+            else totalOut -= amt; // Positive means payment made
         });
+
+        totalOut = Math.max(0, totalOut);
 
         if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); } 
         else { alertBox.style.display = 'none'; } 
 
+        // FIXED: Workshop intake strictly queries Job Cards only
         let mix = [];
         if(jc) mix = mix.concat(jc.map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode })));
-        if(pos) mix = mix.concat(pos.map(p => ({ id: p.id, type: 'POS', dt: p.created_at, amt: p.total_amount, mode: p.payment_mode })));
+        
         mix.sort((a,b) => new Date(b.dt) - new Date(a.dt));
         mix = mix.slice(0, 4);
 
@@ -257,8 +270,7 @@
         if (mix.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>'; 
         else {
             mix.forEach(x => { 
-                const prefix = x.type === 'POS' ? 'POS' : 'JC';
-                const refLink = `<a href="${x.type === 'POS' ? 'pos-green.html' : 'billing.html'}?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">${prefix}-${x.id.split('-')[0].toUpperCase()}</a>`; 
+                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`; 
                 tbody.innerHTML += `<tr><td>${refLink}</td><td>${new Date(x.dt).toLocaleDateString('en-IN')}</td><td style="font-weight:bold;">${x.type}</td><td style="font-weight:bold;">₹${x.amt||0}</td><td style="font-weight:bold; color:${x.mode === 'Credit' ? '#b91c1c' : '#15803d'};">${x.mode}</td></tr>`; 
             }); 
         }
@@ -291,6 +303,8 @@
         const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
         const advance = parseFloat(document.getElementById('jcAdvance')?.value) || 0;
+        const isNewCust = document.getElementById('newCustBadge').style.display === 'inline-block';
+        const ob = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
         
         if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
         if (!name || !problem) return alert("Customer Name and Problem required.");
@@ -299,6 +313,16 @@
         btn.innerText = "PROCESSING..."; btn.disabled = true;
 
         await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, category: 'Regular' }, { onConflict: 'mobile_number' });
+        
+        // FIXED: Writes the Opening Balance properly to the ledger directly upon new customer saving.
+        if (isNewCust && ob > 0) {
+            await supabaseClient.from('credit_payments').insert({
+                customer_mobile: mobile,
+                amount_paid: -Math.abs(ob),
+                payment_mode: 'Opening Balance',
+                recorded_by: activeRole
+            });
+        }
 
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
         if (finalVehicleId === 'NEW') {
@@ -326,12 +350,5 @@
 
     initializeIntake();
 </script>
-<!-- 
-CHANGELOG: Phase 1 New Job Card
-- Applied identical twin UI configuration for Mobile, Credit Ledger access, and History.
-- Implemented Unified Credit Engine via `loadIdenticalTwinIntakeData` parsing exact values shared with CRM.
-- Split merged vehicle selection block into precise `Brand` and `Model` taxonomy dropdowns matching database structure.
-- Embedded rigid RegEx `.replace(/\s+/g, '')` into contact and reg inputs.
--->
 </body>
 </html>
