@@ -170,12 +170,16 @@
 
     async function loadDailyCollection() {
         const todayStr = new Date().toISOString().split('T')[0];
-        const { data: jc } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr);
-        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr);
         
+        // Zero-Lag Database Sync
+        const [jcRes, posRes] = await Promise.all([
+            supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr),
+            supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr)
+        ]);
+
         let wsTotal = 0; let posTotal = 0;
-        (jc||[]).forEach(j => wsTotal += parseFloat(j.total_invoice_value)||0);
-        (pos||[]).forEach(p => posTotal += parseFloat(p.total_amount)||0);
+        (jcRes.data||[]).forEach(j => wsTotal += parseFloat(j.total_invoice_value)||0);
+        (posRes.data||[]).forEach(p => posTotal += parseFloat(p.total_amount)||0);
         document.getElementById('dailyCollectionBar').innerHTML = `Today's Collection: ₹${wsTotal} (Workshop) | ₹${posTotal} (POS)`;
     }
 
@@ -250,6 +254,7 @@
 
     let ledgerExportData = []; 
 
+    // BULLETPROOF CREDIT ENGINE INTEGRATED INTO CRM LEDGER
     async function loadCrmLedger(mobile) {
         const st = document.getElementById(`fltSt_${mobile}`).value;
         const end = document.getElementById(`fltEnd_${mobile}`).value;
@@ -257,22 +262,29 @@
         let events = []; 
         let wsDebt = 0; let grnDebt = 0;
 
-        let pQ = supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit');
-        const { data: ps } = await pQ;
-        (ps || []).forEach(s => {
+        // SPEED FIX: Fetch all 3 databases simultaneously
+        const [psRes, jsRes, paysRes] = await Promise.all([
+            supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile)
+        ]);
+
+        const ps = psRes.data || [];
+        const js = jsRes.data || [];
+        const pays = paysRes.data || [];
+
+        ps.forEach(s => {
             events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id });
         });
         
-        let jQ = supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit');
-        const { data: js } = await jQ;
-        (js || []).forEach(j => {
+        js.forEach(j => {
             events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id });
         });
         
-        const { data: pays } = await supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile);
-        (pays || []).forEach(p => {
+        pays.forEach(p => {
             const amt = parseFloat(p.amount_paid) || 0;
-            if(amt < 0) {
+            // MATH FIX: Only respect true opening balance debt entries
+            if(amt < 0 && p.payment_mode === 'Opening Balance') {
                 events.push({ date: new Date('2000-01-01'), desc: `Opening Balance Debt`, debit: Math.abs(amt), credit: 0, isInvoice: false, type: 'OB', id: p.id });
             } else if(amt > 0) {
                 events.push({ date: new Date(p.created_at), desc: `Payment via ${p.payment_mode} by ${p.paid_by_role}`, debit: 0, credit: amt, id: p.id, isInvoice: false, linked_jc: p.job_card_id, linked_pos: p.sale_id });
@@ -286,6 +298,7 @@
         
         ledgerExportData = [["Date", "Description", "Debit", "Credit", "Balance Due"]];
 
+        // Strict mapping for targeted settlement ui calculation
         const invoiceBalances = {};
         events.filter(e => e.isInvoice || e.type==='OB').forEach(e => { invoiceBalances[e.id] = e.debit; });
         events.filter(e => !e.isInvoice && e.credit > 0).forEach(e => {
@@ -355,14 +368,16 @@
 
     function generatePaymentReceipt(mobile, amount, mode, type, id) {
         const d = new Date();
-        const prefix = type === 'JC' ? 'Workshop Job Card' : 'Retail POS Invoice';
+        const prefix = type === 'JC' ? 'Workshop Job Card' : (type === 'POS' ? 'Retail POS Invoice' : 'Opening Balance');
+        const refText = type === 'OB' ? 'Manual Registry' : id.split('-')[0].toUpperCase();
+        
         const receiptHtml = `
             Date: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}<br>
             Client Mobile: ${mobile}<br><br>
             Received with thanks the sum of:<br>
             <strong style="font-size:1.5rem; color:var(--success);">₹${amount.toFixed(2)}</strong><br><br>
             <strong>Mode:</strong> ${mode}<br>
-            <strong>Target:</strong> ${prefix} (${id.split('-')[0].toUpperCase()})<br><br>
+            <strong>Target:</strong> ${prefix} (${refText})<br><br>
             <strong>Collected By Dept:</strong> ${activeSessionRole.toUpperCase()}<br>
             <em style="font-size:0.75rem;">*Subject to internal vault clearing.*</em>
         `;
@@ -393,13 +408,5 @@
         link.click(); document.body.removeChild(link);
     }
 </script>
-<!-- 
-CHANGELOG: Phase 1 Utility Router
-- Injected `dailyCollectionBar` natively.
-- Rewrote CRM Ledger to strictly follow chronological Date/Desc/Debit/Credit/Balance format.
-- Implemented Targeted Invoice Settlement (Pay buttons dynamically map to specific rows) to prevent inter-department poaching.
-- Injected SheetJS logic to fulfill Universal Report Rule A (Export Excel/PDF).
-- Built placeholder for Loyalty Passbook (Phase 4).
--->
 </body>
 </html>
