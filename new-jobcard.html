@@ -30,6 +30,12 @@
         .btn-action:hover { opacity: 0.9; }
         
         .new-badge { background: var(--danger); color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-left: 6px; display: inline-block; vertical-align: middle; font-weight:bold; }
+        .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; margin-top: 16px; display: none; cursor: pointer; transition: opacity 0.2s; text-align: center;}
+        .credit-alert:hover { opacity: 0.85; }
+
+        .data-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        .data-table th { padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border); background:#f8fafc; }
+        .data-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
     </style>
 </head>
 <body>
@@ -48,75 +54,93 @@
 
 <div class="wrapper">
     <div class="card-panel">
-        <div class="block-title">Customer & Vehicle Intake</div>
+        <div class="block-title">Customer & Vehicle Intake Engine</div>
         
-        <div class="inputs-grid">
+        <div class="inputs-grid" style="margin-bottom:0;">
             <div class="field-group">
                 <label>Customer Mobile Number <span style="color:var(--danger);">*</span></label>
-                <input type="tel" id="jcMobile" placeholder="10 Digits" maxlength="10" autofocus oninput="processCustomerLookup(this.value)">
+                <!-- REGEX HYGIENE: Strip spaces from mobile inputs -->
+                <input type="tel" id="jcMobile" placeholder="10 Digits" maxlength="10" autofocus oninput="this.value=this.value.replace(/\s+/g, ''); processCustomerLookup(this.value)">
             </div>
             <div class="field-group">
-                <label>Customer Name <span id="newCustBadge" class="new-badge" style="display:none;">NEW CUSTOMER - PITCH AMC!</span></label>
-                <input type="text" id="jcName" placeholder="Full Name" oninput="this.value=this.value.toUpperCase()">
+                <label>Customer Name <span id="newCustBadge" class="new-badge" style="display:none;">NEW CUSTOMER</span></label>
+                <!-- REGEX HYGIENE: Auto capitalize and trim -->
+                <input type="text" id="jcName" placeholder="Full Name" oninput="this.value=this.value.toUpperCase().replace(/^\s+/,'')">
             </div>
         </div>
+        
+        <div id="creditAlertBox" class="credit-alert" onclick="window.open('utility-router.html?crm=' + document.getElementById('jcMobile').value.trim(), '_blank')">
+            💳 ACTIVE CREDIT BALANCE: ₹<span id="unifiedCreditBal">0.00</span> — Click to Open Ledger
+        </div>
 
-        <div class="field-group" style="margin-bottom: 20px;">
+        <div id="custHistoryPanel" style="display:none; margin-top:20px;"> 
+            <label style="display:block; margin-bottom:6px;">📋 Last 4 Enterprise Transactions</label>
+            <div style="overflow-x:auto; border:1px solid var(--border); border-radius:6px;"> 
+                <table class="data-table"> 
+                    <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead> 
+                    <tbody id="custHistoryBody"></tbody> 
+                </table> 
+            </div> 
+        </div>
+
+        <div class="field-group" style="margin-top: 20px; margin-bottom: 20px;">
             <label>Select Vehicle</label>
-            <select id="jcVehicleSelect" onchange="toggleNewVehicleFields(); checkRepeatComplaint()"> <option value="">-- Enter Mobile Number First --</option>
+            <select id="jcVehicleSelect" onchange="toggleNewVehicleFields(); checkRepeatComplaint()">
+                <option value="">-- Enter Mobile Number First --</option>
                 <option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>
             </select>
         </div>
 
+        <!-- NEW SPLIT BRAND/MODEL UI -->
         <div id="newVehicleBlock" style="display:none; background:#f1f5f9; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <h4 style="margin:0 0 12px 0; color:var(--info); font-size:0.9rem;">Register New Asset</h4>
             <div class="inputs-grid" style="margin-bottom:0;">
-                <div class="field-group"><label>Registration Plate (MP48...)</label><input type="text" id="nvReg" placeholder="e.g. MP48 AB 1234" oninput="this.value=this.value.toUpperCase().replace(/\s/g, '')"></div>
-                <div class="field-group"><label>Make & Model</label><input type="text" id="nvModel" placeholder="e.g. SPLENDOR PLUS" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Category / Segment</label><select id="nvCategory"><option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option><option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option><option value="(C) Premium Bikes 115-140CC Old">(C) Premium Bikes 115-140CC Old</option><option value="(H) Lifestyle Bikes Upto 400CC">(H) Lifestyle Bikes Upto 400CC</option><option value="(I) Scooterate">(I) Scooterate</option></select></div>
+                <div class="field-group">
+                    <label>Registration Plate</label>
+                    <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=this.value.toUpperCase().replace(/\s+/g, '')">
+                </div>
+                <div class="field-group">
+                    <label>Brand</label>
+                    <select id="nvBrand" onchange="populateModels()"><option value="">Select Brand</option></select>
+                </div>
+                <div class="field-group">
+                    <label>Model Name</label>
+                    <select id="nvModel"><option value="">Select Model</option></select>
+                </div>
+                <div class="field-group">
+                    <label>Color</label>
+                    <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div class="field-group">
+                    <label>Odometer (KM)</label>
+                    <input type="number" id="nvOdo" placeholder="e.g. 15000">
+                </div>
             </div>
         </div>
     </div>
     
-    <div id="custHistoryPanel" style="display:none; background:white; padding:20px; border-radius:10px; border:1px solid var(--border); margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.02);"> <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:14px;"> <span style="font-size:1.05rem; font-weight:700; color:var(--primary);"> 📋 Last 6 Months — Service History </span> <span id="custCreditBadge" style="display:none; font-size:0.9rem; font-weight:900; color:#b91c1c; background:#fee2e2; padding:6px 14px; border-radius:6px; border:1px solid #fca5a5; cursor:pointer;" onclick="window.open('utility-router.html?crm=' + document.getElementById('jcMobile').value.trim(), '_blank')" title="Click to open CRM Billing Ledger"> 💳 Credit Balance: ₹… </span> </div> <div style="overflow-x:auto; max-height:280px;"> <table style="width:100%; border-collapse:collapse; font-size:0.82rem;"> <thead> <tr style="background:#f8fafc;"> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> JC Ref </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Date </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Vehicle </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Problem </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Amount </th> <th style="padding:8px 12px; text-align:left; font-size:0.7rem; color:#64748b; border-bottom:1px solid var(--border);"> Status </th> </tr> </thead> <tbody id="custHistoryBody"> </tbody> </table> </div> </div> <div class="card-panel">
+    <div class="card-panel">
         <div class="block-title">Job Requirements & Assignment</div>
-        
         <div class="inputs-grid" style="margin-bottom: 20px;">
-            <div class="field-group">
-                <label>Primary Technician</label>
-                <select id="intakePrimaryMech"><option value="">-- Unassigned --</option></select>
-            </div>
-            <div class="field-group">
-                <label>Co-Mechanic (50% Split)</label>
-                <select id="intakeCoMech"><option value="">-- None --</option></select>
-            </div>
+            <div class="field-group"><label>Primary Technician</label><select id="intakePrimaryMech"><option value="">-- Unassigned --</option></select></div>
+            <div class="field-group"><label>Co-Mechanic (50% Split)</label><select id="intakeCoMech"><option value="">-- None --</option></select></div>
         </div>
-
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
-            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase(); checkRepeatComplaint()"></textarea> </div>
-
-        <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint within the last 30 days. Verify with service history above before proceeding. <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"> </div> </div> <div class="inputs-grid">
+            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=this.value.toUpperCase(); checkRepeatComplaint()"></textarea> 
+        </div>
+        <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> 
+            ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint recently. <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"> </div> 
+        </div> 
+        <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
-            
-            <div class="field-group">
-                <label>Referral Code (If Any)</label>
-                <input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=this.value.toUpperCase()">
-            </div>
-            
+            <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=this.value.toUpperCase()"></div>
             <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
                 <label>Workshop Advance Collected (₹)</label>
                 <input type="number" id="jcAdvance" value="0" min="0">
-                <span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to Workshop Drawer)</span>
-            </div>
-            <div class="field-group" id="blockPrepaid" style="display:none;">
-                <label>Prepaid Deposited (₹)</label>
-                <input type="number" id="jcPrepaid" value="0" min="0">
-                <span style="font-size:0.65rem; color:#64748b; margin-top:2px;">(Cash goes to Parts Drawer)</span>
             </div>
         </div>
-
-        <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED</button>
+        <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
     </div>
 </div>
 
@@ -124,32 +148,37 @@
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    
     const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleDisplay').innerText = activeRole.toUpperCase();
 
     if(activeRole !== 'admin' && activeRole !== 'service' && activeRole !== 'green' && activeRole !== 'moped') {
-        alert("You do not have authorization to create Job Cards.");
         window.location.href = 'login.html';
     }
+    if (activeRole === 'admin' || activeRole === 'service') document.getElementById('blockWorkshopAdvance').style.display = 'flex';
 
-    // Toggle logic for showing the right field
-    if (activeRole === 'green' || activeRole === 'moped') {
-        document.getElementById('blockPrepaid').style.display = 'flex';
-    } else {
-        document.getElementById('blockWorkshopAdvance').style.display = 'flex';
+    let globalVehicleMaster = [];
+
+    async function initializeIntake() {
+        const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('staff_role', 'Mechanic').eq('is_active', true);
+        const pSel = document.getElementById('intakePrimaryMech'); const cSel = document.getElementById('intakeCoMech');
+        (staff || []).forEach(m => { pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
+
+        // Database pre-fetch for Brand/Model Dropdowns
+        const { data: vMaster } = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
+        globalVehicleMaster = vMaster || [];
+        const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
+        const brandSel = document.getElementById('nvBrand');
+        brands.forEach(b => { brandSel.innerHTML += `<option value="${b}">${b}</option>`; });
     }
 
-    async function loadMechanics() {
-        const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('staff_role', 'Mechanic').eq('is_active', true);
-        const pSel = document.getElementById('intakePrimaryMech');
-        const cSel = document.getElementById('intakeCoMech');
-        (staff || []).forEach(m => {
-            pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
-            cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+    function populateModels() {
+        const selectedBrand = document.getElementById('nvBrand').value;
+        const modelSel = document.getElementById('nvModel');
+        modelSel.innerHTML = '<option value="">Select Model</option>';
+        globalVehicleMaster.filter(item => item.brand === selectedBrand).forEach(m => {
+            modelSel.innerHTML += `<option value="${m.model_name}" data-cat="${m.category_group}">${m.model_name}</option>`;
         });
     }
-    loadMechanics();
 
     async function processCustomerLookup(mobileStr) {
         const cleanMobile = mobileStr.trim();
@@ -161,20 +190,18 @@
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
             document.getElementById('newVehicleBlock').style.display = 'none';
             nBadge.style.display = 'none';
-            document.getElementById('custHistoryPanel').style.display = 'none'; // NEW
-            document.getElementById('custCreditBadge').style.display = 'none'; // NEW
+            document.getElementById('custHistoryPanel').style.display = 'none'; 
+            document.getElementById('creditAlertBox').style.display = 'none'; 
             return;
         }
 
-        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(id, reg_number, make_model)').eq('mobile_number', cleanMobile).single();
+        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).single();
         
         if (cust) {
             nBadge.style.display = 'none';
             document.getElementById('jcName').value = cust.name;
             vSelect.innerHTML = '';
-            if (cust.vehicles && cust.vehicles.length > 0) {
-                cust.vehicles.forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.make_model})</option>`; });
-            }
+            (cust.vehicles || []).forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.brand || ''} ${v.make_model || ''})</option>`; });
             vSelect.innerHTML += `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         } else {
@@ -183,230 +210,128 @@
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         }
-        
-        loadCustomerHistory(cleanMobile); // NEW
+        loadIdenticalTwinIntakeData(cleanMobile); 
     }
 
     function toggleNewVehicleFields() {
-        const vSelect = document.getElementById('jcVehicleSelect').value;
-        if (vSelect === 'NEW') document.getElementById('newVehicleBlock').style.display = 'block';
+        if (document.getElementById('jcVehicleSelect').value === 'NEW') document.getElementById('newVehicleBlock').style.display = 'block';
         else document.getElementById('newVehicleBlock').style.display = 'none';
     }
 
-    async function loadCustomerHistory(mobile) { // NEW
-      const panel = document.getElementById('custHistoryPanel'); // NEW
-      const tbody = document.getElementById('custHistoryBody'); // NEW
-      const creditBadge = document.getElementById('custCreditBadge'); // NEW
-      
-      const sixMonthsAgo = new Date(); // NEW
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6); // NEW
-      const cutoff = sixMonthsAgo.toISOString().split('T')[0]; // NEW
-      
-      const { data: jcs } = await supabaseClient // NEW
-        .from('job_cards') // NEW
-        .select('id, created_at, total_invoice_value, status, problem_mentioned, vehicles(reg_number)') // NEW
-        .eq('customer_mobile', mobile) // NEW
-        .gte('created_at', cutoff) // NEW
-        .order('created_at', { ascending: false }) // NEW
-        .limit(20); // NEW
+    // UNIFIED CREDIT ENGINE
+    async function loadIdenticalTwinIntakeData(mobile) {
+        const alertBox = document.getElementById('creditAlertBox');
+        
+        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed');
+        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed');
+        const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile);
 
-      const { data: creditJc } = await supabaseClient // NEW
-        .from('job_cards') // NEW
-        .select('id, total_invoice_value') // NEW
-        .eq('customer_mobile', mobile) // NEW
-        .eq('payment_mode', 'Credit') // NEW
-        .eq('status', 'Closed'); // NEW
+        let totalOut = 0;
+        (jc || []).filter(j => j.payment_mode === 'Credit').forEach(j => {
+            const paid = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(j.total_invoice_value) || 0) - paid;
+            if (out > 0) totalOut += out;
+        });
 
-      const { data: creditPays } = await supabaseClient // NEW
-        .from('credit_payments') // NEW
-        .select('amount_paid, job_card_id') // NEW
-        .eq('customer_mobile', mobile); // NEW
+        (pos || []).filter(s => s.payment_mode === 'Credit').forEach(s => {
+            const paid = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
+            const out = (parseFloat(s.total_amount) || 0) - paid;
+            if (out > 0) totalOut += out;
+        });
 
-      let totalCredit = 0; // NEW
-      (creditJc || []).forEach(j => { // NEW
-        const paid = (creditPays || []) // NEW
-          .filter(p => p.job_card_id === j.id) // NEW
-          .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0); // NEW
-        const out = (parseFloat(j.total_invoice_value) || 0) - paid; // NEW
-        if (out > 0) totalCredit += out; // NEW
-      }); // NEW
+        (pays || []).filter(p => !p.sale_id && !p.job_card_id).forEach(p => {
+            if(parseFloat(p.amount_paid) < 0) totalOut += Math.abs(parseFloat(p.amount_paid));
+            else totalOut -= parseFloat(p.amount_paid) || 0;
+        });
 
-      if (totalCredit > 0) { // NEW
-        creditBadge.style.display = 'inline-block'; // NEW
-        creditBadge.innerText = '💳 Credit Balance: ₹' + totalCredit.toFixed(2) + ' — Click to View Ledger'; // NEW
-      } else { // NEW
-        creditBadge.style.display = 'none'; // NEW
-      } // NEW
+        if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); } 
+        else { alertBox.style.display = 'none'; } 
 
-      tbody.innerHTML = ''; // NEW
-      if (!jcs || jcs.length === 0) { // NEW
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">No service history in last 6 months.</td></tr>'; // NEW
-        panel.style.display = 'block'; // NEW
-        return; // NEW
-      } // NEW
+        let mix = [];
+        if(jc) mix = mix.concat(jc.map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode })));
+        if(pos) mix = mix.concat(pos.map(p => ({ id: p.id, type: 'POS', dt: p.created_at, amt: p.total_amount, mode: p.payment_mode })));
+        mix.sort((a,b) => new Date(b.dt) - new Date(a.dt));
+        mix = mix.slice(0, 4);
 
-      jcs.forEach(j => { // NEW
-        const ref = `<a href="billing.html?id=${j.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${j.id.split('-')[0].toUpperCase()}</a>`; // NEW
-        const dt = new Date(j.created_at).toLocaleDateString('en-IN'); // NEW
-        const reg = j.vehicles?.reg_number || '--'; // NEW
-        const prob = (j.problem_mentioned || '--').substring(0, 40) + ((j.problem_mentioned||'').length > 40 ? '…' : ''); // NEW
-        const amt = '₹' + (j.total_invoice_value || 0); // NEW
-        const statusColor = j.status === 'Closed' ? '#15803d' : (j.status === 'Cancelled' ? '#b91c1c' : '#b45309'); // NEW
-        const statusBg = j.status === 'Closed' ? '#dcfce7' : (j.status === 'Cancelled' ? '#fee2e2' : '#fef3c7'); // NEW
+        const tbody = document.getElementById('custHistoryBody'); tbody.innerHTML = '';
+        if (mix.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>'; 
+        else {
+            mix.forEach(x => { 
+                const prefix = x.type === 'POS' ? 'POS' : 'JC';
+                const refLink = `<a href="${x.type === 'POS' ? 'pos-green.html' : 'billing.html'}?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">${prefix}-${x.id.split('-')[0].toUpperCase()}</a>`; 
+                tbody.innerHTML += `<tr><td>${refLink}</td><td>${new Date(x.dt).toLocaleDateString('en-IN')}</td><td style="font-weight:bold;">${x.type}</td><td style="font-weight:bold;">₹${x.amt||0}</td><td style="font-weight:bold; color:${x.mode === 'Credit' ? '#b91c1c' : '#15803d'};">${x.mode}</td></tr>`; 
+            }); 
+        }
+        document.getElementById('custHistoryPanel').style.display = 'block'; 
+    } 
 
-        tbody.innerHTML += `<tr> // NEW
-          <td style="padding:8px 12px;">${ref}</td> // NEW
-          <td style="padding:8px 12px;">${dt}</td> // NEW
-          <td style="padding:8px 12px;font-weight:bold;">${reg}</td> // NEW
-          <td style="padding:8px 12px;color:#64748b;">${prob}</td> // NEW
-          <td style="padding:8px 12px;font-weight:bold;">${amt}</td> // NEW
-          <td style="padding:8px 12px;"> // NEW
-            <span style="background:${statusBg}; color:${statusColor};padding:2px 8px; border-radius:4px;font-size:0.75rem; font-weight:bold;"> // NEW
-              ${j.status} // NEW
-            </span> // NEW
-          </td> // NEW
-        </tr>`; // NEW
-      }); // NEW
+    async function checkRepeatComplaint() { 
+      const mobile = document.getElementById('jcMobile').value.trim(); 
+      const prob = document.getElementById('jcProblem').value.trim().toLowerCase(); 
+      const vehicleSel = document.getElementById('jcVehicleSelect').value; 
+      const flagBox = document.getElementById('warrantFlagBox'); 
+      flagBox.style.display = 'none'; 
+      if (!mobile || mobile.length !== 10 || vehicleSel === '' || vehicleSel === 'NEW' || prob.length < 5) return; 
 
-      panel.style.display = 'block'; // NEW
-    } // NEW
+      const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); 
+      const { data: recent } = await supabaseClient.from('job_cards').select('id, problem_mentioned, closed_at').eq('customer_mobile', mobile).eq('vehicle_id', vehicleSel).eq('status', 'Closed').gte('closed_at', thirtyDaysAgo.toISOString()).order('closed_at', { ascending: false }).limit(5); 
+      if (!recent || recent.length === 0) return; 
 
-    async function checkRepeatComplaint() { // NEW
-      const mobile = document.getElementById('jcMobile').value.trim(); // NEW
-      const prob = document.getElementById('jcProblem').value.trim().toLowerCase(); // NEW
-      const vehicleSel = document.getElementById('jcVehicleSelect').value; // NEW
-      const flagBox = document.getElementById('warrantFlagBox'); // NEW
-      const flagDetail = document.getElementById('warrantFlagDetail'); // NEW
-
-      flagBox.style.display = 'none'; // NEW
-
-      if (!mobile || mobile.length !== 10 || vehicleSel === '' || vehicleSel === 'NEW' || prob.length < 5) return; // NEW
-
-      const thirtyDaysAgo = new Date(); // NEW
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); // NEW
-
-      const { data: recent } = await supabaseClient // NEW
-        .from('job_cards') // NEW
-        .select('id, problem_mentioned, closed_at') // NEW
-        .eq('customer_mobile', mobile) // NEW
-        .eq('vehicle_id', vehicleSel) // NEW
-        .eq('status', 'Closed') // NEW
-        .gte('closed_at', thirtyDaysAgo.toISOString()) // NEW
-        .order('closed_at', { ascending: false }) // NEW
-        .limit(5); // NEW
-
-      if (!recent || recent.length === 0) return; // NEW
-
-      const tokens = prob.split(/\s+/).filter(t => t.length > 3); // NEW
-      const match = (recent || []).find(j => { // NEW
-        const prevProb = (j.problem_mentioned || '').toLowerCase(); // NEW
-        return tokens.some(t => prevProb.includes(t)); // NEW
-      }); // NEW
-
-      if (match) { // NEW
-        flagBox.style.display = 'block'; // NEW
-        const closeDate = new Date(match.closed_at).toLocaleDateString('en-IN'); // NEW
-        const ref = 'JC-' + match.id.split('-')[0].toUpperCase(); // NEW
-        flagDetail.innerText = 'Last closed: ' + ref + ' on ' + closeDate + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"'; // NEW
-      } // NEW
-    } // NEW
+      const tokens = prob.split(/\s+/).filter(t => t.length > 3); 
+      const match = (recent || []).find(j => tokens.some(t => (j.problem_mentioned || '').toLowerCase().includes(t))); 
+      if (match) { 
+        flagBox.style.display = 'block'; 
+        document.getElementById('warrantFlagDetail').innerText = 'Last closed: JC-' + match.id.split('-')[0].toUpperCase() + ' on ' + new Date(match.closed_at).toLocaleDateString('en-IN') + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"'; 
+      } 
+    } 
 
     async function commitNewJobCard() {
         const mobile = document.getElementById('jcMobile').value.trim();
         const name = document.getElementById('jcName').value.trim().toUpperCase();
         const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
-        const refCode = document.getElementById('jcReferral').value.trim().toUpperCase();
-        const advance = parseFloat(document.getElementById('jcAdvance').value) || 0;
-        const prepaid = parseFloat(document.getElementById('jcPrepaid').value) || 0;
-        const pMech = document.getElementById('intakePrimaryMech').value || null;
-        const cMech = document.getElementById('intakeCoMech').value || null;
+        const advance = parseFloat(document.getElementById('jcAdvance')?.value) || 0;
         
-        if (mobile.length !== 10) return alert("Please enter a valid 10-digit mobile number.");
-        if (!name) return alert("Please enter the customer's name.");
-        if (!problem) return alert("Please document the customer's problem.");
+        if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
+        if (!name || !problem) return alert("Customer Name and Problem required.");
         
         const btn = document.getElementById('btnCreateJc');
         btn.innerText = "PROCESSING..."; btn.disabled = true;
 
-        // --- NEW REFERRAL LOGIC ---
-        let applyReferralDiscount = false;
-        let referrerMobile = null;
-
-        if (refCode) {
-            // Check if referrer code is valid in customers table
-            const { data: referrerData } = await supabaseClient
-                .from('customers')
-                .select('mobile_number')
-                .eq('referral_code', refCode)
-                .single();
-
-            if (referrerData && referrerData.mobile_number !== mobile) {
-                referrerMobile = referrerData.mobile_number;
-                
-                // Rule: Honor discount if new OR inactive for > 1 year
-                const oneYearAgo = new Date();
-                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-                const { data: pastJobs } = await supabaseClient
-                    .from('job_cards')
-                    .select('created_at')
-                    .eq('customer_mobile', mobile)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (!pastJobs || pastJobs.length === 0 || new Date(pastJobs[0].created_at) < oneYearAgo) {
-                    applyReferralDiscount = true;
-                } else {
-                    alert("Referral code valid, but this customer has visited within the last 1 year. The 5% referral discount will not be applied.");
-                }
-            } else if (referrerData && referrerData.mobile_number === mobile) {
-                alert("Customer cannot use their own referral code.");
-            } else {
-                alert("Invalid Referral Code entered. Proceeding without referral discount.");
-            }
-        }
-        // --------------------------
+        await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, category: 'Regular' }, { onConflict: 'mobile_number' });
 
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
-
-        // Update customer profile, injecting the referral discount boolean if applicable
-        const custPayload = { mobile_number: mobile, name: name, category: 'Regular' };
-        if (applyReferralDiscount) {
-            custPayload.referral_discount_active = true;
-        }
-        await supabaseClient.from('customers').upsert(custPayload, { onConflict: 'mobile_number' });
-
-        // If a valid referral occurred, record it in the referrals table
-        if (applyReferralDiscount && referrerMobile) {
-            await supabaseClient.from('referrals').insert({
-                referrer_mobile: referrerMobile,
-                referred_mobile: mobile,
-                referral_date: new Date().toISOString().split('T')[0],
-                reward_credited: false
-            });
-        }
-
         if (finalVehicleId === 'NEW') {
-            const reg = document.getElementById('nvReg').value.trim().toUpperCase();
-            const model = document.getElementById('nvModel').value.trim().toUpperCase();
-            const cat = document.getElementById('nvCategory').value;
+            const reg = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
+            const brand = document.getElementById('nvBrand').value;
+            const modelSel = document.getElementById('nvModel');
+            const model = modelSel.value;
+            const cat = modelSel.options[modelSel.selectedIndex]?.getAttribute('data-cat') || '(A) Commuter Bikes 100CC Old';
             
-            if (!reg || !model) { alert("Please fill out the new vehicle Registration Number and Model."); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
-            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ customer_mobile: mobile, reg_number: reg, make_model: model, category_group: cat }).select().single();
-            if (vehErr) { alert("Error registering vehicle: " + vehErr.message); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
+            if (!reg || !brand || !model) { alert("Reg No, Brand, and Model required."); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
+            
+            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ customer_mobile: mobile, reg_number: reg, brand: brand, make_model: model, color: document.getElementById('nvColor').value.toUpperCase(), odometer: document.getElementById('nvOdo').value, category_group: cat }).select().single();
+            if (vehErr) { alert("Error: " + vehErr.message); btn.disabled = false; return; }
             finalVehicleId = newVeh.id;
         } 
 
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance, prepaid_amount: prepaid,
-            mech_id: pMech, co_mech_id: cMech, status: 'Open', source_role: activeRole
+            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance,
+            mech_id: document.getElementById('intakePrimaryMech').value || null, co_mech_id: document.getElementById('intakeCoMech').value || null, status: 'Open', source_role: activeRole
         }).select().single();
 
-        if (jcErr) { alert("Error creating Job Card: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED"; btn.disabled = false; return; }
-
+        if (jcErr) { alert("Error: " + jcErr.message); btn.disabled = false; return; }
         window.location.href = `billing.html?id=${jc.id}`;
     }
+
+    initializeIntake();
 </script>
+<!-- 
+CHANGELOG: Phase 1 New Job Card
+- Applied identical twin UI configuration for Mobile, Credit Ledger access, and History.
+- Implemented Unified Credit Engine via `loadIdenticalTwinIntakeData` parsing exact values shared with CRM.
+- Split merged vehicle selection block into precise `Brand` and `Model` taxonomy dropdowns matching database structure.
+- Embedded rigid RegEx `.replace(/\s+/g, '')` into contact and reg inputs.
+-->
 </body>
 </html>
