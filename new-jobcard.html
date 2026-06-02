@@ -197,8 +197,8 @@
             return;
         }
 
-        // FIXED: Using maybeSingle() prevents fatal error PGRST116 when customer doesn't exist
-        const { data: cust, error } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).maybeSingle();
+        // NO-CRASH FIX: .maybeSingle() prevents DB panic
+        const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).maybeSingle();
         
         if (cust) {
             nBadge.style.display = 'none';
@@ -215,6 +215,8 @@
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         }
+        
+        // Triggers the zero-lag speed function
         loadIdenticalTwinIntakeData(cleanMobile); 
     }
 
@@ -223,43 +225,52 @@
         else document.getElementById('newVehicleBlock').style.display = 'none';
     }
 
-    // FIXED: Bulletproof Unified Credit Engine
+    // BULLETPROOF CREDIT ENGINE & ZERO-LAG PROMISE BUNDLE
     async function loadIdenticalTwinIntakeData(mobile) {
         const alertBox = document.getElementById('creditAlertBox');
         
-        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed');
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed');
-        const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile);
+        // SPEED FIX: Fetch all 3 databases at the exact same millisecond
+        const [jcRes, posRes, paysRes] = await Promise.all([
+            supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
+            supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
+            supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id, payment_mode').eq('customer_mobile', mobile)
+        ]);
+
+        const jc = jcRes.data || [];
+        const pos = posRes.data || [];
+        const pays = paysRes.data || [];
 
         let totalOut = 0;
 
-        // 1. Job Cards Debt (Strict isolation)
-        (jc || []).filter(j => j.payment_mode === 'Credit').forEach(j => {
-            const linkedPayments = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+        // MATH FIX 1: Add Job Cards debt and ONLY subtract genuine positive payments tied to them
+        jc.filter(j => j.payment_mode === 'Credit').forEach(j => {
+            const linkedPayments = pays.filter(p => p.job_card_id === j.id && parseFloat(p.amount_paid) > 0).reduce((s, p) => s + parseFloat(p.amount_paid), 0);
             const out = (parseFloat(j.total_invoice_value) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
-        // 2. POS Debt (Strict isolation)
-        (pos || []).filter(s => s.payment_mode === 'Credit').forEach(s => {
-            const linkedPayments = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
+        // MATH FIX 2: POS Debt
+        pos.filter(s => s.payment_mode === 'Credit').forEach(s => {
+            const linkedPayments = pays.filter(p => p.sale_id === s.id && parseFloat(p.amount_paid) > 0).reduce((sm, p) => sm + parseFloat(p.amount_paid), 0);
             const out = (parseFloat(s.total_amount) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
-        // 3. Unlinked Manual Entries (e.g., Opening Balance debt or free payments)
-        (pays || []).filter(p => !p.sale_id && !p.job_card_id).forEach(p => {
-            const amt = parseFloat(p.amount_paid) || 0;
-            if (amt < 0) totalOut += Math.abs(amt); // Negative means debt added manually
-            else totalOut -= amt; // Positive means payment made
+        // MATH FIX 3: True "Opening Balance" specific debt
+        pays.filter(p => !p.sale_id && !p.job_card_id && parseFloat(p.amount_paid) < 0 && p.payment_mode === 'Opening Balance').forEach(p => {
+            totalOut += Math.abs(parseFloat(p.amount_paid));
         });
 
-        totalOut = Math.max(0, totalOut);
+        // MATH FIX 4: Unlinked free cash payments
+        pays.filter(p => !p.sale_id && !p.job_card_id && parseFloat(p.amount_paid) > 0).forEach(p => {
+            totalOut -= parseFloat(p.amount_paid);
+        });
+
+        totalOut = Math.max(0, totalOut); // Cannot drop below 0
 
         if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); } 
         else { alertBox.style.display = 'none'; } 
 
-        // FIXED: Workshop intake strictly queries Job Cards only
         let mix = [];
         if(jc) mix = mix.concat(jc.map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode })));
         
@@ -314,7 +325,6 @@
 
         await supabaseClient.from('customers').upsert({ mobile_number: mobile, name: name, category: 'Regular' }, { onConflict: 'mobile_number' });
         
-        // FIXED: Writes the Opening Balance properly to the ledger directly upon new customer saving.
         if (isNewCust && ob > 0) {
             await supabaseClient.from('credit_payments').insert({
                 customer_mobile: mobile,
