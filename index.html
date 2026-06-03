@@ -38,6 +38,7 @@
         .border-lube { border-left: 4px solid var(--purple); }
         .border-staff { border-left: 4px solid var(--service); }
         .border-pos { border-left: 4px solid var(--danger); }
+        .border-moped-pos { border-left: 4px solid var(--moped); } /* New Border Style for Moped POS */
         .border-ledger { border-left: 4px solid #0f172a; }
 
         .navigation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
@@ -133,11 +134,20 @@
         </div>
 
         <div id="cardPosFlow" class="matrix-card border-pos" style="display:none;" onclick="window.location.href='reports.html'">
-            <span class="card-meta-label">Retail POS Sales</span>
+            <span class="card-meta-label">Green Retail Sales</span>
             <div style="font-size:0.8rem; font-weight:700; color:var(--text); margin-top:4px;">
                 <div style="display:flex; justify-content:space-between;"><span>Cash:</span><span id="mPosCash">₹0</span></div>
                 <div style="display:flex; justify-content:space-between; margin:2px 0;"><span>UPI/Card:</span><span id="mPosUpi">₹0</span></div>
                 <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mPosCredit">₹0</span></div>
+            </div>
+        </div>
+
+        <div id="cardMopedPosFlow" class="matrix-card border-moped-pos" style="display:none;" onclick="window.location.href='reports.html'">
+            <span class="card-meta-label">Moped Retail Sales</span>
+            <div style="font-size:0.8rem; font-weight:700; color:var(--text); margin-top:4px;">
+                <div style="display:flex; justify-content:space-between;"><span>Cash:</span><span id="mMopPosCash">₹0</span></div>
+                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span>UPI/Card:</span><span id="mMopPosUpi">₹0</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mMopPosCredit">₹0</span></div>
             </div>
         </div>
 
@@ -152,7 +162,9 @@
         <a href="new-jobcard.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
         <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
         <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
+        
         <a href="pos-green.html" id="navGreenPos" class="action-btn bg-retail" style="display:none;">Green POS</a>
+        <a href="pos-green.html" id="navMopedPos" class="action-btn bg-moped" style="display:none;">Moped POS</a>
         
         <a href="inventory-lookup.html" id="navInventoryLookup" class="action-btn" style="background:#059669; display:none;">Stock Lookup</a>
         <a href="product-master-console.html" id="navProductCatalog" class="action-btn" style="background:var(--purple); display:none;">Product Catalog</a>
@@ -232,8 +244,17 @@
             document.getElementById('cardMopedFlow').style.display = 'block';
         }
 
-        if(sessionRole === 'green' || sessionRole === 'admin') {
+        // MODIFIED: Admin sees both POS cards. Moped sees Moped POS card. Green sees Green POS card.
+        if(sessionRole === 'admin') {
             document.getElementById('cardPosFlow').style.display = 'block';
+            document.getElementById('cardMopedPosFlow').style.display = 'block';
+            document.getElementById('navProductCatalog').style.display = 'block';
+            document.getElementById('cardStockValuation').style.display = 'block';
+            loadStockValuation(); 
+        } else if(sessionRole === 'green') {
+            document.getElementById('cardPosFlow').style.display = 'block';
+        } else if(sessionRole === 'moped') {
+            document.getElementById('cardMopedPosFlow').style.display = 'block';
         }
         
         const lubeGrn = document.getElementById('mLubeGreen');
@@ -244,23 +265,16 @@
         if(sessionRole === 'green') document.getElementById('navGreenJc').style.display = 'block';
         if(sessionRole === 'moped') document.getElementById('navMopedJc').style.display = 'block';
         if(sessionRole === 'service' || sessionRole === 'admin') document.getElementById('navNewJc').style.display = 'block';
+        
+        // MODIFIED: Button display logic for POS
         if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('navGreenPos').style.display = 'block';
+        if(sessionRole === 'moped' || sessionRole === 'admin') document.getElementById('navMopedPos').style.display = 'block';
         
-        // PURCHASE BUTTON (UPDATED HREF ABOVE)
         if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') document.getElementById('navPurchase').style.display = 'block';
-        
-        // NEW INJECTED: INVENTORY LOOKUP BUTTON
         if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'service') {
             document.getElementById('navInventoryLookup').style.display = 'block';
         }
         
-        // NEW INJECTED: ADMIN EXCLUSIVES (PRODUCT CATALOG & VALUATION)
-        if(sessionRole === 'admin') {
-            document.getElementById('navProductCatalog').style.display = 'block';
-            document.getElementById('cardStockValuation').style.display = 'block';
-            loadStockValuation(); // Trigger the backend fetch
-        }
-
         prefetchSystemMechanics();
         triggerDashboardDataAggregators();
     }
@@ -271,7 +285,6 @@
         queryMasterJobRegisters();
     }
     
-    // NEW INJECTED FUNCTION: Stock Valuation for Admin
     async function loadStockValuation() {
         const {data:prods} = await supabaseClient.from('product_master')
             .select('current_stock,mac,mrp,retail_price')
@@ -322,12 +335,35 @@
             document.getElementById('mLubeMoped').innerText = `Mop: ${safeNum(data, 'moped_liters').toFixed(2)} L`;
         });
 
-        if(sessionRole === 'green' || sessionRole === 'admin') {
-            supabaseClient.rpc('get_daily_pos_sales', { target_date: dateStringToday }).then(({ data }) => {
-                document.getElementById('mPosCash').innerText = `₹${Math.round(safeNum(data, 'cash_total'))}`;
-                document.getElementById('mPosUpi').innerText = `₹${Math.round(safeNum(data, 'upi_total'))}`;
-                document.getElementById('mPosCredit').innerText = `₹${Math.round(safeNum(data, 'credit_total'))}`;
+        // MODIFIED: Fetches ALL POS data and dynamically assigns to Green or Moped UI arrays
+        if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') {
+            const { data: posData } = await supabaseClient.from('counter_sales').select('cash_amount, upi_amount, credit_amount, source_role').eq('status', 'Closed').gte('closed_at', dateStringToday + 'T00:00:00');
+            
+            let gCash = 0, gUpi = 0, gCred = 0;
+            let mCash = 0, mUpi = 0, mCred = 0;
+            
+            (posData || []).forEach(p => {
+                if (p.source_role === 'moped') {
+                    mCash += parseFloat(p.cash_amount) || 0;
+                    mUpi += parseFloat(p.upi_amount) || 0;
+                    mCred += parseFloat(p.credit_amount) || 0;
+                } else {
+                    gCash += parseFloat(p.cash_amount) || 0;
+                    gUpi += parseFloat(p.upi_amount) || 0;
+                    gCred += parseFloat(p.credit_amount) || 0;
+                }
             });
+
+            if (document.getElementById('cardPosFlow').style.display === 'block') {
+                document.getElementById('mPosCash').innerText = `₹${Math.round(gCash)}`;
+                document.getElementById('mPosUpi').innerText = `₹${Math.round(gUpi)}`;
+                document.getElementById('mPosCredit').innerText = `₹${Math.round(gCred)}`;
+            }
+            if (document.getElementById('cardMopedPosFlow').style.display === 'block') {
+                document.getElementById('mMopPosCash').innerText = `₹${Math.round(mCash)}`;
+                document.getElementById('mMopPosUpi').innerText = `₹${Math.round(mUpi)}`;
+                document.getElementById('mMopPosCredit').innerText = `₹${Math.round(mCred)}`;
+            }
         }
     }
 
