@@ -171,7 +171,6 @@
     async function loadDailyCollection() {
         const todayStr = new Date().toISOString().split('T')[0];
         
-        // Zero-Lag Database Sync
         const [jcRes, posRes] = await Promise.all([
             supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr),
             supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr)
@@ -216,10 +215,11 @@
                 <div id="crm_ledg_${c.mobile_number}" class="crm-tab-content" style="padding:16px;">
                     <div id="ledgerHeader_${c.mobile_number}" style="background:#fef3c7; border:1px solid #fde68a; padding:12px; border-radius:6px; margin-bottom:16px; display:none;">
                         <h4 style="margin:0 0 8px 0; color:#b45309;">DEBT RECOVERY SNAPSHOT</h4>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; font-weight:bold; font-size:0.9rem;">
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-weight:bold; font-size:0.9rem;">
                             <div style="color:var(--danger);">Total Enterprise Due: <br>₹<span id="totDue_${c.mobile_number}">0</span></div>
                             <div style="color:var(--service);">Workshop Dept Due: <br>₹<span id="wsDue_${c.mobile_number}">0</span></div>
                             <div style="color:var(--success);">Green POS Due: <br>₹<span id="grnDue_${c.mobile_number}">0</span></div>
+                            <div style="color:var(--moped);">Moped POS Due: <br>₹<span id="mopDue_${c.mobile_number}">0</span></div>
                         </div>
                     </div>
 
@@ -254,18 +254,17 @@
 
     let ledgerExportData = []; 
 
-    // BULLETPROOF CREDIT ENGINE INTEGRATED INTO CRM LEDGER
     async function loadCrmLedger(mobile) {
         const st = document.getElementById(`fltSt_${mobile}`).value;
         const end = document.getElementById(`fltEnd_${mobile}`).value;
         
         let events = []; 
-        let wsDebt = 0; let grnDebt = 0;
+        let wsDebt = 0; let grnDebt = 0; let mopDebt = 0;
 
-        // SPEED FIX: Fetch all 3 databases simultaneously
+        // PHASE 2: Added source_role to the fetch array for isolation matching
         const [psRes, jsRes, paysRes] = await Promise.all([
-            supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
-            supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
             supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile)
         ]);
 
@@ -274,16 +273,15 @@
         const pays = paysRes.data || [];
 
         ps.forEach(s => {
-            events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id });
+            events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id, source_role: s.source_role });
         });
         
         js.forEach(j => {
-            events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id });
+            events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id, source_role: j.source_role });
         });
         
         pays.forEach(p => {
             const amt = parseFloat(p.amount_paid) || 0;
-            // MATH FIX: Only respect true opening balance debt entries
             if(amt < 0 && p.payment_mode === 'Opening Balance') {
                 events.push({ date: new Date('2000-01-01'), desc: `Opening Balance Debt`, debit: Math.abs(amt), credit: 0, isInvoice: false, type: 'OB', id: p.id });
             } else if(amt > 0) {
@@ -298,7 +296,6 @@
         
         ledgerExportData = [["Date", "Description", "Debit", "Credit", "Balance Due"]];
 
-        // Strict mapping for targeted settlement ui calculation
         const invoiceBalances = {};
         events.filter(e => e.isInvoice || e.type==='OB').forEach(e => { invoiceBalances[e.id] = e.debit; });
         events.filter(e => !e.isInvoice && e.credit > 0).forEach(e => {
@@ -314,7 +311,15 @@
             
             if(inRange) {
                 const dateStr = e.date.getFullYear() === 2000 ? '--' : e.date.toLocaleDateString('en-IN');
-                const badge = e.type === 'JC' ? '<span class="dept-badge dept-ws">WORKSHOP</span>' : (e.type === 'POS' ? '<span class="dept-badge dept-pos">POS</span>' : '');
+                
+                // PHASE 2: Dynamic badges evaluating specific POS source
+                let badge = '';
+                if (e.type === 'JC') badge = '<span class="dept-badge dept-ws">WORKSHOP</span>';
+                else if (e.type === 'POS') {
+                    if (e.source_role === 'moped') badge = '<span class="dept-badge" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd;">MOPED</span>';
+                    else badge = '<span class="dept-badge dept-pos">GREEN</span>';
+                }
+
                 const drStr = e.debit > 0 ? `₹${e.debit.toFixed(2)}` : '';
                 const crStr = e.credit > 0 ? `<span style="color:var(--success); font-weight:bold;">₹${e.credit.toFixed(2)}</span>` : '';
                 const balStr = `<strong style="color:var(--danger);">₹${Math.max(0, runningBalance).toFixed(2)}</strong>`;
@@ -323,13 +328,26 @@
                 if((e.isInvoice || e.type==='OB') && invoiceBalances[e.id] > 0) {
                     const owe = invoiceBalances[e.id];
                     if(e.type === 'JC') wsDebt += owe;
-                    if(e.type === 'POS') grnDebt += owe;
-                    targetSettleUi = `
-                        <div style="display:flex; align-items:center;" class="no-print">
-                            <input type="number" id="payInp_${e.id}" class="target-pay-input" placeholder="₹${owe.toFixed(0)}">
-                            <select id="payMod_${e.id}" style="padding:2px; font-size:0.7rem; margin-left:4px;"><option value="Cash">Cash</option><option value="UPI">UPI</option></select>
-                            <button class="target-pay-btn" onclick="applyTargetPayment('${mobile}', '${e.id}', '${e.type}', ${owe})">PAY</button>
-                        </div>`;
+                    else if(e.type === 'POS' && e.source_role === 'moped') mopDebt += owe;
+                    else if(e.type === 'POS') grnDebt += owe;
+                    
+                    // PHASE 2: STRICT LEDGER LOCKDOWN ALGORITHM
+                    let isAllowedToSettle = false;
+                    if (activeSessionRole === 'admin') isAllowedToSettle = true;
+                    else if (activeSessionRole === 'service' && e.type === 'JC') isAllowedToSettle = true;
+                    else if (activeSessionRole === 'green' && e.type === 'POS' && (e.source_role === 'green' || !e.source_role)) isAllowedToSettle = true;
+                    else if (activeSessionRole === 'moped' && e.type === 'POS' && e.source_role === 'moped') isAllowedToSettle = true;
+
+                    if (isAllowedToSettle) {
+                        targetSettleUi = `
+                            <div style="display:flex; align-items:center;" class="no-print">
+                                <input type="number" id="payInp_${e.id}" class="target-pay-input" placeholder="₹${owe.toFixed(0)}">
+                                <select id="payMod_${e.id}" style="padding:2px; font-size:0.7rem; margin-left:4px;"><option value="Cash">Cash</option><option value="UPI">UPI</option></select>
+                                <button class="target-pay-btn" onclick="applyTargetPayment('${mobile}', '${e.id}', '${e.type}', ${owe})">PAY</button>
+                            </div>`;
+                    } else {
+                        targetSettleUi = `<div style="font-size:0.75rem; color:#94a3b8; font-weight:bold;" class="no-print">🔒 Restricted Dept</div>`;
+                    }
                 }
 
                 tableHtml += `<tr><td>${dateStr}</td><td>${e.desc} ${badge}</td><td>${drStr}</td><td>${crStr}</td><td>${balStr}</td><td class="no-print">${targetSettleUi}</td></tr>`;
@@ -339,9 +357,10 @@
 
         tableHtml += '</tbody></table></div>';
         
-        document.getElementById(`totDue_${mobile}`).innerText = (wsDebt + grnDebt).toFixed(2);
+        document.getElementById(`totDue_${mobile}`).innerText = (wsDebt + grnDebt + mopDebt).toFixed(2);
         document.getElementById(`wsDue_${mobile}`).innerText = wsDebt.toFixed(2);
         document.getElementById(`grnDue_${mobile}`).innerText = grnDebt.toFixed(2);
+        document.getElementById(`mopDue_${mobile}`).innerText = mopDebt.toFixed(2);
         document.getElementById(`ledgerHeader_${mobile}`).style.display = 'block';
         
         document.getElementById(`ledgContent_${mobile}`).innerHTML = tableHtml;
