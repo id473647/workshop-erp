@@ -100,14 +100,18 @@
                     <label>Registration Plate</label>
                     <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=(this.value||'').toUpperCase().replace(/\s+/g, '')">
                 </div>
+                
                 <div class="field-group">
                     <label>Brand</label>
-                    <select id="nvBrand" onchange="populateModels()"><option value="">Select Brand</option></select>
+                    <input type="text" id="nvBrand" list="brandList" placeholder="Type or Select Brand" oninput="this.value=(this.value||'').toUpperCase(); populateModels()" onchange="populateModels()">
+                    <datalist id="brandList"></datalist>
                 </div>
                 <div class="field-group">
                     <label>Model Name</label>
-                    <select id="nvModel"><option value="">Select Model</option></select>
+                    <input type="text" id="nvModel" list="modelList" placeholder="Type or Select Model" oninput="this.value=(this.value||'').toUpperCase()">
+                    <datalist id="modelList"></datalist>
                 </div>
+
                 <div class="field-group">
                     <label>Color</label>
                     <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=(this.value||'').toUpperCase()">
@@ -166,17 +170,22 @@
 
         const { data: vMaster } = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
         globalVehicleMaster = vMaster || [];
+        
+        // Populate the Type-and-Select Datalist for Brands
         const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
-        const brandSel = document.getElementById('nvBrand');
-        brands.forEach(b => { brandSel.innerHTML += `<option value="${b}">${b}</option>`; });
+        const brandList = document.getElementById('brandList');
+        brandList.innerHTML = '';
+        brands.forEach(b => { brandList.innerHTML += `<option value="${b}">`; });
     }
 
     function populateModels() {
-        const selectedBrand = document.getElementById('nvBrand').value;
-        const modelSel = document.getElementById('nvModel');
-        modelSel.innerHTML = '<option value="">Select Model</option>';
-        globalVehicleMaster.filter(item => item.brand === selectedBrand).forEach(m => {
-            modelSel.innerHTML += `<option value="${m.model_name}" data-cat="${m.category_group}">${m.model_name}</option>`;
+        const selectedBrand = document.getElementById('nvBrand').value.trim().toUpperCase();
+        const modelList = document.getElementById('modelList');
+        modelList.innerHTML = '';
+        
+        // Dynamically populate models based on whatever brand was typed or selected
+        globalVehicleMaster.filter(item => item.brand.toUpperCase() === selectedBrand).forEach(m => {
+            modelList.innerHTML += `<option value="${m.model_name}">`;
         });
     }
 
@@ -197,7 +206,6 @@
             return;
         }
 
-        // NO-CRASH FIX: .maybeSingle() prevents DB panic
         const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).maybeSingle();
         
         if (cust) {
@@ -216,7 +224,6 @@
             toggleNewVehicleFields();
         }
         
-        // Triggers the zero-lag speed function
         loadIdenticalTwinIntakeData(cleanMobile); 
     }
 
@@ -225,11 +232,9 @@
         else document.getElementById('newVehicleBlock').style.display = 'none';
     }
 
-    // BULLETPROOF CREDIT ENGINE & ZERO-LAG PROMISE BUNDLE
     async function loadIdenticalTwinIntakeData(mobile) {
         const alertBox = document.getElementById('creditAlertBox');
         
-        // SPEED FIX: Fetch all 3 databases at the exact same millisecond
         const [jcRes, posRes, paysRes] = await Promise.all([
             supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
             supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
@@ -242,31 +247,27 @@
 
         let totalOut = 0;
 
-        // MATH FIX 1: Add Job Cards debt and ONLY subtract genuine positive payments tied to them
         jc.filter(j => j.payment_mode === 'Credit').forEach(j => {
             const linkedPayments = pays.filter(p => p.job_card_id === j.id && parseFloat(p.amount_paid) > 0).reduce((s, p) => s + parseFloat(p.amount_paid), 0);
             const out = (parseFloat(j.total_invoice_value) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
-        // MATH FIX 2: POS Debt
         pos.filter(s => s.payment_mode === 'Credit').forEach(s => {
             const linkedPayments = pays.filter(p => p.sale_id === s.id && parseFloat(p.amount_paid) > 0).reduce((sm, p) => sm + parseFloat(p.amount_paid), 0);
             const out = (parseFloat(s.total_amount) || 0) - linkedPayments;
             if (out > 0) totalOut += out;
         });
 
-        // MATH FIX 3: True "Opening Balance" specific debt
         pays.filter(p => !p.sale_id && !p.job_card_id && parseFloat(p.amount_paid) < 0 && p.payment_mode === 'Opening Balance').forEach(p => {
             totalOut += Math.abs(parseFloat(p.amount_paid));
         });
 
-        // MATH FIX 4: Unlinked free cash payments
         pays.filter(p => !p.sale_id && !p.job_card_id && parseFloat(p.amount_paid) > 0).forEach(p => {
             totalOut -= parseFloat(p.amount_paid);
         });
 
-        totalOut = Math.max(0, totalOut); // Cannot drop below 0
+        totalOut = Math.max(0, totalOut);
 
         if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); } 
         else { alertBox.style.display = 'none'; } 
@@ -337,14 +338,37 @@
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
         if (finalVehicleId === 'NEW') {
             const reg = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
-            const brand = document.getElementById('nvBrand').value;
-            const modelSel = document.getElementById('nvModel');
-            const model = modelSel.value;
-            const cat = modelSel.options[modelSel.selectedIndex]?.getAttribute('data-cat') || '(A) Commuter Bikes 100CC Old';
+            const brand = document.getElementById('nvBrand').value.trim().toUpperCase();
+            const model = document.getElementById('nvModel').value.trim().toUpperCase();
             
-            if (!reg || !brand || !model) { alert("Reg No, Brand, and Model required."); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
+            if (!reg || !brand || !model) { alert("Registration No, Brand, and Model are required."); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
             
-            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ customer_mobile: mobile, reg_number: reg, brand: brand, make_model: model, color: document.getElementById('nvColor').value.toUpperCase(), odometer: document.getElementById('nvOdo').value, category_group: cat }).select().single();
+            // ARCHITECTURE AGREEMENT: "Unclassified" default for custom typed vehicles
+            let cat = 'Unclassified'; 
+            const matchedModel = globalVehicleMaster.find(m => m.brand.toUpperCase() === brand && m.model_name.toUpperCase() === model);
+            
+            if (matchedModel) {
+                cat = matchedModel.category_group;
+            } else {
+                // ARCHITECTURE AGREEMENT: "Auto-Master Injection"
+                // Brand new Make/Model combination -> Inject into global vehicle_master
+                await supabaseClient.from('vehicle_master').insert({
+                    brand: brand,
+                    model_name: model,
+                    category_group: 'Unclassified'
+                });
+            }
+            
+            const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ 
+                customer_mobile: mobile, 
+                reg_number: reg, 
+                brand: brand, 
+                make_model: model, 
+                color: document.getElementById('nvColor').value.toUpperCase(), 
+                odometer: document.getElementById('nvOdo').value, 
+                category_group: cat 
+            }).select().single();
+            
             if (vehErr) { alert("Error: " + vehErr.message); btn.disabled = false; return; }
             finalVehicleId = newVeh.id;
         } 
