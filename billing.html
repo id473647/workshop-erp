@@ -71,6 +71,9 @@
         .me-summary { background: #f8fafc; border: 2px solid #2c3e50; padding: 10px; font-family: 'Courier New', monospace; font-size: 0.78rem; }
         .me-sum-row { display: flex; justify-content: space-between; margin: 2px 0; }
         
+        /* MAKER-CHECKER PING UI */
+        .ping-box { background:#eff6ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:10px;}
+
         @media print { 
             @page { margin: 8mm; }
             body * { visibility: hidden; } 
@@ -206,13 +209,24 @@
 
     <div class="valuation-banner">NET PAYABLE: ₹<span id="netValuationDisplay">0</span></div>
     
-    <div id="settlementActionBlock" class="settle-matrix" style="display:none;">
-        <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">CASH</button>
-        <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPI / CARD</button>
-        <button class="btn-action btn-split" onclick="openSplitPaymentModal()">SPLIT</button>
-        <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
-        <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD DRAFT</button>
-        <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
+    <div id="masterActionContainer">
+        <div id="settlementActionBlock" class="settle-matrix" style="display:none;">
+            <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">CASH</button>
+            <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPI / CARD</button>
+            <button class="btn-action btn-split" onclick="openSplitPaymentModal()">SPLIT</button>
+            <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
+            <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD DRAFT</button>
+            <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
+        </div>
+
+        <div class="ping-box" id="pingRequestBlock" style="display:none;">
+            <label style="font-size:0.75rem; font-weight:bold; color:var(--primary);">🛎️ Request Payment at Counter</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <select id="pingTargetDept" style="flex:1; padding:6px; font-size:0.8rem;"><option value="green">Green Counter</option><option value="moped">Moped Counter</option></select>
+                <button onclick="dispatchPaymentPing()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">PING DESK</button>
+            </div>
+            <div id="pingStatusText" style="font-size:0.7rem; color:#64748b; margin-top:6px;"></div>
+        </div>
     </div>
 
     <div id="draftActionBlock" style="display:none; margin-bottom:20px;">
@@ -415,10 +429,8 @@
     let lineItemsLocalMemory = []; let globalCatalogCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let appliedProtocolNamesForTracking = []; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
     
-    // PROMPT 2 GLOBALS
     window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false; let activeCustomerProfile = { category: 'Regular' };
 
-    // Track internally separated totals to push to db
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
 
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
@@ -439,12 +451,14 @@
             document.getElementById('vAdvance').style.background = '#f1f5f9';
         } else { 
             document.getElementById('settlementActionBlock').style.display = 'grid'; 
+            // PHASE 2: Display the Ping block for Workshop/Admin
+            document.getElementById('pingRequestBlock').style.display = 'block';
+            
             document.getElementById('vPrepaid').disabled = true;
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
 
-        // Fix 3 Step 5: Toggle concession block based on role
         if (sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('serviceDiscBlock').style.display = 'block';
             document.getElementById('simpleDiscBlock').style.display = 'none';
@@ -488,7 +502,7 @@
     }
 
     function lockUserInterface() {
-        document.getElementById('lockedBanner').style.display = 'block'; document.getElementById('uiPartEntryBlock').style.display = 'none'; document.getElementById('uiProtocolEntryBlock').style.display = 'none'; document.getElementById('settlementActionBlock').style.display = 'none'; document.getElementById('draftActionBlock').style.display = 'none'; document.getElementById('columnDestroyer').style.display = 'none';
+        document.getElementById('lockedBanner').style.display = 'block'; document.getElementById('uiPartEntryBlock').style.display = 'none'; document.getElementById('uiProtocolEntryBlock').style.display = 'none'; document.getElementById('masterActionContainer').style.display = 'none'; document.getElementById('draftActionBlock').style.display = 'none'; document.getElementById('columnDestroyer').style.display = 'none';
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = true; el.style.background = '#f1f5f9'; });
         if(sessionRole === 'admin') document.getElementById('btnUnlockAdmin').style.display = 'inline-block';
     }
@@ -533,7 +547,6 @@
         }); 
     }
     
-    // UPDATED FUNCTION: Fully robust payload creation for Protocols
     async function addFixedProtocol() { 
         const sel = document.getElementById('serviceProtocolSelect'); 
         if(!sel.value) return; 
@@ -549,10 +562,9 @@
 
         sel.disabled = true;
         
-        // Explicitly constructing the payload to enforce warehouse_type correctly
         const payload = { 
             job_card_id: targetJobId, 
-            warehouse_type: 'Service', // Explicitly setting this strictly
+            warehouse_type: 'Service',
             item_name: pkgName, 
             qty: 1, 
             unit_metric: 'Pkg', 
@@ -560,12 +572,9 @@
             total_price: pkgRate 
         };
         
-        console.log("Injecting Protocol Payload:", payload); // Look in F12 console
-
         const { error } = await supabaseClient.from('job_card_items').insert(payload); 
         
         if (error) {
-            console.error("Supabase Error Details:", error);
             alert("Error injecting protocol: " + error.message);
         }
 
@@ -626,16 +635,14 @@
         }, 200);
     }
 
-    // PROMPT 2: ADVANCED VEHICLE AWARE AUTOCOMPLETE
     async function queryCatalogAutocomplete(inputRef) {
         const upperVal = inputRef.value.toUpperCase();
-    if (inputRef.value !== upperVal) {
-        // Preserve cursor position when correcting case
-        const cursorPos = inputRef.selectionStart;
-        inputRef.value = upperVal;
-        inputRef.setSelectionRange(cursorPos, cursorPos);
-    }
-    const q = upperVal.trim();   // local trim only for search, not field
+        if (inputRef.value !== upperVal) {
+            const cursorPos = inputRef.selectionStart;
+            inputRef.value = upperVal;
+            inputRef.setSelectionRange(cursorPos, cursorPos);
+        }
+        const q = upperVal.trim();
         const listContainer = document.getElementById('autolist-n');
         listContainer.innerHTML = '';
         listContainer.style.display = 'none';
@@ -645,7 +652,6 @@
         const tokens = q.split(' ').filter(t=>t.length>0);
         const vehicleModel = activeJobContext?.vehicles?.make_model?.toUpperCase()||null;
 
-        // PASS 1 — vehicle shortlist
         let results = [];
         if (vehicleModel) {
             const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model', vehicleModel);
@@ -661,7 +667,6 @@
             });
         }
 
-        // PASS 2 — global fallback
         if (results.length===0) {
             results = globalCatalogCache.filter(p => {
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
@@ -692,7 +697,6 @@
         window._pendingItemUnverified = true;
     }
     
-    // PROMPT 2: ADVANCED APPLY ITEM LOGIC
     function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) {
         document.getElementById('nPart').value = name;
         document.getElementById('nBrand').value = brand;
@@ -748,7 +752,6 @@
     
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
-    // PROMPT 2: ADVANCED PUSH LOGIC
     async function pushItemToJobCard() { 
         const partStr = document.getElementById('nPart').value.trim(); 
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
@@ -764,7 +767,6 @@
         const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
         const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase(); 
         
-        // Handle Unverified Mocking
         if (window._pendingItemUnverified) {
             await supabaseClient.from('product_master').insert({
                 item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
@@ -914,8 +916,6 @@
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = document.getElementById('netValuationDisplay').innerText;
-        
-        console.log('SETTLEMENT lubricant_total:', internalLubeNet, 'green:', internalGreenNet, 'moped:', internalMopedNet);
 
         const updates = { 
             total_invoice_value: netVal, 
@@ -934,7 +934,6 @@
             moped_total: internalMopedNet  
         };
         
-        // PROMPT 2 FIX: Always stamp closed_at when settling to Closed
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
         
@@ -954,7 +953,6 @@
                 ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` });
             }
             if (ledgerEntries.length > 0) {
-                console.log('STAFF LEDGER ENTRIES:', ledgerEntries);
                 await supabaseClient.from('staff_ledger').insert(ledgerEntries);
             }
         }
@@ -975,19 +973,16 @@
         }
     }
 
-    // PROMPT 2: MULTI ENTITY BUILDER & SAVINGS SUMMARY HOOK
     function populateReceiptDocument(paymentMode, finalNet, scopeVals) { 
-        // 1. Check Multi-Entity First
         const mopedAmt = parseFloat(scopeVals.moped_total) || 0;
         const greenAmt = parseFloat(scopeVals.green_total) || 0;
         const labourAmt = (parseFloat(scopeVals.labour_charges) || 0) + (parseFloat(scopeVals.lathe_welding) || 0) + servicePkgGrossTotal;
 
         if (mopedAmt > 0) {
             renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt);
-            return; // EXIT — run multi-entity instead
+            return; 
         }
 
-        // 2. Fallback to existing single entity receipt
         const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; 
         
         let totalMrpValue = 0; let totalActualValue = 0;
@@ -1007,7 +1002,6 @@
             } 
         }); 
 
-        // Add Savings Summary if applicable
         const totalSavings = totalMrpValue - totalActualValue;
         if (totalSavings > 0) {
             const savingsEl = document.getElementById('receiptSavingsSummary');
@@ -1042,7 +1036,6 @@
         document.getElementById('modalReceipt').style.display = 'flex';
     }
 
-    // PROMPT 2: MULTI ENTITY RENDERER
     function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) {
         const hasMyCare = greenAmt>0 || labourAmt>0;
         const myCareSub = greenAmt + labourAmt;
@@ -1211,6 +1204,36 @@
         
         window.print(); 
         setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
+    }
+
+    // PHASE 2: MAKER-CHECKER PING FUNCTIONALITY
+    async function dispatchPaymentPing() {
+        const reqAmt = parseFloat(document.getElementById('splitReqAmt').innerText.replace('₹','')) || 0;
+        if (reqAmt <= 0) return alert("No outstanding balance to request.");
+        
+        const target = document.getElementById('pingTargetDept').value;
+        const statusText = document.getElementById('pingStatusText');
+        
+        if(!confirm(`Send payment request for ₹${reqAmt} to the ${target.toUpperCase()} counter?`)) return;
+        
+        statusText.innerText = "Dispatching request...";
+
+        const payload = {
+            customer_mobile: activeJobContext.customer_mobile,
+            requested_by_role: activeRole,
+            request_type: 'Cash Collection',
+            payload: { jc_id: activeJcId, amount: reqAmt },
+            status: 'Pending',
+            target_dept: target
+        };
+
+        const { error } = await supabaseClient.from('approval_requests').insert(payload);
+        if (error) {
+            statusText.innerText = "Error: " + error.message;
+        } else {
+            statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`;
+            document.getElementById('btnCollectLocal').style.display = 'none'; 
+        }
     }
 
     initializeJobContext();
