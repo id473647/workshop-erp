@@ -110,6 +110,11 @@
             body.print-pos-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
             body.print-pos-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 80mm; max-width: 80mm; padding: 0; }
             body.print-pos-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 8mm; }
+            
+            body.print-ping-mode * { visibility: hidden; }
+            body.print-ping-mode #renderPingReceiptTarget,
+            body.print-ping-mode #renderPingReceiptTarget * { visibility: visible; }
+            body.print-ping-mode #renderPingReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
         }
         
         .status-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
@@ -131,6 +136,13 @@
 </nav>
 
 <div class="wrapper">
+    <div id="pingQueueBlock" style="display:none; margin-bottom:20px;">
+        <div class="card-panel" style="background:#f0f9ff; border:1px solid #bae6fd; padding:16px;">
+            <h4 style="margin:0 0 12px 0; color:#0369a1;">🔔 Pending Cash Collections</h4>
+            <div id="pingQueueList" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+    </div>
+
     <div id="flowHub" class="card-panel active-step">
         <div class="block-title">Customer Contact Verification</div>
         <div class="inputs-grid">
@@ -418,6 +430,25 @@
     </div>
 </div>
 
+<div id="paymentReceiptModal" class="overlay-modal" style="z-index: 500;">
+    <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <div class="receipt-card" id="renderPingReceiptTarget" style="background:white; color:black; width: 300px; padding:24px; border-radius:12px; font-family:'Courier New', Courier, monospace; text-align:center;">
+            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:8px;">
+                <img src="logo-main.jpg" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
+                <img src="logo-green.png" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:1rem; margin-bottom:10px; border-bottom:1px dashed #000; padding-bottom:5px;">PAYMENT ACKNOWLEDGEMENT</div>
+            <div id="prtContent" style="text-align:left; font-size:0.8rem; line-height:1.5;"></div>
+            <div style="border-top:1px dashed #000; margin-top:10px; margin-bottom:15px;"></div>
+            <div style="font-size:0.7rem; text-align:center;">Computer Generated Document</div>
+        </div>
+        <div style="display:flex; gap:8px; width:100%; max-width:300px;">
+            <button onclick="printPingReceipt()" style="flex:1; background:var(--primary); color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ PRINT</button>
+            <button onclick="document.getElementById('paymentReceiptModal').style.display='none'" style="flex:1; background:#e2e8f0; color:#1e293b; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">CLOSE</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
@@ -469,7 +500,6 @@
     }
 
     function enforceTitleCaseNomenclature(str) { return str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''; }
-    function enforceBrandCapitalization(inputRef) { inputRef.value = inputRef.value.toUpperCase(); }
 
     function convertNumberToWords(amount) {
         const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' };
@@ -513,6 +543,12 @@
         }
 
         let baseQuery = supabaseClient.from('counter_sales').select('*');
+        
+        // Ensure isolation: Moped only sees Moped history
+        const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || '';
+        if(activeRole === 'moped') { baseQuery = baseQuery.eq('source_role', 'moped'); }
+        else if(activeRole === 'green') { baseQuery = baseQuery.eq('source_role', 'green'); }
+
         const dateTargetColumn = currentPosTabMode === 'Estimates' ? 'created_at' : 'closed_at';
         
         if(currentPosTabMode === 'AgedCredit') { 
@@ -566,11 +602,9 @@
         }
     }
 
-    // BULLETPROOF CREDIT ENGINE (Prevents ₹3000 Ghosting)
     async function calculateMasterCreditBalance(mobile) {
         if (!mobile) return 0;
         
-        // Zero-Lag Database Sync
         const [jcRes, posRes, paysRes] = await Promise.all([
             supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed'),
             supabaseClient.from('counter_sales').select('id, total_amount').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed'),
@@ -622,7 +656,6 @@
         evaluatedPhoneContext = cleanStr;
         document.getElementById('masterHistoryBlock').style.display = 'none';
 
-        // NO-CRASH FIX: .maybeSingle() prevents DB panic, Zero-Lag Promise sync
         const [cDataRes, jcListRes, posListRes] = await Promise.all([
             supabaseClient.from('customers').select('*').eq('mobile_number', evaluatedPhoneContext).maybeSingle(),
             supabaseClient.from('job_cards').select('id').eq('customer_mobile', evaluatedPhoneContext).limit(1),
@@ -650,7 +683,6 @@
             else if(hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Already a workshop customer</span>';
             else if(hasPos) wrapper.innerHTML = '<span class="c-tag tag-cash">Already a customer</span>';
             
-            // Uses the Bulletproof Credit Math Fix
             const currentBalance = await calculateMasterCreditBalance(evaluatedPhoneContext);
             if(currentBalance > 0) { 
                 document.getElementById('unifiedCreditBal').innerText = currentBalance.toFixed(2); 
@@ -714,6 +746,7 @@
         globalCatalogCache = master || []; 
     }
 
+    // PHASE 2: Virtual Split (Data Bouncer) Applied Here
     async function queryCatalogAutocomplete(inputRef, targetIdx) {
         const searchVal = inputRef.value.trim().toLowerCase();
         const listContainer = document.getElementById(`autolist-${targetIdx}`);
@@ -722,6 +755,7 @@
         
         const tokens = searchVal.split(' ').filter(t=>t.length>0);
         const veh = (document.getElementById('posVehicleFilter')?.value||'').toUpperCase();
+        const role = (localStorage.getItem('ERP_ACTIVE_ROLE') || '').toLowerCase();
         
         let results = [];
         if (veh) {
@@ -732,6 +766,11 @@
                 groupIds = (grps||[]).map(g=>g.product_master_id);
             }
             results = globalCatalogCache.filter(p => {
+                // PHASE 2 BOUNCER
+                const pType = (p.warehouse_type || 'universal').toLowerCase();
+                const allowed = (pType === role || pType === 'universal' || pType === 'both');
+                if((role === 'moped' || role === 'green') && !allowed) return false;
+
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
                 if (!tokens.every(t=>txt.includes(t))) return false;
                 return p.scope==='universal' || groupIds.includes(p.id) || (p.compatibility_tags?.toUpperCase().split(',').map(s=>s.trim()).includes(veh));
@@ -740,6 +779,11 @@
         
         if (results.length===0) {
             results = globalCatalogCache.filter(p => {
+                // PHASE 2 BOUNCER
+                const pType = (p.warehouse_type || 'universal').toLowerCase();
+                const allowed = (pType === role || pType === 'universal' || pType === 'both');
+                if((role === 'moped' || role === 'green') && !allowed) return false;
+
                 const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
                 return tokens.every(t=>txt.includes(t));
             });
@@ -1585,6 +1629,93 @@
         openCreditLedgerModal(currentCreditLedgerMobile, document.getElementById('clCustName').innerText);
         queryPosHistoryEngine();
     }
+
+    // PHASE 2: MAKER-CHECKER PING LISTENER
+    async function pollApprovalRequests() {
+        const role = (localStorage.getItem('ERP_ACTIVE_ROLE') || '').toLowerCase();
+        if(role !== 'green' && role !== 'moped') return;
+        
+        const { data, error } = await supabaseClient.from('approval_requests')
+            .select('*')
+            .eq('status', 'Pending')
+            .eq('target_dept', role);
+            
+        const block = document.getElementById('pingQueueBlock');
+        const list = document.getElementById('pingQueueList');
+        
+        if(error || !data || data.length === 0) {
+            block.style.display = 'none';
+            return;
+        }
+        
+        block.style.display = 'block';
+        list.innerHTML = '';
+        
+        data.forEach(req => {
+            const amt = req.payload?.amount || 0;
+            const jcId = req.payload?.jc_id || 'UNKNOWN';
+            const shortJc = jcId.split('-')[0].toUpperCase();
+            
+            list.innerHTML += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:12px; border-radius:6px; border:1px solid #bae6fd;">
+                    <div>
+                        <strong style="color:var(--primary);">Workshop Request: JC-${shortJc}</strong><br>
+                        <span style="font-size:0.8rem; color:#64748b;">Collect from: ${req.customer_mobile || 'Walk-in'}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <strong style="font-size:1.2rem; color:var(--danger);">₹${amt}</strong>
+                        <select id="pingMode_${req.id}" style="padding:6px; font-size:0.8rem;">
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                        </select>
+                        <button onclick="acceptPingRequest('${req.id}', '${jcId}', ${amt}, '${req.customer_mobile}')" style="background:var(--success); color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">ACCEPT & PRINT</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    async function acceptPingRequest(reqId, jcId, amount, mobile) {
+        const role = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'green').toUpperCase();
+        const mode = document.getElementById(`pingMode_${reqId}`).value;
+        
+        await supabaseClient.from('approval_requests').update({ status: 'Cleared' }).eq('id', reqId);
+        
+        await supabaseClient.from('credit_payments').insert({
+            customer_mobile: mobile,
+            job_card_id: jcId,
+            amount_paid: amount,
+            payment_mode: mode,
+            paid_by_role: role.toLowerCase(),
+            note: 'Cross-Department Settlement'
+        });
+        
+        const d = new Date();
+        const receiptHtml = `
+            Date: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}<br>
+            Client Mobile: ${mobile}<br><br>
+            Received with thanks the sum of:<br>
+            <strong style="font-size:1.5rem; color:var(--success);">₹${amount}</strong><br><br>
+            <strong>Mode:</strong> ${mode}<br>
+            <strong>Target:</strong> Workshop Job Card (JC-${jcId.split('-')[0].toUpperCase()})<br><br>
+            <strong>Collected By Dept:</strong> ${role}<br>
+            <em style="font-size:0.75rem;">*Cross-Department Settlement Verified*</em>
+        `;
+        
+        document.getElementById('prtContent').innerHTML = receiptHtml;
+        document.getElementById('paymentReceiptModal').style.display = 'flex';
+        pollApprovalRequests();
+    }
+
+    function printPingReceipt() {
+        document.body.classList.add('print-ping-mode');
+        window.print();
+        setTimeout(() => document.body.classList.remove('print-ping-mode'), 500);
+    }
+
+    // Polling triggers
+    setInterval(pollApprovalRequests, 15000);
+    setTimeout(pollApprovalRequests, 1000);
 
     initPosTerminal();
 </script>
