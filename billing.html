@@ -1163,7 +1163,10 @@
         document.getElementById('tkFrontVehReg').innerText = veh.reg_number || '--';
         document.getElementById('tkFrontVehChassis').innerText = veh.chassis_number || '--';
         document.getElementById('tkFrontVehEngine').innerText = veh.engine_number || '--';
-        document.getElementById('tkFrontVehOdo').innerText = veh.odometer ? `${veh.odometer} km` : '--';
+
+        // --- ODOMETER BUG FIX ---
+        const rawOdo = activeJobContext?.odometer;
+        document.getElementById('tkFrontVehOdo').innerText = (rawOdo && rawOdo !== 'null' && rawOdo !== 'undefined') ? `${rawOdo} km` : '--';
         
         document.getElementById('tkFrontProblem').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance';
         
@@ -1206,9 +1209,10 @@
         setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
     }
 
-    // PHASE 2: MAKER-CHECKER PING FUNCTIONALITY
+    // PHASE 2: MAKER-CHECKER PING FUNCTIONALITY (FIXED)
     async function dispatchPaymentPing() {
-        const reqAmt = parseFloat(document.getElementById('splitReqAmt').innerText.replace('₹','')) || 0;
+        // Read directly from the final net payable display
+        const reqAmt = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
         if (reqAmt <= 0) return alert("No outstanding balance to request.");
         
         const target = document.getElementById('pingTargetDept').value;
@@ -1220,9 +1224,9 @@
 
         const payload = {
             customer_mobile: activeJobContext.customer_mobile,
-            requested_by_role: activeRole,
+            requested_by_role: sessionRole, // Fixed: Maps to your actual session variable
             request_type: 'Cash Collection',
-            payload: { jc_id: activeJcId, amount: reqAmt },
+            payload: { jc_id: targetJobId, amount: reqAmt }, // Fixed: Maps to your active target job
             status: 'Pending',
             target_dept: target
         };
@@ -1232,7 +1236,6 @@
             statusText.innerText = "Error: " + error.message;
         } else {
             statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`;
-            document.getElementById('btnCollectLocal').style.display = 'none'; 
         }
     }
 
