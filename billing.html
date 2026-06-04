@@ -70,9 +70,6 @@
         .me-total { display: flex; justify-content: space-between; font-size: 0.82rem; }
         .me-summary { background: #f8fafc; border: 2px solid #2c3e50; padding: 10px; font-family: 'Courier New', monospace; font-size: 0.78rem; }
         .me-sum-row { display: flex; justify-content: space-between; margin: 2px 0; }
-        
-        /* MAKER-CHECKER PING UI */
-        .ping-box { background:#eff6ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:10px;}
 
         @media print { 
             @page { margin: 8mm; }
@@ -217,15 +214,6 @@
             <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
             <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD DRAFT</button>
             <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
-        </div>
-
-        <div class="ping-box" id="pingRequestBlock" style="display:none;">
-            <label style="font-size:0.75rem; font-weight:bold; color:var(--primary);">🛎️ Request Payment at Counter</label>
-            <div style="display:flex; gap:8px; margin-top:6px;">
-                <select id="pingTargetDept" style="flex:1; padding:6px; font-size:0.8rem;"><option value="green">Green Counter</option><option value="moped">Moped Counter</option></select>
-                <button onclick="dispatchPaymentPing()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">PING DESK</button>
-            </div>
-            <div id="pingStatusText" style="font-size:0.7rem; color:#64748b; margin-top:6px;"></div>
         </div>
     </div>
 
@@ -451,8 +439,6 @@
             document.getElementById('vAdvance').style.background = '#f1f5f9';
         } else { 
             document.getElementById('settlementActionBlock').style.display = 'grid'; 
-            // PHASE 2: Display the Ping block for Workshop/Admin
-            document.getElementById('pingRequestBlock').style.display = 'block';
             
             document.getElementById('vPrepaid').disabled = true;
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
@@ -1207,36 +1193,6 @@
         
         window.print(); 
         setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
-    }
-
-    // PHASE 2: MAKER-CHECKER PING FUNCTIONALITY (FIXED)
-    async function dispatchPaymentPing() {
-        // Read directly from the final net payable display
-        const reqAmt = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
-        if (reqAmt <= 0) return alert("No outstanding balance to request.");
-        
-        const target = document.getElementById('pingTargetDept').value;
-        const statusText = document.getElementById('pingStatusText');
-        
-        if(!confirm(`Send payment request for ₹${reqAmt} to the ${target.toUpperCase()} counter?`)) return;
-        
-        statusText.innerText = "Dispatching request...";
-
-        const payload = {
-            customer_mobile: activeJobContext.customer_mobile,
-            requested_by_role: sessionRole, // Fixed: Maps to your actual session variable
-            request_type: 'Cash Collection',
-            payload: { jc_id: targetJobId, amount: reqAmt }, // Fixed: Maps to your active target job
-            status: 'Pending',
-            target_dept: target
-        };
-
-        const { error } = await supabaseClient.from('approval_requests').insert(payload);
-        if (error) {
-            statusText.innerText = "Error: " + error.message;
-        } else {
-            statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`;
-        }
     }
 
     initializeJobContext();
