@@ -85,12 +85,18 @@
             </div> 
         </div>
 
-        <div class="field-group" style="margin-top: 20px; margin-bottom: 20px;">
-            <label>Select Vehicle</label>
-            <select id="jcVehicleSelect" onchange="toggleNewVehicleFields(); checkRepeatComplaint()">
-                <option value="">-- Enter Mobile Number First --</option>
-                <option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>
-            </select>
+        <div class="inputs-grid" style="margin-top: 20px; margin-bottom: 20px;">
+            <div class="field-group">
+                <label>Select Vehicle</label>
+                <select id="jcVehicleSelect" onchange="toggleNewVehicleFields(); checkRepeatComplaint()">
+                    <option value="">-- Enter Mobile Number First --</option>
+                    <option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>
+                </select>
+            </div>
+            <div class="field-group" id="globalOdometerBlock" style="display:none;">
+                <label>Current Odometer (KM)</label>
+                <input type="number" id="nvOdo" placeholder="e.g. 15000">
+            </div>
         </div>
 
         <div id="newVehicleBlock" style="display:none; background:#f1f5f9; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
@@ -115,10 +121,6 @@
                 <div class="field-group">
                     <label>Color</label>
                     <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=(this.value||'').toUpperCase()">
-                </div>
-                <div class="field-group">
-                    <label>Odometer (KM)</label>
-                    <input type="number" id="nvOdo" placeholder="e.g. 15000">
                 </div>
             </div>
         </div>
@@ -194,11 +196,13 @@
         const vSelect = document.getElementById('jcVehicleSelect');
         const nBadge = document.getElementById('newCustBadge');
         const obGroup = document.getElementById('openingBalGroup');
+        const odoBlock = document.getElementById('globalOdometerBlock');
         
         if (cleanMobile.length !== 10) {
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
             document.getElementById('newVehicleBlock').style.display = 'none';
+            odoBlock.style.display = 'none';
             nBadge.style.display = 'none';
             obGroup.style.display = 'none';
             document.getElementById('custHistoryPanel').style.display = 'none'; 
@@ -215,6 +219,11 @@
             vSelect.innerHTML = '';
             (cust.vehicles || []).forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.brand || ''} ${v.make_model || ''})</option>`; });
             vSelect.innerHTML += `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
+            
+            // Show Odometer block if they have an existing vehicle selected
+            if (cust.vehicles && cust.vehicles.length > 0) {
+                odoBlock.style.display = 'flex';
+            }
             toggleNewVehicleFields();
         } else {
             nBadge.style.display = 'inline-block';
@@ -228,8 +237,20 @@
     }
 
     function toggleNewVehicleFields() {
-        if (document.getElementById('jcVehicleSelect').value === 'NEW') document.getElementById('newVehicleBlock').style.display = 'block';
-        else document.getElementById('newVehicleBlock').style.display = 'none';
+        const vSelectValue = document.getElementById('jcVehicleSelect').value;
+        const odoBlock = document.getElementById('globalOdometerBlock');
+        const nvBlock = document.getElementById('newVehicleBlock');
+        
+        if (vSelectValue === 'NEW') {
+            nvBlock.style.display = 'block';
+            odoBlock.style.display = 'flex'; // Ensure odometer is visible for new vehicles
+        } else if (vSelectValue !== '') {
+            nvBlock.style.display = 'none';
+            odoBlock.style.display = 'flex'; // Ensure odometer is visible for existing vehicles
+        } else {
+            nvBlock.style.display = 'none';
+            odoBlock.style.display = 'none';
+        }
     }
 
     async function loadIdenticalTwinIntakeData(mobile) {
@@ -318,6 +339,9 @@
         const isNewCust = document.getElementById('newCustBadge').style.display === 'inline-block';
         const ob = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
         
+        // ODOMETER FIX: Capture the global odometer input
+        const currentOdometer = document.getElementById('nvOdo').value || null;
+        
         if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
         if (!name || !problem) return alert("Customer Name and Problem required.");
         
@@ -365,7 +389,6 @@
                 brand: brand, 
                 make_model: model, 
                 color: document.getElementById('nvColor').value.toUpperCase(), 
-                odometer: document.getElementById('nvOdo').value, 
                 category_group: cat 
             }).select().single();
             
@@ -373,9 +396,11 @@
             finalVehicleId = newVeh.id;
         } 
 
+        // ODOMETER FIX: Inject the odometer into the job_cards payload
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
             customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance,
-            mech_id: document.getElementById('intakePrimaryMech').value || null, co_mech_id: document.getElementById('intakeCoMech').value || null, status: 'Open', source_role: activeRole
+            mech_id: document.getElementById('intakePrimaryMech').value || null, co_mech_id: document.getElementById('intakeCoMech').value || null, 
+            status: 'Open', source_role: activeRole, odometer: currentOdometer
         }).select().single();
 
         if (jcErr) { alert("Error: " + jcErr.message); btn.disabled = false; return; }
