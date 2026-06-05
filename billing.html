@@ -53,14 +53,12 @@
         
         #mechanic-print-ticket { display: none; }
         
-        /* Concession distribution block styles */
         #serviceDiscBlock { display: none; background: #fffbeb; padding: 12px; border-radius: 6px; border: 1px solid #fde68a; margin-top: 10px; grid-column: 1 / -1; }
         .dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
         .dist-field { display: flex; flex-direction: column; gap: 2px; }
         .dist-field label { font-size: 0.7rem; color: #92400e; }
         .dist-field input { border: 1px solid #fcd34d; padding: 8px; }
 
-        /* MULTI-ENTITY STYLES */
         .me-section { background: white; color: black; font-family: 'Courier New', monospace; padding: 10px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 0.78rem; line-height: 1.3; margin-bottom: 8px; }
         .me-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 6px; margin-bottom: 6px; }
         .me-gst { font-size: 0.65rem; }
@@ -70,18 +68,20 @@
         .me-total { display: flex; justify-content: space-between; font-size: 0.82rem; }
         .me-summary { background: #f8fafc; border: 2px solid #2c3e50; padding: 10px; font-family: 'Courier New', monospace; font-size: 0.78rem; }
         .me-sum-row { display: flex; justify-content: space-between; margin: 2px 0; }
+        
+        .ping-box { background:#eff6ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:10px;}
+        
+        /* PHASE 3: Admin Override Block */
+        #adminOverrideBlock { display:none; background:#fef2f2; padding:16px; border-radius:8px; border:1px solid #fecaca; text-align:center; margin-bottom:16px; }
 
         @media print { 
             @page { margin: 8mm; }
             body * { visibility: hidden; } 
-            
-            /* Receipt Print Logic */
             body.print-receipt #renderThermalReceiptTarget, body.print-receipt #renderThermalReceiptTarget * { visibility: visible; } 
             body.print-receipt #renderThermalReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
             body.print-receipt #renderThermalReceiptTarget:not(.a5-mode) { width: 300px; max-width: 300px; padding: 0; }
             body.print-receipt #renderThermalReceiptTarget.a5-mode { width: 100%; max-width: 148mm; padding: 10mm; } 
 
-            /* Multi Entity Print Logic */
             body.print-multi #multiEntityReceiptTarget, body.print-multi #multiEntityReceiptTarget * { visibility: visible; }
             body.print-multi #multiEntityReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; }
             body.print-multi #renderThermalReceiptTarget { display: none !important; }
@@ -89,7 +89,6 @@
             body.print-landscape #multiEntityReceiptTarget { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; width: 148mm; }
             body.print-landscape .me-summary { grid-column: 1 / -1; }
             
-            /* Mechanic Ticket Print Logic */
             body.print-mechanic #mechanic-print-ticket, body.print-mechanic #mechanic-print-ticket * { visibility: visible !important; }
             body.print-mechanic #mechanic-print-ticket { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #000; background: #fff; margin: 0; padding: 0; border: none; }
             .a5-page { page-break-after: always; position: relative; box-sizing: border-box; width: 100%; }
@@ -207,6 +206,14 @@
     <div class="valuation-banner">NET PAYABLE: ₹<span id="netValuationDisplay">0</span></div>
     
     <div id="masterActionContainer">
+        
+        <div id="adminOverrideBlock">
+            <h4 style="margin:0 0 8px 0; color:#991b1b;">⚠️ Discount Exceeds 10% Limit</h4>
+            <p style="font-size:0.85rem; color:#dc2626; margin:0 0 12px 0;">Admin approval is required to allocate this concession.</p>
+            <button id="btnReqOverride" class="btn-action" style="background:#b91c1c; width:100%;" onclick="requestAdminOverride()">🚨 REQUEST ADMIN OVERRIDE</button>
+            <div id="overridePollingText" style="display:none; font-weight:bold; color:#b45309; margin-top:8px;">⏳ Request sent. Waiting for Admin to approve...</div>
+        </div>
+
         <div id="settlementActionBlock" class="settle-matrix" style="display:none;">
             <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">CASH</button>
             <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPI / CARD</button>
@@ -214,6 +221,15 @@
             <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
             <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD DRAFT</button>
             <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
+        </div>
+
+        <div class="ping-box" id="pingRequestBlock" style="display:none;">
+            <label style="font-size:0.75rem; font-weight:bold; color:var(--primary);">🛎️ Request Payment at Counter</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <select id="pingTargetDept" style="flex:1; padding:6px; font-size:0.8rem;"><option value="green">Green Counter</option><option value="moped">Moped Counter</option></select>
+                <button onclick="dispatchPaymentPing()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">PING DESK</button>
+            </div>
+            <div id="pingStatusText" style="font-size:0.7rem; color:#64748b; margin-top:6px;"></div>
         </div>
     </div>
 
@@ -421,6 +437,11 @@
 
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
 
+    // PHASE 3 Override Variables
+    let overrideApproved = false;
+    let overridePending = false;
+    let overridePollingInterval = null;
+
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
     async function editVehicleReg() {
@@ -439,7 +460,7 @@
             document.getElementById('vAdvance').style.background = '#f1f5f9';
         } else { 
             document.getElementById('settlementActionBlock').style.display = 'grid'; 
-            
+            document.getElementById('pingRequestBlock').style.display = 'block';
             document.getElementById('vPrepaid').disabled = true;
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
@@ -784,6 +805,7 @@
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
+    // PHASE 3: 10% Hard-Cap Logic Integration
     function compileDynamicSums() { 
         partsGrossTotal = 0; servicePkgGrossTotal = 0; 
         
@@ -811,6 +833,9 @@
         let l = parseFloat(document.getElementById('vLabour').value) || 0; 
         let t = parseFloat(document.getElementById('vLathe').value) || 0; 
         let d = 0;
+
+        // Gross total before any manual discount
+        const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + (l + servicePkgGrossTotal) + t;
         
         if (sessionRole === 'service' || sessionRole === 'admin') {
             const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
@@ -826,17 +851,38 @@
             else if (remaining > 0) balNode.style.color = '#d97706';
             else balNode.style.color = 'var(--success)';
             
+            // Apply approved distributions dynamically
             greenNet = Math.max(0, greenNet - discGreen);
             mopedNet = Math.max(0, mopedNet - discMoped);
             l = Math.max(0, l - discLabour);
             t = Math.max(0, t - discLathe);
 
-            d = 0; 
+            d = totalServiceDisc; 
             partsGrossTotal = greenNet + mopedNet; 
         } else {
             d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
             if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
             else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
+        }
+
+        // PHASE 3: 10% Failsafe Check
+        const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin');
+        const adminBlock = document.getElementById('adminOverrideBlock');
+        const settleBlock = document.getElementById('settlementActionBlock');
+        const pingBlock = document.getElementById('pingRequestBlock');
+
+        if (requiresOverride && !overrideApproved) {
+            if(settleBlock) settleBlock.style.display = 'none';
+            if(pingBlock) pingBlock.style.display = 'none';
+            if(adminBlock) adminBlock.style.display = 'block';
+        } else {
+            if(adminBlock) adminBlock.style.display = 'none';
+            if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') {
+                if(sessionRole !== 'green' && sessionRole !== 'moped') {
+                    if(settleBlock) settleBlock.style.display = 'grid';
+                    if(pingBlock) pingBlock.style.display = 'block';
+                }
+            }
         }
         
         internalGreenNet = greenNet;
@@ -859,13 +905,77 @@
             splitIndicator.style.display = 'none';
         }
 
-        const netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
+        // We already subtracted the distributed discount from the individual departments, so we don't subtract 'd' again here if role is service/admin
+        let netBeforeAdv = 0;
+        if (sessionRole === 'service' || sessionRole === 'admin') {
+            netBeforeAdv = partsGrossTotal + totalLabor + t;
+        } else {
+            netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
+        }
         
         let pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; 
         const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
         if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); document.getElementById('vPointsUsed').value = pUsed; } 
         
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
+    }
+
+    // PHASE 3: Admin Override Request & Polling
+    async function requestAdminOverride() {
+        const d = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
+        const grossTotalBeforeDiscount = (partsGrossTotal) + (parseFloat(document.getElementById('vLabour').value)||0) + servicePkgGrossTotal + (parseFloat(document.getElementById('vLathe').value)||0);
+
+        document.getElementById('btnReqOverride').style.display = 'none';
+        document.getElementById('overridePollingText').style.display = 'block';
+
+        const payload = {
+            request_type: 'Discount Override',
+            status: 'Pending',
+            target_dept: 'admin',
+            payload: { jc_id: targetJobId, requested_discount: d, total_bill_value: grossTotalBeforeDiscount }
+        };
+
+        await supabaseClient.from('approval_requests').insert(payload);
+        overridePending = true;
+        
+        // Start polling for approval
+        overridePollingInterval = setInterval(pollForAdminOverride, 5000);
+    }
+
+    async function pollForAdminOverride() {
+        if(!overridePending) return;
+
+        const { data } = await supabaseClient.from('approval_requests')
+            .select('status, payload')
+            .eq('request_type', 'Discount Override')
+            .eq('status', 'Cleared')
+            .contains('payload', { jc_id: targetJobId })
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if(data && data.length > 0) {
+            clearInterval(overridePollingInterval);
+            overridePending = false;
+            overrideApproved = true;
+            
+            const dist = data[0].payload.distribution || { green:0, moped:0, labour:0, lathe:0 };
+            
+            // Lock inputs and apply admin distribution
+            document.getElementById('vTotalServiceDisc').disabled = true;
+            document.getElementById('vDiscGreen').value = dist.green;
+            document.getElementById('vDiscMoped').value = dist.moped;
+            document.getElementById('vDiscLabour').value = dist.labour;
+            document.getElementById('vDiscLathe').value = dist.lathe;
+
+            // Lock distribution inputs
+            document.getElementById('vDiscGreen').disabled = true;
+            document.getElementById('vDiscMoped').disabled = true;
+            document.getElementById('vDiscLabour').disabled = true;
+            document.getElementById('vDiscLathe').disabled = true;
+
+            alert("✅ Admin Approved! Discount allocated securely. You may now finalize settlement.");
+            compileDynamicSums();
+        }
     }
     
     function openSplitPaymentModal() { 
@@ -1150,7 +1260,6 @@
         document.getElementById('tkFrontVehChassis').innerText = veh.chassis_number || '--';
         document.getElementById('tkFrontVehEngine').innerText = veh.engine_number || '--';
 
-        // --- ODOMETER BUG FIX ---
         const rawOdo = activeJobContext?.odometer;
         document.getElementById('tkFrontVehOdo').innerText = (rawOdo && rawOdo !== 'null' && rawOdo !== 'undefined') ? `${rawOdo} km` : '--';
         
@@ -1193,6 +1302,35 @@
         
         window.print(); 
         setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
+    }
+
+    async function dispatchPaymentPing() {
+        const reqAmt = parseFloat(document.getElementById('splitTotalDisplay')?.innerText || document.getElementById('netValuationDisplay').innerText) || 0;
+        if (reqAmt <= 0) return alert("No outstanding balance to request.");
+        
+        const target = document.getElementById('pingTargetDept').value;
+        const statusText = document.getElementById('pingStatusText');
+        
+        if(!confirm(`Send payment request for ₹${reqAmt} to the ${target.toUpperCase()} counter?`)) return;
+        
+        statusText.innerText = "Dispatching request...";
+
+        const payload = {
+            customer_mobile: activeJobContext.customer_mobile,
+            requested_by_role: sessionRole,
+            request_type: 'Cash Collection',
+            payload: { jc_id: targetJobId, amount: reqAmt },
+            status: 'Pending',
+            target_dept: target
+        };
+
+        const { error } = await supabaseClient.from('approval_requests').insert(payload);
+        if (error) {
+            statusText.innerText = "Error: " + error.message;
+        } else {
+            statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`;
+            document.getElementById('settlementActionBlock').style.display = 'none'; 
+        }
     }
 
     initializeJobContext();
