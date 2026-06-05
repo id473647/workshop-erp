@@ -67,6 +67,12 @@
 
         .receipt-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 300; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .receipt-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; font-family: 'Courier New', Courier, monospace; }
+        
+        /* PHASE 3 AUDIT LOG STYLES */
+        .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .status-Pending { background: #fef3c7; color: #b45309; }
+        .status-Cleared { background: #dcfce7; color: #15803d; }
+        .status-Rejected { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -100,6 +106,11 @@
             <div class="u-card" id="cardLedger" onclick="window.location.href='workshop-ledger.html'">
                 <h4 class="u-title">📓 Workshop Ledger</h4><p class="u-desc">Daily cash sheet and expense vault.</p>
             </div>
+            
+            <div class="u-card" id="cardAudit" style="display:none; border-left:4px solid var(--danger);" onclick="openWorkspaceTarget('wsAuditLog'); loadAuditLog();">
+                <h4 class="u-title">🛡️ Approval Audit Log</h4><p class="u-desc">Permanent history of all overrides and cross-ledger pings.</p>
+            </div>
+
             <div class="u-card" id="cardGreenEod" onclick="window.location.href='reports.html?tab=eod-green'" style="display:none; border-left:4px solid var(--success);">
                 <h4 class="u-title">🟢 Green EOD Report</h4><p class="u-desc">Dedicated End of Day register for Green Warehouse.</p>
             </div>
@@ -116,6 +127,20 @@
             <button class="btn-action" style="background:var(--success);" onclick="searchCRM()">SEARCH</button>
         </div>
         <div id="crmResults" style="margin-top:20px;"></div>
+    </div>
+
+    <div id="wsAuditLog" class="card-panel utility-workspace">
+        <div class="block-title">Enterprise Approval Audit Log</div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Date & Time</th><th>Request Type</th><th>Reference</th><th>Requested By</th><th>Resolution</th></tr>
+                </thead>
+                <tbody id="auditLogBody">
+                    <tr><td colspan="5" style="text-align:center;">Loading audit history...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -152,6 +177,7 @@
     window.onload = () => {
         if (activeSessionRole === 'green') document.getElementById('cardGreenEod').style.display = 'flex';
         if (activeSessionRole === 'moped') document.getElementById('cardMopedEod').style.display = 'flex';
+        if (activeSessionRole === 'admin') document.getElementById('cardAudit').style.display = 'flex'; // Phase 3 Audit Tab
         loadDailyCollection();
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -261,7 +287,6 @@
         let events = []; 
         let wsDebt = 0; let grnDebt = 0; let mopDebt = 0;
 
-        // PHASE 2: Added source_role to the fetch array for isolation matching
         const [psRes, jsRes, paysRes] = await Promise.all([
             supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
             supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
@@ -312,7 +337,6 @@
             if(inRange) {
                 const dateStr = e.date.getFullYear() === 2000 ? '--' : e.date.toLocaleDateString('en-IN');
                 
-                // PHASE 2: Dynamic badges evaluating specific POS source
                 let badge = '';
                 if (e.type === 'JC') badge = '<span class="dept-badge dept-ws">WORKSHOP</span>';
                 else if (e.type === 'POS') {
@@ -331,7 +355,6 @@
                     else if(e.type === 'POS' && e.source_role === 'moped') mopDebt += owe;
                     else if(e.type === 'POS') grnDebt += owe;
                     
-                    // PHASE 2: STRICT LEDGER LOCKDOWN ALGORITHM
                     let isAllowedToSettle = false;
                     if (activeSessionRole === 'admin') isAllowedToSettle = true;
                     else if (activeSessionRole === 'service' && e.type === 'JC') isAllowedToSettle = true;
@@ -366,6 +389,7 @@
         document.getElementById(`ledgContent_${mobile}`).innerHTML = tableHtml;
     }
 
+    // PHASE 3: Streamlined Payment (No local Write-Off Logic)
     async function applyTargetPayment(mobile, targetId, targetType, maxAmt) {
         const amtInput = document.getElementById(`payInp_${targetId}`);
         const amt = parseFloat(amtInput.value) || 0;
@@ -425,6 +449,47 @@
         const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent));
         link.setAttribute("download", `Ledger_${mobile}.csv`); document.body.appendChild(link);
         link.click(); document.body.removeChild(link);
+    }
+
+    // PHASE 3: AUDIT LOG FETCHER
+    async function loadAuditLog() {
+        const { data: logs, error } = await supabaseClient.from('approval_requests')
+            .select('*').order('created_at', { ascending: false }).limit(50);
+            
+        const tbody = document.getElementById('auditLogBody');
+        tbody.innerHTML = '';
+        
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Failed to load audit history: ${error.message}</td></tr>`;
+            return;
+        }
+
+        (logs||[]).forEach(log => {
+            const dateStr = new Date(log.created_at).toLocaleString('en-IN');
+            
+            let refStr = '--';
+            if (log.payload?.jc_id) refStr = `JC-${log.payload.jc_id.split('-')[0].toUpperCase()}`;
+            else if (log.payload?.sale_id) refStr = `POS-${log.payload.sale_id.split('-')[0].toUpperCase()}`;
+            
+            const reqBy = (log.requested_by_role || 'SYSTEM').toUpperCase();
+            
+            // Format Resolution based on type
+            let resDetails = '';
+            if (log.status === 'Cleared' && log.request_type === 'Discount Override') {
+                const dist = log.payload?.distribution || {};
+                resDetails = `<div style="font-size:0.7rem; color:#64748b; margin-top:4px;">G:₹${dist.green||0} | M:₹${dist.moped||0} | L:₹${dist.labour||0} | T:₹${dist.lathe||0}</div>`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td style="font-weight:bold;">${log.request_type}</td>
+                    <td><span style="font-family:monospace;">${refStr}</span></td>
+                    <td>${reqBy}</td>
+                    <td><span class="status-tag status-${log.status}">${log.status}</span>${resDetails}</td>
+                </tr>
+            `;
+        });
     }
 </script>
 </body>
