@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Utility Operations Gateway - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        :root { 
-            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; 
-            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; 
-            --utility: #64748b; --gold: #f59e0b; --purple: #8e44ad;
-        }
+        :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --gold: #f59e0b; --purple: #8e44ad; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom:40px; }
         
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100; box-sizing: border-box; }
@@ -60,6 +58,28 @@
         .badge-credit { background: #ffedd5; color: #b45309; }
         .badge-settled { background: #dcfce7; color: #15803d; }
         .pay-row { background: #f8fafc; font-size: 0.8rem; padding: 4px 10px; display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; margin-left: 15px; }
+        
+        .target-pay-btn { background: var(--success); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; margin-left: 8px;}
+        .target-pay-input { width: 70px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; margin-left: 8px;}
+        .dept-badge { font-size:0.65rem; padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:bold; }
+        .dept-ws { background:#e0f2fe; color:#0369a1; }
+        .dept-pos { background:#dcfce7; color:#15803d; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printableLedgerArea, #printableLedgerArea * { visibility: visible; }
+            #printableLedgerArea { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none; margin: 0; padding: 20px;}
+            .no-print { display: none !important; }
+        }
+
+        .receipt-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 300; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .receipt-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; font-family: 'Courier New', Courier, monospace; }
+        
+        /* PHASE 3 AUDIT LOG STYLES */
+        .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .status-Pending { background: #fef3c7; color: #b45309; }
+        .status-Cleared { background: #dcfce7; color: #15803d; }
+        .status-Rejected { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -78,7 +98,7 @@
     </div>
 </nav>
 
-<div id="dailyCollectionBar" onclick="window.location.href='reports.html'">Today's Collection: Fetching...</div>
+<div id="dailyCollectionBar" onclick="window.location.href='workshop-ledger.html'">Today's Collection: Fetching...</div>
 
 <div class="wrapper">
     <div id="hubGrid" class="utility-workspace active">
@@ -89,14 +109,14 @@
                 <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">Manage client profiles, map vehicles, and adjust discount tiers.</p>
             </div>
             <div class="u-card" id="cardReports" onclick="window.location.href='reports.html'">
-                <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">EOD Register, Marketing Leads, and Analytics.</p>
+                <h4 class="u-title">📊 Enterprise Reports</h4><p class="u-desc">Analytics, Gamification Progress, and Velocity Reports.</p>
             </div>
-     
-            <div class="u-card" id="cardGreenEod" onclick="window.location.href='reports.html?tab=eod-green'" style="display:none; border-left:4px solid var(--success);">
-                <h4 class="u-title">🟢 Green EOD Report</h4><p class="u-desc">Dedicated End of Day register for Green Warehouse.</p>
+            <div class="u-card" id="cardLedger" onclick="window.location.href='workshop-ledger.html'">
+                <h4 class="u-title">📓 Financial Ledgers & EOD</h4><p class="u-desc">Daily cash sheets, Cross-Ledger, and EOD reconciliations.</p>
             </div>
-            <div class="u-card" id="cardMopedEod" onclick="window.location.href='reports.html?tab=eod-moped'" style="display:none; border-left:4px solid var(--moped);">
-                <h4 class="u-title">🛵 Moped EOD Report</h4><p class="u-desc">Dedicated End of Day register for Moped Warehouse.</p>
+            
+            <div class="u-card" id="cardAudit" style="display:none; border-left:4px solid var(--danger);" onclick="openWorkspaceTarget('wsAuditLog'); loadAuditLog();">
+                <h4 class="u-title">🛡️ Approval Audit Log</h4><p class="u-desc">Permanent history of all overrides and cross-ledger pings.</p>
             </div>
 
             <div class="u-card" id="cardStaff" onclick="openWorkspaceTarget('wsTech')">
@@ -288,6 +308,40 @@
       <div id="vehMergePanel" style="display:none;"></div> 
 
     </div> 
+
+    <div id="wsAuditLog" class="card-panel utility-workspace">
+        <div class="block-title">Enterprise Approval Audit Log</div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr><th>Date & Time</th><th>Request Type</th><th>Reference</th><th>Requested By</th><th>Resolution</th></tr>
+                </thead>
+                <tbody id="auditLogBody">
+                    <tr><td colspan="5" style="text-align:center;">Loading audit history...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="paymentReceiptModal" class="receipt-modal">
+    <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <div class="receipt-card" id="renderReceiptTarget" style="background:white; color:black; width: 300px;">
+            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:8px;">
+                <img src="logo-main.jpg" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
+                <img src="logo-green.png" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
+            </div>
+            <div style="text-align:center; font-weight:bold; font-size:1rem; margin-bottom:10px; border-bottom:1px dashed #000; padding-bottom:5px;">PAYMENT ACKNOWLEDGEMENT</div>
+            <div id="prtContent" style="text-align:left; font-size:0.8rem; line-height:1.5;"></div>
+            <div style="border-top:1px dashed #000; margin-top:10px; margin-bottom:15px;"></div>
+            <div style="font-size:0.7rem; text-align:center;">Computer Generated Document</div>
+        </div>
+        <div style="display:flex; gap:8px; width:100%; max-width:300px;">
+            <button onclick="window.print()" style="flex:1; background:var(--primary); color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ PRINT</button>
+            <button onclick="exportReceiptAsJPG()" style="flex:1; background:#25d366; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">💬 JPG</button>
+            <button onclick="document.getElementById('paymentReceiptModal').style.display='none'" style="flex:1; background:#e2e8f0; color:#1e293b; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">CLOSE</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -304,12 +358,12 @@
     }
 
     window.onload = () => {
-        if (['admin', 'green', 'moped'].includes(activeSessionRole))
-            document.getElementById('cardProductGroups').style.display = 'flex';
+        if (['admin', 'green', 'moped'].includes(activeSessionRole)) document.getElementById('cardProductGroups').style.display = 'flex';
         if (['admin','service','green','moped'].includes(activeSessionRole)) document.getElementById('cardVehicles').style.display = 'flex'; 
+        if (activeSessionRole === 'admin') document.getElementById('cardAudit').style.display = 'flex'; // Phase 3 Audit Tab
+        
         loadDailyCollection();
 
-        // NEW FIX: Auto-open CRM when ?crm=MOBILE parameter is present
         const urlParams = new URLSearchParams(window.location.search);
         const crmMobile = urlParams.get('crm');
         if (crmMobile && crmMobile.length >= 10) {
@@ -332,19 +386,16 @@
 
     async function loadDailyCollection() {
         const todayStr = new Date().toISOString().split('T')[0];
-        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr);
-        const { data: pos, error: posErr } = await supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr);
+        const { data: jc } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr);
+        const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr);
         
-        if (jcErr) console.error(jcErr);
-        if (posErr) console.error(posErr);
-
         let wsTotal = 0; let posTotal = 0;
         (jc||[]).forEach(j => wsTotal += parseFloat(j.total_invoice_value)||0);
         (pos||[]).forEach(p => posTotal += parseFloat(p.total_amount)||0);
         document.getElementById('dailyCollectionBar').innerHTML = `Today's Collection: ₹${wsTotal} (Workshop) | ₹${posTotal} (POS)`;
     }
 
-    // === 1. CRM LOGIC (U1 / U3) ===
+    // === 1. CRM LOGIC (Phase 1, 2, 3 Integrated) ===
     async function searchCRM() {
         const query = document.getElementById('crmSearch').value.trim();
         const resBox = document.getElementById('crmResults');
@@ -412,13 +463,6 @@
                 </div>
 
                 <div id="crm_ledg_${c.mobile_number}" class="crm-tab-content" style="padding:16px;">
-                    <div style="display:flex; gap:10px; margin-bottom:16px; background:#f8fafc; padding:10px; border-radius:6px; flex-wrap:wrap;">
-                        <select id="fltSrc_${c.mobile_number}"><option value="Both">Both (POS & Workshop)</option><option value="Workshop">Workshop Only</option><option value="POS">POS Only</option></select>
-                        <input type="date" id="fltSt_${c.mobile_number}">
-                        <input type="date" id="fltEnd_${c.mobile_number}">
-                        <button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN</button>
-                    </div>
-                    
                     <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                         <div style="flex:1; min-width:150px;">
                             <label>Opening Balance Debt (₹)</label>
@@ -426,27 +470,40 @@
                         </div>
                         <button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button>
                     </div>
+
+                    <div id="ledgerHeader_${c.mobile_number}" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:6px; margin-bottom:16px; display:none;">
+                        <h4 style="margin:0 0 8px 0; color:#b45309;">DEBT RECOVERY SNAPSHOT</h4>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-weight:bold; font-size:0.9rem;">
+                            <div style="color:var(--danger);">Total Enterprise Due: <br>₹<span id="totDue_${c.mobile_number}">0</span></div>
+                            <div style="color:var(--service);">Workshop Dept Due: <br>₹<span id="wsDue_${c.mobile_number}">0</span></div>
+                            <div style="color:var(--success);">Green POS Due: <br>₹<span id="grnDue_${c.mobile_number}">0</span></div>
+                            <div style="color:var(--moped);">Moped POS Due: <br>₹<span id="mopDue_${c.mobile_number}">0</span></div>
+                        </div>
+                    </div>
+
+                    <div class="no-print" style="display:flex; gap:10px; margin-bottom:16px; background:#f8fafc; padding:10px; border-radius:6px; flex-wrap:wrap;">
+                        <input type="date" id="fltSt_${c.mobile_number}">
+                        <input type="date" id="fltEnd_${c.mobile_number}">
+                        <button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN LEDGER</button>
+                        <button class="btn-action" style="background:#15803d; padding:8px 16px; width:auto; margin-left:auto;" onclick="exportLedgerCsv('${c.mobile_number}')">📊 Excel</button>
+                        <button class="btn-action" style="background:var(--primary); padding:8px 16px; width:auto;" onclick="window.print()">🖨️ PDF</button>
+                    </div>
                     
-                    <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
+                    <div id="printableLedgerArea">
+                        <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
+                    </div>
                 </div>
             </div>`;
         }
         resBox.innerHTML = html;
-        for (const c of custs) {
-            computeAndShowCreditBalance(c.mobile_number);
-        }
+        for (const c of custs) { computeAndShowCreditBalance(c.mobile_number); }
         
-        // Check and display silence badge in profile header
-        setTimeout(async () => { // NEW
-          const nameEl = document.getElementById( // NEW
-            'updName_' + c.mobile_number); // NEW
-          if (nameEl && nameEl.parentElement) { // NEW
-            await checkCustomerSilence( // NEW
-              c.mobile_number, // NEW
-              nameEl.parentElement // NEW
-            ); // NEW
-          } // NEW
-        }, 100); // NEW
+        setTimeout(async () => { 
+          const nameEl = document.getElementById('updName_' + custs[0]?.mobile_number); 
+          if (nameEl && nameEl.parentElement) { 
+            await checkCustomerSilence(custs[0].mobile_number, nameEl.parentElement); 
+          } 
+        }, 100); 
     }
 
     function switchCrmTab(mobile, tab, evt) {
@@ -459,39 +516,19 @@
     }
 
     async function computeAndShowCreditBalance(mobile) {
-        const { data: jc } = await supabaseClient
-            .from('job_cards')
-            .select('id, total_invoice_value')
-            .eq('customer_mobile', mobile)
-            .eq('payment_mode', 'Credit')
-            .eq('status', 'Closed');
-
-        const { data: pos } = await supabaseClient
-            .from('counter_sales')
-            .select('id, total_amount')
-            .eq('customer_mobile', mobile)
-            .eq('payment_mode', 'Credit')
-            .eq('status', 'Closed');
-
-        const { data: pays } = await supabaseClient
-            .from('credit_payments')
-            .select('amount_paid, sale_id, job_card_id')
-            .eq('customer_mobile', mobile);
+        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
+        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
+        const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile);
 
         let totalOut = 0;
-
         (jc || []).forEach(j => {
-            const paid = (pays || [])
-                .filter(p => p.job_card_id === j.id)
-                .reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+            const paid = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
             const out = (parseFloat(j.total_invoice_value) || 0) - paid;
             if (out > 0) totalOut += out;
         });
 
         (pos || []).forEach(s => {
-            const paid = (pays || [])
-                .filter(p => p.sale_id === s.id)
-                .reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
+            const paid = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
             const out = (parseFloat(s.total_amount) || 0) - paid;
             if (out > 0) totalOut += out;
         });
@@ -499,8 +536,7 @@
         const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id);
         let obDebt = 0;
         obPays.forEach(p => {
-            if (parseFloat(p.amount_paid) < 0)
-                obDebt += Math.abs(parseFloat(p.amount_paid));
+            if (parseFloat(p.amount_paid) < 0) obDebt += Math.abs(parseFloat(p.amount_paid));
             else obDebt -= parseFloat(p.amount_paid) || 0;
         });
         if (obDebt > 0) totalOut += obDebt;
@@ -514,41 +550,23 @@
         }
     }
     
-    async function checkCustomerSilence(mobile, containerEl) { // NEW
-      const ninetyDaysAgo = new Date(); // NEW
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); // NEW
+    async function checkCustomerSilence(mobile, containerEl) { 
+      const ninetyDaysAgo = new Date(); 
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); 
 
-      const { data } = await supabaseClient // NEW
-        .from('job_cards') // NEW
-        .select('created_at') // NEW
-        .eq('customer_mobile', mobile) // NEW
-        .order('created_at', { ascending: false }) // NEW
-        .limit(1); // NEW
+      const { data } = await supabaseClient.from('job_cards').select('created_at').eq('customer_mobile', mobile).order('created_at', { ascending: false }).limit(1); 
 
-      const lastVisit = data && data.length > 0 // NEW
-        ? new Date(data[0].created_at) // NEW
-        : null; // NEW
+      const lastVisit = data && data.length > 0 ? new Date(data[0].created_at) : null; 
 
-      if (!lastVisit || lastVisit < ninetyDaysAgo) { // NEW
-        const daysSince = lastVisit // NEW
-          ? Math.floor((Date.now() - lastVisit.getTime()) // NEW
-              / 86400000) // NEW
-          : null; // NEW
-        const badge = document.createElement('span'); // NEW
-        badge.style.cssText = 'background:#fef3c7;' // NEW
-          + 'color:#b45309;font-size:0.75rem;font-weight:bold;' // NEW
-          + 'padding:2px 8px;border-radius:4px;margin-left:8px;' // NEW
-          + 'border:1px solid #fde68a;'; // NEW
-        badge.title = 'Last visited: ' // NEW
-          + (lastVisit // NEW
-            ? lastVisit.toLocaleDateString('en-IN') // NEW
-            : 'Never'); // NEW
-        badge.innerText = lastVisit // NEW
-          ? '📞 SILENT ' + daysSince + ' DAYS' // NEW
-          : '📞 NEW / NO HISTORY'; // NEW
-        if (containerEl) containerEl.appendChild(badge); // NEW
-      } // NEW
-    } // NEW
+      if (!lastVisit || lastVisit < ninetyDaysAgo) { 
+        const daysSince = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null; 
+        const badge = document.createElement('span'); 
+        badge.style.cssText = 'background:#fef3c7;color:#b45309;font-size:0.75rem;font-weight:bold;padding:2px 8px;border-radius:4px;margin-left:8px;border:1px solid #fde68a;'; 
+        badge.title = 'Last visited: ' + (lastVisit ? lastVisit.toLocaleDateString('en-IN') : 'Never'); 
+        badge.innerText = lastVisit ? '📞 SILENT ' + daysSince + ' DAYS' : '📞 NEW / NO HISTORY'; 
+        if (containerEl) containerEl.appendChild(badge); 
+      } 
+    } 
 
     async function updateVehicleDetails(vid) {
         const data = {
@@ -586,665 +604,330 @@
     async function setOpeningBalance(mobile, name) {
         const amt = parseFloat(document.getElementById(`ob_${mobile}`).value) || 0;
         if(amt <= 0) return;
-        const { error } = await supabaseClient.from('credit_payments').insert({
-            customer_mobile: mobile,
-            amount_paid: -amt, 
-            payment_mode: 'Opening Balance',
-            note: 'Opening Balance',
-            paid_by_role: activeSessionRole
-        });
+        const { error } = await supabaseClient.from('credit_payments').insert({ customer_mobile: mobile, amount_paid: -amt, payment_mode: 'Opening Balance', note: 'Opening Balance', paid_by_role: activeSessionRole });
         if (error) return alert("Error: " + error.message);
         alert('Opening Balance Logged');
         document.getElementById(`ob_${mobile}`).value = '';
-        if (document.getElementById(`crm_ledg_${mobile}`).classList.contains('active')) {
-            loadCrmLedger(mobile);
-        }
+        if (document.getElementById(`crm_ledg_${mobile}`).classList.contains('active')) { loadCrmLedger(mobile); }
         computeAndShowCreditBalance(mobile);
     }
 
+    let ledgerExportData = []; 
+
+    // PHASE 2 & 3 INTEGRATED LEDGER ENGINE
     async function loadCrmLedger(mobile) {
-        const src = document.getElementById(`fltSrc_${mobile}`).value;
         const st = document.getElementById(`fltSt_${mobile}`).value;
         const end = document.getElementById(`fltEnd_${mobile}`).value;
         
-        let sales = [];
-        if(src === 'Both' || src === 'POS') {
-            let q = supabaseClient.from('counter_sales').select('id, created_at, total_amount, payment_mode, status').eq('customer_mobile', mobile);
-            if(st) q = q.gte('created_at', st);
-            if(end) q = q.lte('created_at', end + 'T23:59:59');
-            const { data: ps, error } = await q;
-            if (error) console.error(error);
-            if(ps) sales = sales.concat(ps.map(s => ({ ...s, src: 'POS', ref: 'POS-'+s.id.split('-')[0].toUpperCase(), amt: s.total_amount })));
-        }
-        if(src === 'Both' || src === 'Workshop') {
-            let q = supabaseClient.from('job_cards').select('id, created_at, total_invoice_value, payment_mode, status').eq('customer_mobile', mobile);
-            if(st) q = q.gte('created_at', st);
-            if(end) q = q.lte('created_at', end + 'T23:59:59');
-            const { data: js, error } = await q;
-            if (error) console.error(error);
-            if(js) sales = sales.concat(js.map(j => ({ ...j, src: 'JC', ref: 'JC-'+j.id.split('-')[0].toUpperCase(), amt: j.total_invoice_value })));
-        }
+        let events = []; 
+        let wsDebt = 0; let grnDebt = 0; let mopDebt = 0;
+
+        const [psRes, jsRes, paysRes] = await Promise.all([
+            supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
+            supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile)
+        ]);
+
+        const ps = psRes.data || [];
+        const js = jsRes.data || [];
+        const pays = paysRes.data || [];
+
+        ps.forEach(s => { events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id, source_role: s.source_role }); });
+        js.forEach(j => { events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id, source_role: j.source_role }); });
         
-        const { data: pays, error: pErr } = await supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile);
-        if (pErr) console.error(pErr);
-        
-        sales.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-        
-        let totOutstanding = 0;
-        let invCount = 0;
-        
-        let obPays = (pays||[]).filter(p => !p.sale_id && !p.job_card_id);
-        let obDebt = 0;
-        obPays.forEach(p => obDebt += (parseFloat(p.amount_paid) < 0 ? Math.abs(p.amount_paid) : 0)); 
-        
-        let html = '<div class="table-wrapper"><table class="data-table"><thead><tr><th>Ref</th><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th></tr></thead><tbody>';
-        
-        sales.forEach(s => {
-            let spays = (pays||[]).filter(p => (s.src==='POS' && p.sale_id===s.id) || (s.src==='JC' && p.job_card_id===s.id));
-            let paid = 0;
-            spays.forEach(p => paid += parseFloat(p.amount_paid)||0);
-            let out = parseFloat(s.amt) - paid;
-            let isCredit = s.payment_mode === 'Credit';
-            let badge = '';
-            if(isCredit) {
-                if(out <= 0) badge = '<span class="crm-badge badge-settled">SETTLED</span>';
-                else {
-                    badge = '<span class="crm-badge badge-credit">CREDIT</span>';
-                    totOutstanding += out;
-                    invCount++;
-                }
+        pays.forEach(p => {
+            const amt = parseFloat(p.amount_paid) || 0;
+            if(amt < 0 && p.payment_mode === 'Opening Balance') {
+                events.push({ date: new Date('2000-01-01'), desc: `Opening Balance Debt`, debit: Math.abs(amt), credit: 0, isInvoice: false, type: 'OB', id: p.id });
+            } else if(amt > 0) {
+                events.push({ date: new Date(p.created_at), desc: `Payment via ${p.payment_mode} by ${p.paid_by_role}`, debit: 0, credit: amt, id: p.id, isInvoice: false, linked_jc: p.job_card_id, linked_pos: p.sale_id });
             }
-            
-            let subRows = '';
-            spays.forEach(p => {
-                subRows += `<div class="pay-row"><span>₹${p.amount_paid} via ${p.payment_mode} — ${p.note||''}</span><span>
-                <button onclick="delPay('${p.id}', '${mobile}')" style="background:none; border:none; color:var(--danger); font-size:1.1rem; cursor:pointer;">🗑️</button></span></div>`;
-            });
-            
-            const refLink = s.src === 'JC'
-                ? `<a href="billing.html?id=${s.id}" target="_blank" style="color:var(--info); font-weight:bold; text-decoration:none;">${s.ref}</a>` 
-                : `<a href="pos-green.html?id=${s.id}" target="_blank" style="color:var(--moped); font-weight:bold; text-decoration:none;">${s.ref}</a>`; 
-            
-            html += `<tr><td>${refLink}</td><td>${new Date(s.created_at).toLocaleDateString()}</td><td>₹${s.amt}</td><td>${s.payment_mode}</td><td>${badge}</td></tr>`;
-            if(subRows) html += `<tr><td colspan="5" style="padding:0;">${subRows}</td></tr>`;
         });
         
-        if(obDebt > 0) {
-            let obPaid = 0;
-            obPays.filter(p => parseFloat(p.amount_paid) > 0).forEach(p => obPaid += parseFloat(p.amount_paid));
-            let obOut = obDebt - obPaid;
-            if(obOut > 0) {
-                totOutstanding += obOut;
-                invCount++;
-            }
-            html += `<tr><td>Opening Balance</td><td>-</td><td>₹${obDebt}</td><td>Credit</td><td>${obOut<=0?'<span class="crm-badge badge-settled">SETTLED</span>':'<span class="crm-badge badge-credit">CREDIT</span>'}</td></tr>`;
-            let obSubRows = '';
-            obPays.filter(p => parseFloat(p.amount_paid) > 0).forEach(p => {
-                obSubRows += `<div class="pay-row"><span>₹${p.amount_paid} via ${p.payment_mode} — ${p.note||''}</span><span><button onclick="delPay('${p.id}', '${mobile}')" style="background:none; border:none; color:var(--danger); font-size:1.1rem; cursor:pointer;">🗑️</button></span></div>`;
-            });
-            if(obSubRows) html += `<tr><td colspan="5" style="padding:0;">${obSubRows}</td></tr>`;
-        }
+        events.sort((a,b) => a.date - b.date);
+        
+        let runningBalance = 0;
+        let tableHtml = `<div class="table-wrapper"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Debit (Billed)</th><th>Credit (Paid)</th><th>Balance Due</th><th class="no-print">Target Settle</th></tr></thead><tbody>`;
+        
+        ledgerExportData = [["Date", "Description", "Debit", "Credit", "Balance Due"]];
 
-        html += '</tbody></table></div>';
+        const invoiceBalances = {};
+        events.filter(e => e.isInvoice || e.type==='OB').forEach(e => { invoiceBalances[e.id] = e.debit; });
+        events.filter(e => !e.isInvoice && e.credit > 0).forEach(e => {
+            if(e.linked_jc && invoiceBalances[e.linked_jc]) invoiceBalances[e.linked_jc] -= e.credit;
+            if(e.linked_pos && invoiceBalances[e.linked_pos]) invoiceBalances[e.linked_pos] -= e.credit;
+        });
+
+        events.forEach(e => {
+            runningBalance += e.debit;
+            runningBalance -= e.credit;
+            
+            const inRange = (!st || e.date >= new Date(st)) && (!end || e.date <= new Date(end + 'T23:59:59'));
+            
+            if(inRange) {
+                const dateStr = e.date.getFullYear() === 2000 ? '--' : e.date.toLocaleDateString('en-IN');
+                
+                let badge = '';
+                if (e.type === 'JC') badge = '<span class="dept-badge dept-ws">WORKSHOP</span>';
+                else if (e.type === 'POS') {
+                    if (e.source_role === 'moped') badge = '<span class="dept-badge" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd;">MOPED</span>';
+                    else badge = '<span class="dept-badge dept-pos">GREEN</span>';
+                }
+
+                const drStr = e.debit > 0 ? `₹${e.debit.toFixed(2)}` : '';
+                const crStr = e.credit > 0 ? `<span style="color:var(--success); font-weight:bold;">₹${e.credit.toFixed(2)}</span>` : '';
+                const balStr = `<strong style="color:var(--danger);">₹${Math.max(0, runningBalance).toFixed(2)}</strong>`;
+                
+                let targetSettleUi = '';
+                if((e.isInvoice || e.type==='OB') && invoiceBalances[e.id] > 0) {
+                    const owe = invoiceBalances[e.id];
+                    if(e.type === 'JC') wsDebt += owe;
+                    else if(e.type === 'POS' && e.source_role === 'moped') mopDebt += owe;
+                    else if(e.type === 'POS') grnDebt += owe;
+                    
+                    let isAllowedToSettle = false;
+                    if (activeSessionRole === 'admin') isAllowedToSettle = true;
+                    else if (activeSessionRole === 'service' && e.type === 'JC') isAllowedToSettle = true;
+                    else if (activeSessionRole === 'green' && e.type === 'POS' && (e.source_role === 'green' || !e.source_role)) isAllowedToSettle = true;
+                    else if (activeSessionRole === 'moped' && e.type === 'POS' && e.source_role === 'moped') isAllowedToSettle = true;
+
+                    if (isAllowedToSettle) {
+                        targetSettleUi = `
+                            <div style="display:flex; align-items:center;" class="no-print">
+                                <input type="number" id="payInp_${e.id}" class="target-pay-input" placeholder="₹${owe.toFixed(0)}">
+                                <select id="payMod_${e.id}" style="padding:2px; font-size:0.7rem; margin-left:4px;"><option value="Cash">Cash</option><option value="UPI">UPI</option></select>
+                                <button class="target-pay-btn" onclick="applyTargetPayment('${mobile}', '${e.id}', '${e.type}', ${owe})">PAY</button>
+                            </div>`;
+                    } else {
+                        targetSettleUi = `<div style="font-size:0.75rem; color:#94a3b8; font-weight:bold;" class="no-print">🔒 Restricted Dept</div>`;
+                    }
+                }
+
+                tableHtml += `<tr><td>${dateStr}</td><td>${e.desc} ${badge}</td><td>${drStr}</td><td>${crStr}</td><td>${balStr}</td><td class="no-print">${targetSettleUi}</td></tr>`;
+                ledgerExportData.push([dateStr, e.desc, drStr, crStr, Math.max(0, runningBalance).toFixed(2)]);
+            }
+        });
+
+        tableHtml += '</tbody></table></div>';
         
-        if(totOutstanding > 0) {
-            html += `
-            <div style="margin-top:20px; background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #cbd5e1;">
-                <h4 style="margin:0 0 12px 0; color:var(--primary);">💳 RECORD PAYMENT</h4>
-                <div style="font-size:0.85rem; color:#b45309; font-weight:bold; margin-bottom:12px;">Total Outstanding: ₹${totOutstanding.toFixed(2)} across ${invCount} invoices/debt records</div>
-                <div class="inputs-grid" style="margin-bottom:0;">
-                    <div class="field-group"><label>Amount (₹)</label><input type="number" id="payAmt_${mobile}" placeholder="0" min="1"></div>
-                    <div class="field-group"><label>Mode</label><select id="payMod_${mobile}"><option value="Cash">Cash</option><option value="UPI">UPI</option></select></div>
-                    <div class="field-group"><label>Note</label><input type="text" id="payNot_${mobile}" placeholder="Optional"></div>
-                    <button class="btn-action" onclick="applyCreditPayment('${mobile}')">APPLY PAYMENT</button>
-                </div>
-            </div>`;
-        }
+        document.getElementById(`totDue_${mobile}`).innerText = (wsDebt + grnDebt + mopDebt).toFixed(2);
+        document.getElementById(`wsDue_${mobile}`).innerText = wsDebt.toFixed(2);
+        document.getElementById(`grnDue_${mobile}`).innerText = grnDebt.toFixed(2);
+        document.getElementById(`mopDue_${mobile}`).innerText = mopDebt.toFixed(2);
+        document.getElementById(`ledgerHeader_${mobile}`).style.display = 'block';
         
-        document.getElementById(`ledgContent_${mobile}`).innerHTML = html;
+        document.getElementById(`ledgContent_${mobile}`).innerHTML = tableHtml;
     }
 
-    async function delPay(id, mobile) {
-        if(!confirm("Delete this payment? This will restore the debt balance.")) return;
-        const { error } = await supabaseClient.from('credit_payments').delete().eq('id', id);
+    async function applyTargetPayment(mobile, targetId, targetType, maxAmt) {
+        const amtInput = document.getElementById(`payInp_${targetId}`);
+        const amt = parseFloat(amtInput.value) || 0;
+        const mode = document.getElementById(`payMod_${targetId}`).value;
+
+        if(amt <= 0 || amt > maxAmt) return alert(`Enter a valid amount up to ₹${maxAmt}.`);
+
+        const payload = { customer_mobile: mobile, amount_paid: amt, payment_mode: mode, paid_by_role: activeSessionRole, note: 'Targeted Ledger Settlement' };
+        if(targetType === 'JC') payload.job_card_id = targetId;
+        if(targetType === 'POS') payload.sale_id = targetId;
+
+        const { error } = await supabaseClient.from('credit_payments').insert(payload);
         if (error) alert("Error: " + error.message);
         else {
+            generatePaymentReceipt(mobile, amt, mode, targetType, targetId);
             loadCrmLedger(mobile);
             computeAndShowCreditBalance(mobile);
         }
     }
 
-    async function applyCreditPayment(mobile) {
-        let remaining = parseFloat(document.getElementById(`payAmt_${mobile}`).value) || 0;
-        const mode = document.getElementById(`payMod_${mobile}`).value;
-        const note = document.getElementById(`payNot_${mobile}`).value;
+    function generatePaymentReceipt(mobile, amount, mode, type, id) {
+        const d = new Date();
+        const prefix = type === 'JC' ? 'Workshop Job Card' : (type === 'POS' ? 'Retail POS Invoice' : 'Opening Balance');
+        const refText = type === 'OB' ? 'Manual Registry' : id.split('-')[0].toUpperCase();
         
-        if(remaining <= 0) return;
-        
-        const { data: pos, error: posErr } = await supabaseClient.from('counter_sales').select('id, created_at, total_amount').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
-        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').select('id, created_at, total_invoice_value').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
-        if (posErr || jcErr) return alert("Error fetching invoices");
-
-        let all = [];
-        if(pos) all = all.concat(pos.map(s => ({ type:'POS', id: s.id, dt: s.created_at, amt: s.total_amount })));
-        if(jc) all = all.concat(jc.map(s => ({ type:'JC', id: s.id, dt: s.created_at, amt: s.total_invoice_value })));
-        all.sort((a,b) => new Date(a.dt) - new Date(b.dt));
-        
-        const { data: pays, error: pErr } = await supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile);
-        if (pErr) return alert("Error fetching payments");
-
-        let obPays = (pays||[]).filter(p => !p.sale_id && !p.job_card_id);
-        let obDebt = 0; let obPaid = 0;
-        obPays.forEach(p => {
-            if(parseFloat(p.amount_paid) < 0) obDebt += Math.abs(parseFloat(p.amount_paid));
-            else obPaid += parseFloat(p.amount_paid);
-        });
-        
-        const insertBatch = [];
-        
-        if(obDebt - obPaid > 0) {
-            let apply = Math.min(remaining, obDebt - obPaid);
-            insertBatch.push({ customer_mobile: mobile, amount_paid: apply, payment_mode: mode, note: note, paid_by_role: activeSessionRole });
-            remaining -= apply;
-        }
-        
-        for(const s of all) {
-            if(remaining <= 0) break;
-            let psum = 0;
-            (pays||[]).filter(p => (s.type==='POS'&&p.sale_id===s.id) || (s.type==='JC'&&p.job_card_id===s.id)).forEach(p => psum += parseFloat(p.amount_paid)||0);
-            let out = parseFloat(s.amt) - psum;
-            if(out > 0) {
-                let apply = Math.min(remaining, out);
-                let pay = { customer_mobile: mobile, amount_paid: apply, payment_mode: mode, note: note, paid_by_role: activeSessionRole };
-                if(s.type==='POS') pay.sale_id = s.id;
-                else pay.job_card_id = s.id;
-                insertBatch.push(pay);
-                remaining -= apply;
-            }
-        }
-        
-        if(insertBatch.length > 0) {
-            const { error } = await supabaseClient.from('credit_payments').insert(insertBatch);
-            if (error) alert("Error: " + error.message);
-            else {
-                alert('Payment Applied Successfully (FIFO)');
-                loadCrmLedger(mobile);
-                computeAndShowCreditBalance(mobile);
-            }
-        }
+        const receiptHtml = `
+            Date: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}<br>
+            Client Mobile: ${mobile}<br><br>
+            Received with thanks the sum of:<br>
+            <strong style="font-size:1.5rem; color:var(--success);">₹${amount.toFixed(2)}</strong><br><br>
+            <strong>Mode:</strong> ${mode}<br>
+            <strong>Target:</strong> ${prefix} (${refText})<br><br>
+            <strong>Collected By Dept:</strong> ${activeSessionRole.toUpperCase()}<br>
+            <em style="font-size:0.75rem;">*Subject to internal vault clearing.*</em>
+        `;
+        document.getElementById('prtContent').innerHTML = receiptHtml;
+        document.getElementById('paymentReceiptModal').style.display = 'flex';
     }
 
-    // === PRODUCT GROUP MANAGEMENT LOGIC (U2) ===
+    function exportReceiptAsJPG() {
+        const layoutTarget = document.getElementById('renderReceiptTarget');
+        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+            canvas.toBlob(blob => {
+                const targetBlobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = targetBlobUrl; a.download = `Receipt_${new Date().getTime()}.jpg`; a.click(); 
+                URL.revokeObjectURL(targetBlobUrl);
+            }, 'image/jpeg', 0.95);
+        });
+    }
+
+    function exportLedgerCsv(mobile) {
+        if(ledgerExportData.length <= 1) return alert("No data to export.");
+        let csvContent = "data:text/csv;charset=utf-8,";
+        ledgerExportData.forEach(rowArray => {
+            let row = rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",");
+            csvContent += row + "\r\n";
+        });
+        const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent));
+        link.setAttribute("download", `Ledger_${mobile}.csv`); document.body.appendChild(link);
+        link.click(); document.body.removeChild(link);
+    }
+
+    // === PHASE 3: AUDIT LOG FETCHER ===
+    async function loadAuditLog() {
+        const { data: logs, error } = await supabaseClient.from('approval_requests')
+            .select('*').order('created_at', { ascending: false }).limit(50);
+            
+        const tbody = document.getElementById('auditLogBody');
+        tbody.innerHTML = '';
+        
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Failed to load audit history: ${error.message}</td></tr>`;
+            return;
+        }
+
+        if(!logs || logs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b;">No audit records found.</td></tr>`;
+            return;
+        }
+
+        (logs||[]).forEach(log => {
+            const dateStr = new Date(log.created_at).toLocaleString('en-IN');
+            
+            let refStr = '--';
+            if (log.payload?.jc_id) refStr = `JC-${log.payload.jc_id.split('-')[0].toUpperCase()}`;
+            else if (log.payload?.sale_id) refStr = `POS-${log.payload.sale_id.split('-')[0].toUpperCase()}`;
+            
+            const reqBy = (log.requested_by_role || 'SYSTEM').toUpperCase();
+            
+            let resDetails = '';
+            if (log.status === 'Cleared' && log.request_type === 'Discount Override') {
+                const dist = log.payload?.distribution || {};
+                resDetails = `<div style="font-size:0.7rem; color:#64748b; margin-top:4px;">G:₹${dist.green||0} | M:₹${dist.moped||0} | L:₹${dist.labour||0} | T:₹${dist.lathe||0}</div>`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td style="font-weight:bold;">${log.request_type}</td>
+                    <td><span style="font-family:monospace; color:var(--info);">${refStr}</span></td>
+                    <td>${reqBy}</td>
+                    <td><span class="status-tag status-${log.status}">${log.status}</span>${resDetails}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // === PRODUCT GROUP, BRAND, SERVICE, STAFF, SCHEMES, VEHICLE LOGIC (PRESERVED) ===
     let catalogCache = [];
-    async function fetchCatalogForPG() {
-        if(catalogCache.length === 0) {
-            const { data, error } = await supabaseClient.from('product_master').select('*');
-            if (error) console.error(error);
-            catalogCache = data || [];
-        }
-    }
-
-    async function searchGroupProduct(inp) {
-        await fetchCatalogForPG();
-        const q = inp.value.toLowerCase().trim();
-        const auto = document.getElementById('pgProdAuto');
-        if(q.length < 2) { auto.style.display = 'none'; return; }
-        const tokens = q.split(' ').filter(t=>t);
-        const res = catalogCache.filter(p => {
-            const str = (p.item_name + ' ' + (p.brand||'')).toLowerCase();
-            return tokens.every(t => str.includes(t));
-        }).slice(0,10);
-        
-        auto.innerHTML = '';
-        res.forEach(p => {
-            const d = document.createElement('div');
-            d.style.padding = '8px 12px'; d.style.cursor = 'pointer'; d.style.borderBottom = '1px solid #eee';
-            d.innerHTML = `<strong>${p.item_name}</strong> <span style="font-size:0.75rem; color:#666;">${p.brand||''}</span>`;
-            d.onmousedown = () => {
-                document.getElementById('pgProdSearch').value = p.item_name;
-                document.getElementById('pgSelectedProdId').value = p.id;
-                auto.style.display = 'none';
-            };
-            auto.appendChild(d);
-        });
-        auto.style.display = res.length > 0 ? 'block' : 'none';
-    }
-
-    async function createProductGroup() {
-        const name = document.getElementById('pgName').value.trim();
-        const desc = document.getElementById('pgDesc').value.trim();
-        if(!name) return;
-        const { error } = await supabaseClient.from('product_groups').insert({ group_name: name }); 
-        if (error) return alert("Error: " + error.message);
-        document.getElementById('pgName').value = '';
-        document.getElementById('pgDesc').value = '';
-        loadProductGroups();
-    }
-
-    async function loadProductGroups() {
-        const { data, error } = await supabaseClient.from('product_groups').select('*').order('group_name');
-        if (error) return console.error(error);
-        let selP = '<option value="">-- Choose Group --</option>';
-        let selV = '<option value="">-- Choose Group --</option>';
-        let trs = '';
-        (data||[]).forEach(g => {
-            selP += `<option value="${g.id}">${g.group_name}</option>`;
-            selV += `<option value="${g.id}">${g.group_name}</option>`;
-            trs += `<tr><td><strong>${g.group_name}</strong></td><td>${g.description||''}</td><td><button onclick="deleteProductGroup('${g.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`;
-        });
-        document.getElementById('tbProductGroups').innerHTML = trs;
-        document.getElementById('pgSelectProducts').innerHTML = selP;
-        document.getElementById('pgSelectVehicles').innerHTML = selV;
-    }
-
-    async function deleteProductGroup(id) {
-        if(confirm('Delete this product group? Associated mapping relations will be dropped.')) {
-            const { error } = await supabaseClient.from('product_groups').delete().eq('id', id);
-            if (error) alert("Error: " + error.message);
-            else loadProductGroups();
-        }
-    }
-
-    async function loadGroupMappings() {
-        const gid = document.getElementById('pgSelectProducts').value;
-        if(!gid) return document.getElementById('tbGroupProducts').innerHTML = '';
-        const { data, error } = await supabaseClient.from('product_group_items').select('*, product_master(item_name, brand)').eq('group_id', gid);
-        if (error) return console.error(error);
-        let trs = '';
-        (data||[]).forEach(r => {
-            trs += `<tr><td>${r.product_master?.item_name||''} <span style="font-size:0.75rem; color:#666;">${r.product_master?.brand||''}</span></td><td><button onclick="delGroupProduct('${r.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[REM]</button></td></tr>`;
-        });
-        document.getElementById('tbGroupProducts').innerHTML = trs;
-    }
-
-    async function assignProductToGroup() {
-        const gid = document.getElementById('pgSelectProducts').value;
-        const pid = document.getElementById('pgSelectedProdId').value;
-        if(!gid || !pid) return;
-        const { error } = await supabaseClient.from('product_group_items').insert({ group_id: gid, product_master_id: pid });
-        if (error) return alert("Error: " + error.message);
-        document.getElementById('pgProdSearch').value = '';
-        document.getElementById('pgSelectedProdId').value = '';
-        loadGroupMappings();
-    }
-
-    async function delGroupProduct(id) {
-        const { error } = await supabaseClient.from('product_group_items').delete().eq('id', id);
-        if (error) alert("Error: " + error.message);
-        else loadGroupMappings();
-    }
-
-    async function loadGroupVehicles() {
-        const gid = document.getElementById('pgSelectVehicles').value;
-        if(!gid) return document.getElementById('tbGroupVehicles').innerHTML = '';
-        const { data, error } = await supabaseClient.from('product_group_vehicles').select('*').eq('group_id', gid);
-        if (error) return console.error(error);
-        let trs = '';
-        (data||[]).forEach(r => {
-            trs += `<tr><td>${r.vehicle_model}</td><td><button onclick="delGroupVehicle('${r.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[UNLINK]</button></td></tr>`;
-        });
-        document.getElementById('tbGroupVehicles').innerHTML = trs;
-    }
-
-    async function linkVehicleToGroup() {
-        const gid = document.getElementById('pgSelectVehicles').value;
-        const v = document.getElementById('pgVehModel').value.trim();
-        if(!gid || !v) return;
-        const { error } = await supabaseClient.from('product_group_vehicles').insert({ group_id: gid, vehicle_model: v });
-        if (error) return alert("Error: " + error.message);
-        document.getElementById('pgVehModel').value = '';
-        loadGroupVehicles();
-    }
-
-    async function delGroupVehicle(id) {
-        const { error } = await supabaseClient.from('product_group_vehicles').delete().eq('id', id);
-        if (error) alert("Error: " + error.message);
-        else loadGroupVehicles();
-    }
-
-    // === INVENTORY BRANDS LOGIC ===
-    async function loadBrands() {
-        const { data: b, error } = await supabaseClient.from('brand_master').select('*').order('brand_name');
-        if (error) return console.error(error);
-        const tb = document.getElementById('brandTableBody'); tb.innerHTML = '';
-        (b||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.brand_name}</strong></td><td>${item.disc_regular}%</td><td>${item.disc_silver}%</td><td>${item.disc_gold}%</td><td><button onclick="deleteBrand('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; });
-    }
-    async function saveBrandRule() {
-        const name = document.getElementById('brandName').value; const r = document.getElementById('brandReg').value; const s = document.getElementById('brandSilv').value; const g = document.getElementById('brandGold').value;
-        if(!name) return; 
-        const { error } = await supabaseClient.from('brand_master').insert({ brand_name: name, disc_regular: r, disc_silver: s, disc_gold: g }); 
-        if (error) alert("Error: " + error.message);
-        else loadBrands();
-    }
-    async function deleteBrand(id) { 
-        const { error } = await supabaseClient.from('brand_master').delete().eq('id', id); 
-        if (error) alert("Error: " + error.message);
-        else loadBrands(); 
-    }
-
-    // === SERVICE LOGIC ===
-    async function loadServices() {
-        const { data: s, error } = await supabaseClient.from('service_packages').select('*').order('vehicle_category');
-        if (error) return console.error(error);
-        const tb = document.getElementById('srvTableBody'); tb.innerHTML = '';
-        (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.package_name}</strong></td><td>${item.vehicle_category}</td><td>₹${item.base_rate}</td><td><button onclick="deleteSrv('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; });
-    }
-    async function saveServiceProtocol() {
-        const name = document.getElementById('srvName').value; const cat = document.getElementById('srvCat').value; const rate = document.getElementById('srvRate').value;
-        if(!name) return; 
-        const { error } = await supabaseClient.from('service_packages').insert({ package_name: name, vehicle_category: cat, base_rate: rate }); 
-        if (error) alert("Error: " + error.message);
-        else loadServices();
-    }
-    async function deleteSrv(id) { 
-        const { error } = await supabaseClient.from('service_packages').delete().eq('id', id); 
-        if (error) alert("Error: " + error.message);
-        else loadServices(); 
-    }
-
-    // === STAFF & PAYROLL LOGIC ===
+    async function fetchCatalogForPG() { if(catalogCache.length === 0) { const { data } = await supabaseClient.from('product_master').select('*'); catalogCache = data || []; } }
+    async function searchGroupProduct(inp) { await fetchCatalogForPG(); const q = inp.value.toLowerCase().trim(); const auto = document.getElementById('pgProdAuto'); if(q.length < 2) { auto.style.display = 'none'; return; } const tokens = q.split(' ').filter(t=>t); const res = catalogCache.filter(p => { const str = (p.item_name + ' ' + (p.brand||'')).toLowerCase(); return tokens.every(t => str.includes(t)); }).slice(0,10); auto.innerHTML = ''; res.forEach(p => { const d = document.createElement('div'); d.style.padding = '8px 12px'; d.style.cursor = 'pointer'; d.style.borderBottom = '1px solid #eee'; d.innerHTML = `<strong>${p.item_name}</strong> <span style="font-size:0.75rem; color:#666;">${p.brand||''}</span>`; d.onmousedown = () => { document.getElementById('pgProdSearch').value = p.item_name; document.getElementById('pgSelectedProdId').value = p.id; auto.style.display = 'none'; }; auto.appendChild(d); }); auto.style.display = res.length > 0 ? 'block' : 'none'; }
+    async function createProductGroup() { const name = document.getElementById('pgName').value.trim(); const desc = document.getElementById('pgDesc').value.trim(); if(!name) return; const { error } = await supabaseClient.from('product_groups').insert({ group_name: name, description: desc }); if (error) return alert("Error: " + error.message); document.getElementById('pgName').value = ''; document.getElementById('pgDesc').value = ''; loadProductGroups(); }
+    async function loadProductGroups() { const { data, error } = await supabaseClient.from('product_groups').select('*').order('group_name'); if (error) return console.error(error); let selP = '<option value="">-- Choose Group --</option>'; let selV = '<option value="">-- Choose Group --</option>'; let trs = ''; (data||[]).forEach(g => { selP += `<option value="${g.id}">${g.group_name}</option>`; selV += `<option value="${g.id}">${g.group_name}</option>`; trs += `<tr><td><strong>${g.group_name}</strong></td><td>${g.description||''}</td><td><button onclick="deleteProductGroup('${g.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); document.getElementById('tbProductGroups').innerHTML = trs; document.getElementById('pgSelectProducts').innerHTML = selP; document.getElementById('pgSelectVehicles').innerHTML = selV; }
+    async function deleteProductGroup(id) { if(confirm('Delete this product group?')) { const { error } = await supabaseClient.from('product_groups').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadProductGroups(); } }
+    async function loadGroupMappings() { const gid = document.getElementById('pgSelectProducts').value; if(!gid) return document.getElementById('tbGroupProducts').innerHTML = ''; const { data, error } = await supabaseClient.from('product_group_items').select('*, product_master(item_name, brand)').eq('group_id', gid); if (error) return console.error(error); let trs = ''; (data||[]).forEach(r => { trs += `<tr><td>${r.product_master?.item_name||''} <span style="font-size:0.75rem; color:#666;">${r.product_master?.brand||''}</span></td><td><button onclick="delGroupProduct('${r.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[REM]</button></td></tr>`; }); document.getElementById('tbGroupProducts').innerHTML = trs; }
+    async function assignProductToGroup() { const gid = document.getElementById('pgSelectProducts').value; const pid = document.getElementById('pgSelectedProdId').value; if(!gid || !pid) return; const { error } = await supabaseClient.from('product_group_items').insert({ group_id: gid, product_master_id: pid }); if (error) return alert("Error: " + error.message); document.getElementById('pgProdSearch').value = ''; document.getElementById('pgSelectedProdId').value = ''; loadGroupMappings(); }
+    async function delGroupProduct(id) { const { error } = await supabaseClient.from('product_group_items').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadGroupMappings(); }
+    async function loadGroupVehicles() { const gid = document.getElementById('pgSelectVehicles').value; if(!gid) return document.getElementById('tbGroupVehicles').innerHTML = ''; const { data, error } = await supabaseClient.from('product_group_vehicles').select('*').eq('group_id', gid); if (error) return console.error(error); let trs = ''; (data||[]).forEach(r => { trs += `<tr><td>${r.vehicle_model}</td><td><button onclick="delGroupVehicle('${r.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[UNLINK]</button></td></tr>`; }); document.getElementById('tbGroupVehicles').innerHTML = trs; }
+    async function linkVehicleToGroup() { const gid = document.getElementById('pgSelectVehicles').value; const v = document.getElementById('pgVehModel').value.trim(); if(!gid || !v) return; const { error } = await supabaseClient.from('product_group_vehicles').insert({ group_id: gid, vehicle_model: v }); if (error) return alert("Error: " + error.message); document.getElementById('pgVehModel').value = ''; loadGroupVehicles(); }
+    async function delGroupVehicle(id) { const { error } = await supabaseClient.from('product_group_vehicles').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadGroupVehicles(); }
+    async function loadBrands() { const { data: b, error } = await supabaseClient.from('brand_master').select('*').order('brand_name'); if (error) return console.error(error); const tb = document.getElementById('brandTableBody'); tb.innerHTML = ''; (b||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.brand_name}</strong></td><td>${item.disc_regular}%</td><td>${item.disc_silver}%</td><td>${item.disc_gold}%</td><td><button onclick="deleteBrand('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); }
+    async function saveBrandRule() { const name = document.getElementById('brandName').value; const r = document.getElementById('brandReg').value; const s = document.getElementById('brandSilv').value; const g = document.getElementById('brandGold').value; if(!name) return; const { error } = await supabaseClient.from('brand_master').insert({ brand_name: name, disc_regular: r, disc_silver: s, disc_gold: g }); if (error) alert("Error: " + error.message); else loadBrands(); }
+    async function deleteBrand(id) { const { error } = await supabaseClient.from('brand_master').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadBrands(); }
+    async function loadServices() { const { data: s, error } = await supabaseClient.from('service_packages').select('*').order('vehicle_category'); if (error) return console.error(error); const tb = document.getElementById('srvTableBody'); tb.innerHTML = ''; (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.package_name}</strong></td><td>${item.vehicle_category}</td><td>₹${item.base_rate}</td><td><button onclick="deleteSrv('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); }
+    async function saveServiceProtocol() { const name = document.getElementById('srvName').value; const cat = document.getElementById('srvCat').value; const rate = document.getElementById('srvRate').value; if(!name) return; const { error } = await supabaseClient.from('service_packages').insert({ package_name: name, vehicle_category: cat, base_rate: rate }); if (error) alert("Error: " + error.message); else loadServices(); }
+    async function deleteSrv(id) { const { error } = await supabaseClient.from('service_packages').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadServices(); }
     let activeEditMechId = null;
-    function editStaff(id, name, mobile, role, comm) {
-        activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || '';
-        document.getElementById('tRole').value = role || 'Mechanic'; document.getElementById('tComm').value = comm;
-        document.getElementById('btnSaveTech').innerText = "UPDATE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block";
-    }
-    function cancelTechEdit() {
-        activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = '';
-        document.getElementById('tRole').value = 'Mechanic'; document.getElementById('tComm').value = '0';
-        document.getElementById('btnSaveTech').innerText = "SAVE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none";
-    }
-    async function upsertStaffProfileRecord() {
-        const nameStr = document.getElementById('tName').value.trim().toUpperCase(); const mobStr = document.getElementById('tMobile').value.trim();
-        const roleStr = document.getElementById('tRole').value; const commVal = parseFloat(document.getElementById('tComm').value) || 0;
-        if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required.");
-        const payload = { mobile_number: Number(mobStr), name: nameStr, staff_role: roleStr, commission_rate: commVal, is_active: true };
-        
-        let error = null;
-        if (activeEditMechId) { 
-            const result = await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); 
-            error = result.error;
-        } else { 
-            const result = await supabaseClient.from('mechanics').insert(payload); 
-            error = result.error;
-        }
-        
-        if (error) alert("Error: " + error.message);
-        else {
-            cancelTechEdit(); 
-            loadStaffDirectoryLedgers();
-        }
-    }
-    async function loadStaffDirectoryLedgers() {
-        const { data: list, error } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name');
-        if (error) return console.error(error);
-        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
-        list?.forEach(t => {
-            const pts = parseFloat(t.earned_points) || 0;
-            const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Pay ₹${Math.floor(pts)}</button>` : '';
-            const safeName = t.name.replace(/'/g, "\\'");
-            tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem;">${t.staff_role}</span></td><td>${pts.toFixed(0)} Pts</td><td>${cashBtn} <button onclick="deactivateStaff('${t.id}')" style="margin-left:8px; border:none; background:none; color:var(--danger); cursor:pointer;">[DROP]</button></td></tr>`;
-        });
-    }
-    async function markAttendance(mechId) {
-        const d = prompt("Enter Date (YYYY-MM-DD) for Attendance:", new Date().toISOString().split('T')[0]);
-        if(!d) return;
-        const { error } = await supabaseClient.from('mechanic_attendance').insert({ mechanic_id: mechId, attendance_date: d, status: 'Present' });
-        if (error) alert("Error: " + error.message);
-        else alert("Marked Present for " + d);
-    }
-    async function deactivateStaff(id) {
-        if(confirm("Drop this staff member from active roster?")) {
-            const { error } = await supabaseClient.from('mechanics').update({ is_active: false }).eq('id', id); 
-            if (error) alert("Error: " + error.message);
-            else loadStaffDirectoryLedgers();
-        }
-    }
-    async function cashOutStaff(id, currentPts) {
-        if(confirm(`Convert ${currentPts} points to cash payout?`)) {
-            const { error: updErr } = await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', id);
-            if (updErr) return alert("Error: " + updErr.message);
-            const { error: insErr } = await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Points Cashout', stakeholder_id: id, amount: Math.floor(currentPts), note: 'Automated conversion' });
-            if (insErr) return alert("Error logging expense: " + insErr.message);
-            loadStaffDirectoryLedgers();
-        }
-    }
-
-    // === SCHEMES LOGIC ===
-    async function createScheme() {
-        const sName = document.getElementById('schName').value.trim().toUpperCase(); const sRole = document.getElementById('schRole').value;
-        const sMetric = document.getElementById('schMetric').value; const sTarget = parseFloat(document.getElementById('schTarget').value);
-        const sReward = parseFloat(document.getElementById('schReward').value);
-        if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters.");
-        
-        const { error } = await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward });
-        if (error) alert("Error: " + error.message);
-        else {
-            alert("Scheme activated!"); 
-            loadSchemes();
-        }
-    }
-    async function loadSchemes() {
-        const { data: schemes, error } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false });
-        if (error) return console.error(error);
-        const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = '';
-        schemes?.forEach(s => {
-            const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`;
-            tbody.innerHTML += `<tr><td><strong>${s.scheme_name}</strong></td><td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td><td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td><td>${statusHtml}</td></tr>`;
-        });
-    }
-    async function toggleScheme(id, makeActive) {
-        const { error } = await supabaseClient.from('active_schemes').update({ is_active: makeActive }).eq('id', id); 
-        if (error) alert("Error: " + error.message);
-        else loadSchemes();
-    }
+    function editStaff(id, name, mobile, role, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tRole').value = role || 'Mechanic'; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
+    function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tRole').value = 'Mechanic'; document.getElementById('tComm').value = '0'; document.getElementById('btnSaveTech').innerText = "SAVE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
+    async function upsertStaffProfileRecord() { const nameStr = document.getElementById('tName').value.trim().toUpperCase(); const mobStr = document.getElementById('tMobile').value.trim(); const roleStr = document.getElementById('tRole').value; const commVal = parseFloat(document.getElementById('tComm').value) || 0; if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); const payload = { mobile_number: Number(mobStr), name: nameStr, staff_role: roleStr, commission_rate: commVal, is_active: true }; let error = null; if (activeEditMechId) { const result = await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); error = result.error; } else { const result = await supabaseClient.from('mechanics').insert(payload); error = result.error; } if (error) alert("Error: " + error.message); else { cancelTechEdit(); loadStaffDirectoryLedgers(); } }
+    async function loadStaffDirectoryLedgers() { const { data: list, error } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name'); if (error) return console.error(error); const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = ''; list?.forEach(t => { const pts = parseFloat(t.earned_points) || 0; const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Pay ₹${Math.floor(pts)}</button>` : ''; const safeName = t.name.replace(/'/g, "\\'"); tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem;">${t.staff_role}</span></td><td>${pts.toFixed(0)} Pts</td><td>${cashBtn} <button onclick="deactivateStaff('${t.id}')" style="margin-left:8px; border:none; background:none; color:var(--danger); cursor:pointer;">[DROP]</button></td></tr>`; }); }
+    async function markAttendance(mechId) { const d = prompt("Enter Date (YYYY-MM-DD) for Attendance:", new Date().toISOString().split('T')[0]); if(!d) return; const { error } = await supabaseClient.from('mechanic_attendance').insert({ mechanic_id: mechId, attendance_date: d, status: 'Present' }); if (error) alert("Error: " + error.message); else alert("Marked Present for " + d); }
+    async function deactivateStaff(id) { if(confirm("Drop this staff member from active roster?")) { const { error } = await supabaseClient.from('mechanics').update({ is_active: false }).eq('id', id); if (error) alert("Error: " + error.message); else loadStaffDirectoryLedgers(); } }
+    async function cashOutStaff(id, currentPts) { if(confirm(`Convert ${currentPts} points to cash payout?`)) { const { error: updErr } = await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', id); if (updErr) return alert("Error: " + updErr.message); const { error: insErr } = await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Points Cashout', stakeholder_id: id, amount: Math.floor(currentPts), note: 'Automated conversion' }); if (insErr) return alert("Error logging expense: " + insErr.message); loadStaffDirectoryLedgers(); } }
+    async function createScheme() { const sName = document.getElementById('schName').value.trim().toUpperCase(); const sRole = document.getElementById('schRole').value; const sMetric = document.getElementById('schMetric').value; const sTarget = parseFloat(document.getElementById('schTarget').value); const sReward = parseFloat(document.getElementById('schReward').value); if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters."); const { error } = await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward }); if (error) alert("Error: " + error.message); else { alert("Scheme activated!"); loadSchemes(); } }
+    async function loadSchemes() { const { data: schemes, error } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false }); if (error) return console.error(error); const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = ''; schemes?.forEach(s => { const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`; tbody.innerHTML += `<tr><td><strong>${s.scheme_name}</strong></td><td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td><td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td><td>${statusHtml}</td></tr>`; }); }
+    async function toggleScheme(id, makeActive) { const { error } = await supabaseClient.from('active_schemes').update({ is_active: makeActive }).eq('id', id); if (error) alert("Error: " + error.message); else loadSchemes(); }
 
     /* ── VEHICLE SEARCH (customer vehicles table) ──── */
     async function searchVehiclesMaster() { 
-      const q = document.getElementById('vehSearch')
-                  .value.trim();
+      const q = document.getElementById('vehSearch').value.trim();
       const box = document.getElementById('vehSearchResults');
-      document.getElementById('vehMergePanel')
-              .style.display = 'none';
+      document.getElementById('vehMergePanel').style.display = 'none';
 
-      if (q.length < 2) {
-        box.innerHTML =
-          '<p style="color:#64748b;padding:8px;">'
-          + 'Type at least 2 characters.</p>';
-        return;
-      }
-      box.innerHTML =
-        '<p style="color:#64748b;padding:8px;">'
-        + 'Searching...</p>';
+      if (q.length < 2) { box.innerHTML = '<p style="color:#64748b;padding:8px;">Type at least 2 characters.</p>'; return; }
+      box.innerHTML = '<p style="color:#64748b;padding:8px;">Searching...</p>';
 
-      const { data, error } = await supabaseClient
-        .from('vehicles')
-        .select(
-          'id,reg_number,make_model,color,'
-          + 'customer_mobile,customers(name)'
-        )
-        .or(
-          'reg_number.ilike.%' + q + '%,'
-          + 'make_model.ilike.%' + q + '%,'
-          + 'customer_mobile.ilike.%' + q + '%'
-        )
-        .limit(40);
+      const { data, error } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,color,customer_mobile,customers(name)').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%,customer_mobile.ilike.%' + q + '%').limit(40);
 
-      if (error) {
-        box.innerHTML =
-          '<p style="color:var(--danger);">Error: '
-          + error.message + '</p>';
-        return;
-      }
-      if (!data || data.length === 0) {
-        box.innerHTML =
-          '<p style="color:var(--danger);">'
-          + 'No vehicles found.</p>';
-        return;
-      }
+      if (error) { box.innerHTML = '<p style="color:var(--danger);">Error: ' + error.message + '</p>'; return; }
+      if (!data || data.length === 0) { box.innerHTML = '<p style="color:var(--danger);">No vehicles found.</p>'; return; }
 
-      let html =
-        '<div class="table-wrapper"><table>'
-        + '<thead><tr>'
-        + '<th>Reg No</th><th>Make / Model</th>'
-        + '<th>Color</th><th>Customer</th>'
-        + '<th>Mobile</th>'
-        + '<th style="min-width:160px;">Actions</th>'
-        + '</tr></thead><tbody>';
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Reg No</th><th>Make / Model</th><th>Color</th><th>Customer</th><th>Mobile</th><th style="min-width:160px;">Actions</th></tr></thead><tbody>';
 
       data.forEach(v => {
-        const cn = (v.customers?.name || '--')
-                   .replace(/'/g, "\\'");
+        const cn = (v.customers?.name || '--').replace(/'/g, "\\'");
         const rid = v.id;
         html += `<tr id="vrow_${rid}">
-          <td><input type="text" id="vreg_${rid}"
-            value="${v.reg_number||''}"
-            oninput="this.value=this.value.toUpperCase()"
-            style="width:85px;padding:5px;font-size:0.8rem;
-                   border:1px solid var(--border);
-                   border-radius:4px;font-weight:bold;">
-          </td>
-          <td><input type="text" id="vmod_${rid}"
-            value="${v.make_model||''}"
-            oninput="this.value=this.value.toUpperCase()"
-            style="width:110px;padding:5px;font-size:0.8rem;
-                   border:1px solid var(--border);
-                   border-radius:4px;font-weight:bold;">
-          </td>
-          <td><input type="text" id="vcol_${rid}"
-            value="${v.color||''}"
-            oninput="this.value=this.value.toUpperCase()"
-            style="width:70px;padding:5px;font-size:0.8rem;
-                   border:1px solid var(--border);
-                   border-radius:4px;">
-          </td>
+          <td><input type="text" id="vreg_${rid}" value="${v.reg_number||''}" oninput="this.value=this.value.toUpperCase()" style="width:85px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td>
+          <td><input type="text" id="vmod_${rid}" value="${v.make_model||''}" oninput="this.value=this.value.toUpperCase()" style="width:110px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td>
+          <td><input type="text" id="vcol_${rid}" value="${v.color||''}" oninput="this.value=this.value.toUpperCase()" style="width:70px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;"></td>
           <td style="font-size:0.8rem;">${cn}</td>
-          <td style="font-size:0.8rem;">
-            ${v.customer_mobile||'--'}
-          </td>
+          <td style="font-size:0.8rem;">${v.customer_mobile||'--'}</td>
           <td style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button onclick="saveVehicleEdit('${rid}')"
-              style="background:var(--success);color:white;
-                     border:none;padding:4px 8px;
-                     border-radius:4px;font-size:0.75rem;
-                     font-weight:bold;cursor:pointer;">
-              SAVE
-            </button>
-            <button onclick="openMergePanel('${rid}',
-              document.getElementById('vreg_${rid}').value,
-              document.getElementById('vmod_${rid}').value)"
-              style="background:var(--purple);color:white;
-                     border:none;padding:4px 8px;
-                     border-radius:4px;font-size:0.75rem;
-                     font-weight:bold;cursor:pointer;">
-              MERGE
-            </button>
+            <button onclick="saveVehicleEdit('${rid}')" style="background:var(--success);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">SAVE</button>
+            <button onclick="openMergePanel('${rid}', document.getElementById('vreg_${rid}').value, document.getElementById('vmod_${rid}').value)" style="background:var(--purple);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">MERGE</button>
           </td>
         </tr>`;
       });
-
       html += '</tbody></table></div>';
       box.innerHTML = html;
     } 
 
-    /* ── SAVE VEHICLE EDIT ────────────────────────── */
     async function saveVehicleEdit(vid) { 
-      const reg = document.getElementById('vreg_' + vid)
-                  .value.trim().toUpperCase();
-      const mod = document.getElementById('vmod_' + vid)
-                  .value.trim().toUpperCase();
-      const col = document.getElementById('vcol_' + vid)
-                  .value.trim().toUpperCase();
-      if (!reg || !mod) {
-        alert('Reg No and Model cannot be empty.');
-        return;
-      }
-      const { error } = await supabaseClient
-        .from('vehicles')
-        .update({ reg_number: reg, make_model: mod,
-                  color: col })
-        .eq('id', vid);
-      if (error) {
-        alert('Error: ' + error.message);
-      } else {
+      const reg = document.getElementById('vreg_' + vid).value.trim().toUpperCase();
+      const mod = document.getElementById('vmod_' + vid).value.trim().toUpperCase();
+      const col = document.getElementById('vcol_' + vid).value.trim().toUpperCase();
+      if (!reg || !mod) { alert('Reg No and Model cannot be empty.'); return; }
+      const { error } = await supabaseClient.from('vehicles').update({ reg_number: reg, make_model: mod, color: col }).eq('id', vid);
+      if (error) { alert('Error: ' + error.message); } else {
         const row = document.getElementById('vrow_' + vid);
-        if (row) {
-          row.style.background = '#f0fdf4';
-          setTimeout(() => { row.style.background = ''; },
-            1800);
-        }
+        if (row) { row.style.background = '#f0fdf4'; setTimeout(() => { row.style.background = ''; }, 1800); }
       }
     } 
 
-    /* ── OPEN MERGE PANEL ─────────────────────────── */
     function openMergePanel(srcId, srcReg, srcMod) { 
       const panel = document.getElementById('vehMergePanel');
       panel.style.display = 'block';
-      panel.scrollIntoView({ behavior: 'smooth',
-                             block: 'start' });
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       panel.innerHTML = `
-        <div style="background:#fef3c7;
-             border:1px solid #fde68a;padding:16px;
-             border-radius:8px;margin-top:16px;">
-          <h4 style="margin:0 0 8px 0;color:#b45309;">
-            🔀 MERGE DUPLICATE VEHICLE
-          </h4>
-          <p style="font-size:0.85rem;color:#92400e;
-               margin:0 0 12px 0;">
-            <strong>DUPLICATE (will be removed):</strong>
-            ${srcReg} — ${srcMod}<br>
-            All job cards from this entry will move to the
-            correct vehicle selected below.
-          </p>
+        <div style="background:#fef3c7;border:1px solid #fde68a;padding:16px;border-radius:8px;margin-top:16px;">
+          <h4 style="margin:0 0 8px 0;color:#b45309;">🔀 MERGE DUPLICATE VEHICLE</h4>
+          <p style="font-size:0.85rem;color:#92400e;margin:0 0 12px 0;"><strong>DUPLICATE (will be removed):</strong> ${srcReg} — ${srcMod}<br>All job cards from this entry will move to the correct vehicle selected below.</p>
           <div class="inputs-grid" style="margin-bottom:12px;">
-            <div class="field-group" style="flex:2;
-                 position:relative;">
-              <label>Search for CORRECT vehicle
-                (merge target)</label>
-              <input type="text" id="mergeTargetSearch"
-               placeholder="Type reg no or model..."
-               oninput="this.value=this.value.toUpperCase();
-                        searchMergeTarget(this)"
-               autocomplete="off">
-              <div id="mergeTargetDrop"
-               style="position:absolute;top:100%;left:0;
-                      right:0;background:white;
-                      border:1px solid var(--border);
-                      border-radius:0 0 6px 6px;
-                      max-height:160px;overflow-y:auto;
-                      z-index:50;display:none;
-                      box-shadow:0 4px 6px rgba(0,0,0,0.08);">
-              </div>
+            <div class="field-group" style="flex:2;position:relative;">
+              <label>Search for CORRECT vehicle (merge target)</label>
+              <input type="text" id="mergeTargetSearch" placeholder="Type reg no or model..." oninput="this.value=this.value.toUpperCase(); searchMergeTarget(this)" autocomplete="off">
+              <div id="mergeTargetDrop" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:50;display:none;box-shadow:0 4px 6px rgba(0,0,0,0.08);"></div>
               <input type="hidden" id="mergeTargetId">
-              <div id="mergeTargetLabel"
-               style="font-size:0.8rem;color:var(--success);
-                      font-weight:bold;margin-top:4px;
-                      display:none;"></div>
+              <div id="mergeTargetLabel" style="font-size:0.8rem;color:var(--success);font-weight:bold;margin-top:4px;display:none;"></div>
             </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button
-              onclick="executeMerge('${srcId}',
-                '${srcReg}', '${srcMod}')"
-              style="background:var(--danger);color:white;
-                     border:none;padding:10px 20px;
-                     border-radius:6px;font-weight:bold;
-                     cursor:pointer;">
-              ✅ CONFIRM MERGE & REMOVE DUPLICATE
-            </button>
-            <button onclick="document.getElementById(
-                      'vehMergePanel').style.display='none'"
-              style="background:#e2e8f0;color:var(--primary);
-                     border:none;padding:10px 20px;
-                     border-radius:6px;font-weight:bold;
-                     cursor:pointer;">
-              CANCEL
-            </button>
+            <button onclick="executeMerge('${srcId}', '${srcReg}', '${srcMod}')" style="background:var(--danger);color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">✅ CONFIRM MERGE & REMOVE DUPLICATE</button>
+            <button onclick="document.getElementById('vehMergePanel').style.display='none'" style="background:#e2e8f0;color:var(--primary);border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">CANCEL</button>
           </div>
         </div>`;
     } 
 
-    /* ── SEARCH MERGE TARGET ──────────────────────── */
     let _mergeTimer = null;
     async function searchMergeTarget(inp) { 
       clearTimeout(_mergeTimer);
@@ -1252,113 +935,51 @@
       const drop = document.getElementById('mergeTargetDrop');
       if (q.length < 2) { drop.style.display='none'; return; }
       _mergeTimer = setTimeout(async () => {
-        const { data } = await supabaseClient
-          .from('vehicles')
-          .select('id,reg_number,make_model,customer_mobile')
-          .or(
-            'reg_number.ilike.%' + q + '%,'
-            + 'make_model.ilike.%' + q + '%'
-          )
-          .limit(15);
+        const { data } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,customer_mobile').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%').limit(15);
         drop.innerHTML = '';
         (data||[]).forEach(v => {
           const d = document.createElement('div');
-          d.style.cssText =
-            'padding:8px 12px;cursor:pointer;font-size:0.82rem;'
-            + 'border-bottom:1px solid #f1f5f9;';
-          d.innerHTML =
-            '<strong>' + v.reg_number + '</strong> — '
-            + (v.make_model||'')
-            + ' <span style="color:#64748b;font-size:0.75rem;">'
-            + (v.customer_mobile||'') + '</span>';
+          d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:0.82rem;border-bottom:1px solid #f1f5f9;';
+          d.innerHTML = '<strong>' + v.reg_number + '</strong> — ' + (v.make_model||'') + ' <span style="color:#64748b;font-size:0.75rem;">' + (v.customer_mobile||'') + '</span>';
           d.onmousedown = () => {
-            document.getElementById('mergeTargetId').value
-              = v.id;
-            document.getElementById('mergeTargetSearch').value
-              = v.reg_number + ' — ' + (v.make_model||'');
-            const lbl =
-              document.getElementById('mergeTargetLabel');
-            lbl.style.display = 'block';
-            lbl.innerText = '✅ Target: ' + v.reg_number
-              + ' — ' + (v.make_model||'');
+            document.getElementById('mergeTargetId').value = v.id;
+            document.getElementById('mergeTargetSearch').value = v.reg_number + ' — ' + (v.make_model||'');
+            const lbl = document.getElementById('mergeTargetLabel');
+            lbl.style.display = 'block'; lbl.innerText = '✅ Target: ' + v.reg_number + ' — ' + (v.make_model||'');
             drop.style.display = 'none';
           };
           drop.appendChild(d);
         });
-        drop.style.display =
-          (data && data.length) ? 'block' : 'none';
+        drop.style.display = (data && data.length) ? 'block' : 'none';
       }, 250);
     } 
 
-    /* ── EXECUTE MERGE ────────────────────────────── */
     async function executeMerge(srcId, srcReg, srcMod) { 
-      const tgtId =
-        document.getElementById('mergeTargetId').value.trim();
-      const tgtLabel =
-        document.getElementById('mergeTargetSearch')
-                .value.trim();
+      const tgtId = document.getElementById('mergeTargetId').value.trim();
+      const tgtLabel = document.getElementById('mergeTargetSearch').value.trim();
 
-      if (!tgtId) {
-        alert('Please select the correct target vehicle first.');
-        return;
-      }
-      if (tgtId === srcId) {
-        alert('Source and target cannot be the same vehicle.');
-        return;
-      }
+      if (!tgtId) { alert('Please select the correct target vehicle first.'); return; }
+      if (tgtId === srcId) { alert('Source and target cannot be the same vehicle.'); return; }
 
-      const confirmed = confirm(
-        'MERGE CONFIRMATION\n\n'
-        + 'DUPLICATE (will be removed):\n'
-        + srcReg + ' — ' + srcMod + '\n\n'
-        + 'CORRECT TARGET (all job cards move here):\n'
-        + tgtLabel + '\n\n'
-        + 'This cannot be undone. Proceed?'
-      );
+      const confirmed = confirm('MERGE CONFIRMATION\n\nDUPLICATE (will be removed):\n' + srcReg + ' — ' + srcMod + '\n\nCORRECT TARGET (all job cards move here):\n' + tgtLabel + '\n\nThis cannot be undone. Proceed?');
       if (!confirmed) return;
 
-      const { data: jcList, error: jcErr } =
-        await supabaseClient
-          .from('job_cards')
-          .select('id')
-          .eq('vehicle_id', srcId);
-      if (jcErr) {
-        alert('Error reading job cards: ' + jcErr.message);
-        return;
-      }
+      const { data: jcList, error: jcErr } = await supabaseClient.from('job_cards').select('id').eq('vehicle_id', srcId);
+      if (jcErr) { alert('Error reading job cards: ' + jcErr.message); return; }
 
       if (jcList && jcList.length > 0) {
-        const { error: upErr } = await supabaseClient
-          .from('job_cards')
-          .update({ vehicle_id: tgtId })
-          .eq('vehicle_id', srcId);
-        if (upErr) {
-          alert('Error re-linking job cards: ' + upErr.message);
-          return;
-        }
+        const { error: upErr } = await supabaseClient.from('job_cards').update({ vehicle_id: tgtId }).eq('vehicle_id', srcId);
+        if (upErr) { alert('Error re-linking job cards: ' + upErr.message); return; }
       }
 
-      const { error: delErr } = await supabaseClient
-        .from('vehicles')
-        .delete()
-        .eq('id', srcId);
-      if (delErr) {
-        alert('Job cards moved but could not remove duplicate: '
-          + delErr.message);
-        return;
-      }
+      const { error: delErr } = await supabaseClient.from('vehicles').delete().eq('id', srcId);
+      if (delErr) { alert('Job cards moved but could not remove duplicate: ' + delErr.message); return; }
 
       const moved = jcList ? jcList.length : 0;
-      alert(
-        '✅ Merge complete.\n'
-        + moved + ' job card(s) re-linked to correct vehicle.\n'
-        + 'Duplicate record removed.'
-      );
-      document.getElementById('vehMergePanel')
-              .style.display = 'none';
+      alert('✅ Merge complete.\n' + moved + ' job card(s) re-linked to correct vehicle.\nDuplicate record removed.');
+      document.getElementById('vehMergePanel').style.display = 'none';
       searchVehiclesMaster(); 
     } 
-
 </script>
 </body>
 </html>
