@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; }
+        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --moped: #3498db; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
         
         .sticky-nav { max-width: 1200px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
@@ -39,18 +39,30 @@
         .floating-action { position: fixed; bottom: 30px; right: max(20px, calc((100vw - 1200px) / 2 + 20px)); background: var(--danger); color: white; border: none; border-radius: 50px; padding: 16px 24px; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 12px rgba(231,76,60,0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; } .floating-action:hover { transform: scale(1.05); }
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;}
 
-        .eod-landscape-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; align-items: start; }
-        .grid-col h4 { margin: 0 0 8px 0; padding-bottom: 4px; border-bottom: 2px solid; font-size: 0.85rem; text-transform: uppercase; }
+        /* PHASE 3 ACCORDION UI */
+        .eod-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+        .eod-accordion { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: white; }
+        .eod-summary { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 0.95rem; user-select: none; transition: background 0.15s; }
+        .eod-summary:hover { background: #f8fafc; }
+        .eod-detail { display: none; padding: 16px; border-top: 1px solid var(--border); background: #f8fafc; }
+        .eod-accordion.open .eod-detail { display: block; }
+        .eod-accordion.open .eod-summary { background: #f1f5f9; }
+        .val-positive { color: var(--success); }
+        .val-negative { color: var(--danger); }
+        .val-neutral { color: var(--primary); }
+        .time-link { color: var(--info); cursor: pointer; text-decoration: underline; font-size: 0.8rem; margin-left: 8px; }
+        .jc-link { color: var(--info); text-decoration: none; font-weight: bold; } .jc-link:hover { text-decoration: underline; }
 
         .ticket-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 15px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.85rem; line-height: 1.3; } .ticket-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; } .ticket-title { font-size: 1.2rem; font-weight: bold; margin: 4px 0; } .ticket-meta { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem; } .ticket-divider { border-top: 1px dashed black; margin: 10px 0; } .ticket-row { display: flex; flex-direction: column; margin-bottom: 8px; } .ticket-label { font-size: 0.7rem; color: #555; text-transform: uppercase; } .ticket-value { font-weight: bold; font-size: 0.9rem; } .ticket-amount { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 15px 0; border: 1px dashed #000; padding: 10px; }
 
         @media print { 
-            @page { size: A4 landscape; margin: 10mm; }
+            @page { size: A4 portrait; margin: 10mm; }
             body * { visibility: hidden; } 
             body.print-eod #exportDailyTarget, body.print-eod #exportDailyTarget * { visibility: visible; } 
-            body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; min-width: 1000px; padding: 0; border: none; margin: 0; }
+            body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; padding: 0; border: none; margin: 0; }
             body.print-ticket #ticketRender, body.print-ticket #ticketRender * { visibility: visible; }
             body.print-ticket #ticketRender { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; }
+            .eod-detail { display: block !important; } /* Force tables open for print */
         }
     </style>
 </head>
@@ -78,6 +90,15 @@
 
         <div id="panelDaily" class="view-panel active">
             <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
+                <div class="field-group">
+                    <label>Department Scope</label>
+                    <select id="dlDeptScope" onchange="generateDailyLedger()">
+                        <option value="ALL">Enterprise Master View</option>
+                        <option value="Green">Green Spares</option>
+                        <option value="Moped">Moped Spares</option>
+                        <option value="Workshop">Workshop & Service</option>
+                    </select>
+                </div>
                 <div class="field-group"><label>Target Date</label><input type="date" id="dlStart" onchange="generateDailyLedger()"></div>
                 <div style="display:flex; gap:8px;">
                     <button class="btn-action btn-info" onclick="exportEODToJpg()">📤 EXPORT JPG</button>
@@ -85,26 +106,13 @@
                 </div>
             </div>
 
-            <div id="exportDailyTarget" style="padding:15px; background:white; overflow-x:auto;">
-                <div style="min-width: 1000px;">
-                    <h3 style="margin-top:0; color:var(--primary); text-align:center;">Daily EOD Financial Report</h3>
+            <div id="exportDailyTarget" style="padding:15px; background:white;">
+                <div>
+                    <h3 style="margin-top:0; color:var(--primary); text-align:center;">Master EOD Financial Clearinghouse</h3>
                     <p style="text-align:center; color:#64748b; font-size:0.8rem; margin-top:-10px; margin-bottom:20px;" id="dlDateDisplay">--</p>
 
-                    <div class="summary-banner">
-                        <div class="summary-box" style="background:#dcfce7; border-color:#bbf7d0;"><span class="summary-title" style="color:#15803d;">Net Cash In Drawer</span><span class="summary-val" id="dlNetCash" style="color:#166534;">₹0</span><span style="font-size:0.65rem; color:#15803d; display:block; margin-top:4px;">(Total Cash + Adv) - (Payouts)</span></div>
-                        <div class="summary-box"><span class="summary-title">Total Cash (Gross)</span><span class="summary-val" id="dlGrossCash">₹0</span></div>
-                        <div class="summary-box" style="background:#e0f2fe; border-color:#bae6fd;"><span class="summary-title" style="color:#0369a1;">Total Bank / UPI</span><span class="summary-val" id="dlGrossUpi" style="color:#075985;">₹0</span></div>
-                        <div class="summary-box"><span class="summary-title">Total Advances</span><span class="summary-val" id="dlTotalAdv" style="color:var(--primary);">₹0</span></div>
-                        <div class="summary-box" style="background:#f0fdfa; border-color:#5eead4;"><span class="summary-title" style="color:#0f766e;">Total Prepaid (G/M)</span><span class="summary-val" id="dlTotalPrepaid" style="color:#0f766e;">₹0</span></div>
-                        <div class="summary-box" style="background:#fefce8; border-color:#fef08a;"><span class="summary-title" style="color:#a16207;">Total Expenses Out</span><span class="summary-val" id="dlTotalExpOut" style="color:#854d0e;">₹0</span></div>
-                    </div>
-
-                    <div class="eod-landscape-grid">
-                        <div class="grid-col"><h4 style="color:var(--success); border-color:var(--success);">Cash Sales</h4><div class="table-wrapper"><table id="tbDailyCash"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table></div></div>
-                        <div class="grid-col"><h4 style="color:var(--info); border-color:var(--info);">UPI / Card Sales</h4><div class="table-wrapper"><table id="tbDailyUpi"><thead><tr><th>Ref</th><th>Amount</th></tr></thead><tbody></tbody></table></div></div>
-                        <div class="grid-col"><h4 style="color:var(--primary); border-color:var(--primary);">Advances (Workshop)</h4><div class="table-wrapper"><table id="tbDailyAdvances"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table></div></div>
-                        <div class="grid-col"><h4 style="color:#0f766e; border-color:#0f766e;">Prepaid (Green/Moped)</h4><div class="table-wrapper"><table id="tbDailyPrepaid"><thead><tr><th>Ref JC</th><th>Amount</th></tr></thead><tbody></tbody></table></div></div>
-                        <div class="grid-col"><h4 style="color:var(--danger); border-color:var(--danger);">Expenses / Payouts</h4><div class="table-wrapper"><table id="tbDailyExpense"><thead><tr><th>Target/Note</th><th>Amount</th></tr></thead><tbody></tbody></table></div></div>
+                    <div class="eod-stack" id="eodAccordionStack">
+                        <div style="text-align:center; padding:40px; color:#64748b;">Evaluating financial ledgers...</div>
                     </div>
                 </div>
             </div>
@@ -179,6 +187,13 @@
     async function initializeLedgerEnvironment() {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('dlStart').value = today; document.getElementById('clStart').value = today; document.getElementById('clEnd').value = today;
+        
+        // PHASE 3: Role-Based Scope Lockdown
+        const scopeDropdown = document.getElementById('dlDeptScope');
+        if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; }
+        else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; }
+        else if (activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; }
+
         const { data: m } = await supabaseClient.from('mechanics').select('id, name'); globalMechanics = m || [];
         await fetchExternalVendors();
     }
@@ -187,6 +202,189 @@
         const { data: v } = await supabaseClient.from('expense_vendors').select('*'); globalVendors = v || [];
         populateCrossLedgerDropdown(); toggleExpenseSubTargets(); generateDailyLedger();
     }
+
+    // === PHASE 3: 11-STEP A-TO-K MASTER CLEARINGHOUSE ENGINE ===
+
+    function toggleAccordion(element) {
+        element.parentElement.classList.toggle('open');
+    }
+
+    function timeMachineJump() {
+        const currentTarget = new Date(document.getElementById('dlStart').value);
+        currentTarget.setDate(currentTarget.getDate() - 1);
+        document.getElementById('dlStart').value = currentTarget.toISOString().split('T')[0];
+        generateDailyLedger();
+    }
+
+    function buildAccordionHtml(letter, title, valueClass, valueStr, tableHtml) {
+        return `
+            <div class="eod-accordion">
+                <div class="eod-summary" onclick="toggleAccordion(this)">
+                    <div><span style="display:inline-block; width:30px; color:#94a3b8;">${letter}.</span> ${title}</div>
+                    <div class="${valueClass}">${valueStr} <span style="font-size:0.7rem; color:#94a3b8;">▼</span></div>
+                </div>
+                <div class="eod-detail">${tableHtml}</div>
+            </div>`;
+    }
+
+    async function generateDailyLedger() {
+        const targetDate = document.getElementById('dlStart').value; 
+        const scope = document.getElementById('dlDeptScope').value;
+        document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
+        
+        const stack = document.getElementById('eodAccordionStack');
+        stack.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b;">Processing mathematical ledger...</div>';
+
+        // 1. Fetch Job Card Items INNER JOINED with Closed Job Cards
+        let partsQuery = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, payment_mode)')
+            .eq('job_cards.status', 'Closed')
+            .gte('job_cards.closed_at', targetDate)
+            .lte('job_cards.closed_at', targetDate + 'T23:59:59');
+        if (scope === 'Green' || scope === 'Moped') partsQuery = partsQuery.eq('warehouse_type', scope);
+
+        // 2. Fetch Unbilled Open JCs (For informational Step B1)
+        let openPartsQuery = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status)')
+            .eq('job_cards.status', 'Open');
+        if (scope === 'Green' || scope === 'Moped') openPartsQuery = openPartsQuery.eq('warehouse_type', scope);
+
+        // 3. Fetch POS Sales
+        let posQuery = supabaseClient.from('counter_sales').select('*')
+            .eq('status', 'Closed')
+            .gte('closed_at', targetDate)
+            .lte('closed_at', targetDate + 'T23:59:59');
+        if (scope === 'Green') posQuery = posQuery.or('source_role.eq.green,source_role.is.null');
+        else if (scope === 'Moped') posQuery = posQuery.eq('source_role', 'moped');
+
+        // 4. Fetch Old Credit Payments Collected Today
+        let paysQuery = supabaseClient.from('credit_payments').select('*')
+            .gte('created_at', targetDate)
+            .lte('created_at', targetDate + 'T23:59:59');
+        // We fetch ALL payments because we need to parse what dept took the cash vs what dept owns the debt.
+
+        // 5. Fetch Workshop Expenses / Cash Outflows
+        let expQuery = supabaseClient.from('workshop_expenses').select('*')
+            .gte('created_at', targetDate)
+            .lte('created_at', targetDate + 'T23:59:59');
+        if (scope !== 'ALL') expQuery = expQuery.eq('recorded_by', scope.toLowerCase());
+
+        const [pRes, opRes, posRes, paysRes, expRes] = await Promise.all([partsQuery, openPartsQuery, posQuery, paysQuery, expQuery]);
+        
+        const billedParts = pRes.data || [];
+        const openParts = opRes.data || [];
+        const posSales = posRes.data || [];
+        const creditPays = paysRes.data || [];
+        const expenses = expRes.data || [];
+
+        // --- MATH INITIALIZATION ---
+        let valA = 0; let htmlA = '<table><thead><tr><th>Hash</th><th>Item</th><th>Value</th></tr></thead><tbody>';
+        let valB1 = 0; let htmlB1 = '<table><thead><tr><th>Hash</th><th>Item</th><th>Value</th></tr></thead><tbody>';
+        let valB2 = 0; let htmlB2 = '<table><thead><tr><th>Hash (POS/JC)</th><th>Mode</th><th>Value</th></tr></thead><tbody>';
+        let valC = 0; let htmlC = '<table><thead><tr><th>Hash</th><th>Value</th></tr></thead><tbody>';
+        let valF = 0; let htmlF = '<table><thead><tr><th>Payment ID</th><th>Note</th><th>Value</th></tr></thead><tbody>';
+        let valH = 0; let htmlH = '<table><thead><tr><th>Target Dept</th><th>Amount Held</th></tr></thead><tbody>';
+        let valK = 0; let htmlK = '<table><thead><tr><th>Expense/Transfer Note</th><th>Value</th></tr></thead><tbody>';
+
+        // Process Parts (A & C)
+        billedParts.forEach(item => {
+            const v = parseFloat(item.total_price) || 0;
+            valA += v;
+            htmlA += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>${item.item_name}</td><td>₹${v}</td></tr>`;
+            
+            if (item.job_cards?.payment_mode !== 'Credit') {
+                valC += v;
+                htmlC += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        // Process POS (A, B2, C)
+        posSales.forEach(sale => {
+            const v = parseFloat(sale.total_amount) || 0;
+            valA += v;
+            htmlA += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>Retail POS Bill</td><td>₹${v}</td></tr>`;
+
+            if (sale.payment_mode === 'Credit') {
+                valB2 += v;
+                htmlB2 += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>Credit</td><td>₹${v}</td></tr>`;
+            } else {
+                valC += v;
+                htmlC += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        // Add B2 from JC
+        billedParts.forEach(item => {
+            const v = parseFloat(item.total_price) || 0;
+            if (item.job_cards?.payment_mode === 'Credit') {
+                valB2 += v;
+                htmlB2 += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>Credit</td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        // Process Open Parts (B1)
+        openParts.forEach(item => {
+            const v = parseFloat(item.total_price) || 0;
+            valB1 += v;
+            htmlB1 += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>${item.item_name}</td><td>₹${v}</td></tr>`;
+        });
+
+        // Process Old Credit Recoveries (F & H)
+        creditPays.forEach(pay => {
+            const amt = parseFloat(pay.amount_paid) || 0;
+            if (amt <= 0) return; // Skip OB setup
+
+            const collectedBy = pay.paid_by_role || 'admin';
+            
+            // F: Did THIS scope receive money today for an old debt?
+            // H: Did THIS scope collect money physically that belongs to another scope?
+            
+            // For Phase 3, we simply aggregate ALL recovered funds as 'F', and whatever this scope's login physically took is added to their drawer.
+            if (scope === 'ALL' || collectedBy === scope.toLowerCase()) {
+                valF += amt;
+                htmlF += `<tr><td>${pay.id.split('-')[0].toUpperCase()}</td><td>${pay.note || 'Credit Settlement'}</td><td>₹${amt}</td></tr>`;
+            }
+        });
+
+        // Process Expenses & Transfers (K)
+        expenses.forEach(e => {
+            const v = parseFloat(e.amount) || 0;
+            valK += v;
+            let targetName = e.stakeholder_id; 
+            const mech = globalMechanics.find(m => m.id === targetName); 
+            const vend = globalVendors.find(vd => vd.id === targetName); 
+            if(mech) targetName = mech.name; if(vend) targetName = vend.vendor_name;
+            htmlK += `<tr><td><b>${e.expense_category}</b>: ${targetName} - ${e.note||''}</td><td>₹${v}</td></tr>`;
+        });
+
+        // Close Tables
+        htmlA += '</tbody></table>'; htmlB1 += '</tbody></table>'; htmlB2 += '</tbody></table>'; htmlC += '</tbody></table>'; htmlF += '</tbody></table>'; htmlK += '</tbody></table>'; htmlH += '<tr><td colspan="2">See Stakeholder Cross Ledger for exact hold amounts.</td></tr></tbody></table>';
+
+        const valE = valC; // Net Receivables
+        const valG = valE + valF; // Gross Cash Handled
+        const valJ = valG; // (Ignoring H for isolated view math)
+        const valNetDrawer = valJ - valK;
+
+        // Render Stack
+        stack.innerHTML = `
+            ${buildAccordionHtml('A', 'Total Items & Retail Billed Today', 'val-positive', `₹${valA}`, htmlA)}
+            ${buildAccordionHtml('B1', 'Less: Items in Open/Unbilled JCs', 'val-negative', `-₹${valB1}`, htmlB1)}
+            ${buildAccordionHtml('B2', 'Less: Billed to Credit (Unpaid Today)', 'val-negative', `-₹${valB2}`, htmlB2)}
+            ${buildAccordionHtml('C/E', 'Net Expected Collection for Today', 'val-neutral', `₹${valE}`, htmlC)}
+            ${buildAccordionHtml('F', 'Plus: Old Credit / Ledgers Recovered', 'val-positive', `+₹${valF}`, htmlF)}
+            ${buildAccordionHtml('G/J', 'Gross Cash Handled by Scope', 'val-neutral', `₹${valG}`, '<div style="padding:10px;">Sum of Net Expected (E) + Old Recoveries (F)</div>')}
+            ${buildAccordionHtml('K', 'Less: Expenses & Transfers Paid Out', 'val-negative', `-₹${valK}`, htmlK)}
+            
+            <div style="background:#fefce8; border:2px solid #fde047; border-radius:8px; padding:16px; display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                <div style="font-weight:900; color:#854d0e; font-size:1.2rem;">NET CASH IN DRAWER</div>
+                <div style="font-weight:900; color:#a16207; font-size:1.8rem;">₹${valNetDrawer}</div>
+            </div>
+            
+            <div style="text-align:right; margin-top:8px;">
+                <span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger (-24H)</span>
+            </div>
+        `;
+    }
+
+    // [Preserved Cross Ledger, Expense Modals, and Print Functions]
 
     function populateCrossLedgerDropdown() {
         const cTarget = document.getElementById('clStakeholder');
@@ -242,82 +440,6 @@
     function printTicket() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); }
     function waTicket() { const layoutTarget = document.getElementById('ticketRender'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Payout_Ticket.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
-    async function generateDailyLedger() {
-        const targetDate = document.getElementById('dlStart').value; document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
-        
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, payment_mode, total_invoice_value, advance_paid, prepaid_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
-        const { data: advances } = await supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
-        const { data: prepaids } = await supabaseClient.from('job_cards').select('id, prepaid_amount').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('prepaid_amount', 0);
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, payment_mode, total_amount').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
-        const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
-
-        let sumGrossCash = 0; let sumGrossUpi = 0; let sumAdvances = 0; let sumPrepaids = 0; let sumExp = 0;
-        
-        const tbCash = document.getElementById('tbDailyCash').querySelector('tbody'); tbCash.innerHTML = ''; 
-        const tbUpi = document.getElementById('tbDailyUpi').querySelector('tbody'); tbUpi.innerHTML = ''; 
-        const tbAdv = document.getElementById('tbDailyAdvances').querySelector('tbody'); tbAdv.innerHTML = ''; 
-        const tbPre = document.getElementById('tbDailyPrepaid').querySelector('tbody'); tbPre.innerHTML = ''; 
-        const tbExp = document.getElementById('tbDailyExpense').querySelector('tbody'); tbExp.innerHTML = '';
-
-        (jobs || []).forEach(j => { 
-            const v = parseFloat(j.total_invoice_value) || 0; 
-            if (j.payment_mode === 'Cash') { 
-                sumGrossCash += v; tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (j.payment_mode === 'UPI') { 
-                sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (j.payment_mode && j.payment_mode.includes('Split')) { 
-                const splitMatch = j.payment_mode.match(/Split \(Cash: ₹([\d.]+), UPI: ₹([\d.]+)\)/);
-                if (splitMatch) {
-                    const cVal = parseFloat(splitMatch[1]) || 0;
-                    const uVal = parseFloat(splitMatch[2]) || 0;
-                    sumGrossCash += cVal; sumGrossUpi += uVal;
-                    if(cVal > 0) tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                    if(uVal > 0) tbUpi.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
-                } else {
-                    tbCash.innerHTML += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>${j.payment_mode}</td></tr>`; 
-                }
-            } 
-        });
-        
-        (pos || []).forEach(p => { 
-            const v = parseFloat(p.total_amount) || 0; 
-            if (p.payment_mode === 'Cash') { 
-                sumGrossCash += v; tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (p.payment_mode === 'UPI') { 
-                sumGrossUpi += v; tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; 
-            } else if (p.payment_mode && p.payment_mode.includes('Split')) {
-                const splitMatch = p.payment_mode.match(/Split \(Cash: ₹([\d.]+), UPI: ₹([\d.]+)\)/);
-                if (splitMatch) {
-                    const cVal = parseFloat(splitMatch[1]) || 0;
-                    const uVal = parseFloat(splitMatch[2]) || 0;
-                    sumGrossCash += cVal; sumGrossUpi += uVal;
-                    if(cVal > 0) tbCash.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split Cash)</td><td>₹${cVal}</td></tr>`;
-                    if(uVal > 0) tbUpi.innerHTML += `<tr><td>POS-${p.id.split('-')[0].toUpperCase()} (Split UPI)</td><td>₹${uVal}</td></tr>`;
-                }
-            }
-        });
-        
-        (advances || []).forEach(a => { const v = parseFloat(a.advance_paid) || 0; sumAdvances += v; sumGrossCash += v; tbAdv.innerHTML += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; });
-        (prepaids || []).forEach(p => { const v = parseFloat(p.prepaid_amount) || 0; sumPrepaids += v; tbPre.innerHTML += `<tr><td>JC-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`; });
-
-        if((advances||[]).length === 0) tbAdv.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No advances today.</td></tr>'; 
-        if((prepaids||[]).length === 0) tbPre.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No prepaids today.</td></tr>'; 
-        if(tbCash.innerHTML === '') tbCash.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No cash sales.</td></tr>'; 
-        if(tbUpi.innerHTML === '') tbUpi.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No UPI sales.</td></tr>';
-
-        (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; sumExp += v; let targetName = e.stakeholder_id; const mech = globalMechanics.find(m => m.id === targetName); const vend = globalVendors.find(vd => vd.id === targetName); if(mech) targetName = mech.name; if(vend) targetName = vend.vendor_name; tbExp.innerHTML += `<tr><td><b>${targetName||''}</b><br><span style="font-size:0.7rem;">${e.note||''}</span></td><td style="color:var(--danger);">-₹${v}</td></tr>`; });
-        if((exp||[]).length === 0) tbExp.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">No deductions.</td></tr>';
-
-        document.getElementById('dlGrossCash').innerText = `₹${sumGrossCash}`; 
-        document.getElementById('dlGrossUpi').innerText = `₹${sumGrossUpi}`; 
-        document.getElementById('dlTotalAdv').innerText = `₹${sumAdvances}`;
-        document.getElementById('dlTotalPrepaid').innerText = `₹${sumPrepaids}`;
-        document.getElementById('dlTotalExpOut').innerText = `₹${sumExp}`; 
-        
-        const netInDrawer = sumGrossCash - sumExp; 
-        document.getElementById('dlNetCash').innerText = `₹${netInDrawer}`;
-    }
-
     function printEOD() { document.body.classList.add('print-eod'); window.print(); setTimeout(() => { document.body.classList.remove('print-eod'); }, 500); }
     function exportEODToJpg() { const layoutTarget = document.getElementById('exportDailyTarget'); html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `EOD_Register_${document.getElementById('dlStart').value}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
@@ -347,6 +469,7 @@
         }
         document.getElementById('clCredit').innerText = `₹${totalCredit}`; document.getElementById('clDebit').innerText = `₹${totalDebit}`; const net = totalCredit - totalDebit; const netNode = document.getElementById('clNetBalance'); netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
     }
+    
     function exportViewToJpg(targetContainerId, fileNamePrefix) { const layoutTarget = document.getElementById(targetContainerId); html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
 
     initializeLedgerEnvironment();
