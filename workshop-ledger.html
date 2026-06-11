@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --moped: #3498db; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom:60px;}
         
         .sticky-nav { max-width: 1200px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
         .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
@@ -39,27 +39,35 @@
         .floating-action { position: fixed; bottom: 30px; right: max(20px, calc((100vw - 1200px) / 2 + 20px)); background: var(--danger); color: white; border: none; border-radius: 50px; padding: 16px 24px; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 12px rgba(231,76,60,0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; } .floating-action:hover { transform: scale(1.05); }
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;}
 
-        /* PHASE 3 ACCORDION UI */
-        .eod-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+        /* PHASE 3 ACCORDION UI (Bifurcated) */
+        .bifurcated-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 800px) { .bifurcated-grid { grid-template-columns: 1fr; } }
+        
+        .eod-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border: 1px solid var(--border); padding: 16px; border-radius: 8px; background: #f8fafc; }
         .eod-accordion { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: white; }
-        .eod-summary { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 0.95rem; user-select: none; transition: background 0.15s; }
-        .eod-summary:hover { background: #f8fafc; }
+        .eod-summary { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 0.85rem; user-select: none; transition: background 0.15s; }
+        .eod-summary:hover { background: #f1f5f9; }
         .eod-detail { display: none; padding: 16px; border-top: 1px solid var(--border); background: #f8fafc; }
         .eod-accordion.open .eod-detail { display: block; }
         .eod-accordion.open .eod-summary { background: #f1f5f9; }
+        
         .val-positive { color: var(--success); }
         .val-negative { color: var(--danger); }
         .val-neutral { color: var(--primary); }
-        .time-link { color: var(--info); cursor: pointer; text-decoration: underline; font-size: 0.8rem; margin-left: 8px; }
+        .time-link { color: var(--info); cursor: pointer; text-decoration: underline; font-size: 0.8rem; margin-top:8px; display:inline-block; }
         .jc-link { color: var(--info); text-decoration: none; font-weight: bold; } .jc-link:hover { text-decoration: underline; }
+        
+        .net-drawer-box { background: white; border: 2px solid var(--primary); border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+        .net-drawer-title { font-weight: 900; color: var(--primary); font-size: 1rem; text-transform: uppercase; }
+        .net-drawer-val { font-weight: 900; color: var(--success); font-size: 1.6rem; }
 
         .ticket-container { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 15px; border: 1px solid #ccc; width: 300px; max-width: 300px; margin: 0 auto 20px auto; box-sizing: border-box; font-size: 0.85rem; line-height: 1.3; } .ticket-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; } .ticket-title { font-size: 1.2rem; font-weight: bold; margin: 4px 0; } .ticket-meta { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem; } .ticket-divider { border-top: 1px dashed black; margin: 10px 0; } .ticket-row { display: flex; flex-direction: column; margin-bottom: 8px; } .ticket-label { font-size: 0.7rem; color: #555; text-transform: uppercase; } .ticket-value { font-weight: bold; font-size: 0.9rem; } .ticket-amount { font-size: 1.4rem; font-weight: bold; text-align: center; margin: 15px 0; border: 1px dashed #000; padding: 10px; }
 
         @media print { 
-            @page { size: A4 portrait; margin: 10mm; }
+            @page { size: A4 landscape; margin: 10mm; }
             body * { visibility: hidden; } 
             body.print-eod #exportDailyTarget, body.print-eod #exportDailyTarget * { visibility: visible; } 
-            body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; padding: 0; border: none; margin: 0; }
+            body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; min-width: 1000px; padding: 0; border: none; margin: 0; }
             body.print-ticket #ticketRender, body.print-ticket #ticketRender * { visibility: visible; }
             body.print-ticket #ticketRender { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; }
             .eod-detail { display: block !important; } /* Force tables open for print */
@@ -108,11 +116,19 @@
 
             <div id="exportDailyTarget" style="padding:15px; background:white;">
                 <div>
-                    <h3 style="margin-top:0; color:var(--primary); text-align:center;">Master EOD Financial Clearinghouse</h3>
+                    <h3 style="margin-top:0; color:var(--primary); text-align:center;">Bifurcated EOD Clearinghouse</h3>
                     <p style="text-align:center; color:#64748b; font-size:0.8rem; margin-top:-10px; margin-bottom:20px;" id="dlDateDisplay">--</p>
 
-                    <div class="eod-stack" id="eodAccordionStack">
-                        <div style="text-align:center; padding:40px; color:#64748b;">Evaluating financial ledgers...</div>
+                    <div class="bifurcated-grid">
+                        <div class="eod-stack" id="stackWorkshop">
+                            <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Service Ledger</h4>
+                            <div style="text-align:center; padding:20px; color:#64748b;" id="loadingWs">Processing...</div>
+                        </div>
+
+                        <div class="eod-stack" id="stackPOS">
+                            <h4 style="margin:0 0 4px 0; color:var(--success); text-align:center;">Track 2: Retail POS Ledger</h4>
+                            <div style="text-align:center; padding:20px; color:#64748b;" id="loadingPos">Processing...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -143,7 +159,16 @@
 <div id="modalExpense" class="overlay-modal">
     <div class="modal-card">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:16px;"><h3 style="margin:0; color:var(--primary);">Log Outbound Cash Payout</h3><button onclick="document.getElementById('modalExpense').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div>
-        <p style="font-size:0.8rem; color:#64748b; margin-top:-10px; margin-bottom:16px;">This will deduct cash from today's EOD Cash In Drawer tally.</p>
+        <p style="font-size:0.8rem; color:#64748b; margin-top:-10px; margin-bottom:16px;">This will deduct cash from today's physical drawer tally.</p>
+
+        <div class="field-group" style="margin-bottom:12px;">
+            <label style="color:#b45309;">Paid out from which Physical Drawer?</label>
+            <select id="exSourceDrawer" style="border:2px solid #fde68a;">
+                <option value="workshop">Workshop Service Drawer</option>
+                <option value="green">Green POS Drawer</option>
+                <option value="moped">Moped POS Drawer</option>
+            </select>
+        </div>
 
         <div class="field-group" style="margin-bottom:12px;"><label>Expense Category Type</label><select id="exCat" onchange="toggleExpenseSubTargets()"><option value="Mechanic Payout">Mechanic / Labour Payout</option><option value="Lathe/Welding">Lathe & Welding Contract</option><option value="Green Spares">Transfer Cash to Green Warehouse</option><option value="Moped Spares">Transfer Cash to Moped Warehouse</option><option value="Other">Other Operational / Salaries</option></select></div>
         <div class="field-group" id="exStakeholderBlock" style="margin-bottom:12px;"><label>Specific Target Entity</label><select id="exTarget" onchange="handleNewVendorCreation()"><option value="">-- Select --</option></select></div>
@@ -190,9 +215,10 @@
         
         // PHASE 3: Role-Based Scope Lockdown
         const scopeDropdown = document.getElementById('dlDeptScope');
-        if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; }
-        else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; }
-        else if (activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; }
+        const drawerSelect = document.getElementById('exSourceDrawer');
+        if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
+        else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
+        else if (activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
 
         const { data: m } = await supabaseClient.from('mechanics').select('id, name'); globalMechanics = m || [];
         await fetchExternalVendors();
@@ -203,7 +229,7 @@
         populateCrossLedgerDropdown(); toggleExpenseSubTargets(); generateDailyLedger();
     }
 
-    // === PHASE 3: 11-STEP A-TO-K MASTER CLEARINGHOUSE ENGINE ===
+    // === PHASE 3: BIFURCATED EOD CLEARINGHOUSE ENGINE ===
 
     function toggleAccordion(element) {
         element.parentElement.classList.toggle('open');
@@ -232,22 +258,16 @@
         const scope = document.getElementById('dlDeptScope').value;
         document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
         
-        const stack = document.getElementById('eodAccordionStack');
-        stack.innerHTML = '<div style="text-align:center; padding:40px; color:#64748b;">Processing mathematical ledger...</div>';
+        document.getElementById('stackWorkshop').innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
+        document.getElementById('stackPOS').innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
-        // 1. Fetch Job Card Items INNER JOINED with Closed Job Cards
-        let partsQuery = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at, payment_mode)')
-            .eq('job_cards.status', 'Closed')
-            .gte('job_cards.closed_at', targetDate)
-            .lte('job_cards.closed_at', targetDate + 'T23:59:59');
-        if (scope === 'Green' || scope === 'Moped') partsQuery = partsQuery.eq('warehouse_type', scope);
+        // 1. Fetch Closed Job Cards (Workshop Track)
+        let jcQuery = supabaseClient.from('job_cards').select('*')
+            .eq('status', 'Closed')
+            .gte('closed_at', targetDate)
+            .lte('closed_at', targetDate + 'T23:59:59');
 
-        // 2. Fetch Unbilled Open JCs (For informational Step B1)
-        let openPartsQuery = supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status)')
-            .eq('job_cards.status', 'Open');
-        if (scope === 'Green' || scope === 'Moped') openPartsQuery = openPartsQuery.eq('warehouse_type', scope);
-
-        // 3. Fetch POS Sales
+        // 2. Fetch POS Sales (POS Track)
         let posQuery = supabaseClient.from('counter_sales').select('*')
             .eq('status', 'Closed')
             .gte('closed_at', targetDate)
@@ -255,131 +275,145 @@
         if (scope === 'Green') posQuery = posQuery.or('source_role.eq.green,source_role.is.null');
         else if (scope === 'Moped') posQuery = posQuery.eq('source_role', 'moped');
 
-        // 4. Fetch Old Credit Payments Collected Today
+        // 3. Fetch Old Credit Payments Collected Today (Ping & Ledger Recoveries)
         let paysQuery = supabaseClient.from('credit_payments').select('*')
             .gte('created_at', targetDate)
             .lte('created_at', targetDate + 'T23:59:59');
-        // We fetch ALL payments because we need to parse what dept took the cash vs what dept owns the debt.
 
-        // 5. Fetch Workshop Expenses / Cash Outflows
+        // 4. Fetch Expenses & Transfers
         let expQuery = supabaseClient.from('workshop_expenses').select('*')
             .gte('created_at', targetDate)
             .lte('created_at', targetDate + 'T23:59:59');
-        if (scope !== 'ALL') expQuery = expQuery.eq('recorded_by', scope.toLowerCase());
 
-        const [pRes, opRes, posRes, paysRes, expRes] = await Promise.all([partsQuery, openPartsQuery, posQuery, paysQuery, expQuery]);
+        // 5. Fetch JCs with Advances
+        let advQuery = supabaseClient.from('job_cards').select('*')
+            .gte('created_at', targetDate)
+            .lte('created_at', targetDate + 'T23:59:59')
+            .gt('advance_paid', 0);
+
+        const [jcRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcQuery, posQuery, paysQuery, expQuery, advQuery]);
         
-        const billedParts = pRes.data || [];
-        const openParts = opRes.data || [];
-        const posSales = posRes.data || [];
-        const creditPays = paysRes.data || [];
+        const jobs = jcRes.data || [];
+        const sales = posRes.data || [];
+        const pays = paysRes.data || [];
         const expenses = expRes.data || [];
+        const advances = advRes.data || [];
 
-        // --- MATH INITIALIZATION ---
-        let valA = 0; let htmlA = '<table><thead><tr><th>Hash</th><th>Item</th><th>Value</th></tr></thead><tbody>';
-        let valB1 = 0; let htmlB1 = '<table><thead><tr><th>Hash</th><th>Item</th><th>Value</th></tr></thead><tbody>';
-        let valB2 = 0; let htmlB2 = '<table><thead><tr><th>Hash (POS/JC)</th><th>Mode</th><th>Value</th></tr></thead><tbody>';
-        let valC = 0; let htmlC = '<table><thead><tr><th>Hash</th><th>Value</th></tr></thead><tbody>';
-        let valF = 0; let htmlF = '<table><thead><tr><th>Payment ID</th><th>Note</th><th>Value</th></tr></thead><tbody>';
-        let valH = 0; let htmlH = '<table><thead><tr><th>Target Dept</th><th>Amount Held</th></tr></thead><tbody>';
-        let valK = 0; let htmlK = '<table><thead><tr><th>Expense/Transfer Note</th><th>Value</th></tr></thead><tbody>';
+        // === TRACK 1: WORKSHOP MATH ===
+        let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Net Invoice</th></tr></thead><tbody>';
+        let wCredit = 0; let wHtmlB = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
+        let wAdv = 0; let wHtmlC = '<table><thead><tr><th>Hash</th><th>Advance Dep</th></tr></thead><tbody>';
+        let wOld = 0; let wHtmlD = '<table><thead><tr><th>Payment Hash</th><th>Amount</th></tr></thead><tbody>';
+        let wExp = 0; let wHtmlE = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
 
-        // Process Parts (A & C)
-        billedParts.forEach(item => {
-            const v = parseFloat(item.total_price) || 0;
-            valA += v;
-            htmlA += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>${item.item_name}</td><td>₹${v}</td></tr>`;
+        jobs.forEach(j => {
+            const v = parseFloat(j.total_invoice_value) || 0;
+            wGross += v;
+            wHtmlA += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
             
-            if (item.job_cards?.payment_mode !== 'Credit') {
-                valC += v;
-                htmlC += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+            if (j.payment_mode === 'Credit') {
+                wCredit += v;
+                wHtmlB += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
             }
         });
 
-        // Process POS (A, B2, C)
-        posSales.forEach(sale => {
-            const v = parseFloat(sale.total_amount) || 0;
-            valA += v;
-            htmlA += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>Retail POS Bill</td><td>₹${v}</td></tr>`;
+        advances.forEach(a => {
+            const v = parseFloat(a.advance_paid) || 0;
+            wAdv += v;
+            wHtmlC += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
+        });
 
-            if (sale.payment_mode === 'Credit') {
-                valB2 += v;
-                htmlB2 += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>Credit</td><td>₹${v}</td></tr>`;
-            } else {
-                valC += v;
-                htmlC += `<tr><td><a class="jc-link" href="pos-green.html?id=${sale.id}" target="_blank">POS-${sale.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+        pays.forEach(p => {
+            const v = parseFloat(p.amount_paid) || 0;
+            if (v <= 0) return;
+            const collectedBy = p.paid_by_role || 'admin';
+            // Workshop gets cash collected by Admin or Service
+            if (collectedBy === 'admin' || collectedBy === 'service') {
+                wOld += v;
+                wHtmlD += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Recovery'})</td></tr>`;
             }
         });
 
-        // Add B2 from JC
-        billedParts.forEach(item => {
-            const v = parseFloat(item.total_price) || 0;
-            if (item.job_cards?.payment_mode === 'Credit') {
-                valB2 += v;
-                htmlB2 += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>Credit</td><td>₹${v}</td></tr>`;
-            }
-        });
-
-        // Process Open Parts (B1)
-        openParts.forEach(item => {
-            const v = parseFloat(item.total_price) || 0;
-            valB1 += v;
-            htmlB1 += `<tr><td><a class="jc-link" href="billing.html?id=${item.job_card_id}" target="_blank">JC-${item.job_card_id.split('-')[0].toUpperCase()}</a></td><td>${item.item_name}</td><td>₹${v}</td></tr>`;
-        });
-
-        // Process Old Credit Recoveries (F & H)
-        creditPays.forEach(pay => {
-            const amt = parseFloat(pay.amount_paid) || 0;
-            if (amt <= 0) return; // Skip OB setup
-
-            const collectedBy = pay.paid_by_role || 'admin';
-            
-            // F: Did THIS scope receive money today for an old debt?
-            // H: Did THIS scope collect money physically that belongs to another scope?
-            
-            // For Phase 3, we simply aggregate ALL recovered funds as 'F', and whatever this scope's login physically took is added to their drawer.
-            if (scope === 'ALL' || collectedBy === scope.toLowerCase()) {
-                valF += amt;
-                htmlF += `<tr><td>${pay.id.split('-')[0].toUpperCase()}</td><td>${pay.note || 'Credit Settlement'}</td><td>₹${amt}</td></tr>`;
-            }
-        });
-
-        // Process Expenses & Transfers (K)
         expenses.forEach(e => {
-            const v = parseFloat(e.amount) || 0;
-            valK += v;
-            let targetName = e.stakeholder_id; 
-            const mech = globalMechanics.find(m => m.id === targetName); 
-            const vend = globalVendors.find(vd => vd.id === targetName); 
-            if(mech) targetName = mech.name; if(vend) targetName = vend.vendor_name;
-            htmlK += `<tr><td><b>${e.expense_category}</b>: ${targetName} - ${e.note||''}</td><td>₹${v}</td></tr>`;
+            // Admin default fallback to workshop drawer if role string is malformed
+            const drawer = e.recorded_by || 'workshop'; 
+            if (drawer === 'workshop' || drawer === 'admin' || drawer === 'service') {
+                const v = parseFloat(e.amount) || 0;
+                wExp += v;
+                wHtmlE += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
+            }
         });
 
-        // Close Tables
-        htmlA += '</tbody></table>'; htmlB1 += '</tbody></table>'; htmlB2 += '</tbody></table>'; htmlC += '</tbody></table>'; htmlF += '</tbody></table>'; htmlK += '</tbody></table>'; htmlH += '<tr><td colspan="2">See Stakeholder Cross Ledger for exact hold amounts.</td></tr></tbody></table>';
+        wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>';
+        const wNet = (wGross - wCredit) + wAdv + wOld - wExp;
 
-        const valE = valC; // Net Receivables
-        const valG = valE + valF; // Gross Cash Handled
-        const valJ = valG; // (Ignoring H for isolated view math)
-        const valNetDrawer = valJ - valK;
 
-        // Render Stack
-        stack.innerHTML = `
-            ${buildAccordionHtml('A', 'Total Items & Retail Billed Today', 'val-positive', `₹${valA}`, htmlA)}
-            ${buildAccordionHtml('B1', 'Less: Items in Open/Unbilled JCs', 'val-negative', `-₹${valB1}`, htmlB1)}
-            ${buildAccordionHtml('B2', 'Less: Billed to Credit (Unpaid Today)', 'val-negative', `-₹${valB2}`, htmlB2)}
-            ${buildAccordionHtml('C/E', 'Net Expected Collection for Today', 'val-neutral', `₹${valE}`, htmlC)}
-            ${buildAccordionHtml('F', 'Plus: Old Credit / Ledgers Recovered', 'val-positive', `+₹${valF}`, htmlF)}
-            ${buildAccordionHtml('G/J', 'Gross Cash Handled by Scope', 'val-neutral', `₹${valG}`, '<div style="padding:10px;">Sum of Net Expected (E) + Old Recoveries (F)</div>')}
-            ${buildAccordionHtml('K', 'Less: Expenses & Transfers Paid Out', 'val-negative', `-₹${valK}`, htmlK)}
+        // === TRACK 2: POS MATH ===
+        let pGross = 0; let pHtmlF = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
+        let pCredit = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
+        let pOld = 0; let pHtmlH = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
+        let pExp = 0; let pHtmlI = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
+
+        sales.forEach(s => {
+            const v = parseFloat(s.total_amount) || 0;
+            pGross += v;
+            pHtmlF += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
             
-            <div style="background:#fefce8; border:2px solid #fde047; border-radius:8px; padding:16px; display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                <div style="font-weight:900; color:#854d0e; font-size:1.2rem;">NET CASH IN DRAWER</div>
-                <div style="font-weight:900; color:#a16207; font-size:1.8rem;">₹${valNetDrawer}</div>
+            if (s.payment_mode === 'Credit') {
+                pCredit += v;
+                pHtmlG += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        pays.forEach(p => {
+            const v = parseFloat(p.amount_paid) || 0;
+            if (v <= 0) return;
+            const collectedBy = p.paid_by_role || 'admin';
+            // Green or Moped collects it into their physical drawer
+            if (collectedBy === 'green' || collectedBy === 'moped') {
+                pOld += v;
+                pHtmlH += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Counter Ping/Recovery'})</td></tr>`;
+            }
+        });
+
+        expenses.forEach(e => {
+            const drawer = e.recorded_by || 'workshop';
+            if (drawer === 'green' || drawer === 'moped') {
+                const v = parseFloat(e.amount) || 0;
+                pExp += v;
+                pHtmlI += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
+            }
+        });
+
+        pHtmlF += '</tbody></table>'; pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>';
+        const pNet = (pGross - pCredit) + pOld - pExp;
+
+        // Render Tracks
+        document.getElementById('stackWorkshop').innerHTML = `
+            <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
+            ${buildAccordionHtml('A', 'Gross Billed (Closed JCs)', 'val-neutral', `₹${wGross}`, wHtmlA)}
+            ${buildAccordionHtml('B', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit}`, wHtmlB)}
+            ${buildAccordionHtml('C', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv}`, wHtmlC)}
+            ${buildAccordionHtml('D', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld}`, wHtmlD)}
+            ${buildAccordionHtml('E', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp}`, wHtmlE)}
+            
+            <div class="net-drawer-box">
+                <div class="net-drawer-title">Net Workshop Cash</div>
+                <div class="net-drawer-val">₹${wNet}</div>
             </div>
+            <div style="text-align:right;"><span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger</span></div>
+        `;
+
+        document.getElementById('stackPOS').innerHTML = `
+            <h4 style="margin:0 0 4px 0; color:var(--success); text-align:center;">Track 2: POS Drawer</h4>
+            ${buildAccordionHtml('F', 'Gross Retail POS Billed', 'val-neutral', `₹${pGross}`, pHtmlF)}
+            ${buildAccordionHtml('G', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit}`, pHtmlG)}
+            ${buildAccordionHtml('H', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld}`, pHtmlH)}
+            ${buildAccordionHtml('I', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp}`, pHtmlI)}
             
-            <div style="text-align:right; margin-top:8px;">
-                <span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger (-24H)</span>
+            <div class="net-drawer-box" style="border-color:var(--success);">
+                <div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div>
+                <div class="net-drawer-val">₹${pNet}</div>
             </div>
         `;
     }
@@ -410,6 +444,7 @@
     async function commitWorkshopExpense() {
         const cat = document.getElementById('exCat').value;
         let target = document.getElementById('exTarget').value;
+        const sourceDrawer = document.getElementById('exSourceDrawer').value; // PHASE 3 FIX
         
         if (cat === 'Green Spares') target = 'GREEN WAREHOUSE';
         if (cat === 'Moped Spares') target = 'MOPED WAREHOUSE';
@@ -422,7 +457,7 @@
         if(target === 'ADD_NEW') return alert("Please save the new stakeholder first.");
         if((cat === 'Green Spares' || cat === 'Moped Spares') && receiver) { note = `[Receiver: ${receiver}] ${note}`; }
         
-        const { error } = await supabaseClient.from('workshop_expenses').insert({ expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: activeRole });
+        const { error } = await supabaseClient.from('workshop_expenses').insert({ expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: sourceDrawer });
         if (error) return alert("Failed to log expense. Database mismatch on target ID.\nError: " + error.message);
 
         document.getElementById('modalExpense').style.display = 'none'; document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
