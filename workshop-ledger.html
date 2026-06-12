@@ -200,7 +200,10 @@
 <script>
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin';
+    
+    // BULLETPROOF NORMALIZER: Force role to strictly match lowercase immediately on load
+    const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase();
+    
     document.getElementById('roleDisplay').innerText = activeRole.toUpperCase();
 
     let globalMechanics = []; let globalVendors = [];
@@ -216,6 +219,8 @@
         // PHASE 3: Role-Based Scope Lockdown
         const scopeDropdown = document.getElementById('dlDeptScope');
         const drawerSelect = document.getElementById('exSourceDrawer');
+        
+        // This will now successfully match because activeRole was normalized to lowercase above
         if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
         else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
         else if (activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
@@ -271,13 +276,14 @@
         let jcOpenQuery = supabaseClient.from('job_cards').select('*, job_card_items(*)')
             .eq('status', 'Open');
 
-        // 3. Fetch POS Sales (POS Track)
+        // 3. Fetch POS Sales (POS Track) with case-insensitive `ilike`
         let posQuery = supabaseClient.from('counter_sales').select('*')
             .eq('status', 'Closed')
             .gte('closed_at', targetDate)
             .lte('closed_at', targetDate + 'T23:59:59');
-        if (scope === 'Green') posQuery = posQuery.or('source_role.eq.green,source_role.is.null');
-        else if (scope === 'Moped') posQuery = posQuery.eq('source_role', 'moped');
+            
+        if (scope === 'Green') posQuery = posQuery.or('source_role.ilike.green,source_role.is.null');
+        else if (scope === 'Moped') posQuery = posQuery.ilike('source_role', 'moped');
 
         // 4. Fetch Old Credit Payments Collected Today (Ping & Ledger Recoveries)
         let paysQuery = supabaseClient.from('credit_payments').select('*')
@@ -317,12 +323,12 @@
             let visible_value = 0;
             let items = j.job_card_items || [];
             
-            // Clean Mathematical routing based on active role/scope
+            // MATH FIX: Force case-insensitive mapping for warehouse matches
             if (j.status === 'Closed') {
                 if (scope === 'Green') {
-                    visible_value = items.filter(i => i.warehouse_type === 'Green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                    visible_value = items.filter(i => (i.warehouse_type || '').toLowerCase() === 'green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 } else if (scope === 'Moped') {
-                    visible_value = items.filter(i => i.warehouse_type === 'Moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                    visible_value = items.filter(i => (i.warehouse_type || '').toLowerCase() === 'moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 } else {
                     visible_value = parseFloat(j.total_invoice_value) || 0;
                 }
@@ -339,9 +345,9 @@
 
             } else if (j.status === 'Open') {
                 if (scope === 'Green') {
-                    visible_value = items.filter(i => i.warehouse_type === 'Green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                    visible_value = items.filter(i => (i.warehouse_type || '').toLowerCase() === 'green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 } else if (scope === 'Moped') {
-                    visible_value = items.filter(i => i.warehouse_type === 'Moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                    visible_value = items.filter(i => (i.warehouse_type || '').toLowerCase() === 'moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 } else {
                     visible_value = items.reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                     visible_value += (parseFloat(j.labour_charges) || 0);
@@ -536,14 +542,17 @@
         }
         else if (target === 'GREEN WAREHOUSE' || target === 'MOPED WAREHOUSE') {
             const shortTarget = target === 'GREEN WAREHOUSE' ? 'Green' : 'Moped';
-            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').eq('warehouse_type', shortTarget).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
+            
+            // CROSS-LEDGER FIX: Case-insensitive ilike added here too for perfect isolation
+            const { data: lines } = await supabaseClient.from('job_card_items').select('*, job_cards!inner(id, status, closed_at)').ilike('warehouse_type', shortTarget).eq('job_cards.status', 'Closed').gte('job_cards.closed_at', startStr).lte('job_cards.closed_at', endStr + 'T23:59:59');
             const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
+            
             (lines || []).forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; const d = l.job_cards?.closed_at ? new Date(l.job_cards.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${l.job_cards?.id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v}</td><td>--</td></tr>`; });
             (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Cash Transferred: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`; });
         }
         else {
             const isMechanic = globalMechanics.some(m => m.id === target);
-            if(isMechanic) { const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59'); (jobs || []).forEach(j => { let pkgLabor = 0; if(j.job_card_items) { j.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); } const v = (parseFloat(j.labour_charges) || 0) + pkgLabor; totalCredit += v; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`; }); }
+            if(isMechanic) { const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, job_card_items(warehouse_type, total_price)').eq('mech_id', target).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', endStr + 'T23:59:59'); (jobs || []).forEach(j => { let pkgLabor = 0; if(j.job_card_items) { j.job_card_items.forEach(item => { if((item.warehouse_type || '').toLowerCase() === 'service') pkgLabor += parseFloat(item.total_price) || 0; }); } const v = (parseFloat(j.labour_charges) || 0) + pkgLabor; totalCredit += v; const d = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v}</td><td>--</td></tr>`; }); }
             const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', endStr + 'T23:59:59');
             (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; const d = e.created_at ? new Date(e.created_at).toLocaleDateString() : ''; tbody.innerHTML += `<tr><td>${d}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v}</td></tr>`; });
         }
