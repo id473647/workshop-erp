@@ -261,13 +261,17 @@
         document.getElementById('stackWorkshop').innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
         document.getElementById('stackPOS').innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
-        // 1. Fetch Closed Job Cards (Workshop Track)
-        let jcQuery = supabaseClient.from('job_cards').select('*')
+        // 1. Fetch Closed Job Cards (Realized Revenue) WITH line items joined
+        let jcClosedQuery = supabaseClient.from('job_cards').select('*, job_card_items(*)')
             .eq('status', 'Closed')
             .gte('closed_at', targetDate)
             .lte('closed_at', targetDate + 'T23:59:59');
 
-        // 2. Fetch POS Sales (POS Track)
+        // 2. Fetch Open Job Cards (Unrealized WIP) WITH line items joined
+        let jcOpenQuery = supabaseClient.from('job_cards').select('*, job_card_items(*)')
+            .eq('status', 'Open');
+
+        // 3. Fetch POS Sales (POS Track)
         let posQuery = supabaseClient.from('counter_sales').select('*')
             .eq('status', 'Closed')
             .gte('closed_at', targetDate)
@@ -275,93 +279,130 @@
         if (scope === 'Green') posQuery = posQuery.or('source_role.eq.green,source_role.is.null');
         else if (scope === 'Moped') posQuery = posQuery.eq('source_role', 'moped');
 
-        // 3. Fetch Old Credit Payments Collected Today (Ping & Ledger Recoveries)
+        // 4. Fetch Old Credit Payments Collected Today (Ping & Ledger Recoveries)
         let paysQuery = supabaseClient.from('credit_payments').select('*')
             .gte('created_at', targetDate)
             .lte('created_at', targetDate + 'T23:59:59');
 
-        // 4. Fetch Expenses & Transfers
+        // 5. Fetch Expenses & Transfers
         let expQuery = supabaseClient.from('workshop_expenses').select('*')
             .gte('created_at', targetDate)
             .lte('created_at', targetDate + 'T23:59:59');
 
-        // 5. Fetch JCs with Advances
+        // 6. Fetch JCs with Advances (Always scoped by creation date)
         let advQuery = supabaseClient.from('job_cards').select('*')
             .gte('created_at', targetDate)
             .lte('created_at', targetDate + 'T23:59:59')
             .gt('advance_paid', 0);
 
-        const [jcRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcQuery, posQuery, paysQuery, expQuery, advQuery]);
+        const [jcClosedRes, jcOpenRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcClosedQuery, jcOpenQuery, posQuery, paysQuery, expQuery, advQuery]);
         
-        const jobs = jcRes.data || [];
+        // Merge Open and Closed for processing
+        const jobs = [...(jcClosedRes.data || []), ...(jcOpenRes.data || [])];
         const sales = posRes.data || [];
         const pays = paysRes.data || [];
         const expenses = expRes.data || [];
         const advances = advRes.data || [];
 
         // === TRACK 1: WORKSHOP MATH ===
-        let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Net Invoice</th></tr></thead><tbody>';
-        let wCredit = 0; let wHtmlB = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
-        let wAdv = 0; let wHtmlC = '<table><thead><tr><th>Hash</th><th>Advance Dep</th></tr></thead><tbody>';
-        let wOld = 0; let wHtmlD = '<table><thead><tr><th>Payment Hash</th><th>Amount</th></tr></thead><tbody>';
-        let wExp = 0; let wHtmlE = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
+        let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Realized Revenue</th></tr></thead><tbody>';
+        let wOpen = 0;  let wHtmlB = '<table><thead><tr><th>Hash</th><th>Unrealized Revenue (WIP)</th></tr></thead><tbody>';
+        let wCredit = 0; let wHtmlC = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
+        let wAdv = 0; let wHtmlD = '<table><thead><tr><th>Hash</th><th>Advance Dep</th></tr></thead><tbody>';
+        let wOld = 0; let wHtmlE = '<table><thead><tr><th>Payment Hash</th><th>Amount</th></tr></thead><tbody>';
+        let wExp = 0; let wHtmlF = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
 
+        // Process Job Cards based on Status & Role Filter
         jobs.forEach(j => {
-            const v = parseFloat(j.total_invoice_value) || 0;
-            wGross += v;
-            wHtmlA += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+            let visible_value = 0;
+            let items = j.job_card_items || [];
             
-            if (j.payment_mode === 'Credit') {
-                wCredit += v;
-                wHtmlB += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
+            // Clean Mathematical routing based on active role/scope
+            if (j.status === 'Closed') {
+                if (scope === 'Green') {
+                    visible_value = items.filter(i => i.warehouse_type === 'Green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                } else if (scope === 'Moped') {
+                    visible_value = items.filter(i => i.warehouse_type === 'Moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                } else {
+                    visible_value = parseFloat(j.total_invoice_value) || 0;
+                }
+
+                if (visible_value > 0) {
+                    wGross += visible_value;
+                    wHtmlA += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>₹${visible_value}</td></tr>`;
+                    
+                    if (j.payment_mode === 'Credit') {
+                        wCredit += visible_value; // Proportionally deduct their share of credit
+                        wHtmlC += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${visible_value}</td></tr>`;
+                    }
+                }
+
+            } else if (j.status === 'Open') {
+                if (scope === 'Green') {
+                    visible_value = items.filter(i => i.warehouse_type === 'Green').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                } else if (scope === 'Moped') {
+                    visible_value = items.filter(i => i.warehouse_type === 'Moped').reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                } else {
+                    visible_value = items.reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
+                    visible_value += (parseFloat(j.labour_charges) || 0);
+                    visible_value += (parseFloat(j.lathe_welding) || 0);
+                }
+
+                if (visible_value > 0) {
+                    wOpen += visible_value; // Diverted to the 'To Be Billed' bucket
+                    wHtmlB += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a> <span class="badge-role" style="background:#f59e0b;">OPEN</span></td><td>₹${visible_value}</td></tr>`;
+                }
             }
         });
 
-        advances.forEach(a => {
-            const v = parseFloat(a.advance_paid) || 0;
-            wAdv += v;
-            wHtmlC += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
-        });
+        // Workshop Drawer Logic (Only evaluate Advances/Expenses if looking at Master Workshop View)
+        if (scope === 'ALL' || scope === 'Workshop') {
+            advances.forEach(a => {
+                const v = parseFloat(a.advance_paid) || 0;
+                wAdv += v;
+                wHtmlD += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
+            });
 
-        pays.forEach(p => {
-            const v = parseFloat(p.amount_paid) || 0;
-            if (v <= 0) return;
-            const collectedBy = p.paid_by_role || 'admin';
-            // Workshop gets cash collected by Admin or Service
-            if (collectedBy === 'admin' || collectedBy === 'service') {
-                wOld += v;
-                wHtmlD += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Recovery'})</td></tr>`;
-            }
-        });
+            pays.forEach(p => {
+                const v = parseFloat(p.amount_paid) || 0;
+                if (v <= 0) return;
+                const collectedBy = p.paid_by_role || 'admin';
+                if (collectedBy === 'admin' || collectedBy === 'service') {
+                    wOld += v;
+                    wHtmlE += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Recovery'})</td></tr>`;
+                }
+            });
 
-        expenses.forEach(e => {
-            // Admin default fallback to workshop drawer if role string is malformed
-            const drawer = e.recorded_by || 'workshop'; 
-            if (drawer === 'workshop' || drawer === 'admin' || drawer === 'service') {
-                const v = parseFloat(e.amount) || 0;
-                wExp += v;
-                wHtmlE += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
-            }
-        });
+            expenses.forEach(e => {
+                const drawer = e.recorded_by || 'workshop'; 
+                if (drawer === 'workshop' || drawer === 'admin' || drawer === 'service') {
+                    const v = parseFloat(e.amount) || 0;
+                    wExp += v;
+                    wHtmlF += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
+                }
+            });
+        }
 
-        wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>';
+        wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>'; wHtmlF += '</tbody></table>';
+        
+        // Final Formula Application: Notice wOpen (Unrealized) is intentionally EXCLUDED from Net Cash (wNet).
         const wNet = (wGross - wCredit) + wAdv + wOld - wExp;
 
 
         // === TRACK 2: POS MATH ===
-        let pGross = 0; let pHtmlF = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
-        let pCredit = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
-        let pOld = 0; let pHtmlH = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
-        let pExp = 0; let pHtmlI = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
+        let pGross = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
+        let pCredit = 0; let pHtmlH = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
+        let pOld = 0; let pHtmlI = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
+        let pExp = 0; let pHtmlJ = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
 
         sales.forEach(s => {
             const v = parseFloat(s.total_amount) || 0;
             pGross += v;
-            pHtmlF += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
+            pHtmlG += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v}</td></tr>`;
             
             if (s.payment_mode === 'Credit') {
                 pCredit += v;
-                pHtmlG += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
+                pHtmlH += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>₹${v}</td></tr>`;
             }
         });
 
@@ -369,10 +410,9 @@
             const v = parseFloat(p.amount_paid) || 0;
             if (v <= 0) return;
             const collectedBy = p.paid_by_role || 'admin';
-            // Green or Moped collects it into their physical drawer
             if (collectedBy === 'green' || collectedBy === 'moped') {
                 pOld += v;
-                pHtmlH += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Counter Ping/Recovery'})</td></tr>`;
+                pHtmlI += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v} (${p.note||'Counter Ping/Recovery'})</td></tr>`;
             }
         });
 
@@ -381,21 +421,23 @@
             if (drawer === 'green' || drawer === 'moped') {
                 const v = parseFloat(e.amount) || 0;
                 pExp += v;
-                pHtmlI += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
+                pHtmlJ += `<tr><td>${e.expense_category}</td><td>₹${v}</td></tr>`;
             }
         });
 
-        pHtmlF += '</tbody></table>'; pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>';
+        pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>'; pHtmlJ += '</tbody></table>';
         const pNet = (pGross - pCredit) + pOld - pExp;
 
-        // Render Tracks
+        // --- RENDER VISIBILITY CONTROLLER ---
+        
         document.getElementById('stackWorkshop').innerHTML = `
             <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
-            ${buildAccordionHtml('A', 'Gross Billed (Closed JCs)', 'val-neutral', `₹${wGross}`, wHtmlA)}
-            ${buildAccordionHtml('B', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit}`, wHtmlB)}
-            ${buildAccordionHtml('C', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv}`, wHtmlC)}
-            ${buildAccordionHtml('D', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld}`, wHtmlD)}
-            ${buildAccordionHtml('E', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp}`, wHtmlE)}
+            ${buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross}`, wHtmlA)}
+            ${buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen}`, wHtmlB)}
+            ${buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit}`, wHtmlC)}
+            ${buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv}`, wHtmlD)}
+            ${buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld}`, wHtmlE)}
+            ${buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp}`, wHtmlF)}
             
             <div class="net-drawer-box">
                 <div class="net-drawer-title">Net Workshop Cash</div>
@@ -406,16 +448,19 @@
 
         document.getElementById('stackPOS').innerHTML = `
             <h4 style="margin:0 0 4px 0; color:var(--success); text-align:center;">Track 2: POS Drawer</h4>
-            ${buildAccordionHtml('F', 'Gross Retail POS Billed', 'val-neutral', `₹${pGross}`, pHtmlF)}
-            ${buildAccordionHtml('G', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit}`, pHtmlG)}
-            ${buildAccordionHtml('H', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld}`, pHtmlH)}
-            ${buildAccordionHtml('I', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp}`, pHtmlI)}
+            ${buildAccordionHtml('G', 'Gross Retail POS Billed', 'val-success', `₹${pGross}`, pHtmlG)}
+            ${buildAccordionHtml('H', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit}`, pHtmlH)}
+            ${buildAccordionHtml('I', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld}`, pHtmlI)}
+            ${buildAccordionHtml('J', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp}`, pHtmlJ)}
             
             <div class="net-drawer-box" style="border-color:var(--success);">
                 <div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div>
                 <div class="net-drawer-val">₹${pNet}</div>
             </div>
         `;
+        
+        // Hide Track 2 (POS Drawer) for unauthorized Roles
+        document.getElementById('stackPOS').style.display = (activeRole === 'service' || activeRole === 'moped') ? 'none' : 'flex';
     }
 
     // [Preserved Cross Ledger, Expense Modals, and Print Functions]
