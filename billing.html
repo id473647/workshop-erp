@@ -19,7 +19,8 @@
         .prepaid-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 6px 14px; border-radius: 6px; font-weight: 700; display: inline-block; }
         .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
-        .inline-add-strip > div:nth-child(1) { flex: 2 1 180px; position: relative; } .inline-add-strip > input:nth-child(2) { flex: 1 1 90px; } .inline-add-strip > input:nth-child(3) { flex: 0.8 1 70px; } .inline-add-strip > select:nth-child(4) { flex: 1 1 80px; font-weight:bold; } .inline-add-strip > input:nth-child(5) { flex: 0.5 1 60px; } .inline-add-strip > input:nth-child(6) { flex: 0.5 1 60px; } .inline-add-strip > select:nth-child(7) { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
+        .inline-add-strip > div:nth-child(1) { flex: 2 1 180px; position: relative; } .inline-add-strip > input:nth-child(2) { flex: 1 1 90px; } .inline-add-strip > input:nth-child(3) { flex: 0.8 1 70px; } 
+        .inline-add-strip > select.type-select { flex: 1 1 80px; font-weight:bold; } .inline-add-strip > input.qty-input { flex: 0.5 1 60px; } .inline-add-strip > input.rate-input { flex: 0.5 1 60px; } .inline-add-strip > select.issuer-select { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
         .btn-add-line { background: var(--success); color: white; border: none; width: 40px; height: 40px; border-radius: 6px; font-weight: 700; font-size: 1.3rem; cursor: pointer; flex: none; display: flex; align-items: center; justify-content: center; }
         .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; min-width: 350px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
         .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; } .autocomplete-item:hover { background: #f0f7ff; }
@@ -71,7 +72,6 @@
         
         .ping-box { background:#eff6ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:10px;}
         
-        /* PHASE 3: Admin Override Block */
         #adminOverrideBlock { display:none; background:#fef2f2; padding:16px; border-radius:8px; border:1px solid #fecaca; text-align:center; margin-bottom:16px; }
 
         @media print { 
@@ -89,10 +89,10 @@
             body.print-landscape #multiEntityReceiptTarget { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; width: 148mm; }
             body.print-landscape .me-summary { grid-column: 1 / -1; }
             
+            /* PHASE 4: Compressed Mechanic Ticket Logic */
             body.print-mechanic #mechanic-print-ticket, body.print-mechanic #mechanic-print-ticket * { visibility: visible !important; }
             body.print-mechanic #mechanic-print-ticket { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #000; background: #fff; margin: 0; padding: 0; border: none; }
-            .a5-page { page-break-after: always; position: relative; box-sizing: border-box; width: 100%; }
-            .a5-page:last-child { page-break-after: auto; }
+            .a5-page { position: relative; box-sizing: border-box; width: 100%; } /* Removed page-break-after: always */
         }
     </style>
 </head>
@@ -142,10 +142,26 @@
             
             <input type="number" id="nMrp" placeholder="MRP" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
 
-            <select id="nType" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="Spare">Spare (Pcs)</option><option value="Lube">Lube (ML)</option></select>
-            <input type="number" id="nQty" placeholder="Qty / ML" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
-            <input type="number" id="nRate" placeholder="Rate (₹)" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
-            <select id="nIssuer" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="">+ Issued By (Staff)</option></select>
+            <select id="nType" class="type-select" onchange="toggleLubeUI()" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;">
+                <option value="Spare">Spare (Pcs)</option>
+                <option value="Lube">Lube (Pack)</option>
+            </select>
+            
+            <select id="nPackSize" onchange="toggleCustomML()" style="display:none; padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff; font-weight:bold;">
+                <option value="500">500 ML</option>
+                <option value="650">650 ML</option>
+                <option value="800">800 ML</option>
+                <option value="900">900 ML</option>
+                <option value="1000">1000 ML</option>
+                <option value="1200">1200 ML</option>
+                <option value="2500">2500 ML</option>
+                <option value="Custom">⚙️ Custom / Loose</option>
+            </select>
+            <input type="number" id="nCustomML" placeholder="Exact ML" style="display:none; padding:8px; border-radius:4px; border:1px dashed var(--info); width:80px;">
+
+            <input type="number" id="nQty" class="qty-input" placeholder="Qty" value="" min="1" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <input type="number" id="nRate" class="rate-input" placeholder="Rate (₹)" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid var(--border);">
+            <select id="nIssuer" class="issuer-select" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"><option value="">+ Issued By</option></select>
             <button class="btn-add-line" onclick="pushItemToJobCard()">+</button>
         </div>
     </div>
@@ -319,106 +335,63 @@
 </div>
 
 <div id="mechanic-print-ticket">
-    <div class="a5-page" style="padding-bottom: 20px;">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <img src="logo-main.jpg" onerror="this.style.display='none'" style="height: 45px; filter: grayscale(100%); margin-bottom: 5px;">
-            <div style="font-size: 20px; font-weight: bold; text-transform: uppercase;">Mechanic Job Ticket</div>
-            <div style="border-bottom: 2px solid #000; margin-top: 5px;"></div>
+    <div class="a5-page">
+        <div style="text-align: center; margin-bottom: 6px;">
+            <img src="logo-main.jpg" onerror="this.style.display='none'" style="height: 35px; filter: grayscale(100%); margin-bottom: 2px;">
+            <div style="font-size: 16px; font-weight: bold; text-transform: uppercase;">Mechanic Job Ticket</div>
+            <div style="border-bottom: 2px solid #000; margin-top: 2px;"></div>
         </div>
 
-        <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-size: 32px; font-weight: bold; letter-spacing: 1px;" id="tkFrontJc">--</div>
-            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; color: #333;">
+        <div style="text-align: center; margin-bottom: 10px;">
+            <div style="font-size: 24px; font-weight: bold; letter-spacing: 1px;" id="tkFrontJc">--</div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; margin-top: 4px; color: #333;">
                 <span>Created: <span id="tkFrontCreated">--</span></span>
                 <span>Printed: <span id="tkFrontPrinted">--</span></span>
             </div>
         </div>
 
-        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
-            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Customer & Vehicle</div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Name:</strong> <span id="tkFrontCustName">--</span></span><span><strong>Mob:</strong> <span id="tkFrontCustMobile">--</span></span></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Vehicle:</strong> <span id="tkFrontVehModel">--</span></span><span><strong>Color:</strong> <span id="tkFrontVehColor">--</span></span></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Reg No:</strong> <span id="tkFrontVehReg" style="font-weight: bold; font-size: 15px;">--</span></span><span><strong>Odometer:</strong> <span id="tkFrontVehOdo">--</span></span></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Chassis:</strong> <span id="tkFrontVehChassis">--</span></span><span><strong>Engine:</strong> <span id="tkFrontVehEngine">--</span></span></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Est. Budget:</strong> <span id="tkFrontBudget" style="font-weight: bold;">--</span></span></div>
+        <div style="border: 1px solid #000; margin-bottom: 10px; padding: 6px;">
+            <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 4px; padding-bottom: 2px;">Customer & Vehicle</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>Name:</strong> <span id="tkFrontCustName">--</span></span><span><strong>Mob:</strong> <span id="tkFrontCustMobile">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>Vehicle:</strong> <span id="tkFrontVehModel">--</span></span><span><strong>Color:</strong> <span id="tkFrontVehColor">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>Reg No:</strong> <span id="tkFrontVehReg" style="font-weight: bold; font-size: 13px;">--</span></span><span><strong>Odo:</strong> <span id="tkFrontVehOdo">--</span></span></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>Chassis:</strong> <span id="tkFrontVehChassis">--</span></span><span><strong>Engine:</strong> <span id="tkFrontVehEngine">--</span></span></div>
         </div>
 
-        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
-            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Problem & Service Directives</div>
-            <div style="margin-bottom: 8px;"><strong>Customer Problem:</strong><br><span id="tkFrontProblem" style="display:block; margin-top:3px; line-height: 1.4;">--</span></div>
-            <div style="margin-bottom: 8px;"><strong>Injected Protocols:</strong><br><div id="tkFrontProtocols" style="margin-top:3px; line-height: 1.4; padding-left: 10px;"></div></div>
-            <div><strong>Future Advice / Remarks:</strong><br><span id="tkFrontAdvice" style="display:block; margin-top:3px; line-height: 1.4;">--</span></div>
+        <div style="border: 1px solid #000; margin-bottom: 10px; padding: 6px;">
+            <div style="font-size: 12px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 4px; padding-bottom: 2px;">Problem & Directives</div>
+            <div style="margin-bottom: 4px;"><strong>Customer Problem:</strong> <span id="tkFrontProblem">--</span></div>
+            <div><strong>Injected Protocols:</strong> <span id="tkFrontProtocols"></span></div>
         </div>
 
-        <div style="border: 1px solid #000; margin-bottom: 12px; padding: 10px;">
-            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; margin-bottom: 6px; padding-bottom: 3px;">Assignment & Financials</div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Primary Tech:</strong></span> <span id="tkFrontPMech" style="font-weight: bold;">--</span></div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;" id="tkFrontCMechRow"><span><strong>Co-Mechanic:</strong></span> <span id="tkFrontCMech" style="font-weight: bold;">--</span></div>
-            <div style="margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span>Variable Labour:</span> <span id="tkFrontVarLab">--</span></div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span>Protocol Labour:</span> <span id="tkFrontProtLab">--</span></div>
-                <div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Estimated Budget:</span> <span id="tkFrontFinBudget">--</span></div>
-            </div>
-        </div>
-        
-        <div style="text-align: center; font-size: 10px; font-style: italic; color: #555; margin-bottom: 25px;">
-            Final bill amount may vary. This ticket is for internal reference only.
+        <div style="text-align: center; margin-bottom: 6px;">
+            <div style="font-size: 14px; font-weight: bold; text-transform: uppercase;">PARTS & MATERIALS TRACKER</div>
         </div>
 
-        <div style="position: absolute; bottom: 0; width: 100%;">
-            <div style="border-top: 1px dashed #000; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
-                <div style="font-weight: bold;">Authorised by Service Advisor:<br><br>___________________________</div>
-                <img src="logo-green.png" onerror="this.style.display='none'" style="height: 25px; filter: grayscale(100%);">
-            </div>
-        </div>
-    </div>
-
-    <div class="a5-page" style="padding-top: 20px;">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-size: 18px; font-weight: bold; text-transform: uppercase;">PARTS & MATERIALS TRACKER</div>
-            <div style="font-size: 14px; margin-top: 4px;">
-                <strong>JC:</strong> <span id="tkBackJc">--</span> &nbsp;|&nbsp; <strong>REG:</strong> <span id="tkBackReg">--</span>
-            </div>
-            <div style="border-bottom: 2px solid #000; margin-top: 10px;"></div>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11px;">
             <thead>
                 <tr>
-                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 5%;">#</th>
-                    <th style="border: 1px solid #000; padding: 6px; text-align: left; width: 45%;">Part / Item Name</th>
-                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 15%;">Quantity</th>
-                    <th style="border: 1px solid #000; padding: 6px; text-align: left; width: 20%;">Source / Vendor</th>
-                    <th style="border: 1px solid #000; padding: 6px; text-align: center; width: 15%;">Verified ✓</th>
+                    <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 5%;">#</th>
+                    <th style="border: 1px solid #000; padding: 4px; text-align: left; width: 50%;">Part / Item Name</th>
+                    <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 15%;">Qty</th>
+                    <th style="border: 1px solid #000; padding: 4px; text-align: left; width: 30%;">Source / Verified</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">1</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">2</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">3</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">4</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">5</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">6</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">7</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">8</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">9</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
-                <tr><td style="border: 1px solid #000; padding: 12px; text-align: center;">10</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">1</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">2</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">3</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">4</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">5</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">6</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">7</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
+                <tr><td style="border: 1px solid #000; padding: 8px; text-align: center;">8</td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>
             </tbody>
         </table>
 
-        <div style="margin-bottom: 20px;">
-            <div style="font-weight: bold; margin-bottom: 10px;">Mechanic Notes:</div>
-            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
-            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
-            <div style="border-bottom: 1px dotted #000; height: 26px; margin-bottom: 5px;"></div>
-            <div style="border-bottom: 1px dotted #000; height: 26px;"></div>
-        </div>
-
-        <div style="position: absolute; bottom: 0; width: 100%;">
-            <div style="font-weight: bold; padding-bottom: 15px; display: flex; justify-content: space-between;">
-                <span>Parts physically verified by: _______________________</span>
-                <span>Date: _______________________</span>
-            </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px;">
+            <span>Primary Tech: <strong id="tkFrontPMech">--</strong></span>
+            <span>Co-Tech: <strong id="tkFrontCMech">--</strong></span>
         </div>
     </div>
 </div>
@@ -453,6 +426,34 @@
         }
     }
 
+    // PHASE 4: UI Toggle Logic for Lube
+    function toggleLubeUI() {
+        const type = document.getElementById('nType').value;
+        const packSizeEl = document.getElementById('nPackSize');
+        const customMLEl = document.getElementById('nCustomML');
+        const qtyEl = document.getElementById('nQty');
+
+        if (type === 'Lube') {
+            packSizeEl.style.display = 'inline-block';
+            qtyEl.placeholder = 'Bottle Count';
+            toggleCustomML();
+        } else {
+            packSizeEl.style.display = 'none';
+            customMLEl.style.display = 'none';
+            qtyEl.placeholder = 'Qty';
+        }
+    }
+
+    function toggleCustomML() {
+        const pack = document.getElementById('nPackSize').value;
+        const customMLEl = document.getElementById('nCustomML');
+        if (pack === 'Custom') {
+            customMLEl.style.display = 'inline-block';
+        } else {
+            customMLEl.style.display = 'none';
+        }
+    }
+
     async function initializeJobContext() {
         if (sessionRole === 'green' || sessionRole === 'moped') { 
             document.getElementById('draftActionBlock').style.display = 'block'; 
@@ -475,7 +476,7 @@
         }
 
         const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
-        let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By (Staff)</option>';
+        let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By</option>';
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt; 
 
@@ -709,7 +710,16 @@
         document.getElementById('nBrand').value = brand;
         document.getElementById('nRate').value = mrpVal; 
         if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal;
-        document.getElementById('nType').value = cat==='Lube'?'Lube':'Spare';
+        
+        // PHASE 4: Auto-Select Lube & Trigger UI
+        const typeSelect = document.getElementById('nType');
+        if (cat === 'Lube' || cat === 'Lubricant') {
+            typeSelect.value = 'Lube';
+        } else {
+            typeSelect.value = 'Spare';
+        }
+        toggleLubeUI();
+
         document.getElementById('autolist-n').style.display = 'none';
         window._pid = pid; window._pmac = mac; window._pmrp = mrpVal;
         window._pendingItemUnverified = false;
@@ -759,8 +769,9 @@
     
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
+    // PHASE 4: Dimensional Lube Engine Integration
     async function pushItemToJobCard() { 
-        const partStr = document.getElementById('nPart').value.trim(); 
+        const rawPartStr = document.getElementById('nPart').value.trim(); 
         const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
         const typeSelect = document.getElementById('nType').value; 
         const qVal = parseFloat(document.getElementById('nQty').value) || 0; 
@@ -768,44 +779,70 @@
         const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal;
         const issuerId = document.getElementById('nIssuer').value || null; 
         
-        if(!partStr) return; if(typeSelect === 'Lube' && qVal < 50) { return alert("Lubricants must be entered in ML. Cannot enter less than 50 ML."); } 
-        const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; 
-        const metricTarget = typeSelect === 'Lube' ? 'ML' : 'Pcs'; 
-        const calcInitialCost = typeSelect === 'Lube' ? rVal : (qVal * rVal); 
-        const cleanName = partStr.toUpperCase(); const cleanBrand = brandStr.toUpperCase(); 
+        if(!rawPartStr || qVal <= 0) return alert("Valid Part Description and Quantity > 0 are required."); 
         
-        if (window._pendingItemUnverified) {
-            await supabaseClient.from('product_master').insert({
-                item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
-            });
+        let volumeMlVal = null;
+        let finalItemName = rawPartStr.toUpperCase();
+        const cleanBrand = brandStr.toUpperCase();
+
+        if (typeSelect === 'Lube') {
+            const packSelect = document.getElementById('nPackSize').value;
+            volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect);
+            if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant.");
+            
+            // Smart String Concatenation for Invoices
+            finalItemName = cleanBrand !== 'STANDARD' ? `${cleanBrand} - ${rawPartStr.toUpperCase()} (${volumeMlVal} ML)` : `${rawPartStr.toUpperCase()} (${volumeMlVal} ML)`;
+        }
+
+        const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; 
+        const metricTarget = 'Pcs'; // Everything is treated as Pcs/Pack now to fix financial math
+        const calcInitialCost = qVal * rVal; // Math strictly: Count of Packs * Price of Pack
+        
+        if (window._pendingItemUnverified || typeSelect === 'Lube') {
+            await supabaseClient.from('product_master').upsert({
+                item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
+            }, { onConflict: 'item_name,brand' });
         } else {
-            supabaseClient.from('product_master').upsert({ item_name: cleanName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name,brand' }).then(); 
+            supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name,brand' }).then(); 
         }
         
-        const { error } = await supabaseClient.from('job_card_items').insert({ 
-            job_card_id: targetJobId, warehouse_type: wareTarget, item_name: cleanName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId,
+        const payload = { 
+            job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId,
             mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null
-        }); 
+        };
+        if (volumeMlVal) payload.volume_ml = volumeMlVal;
+        
+        const { error } = await supabaseClient.from('job_card_items').insert(payload); 
         
         if(!error) { 
             window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0;
             if(document.getElementById('tierBadge')) document.getElementById('tierBadge').remove();
             if(document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none';
 
+            // PHASE 4: Rapid-Fire Intake Strip Reset
             document.getElementById('nPart').value = ''; 
             document.getElementById('nBrand').value = ''; 
             if(document.getElementById('nMrp')) document.getElementById('nMrp').value = '';
             document.getElementById('nQty').value = ''; 
             document.getElementById('nRate').value = ''; 
+            document.getElementById('nType').value = 'Spare';
+            document.getElementById('nPackSize').value = '500';
+            document.getElementById('nCustomML').value = '';
+            toggleLubeUI();
+            
             document.getElementById('autolist-n').style.display = 'none'; 
             loadInventoryLedgers(); 
-        } 
+            
+            // PHASE 4: Auto-Focus
+            document.getElementById('nPart').focus();
+        } else {
+            alert("Database Error: " + error.message);
+        }
     }
     
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
-    // PHASE 3: 10% Hard-Cap Logic Integration
     function compileDynamicSums() { 
         partsGrossTotal = 0; servicePkgGrossTotal = 0; 
         
@@ -822,7 +859,7 @@
             
             if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
 
-            if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr') {
+            if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) {
                 lubeNet += rowNet;
             }
         }); 
@@ -834,7 +871,6 @@
         let t = parseFloat(document.getElementById('vLathe').value) || 0; 
         let d = 0;
 
-        // Gross total before any manual discount
         const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + (l + servicePkgGrossTotal) + t;
         
         if (sessionRole === 'service' || sessionRole === 'admin') {
@@ -851,7 +887,6 @@
             else if (remaining > 0) balNode.style.color = '#d97706';
             else balNode.style.color = 'var(--success)';
             
-            // Apply approved distributions dynamically
             greenNet = Math.max(0, greenNet - discGreen);
             mopedNet = Math.max(0, mopedNet - discMoped);
             l = Math.max(0, l - discLabour);
@@ -865,7 +900,6 @@
             else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
         }
 
-        // PHASE 3: 10% Failsafe Check
         const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin');
         const adminBlock = document.getElementById('adminOverrideBlock');
         const settleBlock = document.getElementById('settlementActionBlock');
@@ -905,7 +939,6 @@
             splitIndicator.style.display = 'none';
         }
 
-        // We already subtracted the distributed discount from the individual departments, so we don't subtract 'd' again here if role is service/admin
         let netBeforeAdv = 0;
         if (sessionRole === 'service' || sessionRole === 'admin') {
             netBeforeAdv = partsGrossTotal + totalLabor + t;
@@ -920,7 +953,6 @@
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
     }
 
-    // PHASE 3: Admin Override Request & Polling
     async function requestAdminOverride() {
         const d = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
         const grossTotalBeforeDiscount = (partsGrossTotal) + (parseFloat(document.getElementById('vLabour').value)||0) + servicePkgGrossTotal + (parseFloat(document.getElementById('vLathe').value)||0);
@@ -938,7 +970,6 @@
         await supabaseClient.from('approval_requests').insert(payload);
         overridePending = true;
         
-        // Start polling for approval
         overridePollingInterval = setInterval(pollForAdminOverride, 5000);
     }
 
@@ -960,14 +991,12 @@
             
             const dist = data[0].payload.distribution || { green:0, moped:0, labour:0, lathe:0 };
             
-            // Lock inputs and apply admin distribution
             document.getElementById('vTotalServiceDisc').disabled = true;
             document.getElementById('vDiscGreen').value = dist.green;
             document.getElementById('vDiscMoped').value = dist.moped;
             document.getElementById('vDiscLabour').value = dist.labour;
             document.getElementById('vDiscLathe').value = dist.lathe;
 
-            // Lock distribution inputs
             document.getElementById('vDiscGreen').disabled = true;
             document.getElementById('vDiscMoped').disabled = true;
             document.getElementById('vDiscLabour').disabled = true;
@@ -1293,10 +1322,7 @@
             cMechRow.style.display = 'none';
         }
         
-        document.getElementById('tkFrontVarLab').innerText = `₹${parseFloat(document.getElementById('vLabour').value) || 0}`;
-        document.getElementById('tkFrontProtLab').innerText = `₹${protocolTotal}`;
-        document.getElementById('tkFrontFinBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
-        
+        // Single Page Adjustments
         document.getElementById('tkBackJc').innerText = jcFormatted;
         document.getElementById('tkBackReg').innerText = veh.reg_number || '--';
         
