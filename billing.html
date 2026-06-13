@@ -23,7 +23,8 @@
         .inline-add-strip > select.type-select { flex: 1 1 80px; font-weight:bold; } .inline-add-strip > input.qty-input { flex: 0.5 1 60px; } .inline-add-strip > input.rate-input { flex: 0.5 1 60px; } .inline-add-strip > select.issuer-select { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
         .btn-add-line { background: var(--success); color: white; border: none; width: 40px; height: 40px; border-radius: 6px; font-weight: 700; font-size: 1.3rem; cursor: pointer; flex: none; display: flex; align-items: center; justify-content: center; }
         .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; min-width: 350px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
-        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; } .autocomplete-item:hover { background: #f0f7ff; }
+        .autocomplete-item { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; } 
+        .autocomplete-item:hover, .autocomplete-active { background: #f0f7ff !important; }
         .table-wrapper { background: white; border-radius: 10px; border: 1px solid var(--border); overflow-x: auto; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 12px 16px; font-size: 0.75rem; font-weight: 700; color: #64748b; border-bottom: 1px solid var(--border); } td { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .inline-input { width: 85px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-weight: 700; text-align: center; }
@@ -92,7 +93,7 @@
             /* PHASE 4: Compressed Mechanic Ticket Logic */
             body.print-mechanic #mechanic-print-ticket, body.print-mechanic #mechanic-print-ticket * { visibility: visible !important; }
             body.print-mechanic #mechanic-print-ticket { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #000; background: #fff; margin: 0; padding: 0; border: none; }
-            .a5-page { position: relative; box-sizing: border-box; width: 100%; } /* Removed page-break-after: always */
+            .a5-page { position: relative; box-sizing: border-box; width: 100%; } 
         }
     </style>
 </head>
@@ -117,6 +118,7 @@
         <div style="flex: 1;">
             <div class="plate-header" id="regPlate" title="Click to edit vehicle number" onclick="editVehicleReg()">Loading active instance...</div>
             <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
+            <span id="customerHeaderInfo" style="font-size:1.1rem; font-weight:900; color:var(--primary); display:block; margin-top:6px;">👤 Client: Syncing...</span>
             <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                 <span style="font-size:0.75rem; font-weight:bold; color:#64748b;">TECH:</span>
                 <select id="primaryMech" class="input-lockable" style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); font-size:0.75rem; font-weight:bold; color:var(--primary); background:#f8fafc;"><option value="">-- Unassigned --</option></select>
@@ -414,6 +416,9 @@
     let overrideApproved = false;
     let overridePending = false;
     let overridePollingInterval = null;
+    
+    // PHASE 4 Keyboard Nav Tracker
+    let currentFocus = -1;
 
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
@@ -497,7 +502,13 @@
             document.getElementById('vPrepaid').value = parseFloat(job.prepaid_amount) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
-            if (job.customer_mobile) fetchCustomerContext(job);
+            
+            // PHASE 4 Header Identity Injection
+            if (job.customer_mobile) {
+                await fetchCustomerContext(job);
+            } else {
+                document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
+            }
             
             fetchApplicableProtocols(job.vehicles?.category_group); loadInventoryLedgers();
 
@@ -536,7 +547,13 @@
             activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; 
             customerWalletBalance = parseFloat(custData.loyalty_points) || 0; 
             if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); } 
-        } 
+            
+            // Phase 4 Display
+            document.getElementById('customerHeaderInfo').innerText = `👤 Client: ${custData.name} | ${custData.mobile_number}`;
+        } else {
+            document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | ${job.customer_mobile}`;
+        }
+        
         const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); 
         if(subs && subs.length > 0) { document.getElementById('receiptPromoHindi').style.display = 'none'; } else { document.getElementById('receiptPromoHindi').style.display = 'block'; } 
     }
@@ -621,6 +638,38 @@
         compileDynamicSums(); 
     }
 
+    // PHASE 4: Keyboard Navigation Event Listeners
+    document.getElementById('nPart').addEventListener('keydown', function(e) {
+        let x = document.getElementById("autolist-n");
+        if (x) x = x.getElementsByClassName("autocomplete-item");
+        if (e.key === "ArrowDown") {
+            currentFocus++;
+            addActive(x);
+        } else if (e.key === "ArrowUp") {
+            currentFocus--;
+            addActive(x);
+        } else if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            if (currentFocus > -1 && x) {
+                if (x[currentFocus]) x[currentFocus].dispatchEvent(new MouseEvent('mousedown'));
+            }
+        }
+    });
+
+    function addActive(x) {
+        if (!x) return false;
+        removeActive(x);
+        if (currentFocus >= x.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = (x.length - 1);
+        x[currentFocus].classList.add("autocomplete-active");
+    }
+
+    function removeActive(x) {
+        for (let i = 0; i < x.length; i++) {
+            x[i].classList.remove("autocomplete-active");
+        }
+    }
+
     document.addEventListener('click', function(e) {
         const listContainer = document.getElementById('autolist-n');
         const searchInput = document.getElementById('nPart');
@@ -654,6 +703,7 @@
         const listContainer = document.getElementById('autolist-n');
         listContainer.innerHTML = '';
         listContainer.style.display = 'none';
+        currentFocus = -1; // Reset keyboard focus
         
         if (q.length < 2) return;
         
@@ -742,6 +792,9 @@
             }
         }
         showMrpDriftWarning(mrpVal);
+        
+        // Push Cursor to Qty Box dynamically for speed
+        document.getElementById('nQty').focus();
     }
 
     function showMrpDriftWarning(newMrpVal) {
@@ -769,10 +822,10 @@
     
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
-    // PHASE 4: Dimensional Lube Engine Integration
+    // PHASE 4: Dimensional Lube Engine & Universal Brand Concatenation
     async function pushItemToJobCard() { 
         const rawPartStr = document.getElementById('nPart').value.trim(); 
-        const brandStr = document.getElementById('nBrand').value.trim() || 'STANDARD'; 
+        const brandStr = document.getElementById('nBrand').value.trim(); 
         const typeSelect = document.getElementById('nType').value; 
         const qVal = parseFloat(document.getElementById('nQty').value) || 0; 
         const rVal = parseFloat(document.getElementById('nRate').value) || 0; 
@@ -782,16 +835,22 @@
         if(!rawPartStr || qVal <= 0) return alert("Valid Part Description and Quantity > 0 are required."); 
         
         let volumeMlVal = null;
-        let finalItemName = rawPartStr.toUpperCase();
+        const cleanNameRaw = rawPartStr.toUpperCase();
         const cleanBrand = brandStr.toUpperCase();
+        
+        // Universal Brand Concatenation Engine
+        let finalItemName = cleanNameRaw;
+        if (cleanBrand !== '' && cleanBrand !== 'STANDARD') {
+            finalItemName = `${cleanBrand} - ${cleanNameRaw}`;
+        }
 
         if (typeSelect === 'Lube') {
             const packSelect = document.getElementById('nPackSize').value;
             volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect);
             if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant.");
             
-            // Smart String Concatenation for Invoices
-            finalItemName = cleanBrand !== 'STANDARD' ? `${cleanBrand} - ${rawPartStr.toUpperCase()} (${volumeMlVal} ML)` : `${rawPartStr.toUpperCase()} (${volumeMlVal} ML)`;
+            // Add Volume String to Invoices
+            finalItemName += ` (${volumeMlVal} ML)`;
         }
 
         const wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; 
@@ -1279,9 +1338,6 @@
         document.getElementById('tkFrontCustName').innerText = activeCustomerName || 'Walk-in';
         document.getElementById('tkFrontCustMobile').innerText = activeJobContext?.customer_mobile || '--';
         
-        const budget = activeJobContext?.estimate_given || parseFloat(document.getElementById('jcEstimate')?.value) || 0;
-        document.getElementById('tkFrontBudget').innerText = budget > 0 ? `₹${budget}` : 'Not Specified';
-        
         const veh = activeJobContext?.vehicles || {};
         document.getElementById('tkFrontVehModel').innerText = veh.make_model || '--';
         document.getElementById('tkFrontVehColor').innerText = veh.color || '--';
@@ -1301,14 +1357,11 @@
             if (line.warehouse_type === 'Service') {
                 let pRate = parseFloat(line.total_price);
                 if(isNaN(pRate)) pRate = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price);
-                protocolHtml += `<div>- ${line.item_name}: ₹${pRate}</div>`;
+                protocolHtml += `<div>- ${line.item_name}</div>`;
                 protocolTotal += pRate;
             }
         });
         protocolContainer.innerHTML = protocolHtml || '<div>No protocol assigned</div>';
-        
-        const futureAdvice = document.getElementById('vFutureAdvice').value.trim();
-        document.getElementById('tkFrontAdvice').innerText = futureAdvice || 'None';
         
         const pMechSel = document.getElementById('primaryMech');
         const cMechSel = document.getElementById('coMech');
@@ -1321,10 +1374,6 @@
         } else {
             cMechRow.style.display = 'none';
         }
-        
-        // Single Page Adjustments
-        document.getElementById('tkBackJc').innerText = jcFormatted;
-        document.getElementById('tkBackReg').innerText = veh.reg_number || '--';
         
         window.print(); 
         setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
