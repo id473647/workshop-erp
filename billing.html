@@ -9,9 +9,14 @@
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad; --warning: #f59e0b;}
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
+        
+        /* UNIVERSAL NAVIGATION HEADER */
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items:center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; }
-        .badge-role { background: var(--success); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left:8px; }
+        .nav-anchor { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-decoration: none; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border); background: #f8fafc; transition: all 0.2s; }
+        .nav-anchor:hover { background: #e2e8f0; }
+        .badge-role { background: var(--success); color: white; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin: 0 8px; }
+        .header-logos img { height: 28px; margin-right: 8px; }
+
         .container { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .context-banner { background: white; padding: 18px 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .plate-header { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 0; cursor: pointer; transition: color 0.2s; } .plate-header:hover { color: var(--info); text-decoration: underline; }
@@ -21,7 +26,7 @@
         .inline-add-strip-wrapper { margin-bottom: 16px; position: relative; z-index: 60; }
         .inline-add-strip { display: flex; flex-wrap: wrap; gap: 8px; background: #f8fafc; padding: 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
         .inline-add-strip > div:nth-child(1) { flex: 2 1 180px; position: relative; } .inline-add-strip > input:nth-child(2) { flex: 1 1 90px; } .inline-add-strip > input:nth-child(3) { flex: 0.8 1 70px; } 
-        .inline-add-strip > select.type-select { flex: 1 1 80px; font-weight:bold; } .inline-add-strip > input.qty-input { flex: 0.5 1 60px; } .inline-add-strip > input.rate-input { flex: 0.5 1 60px; } .inline-add-strip > select.issuer-select { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
+        .inline-add-strip > select.type-select { flex: 1 1 120px; font-weight:bold; } .inline-add-strip > input.qty-input { flex: 0.5 1 60px; } .inline-add-strip > input.rate-input { flex: 0.5 1 60px; } .inline-add-strip > select.issuer-select { flex: 1.5 1 120px; font-weight:bold; color:var(--info); }
         .btn-add-line { background: var(--success); color: white; border: none; width: 40px; height: 40px; border-radius: 6px; font-weight: 700; font-size: 1.3rem; cursor: pointer; flex: none; display: flex; align-items: center; justify-content: center; }
         
         .autocomplete-container { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 100; width: 100%; min-width: 350px; box-shadow: 0 6px 12px rgba(0,0,0,0.1); display: none; }
@@ -109,10 +114,18 @@
 
 <nav class="sticky-nav">
     <div style="display:flex; gap:12px; align-items:center;">
-        <a href="index.html" class="nav-anchor">← CONSOLE</a>
-        <button id="btnMechPrintTop" onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:4px 10px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🖨️ PRINT MECHANIC TICKET</button>
+        <div class="header-logos">
+            <img src="logo-main.jpg" onerror="this.style.display='none'">
+            <img src="logo-green.png" onerror="this.style.display='none'">
+        </div>
+        <a href="javascript:history.back()" class="nav-anchor">⬅ BACK</a>
+        <a href="index.html" class="nav-anchor">🏠 HOME</a>
     </div>
-    <span id="roleTag" class="badge-role">GUEST</span>
+    <div style="display:flex; gap:12px; align-items:center;">
+        <button id="btnMechPrintTop" onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem; transition: opacity 0.2s;">🖨️ PRINT MECHANIC TICKET</button>
+        <span id="roleTag" class="badge-role">GUEST</span>
+        <a href="login.html" class="nav-anchor" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE')" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">🚪 LOGOUT</a>
+    </div>
 </nav>
 
 <div class="container">
@@ -153,8 +166,8 @@
                 <input type="text" id="nPart" placeholder="Search Parts, Lubes, or Services..." style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
                 <div id="autolist-n" class="autocomplete-container"></div>
             </div>
-            <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
             
+            <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
             <input type="number" id="nMrp" placeholder="MRP" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
 
             <select id="nType" class="type-select" onchange="toggleLubeUI()" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;"></select>
@@ -217,11 +230,11 @@
                     <span class="field-label" style="color: #b45309; margin:0;">[-] ADMIN CONCESSION (₹)</span>
                     <input type="number" id="vTotalServiceDisc" class="field-input input-lockable" value="0" placeholder="Total" style="width: 90px; padding: 6px; margin:0; border-color: #f59e0b; background: white;" oninput="compileDynamicSums()">
                 </div>
-                <div class="concession-grid-compact">
-                    <input type="number" id="vDiscGreen" class="field-input input-lockable" value="0" placeholder="Green" style="padding:8px; margin:0; font-size:0.8rem;" title="Green Distribution" oninput="compileDynamicSums()">
-                    <input type="number" id="vDiscMoped" class="field-input input-lockable" value="0" placeholder="Moped" style="padding:8px; margin:0; font-size:0.8rem;" title="Moped Distribution" oninput="compileDynamicSums()">
-                    <input type="number" id="vDiscLabour" class="field-input input-lockable" value="0" placeholder="Labour" style="padding:8px; margin:0; font-size:0.8rem;" title="Labour Distribution" oninput="compileDynamicSums()">
-                    <input type="number" id="vDiscLathe" class="field-input input-lockable" value="0" placeholder="Lathe" style="padding:8px; margin:0; font-size:0.8rem;" title="Lathe Distribution" oninput="compileDynamicSums()">
+                <div class="concession-grid-compact" style="text-align:center;">
+                    <div><span style="font-size:0.6rem; color:#b45309; font-weight:bold;">GRN</span><input type="number" id="vDiscGreen" class="field-input input-lockable" value="0" style="padding:6px; margin:0; font-size:0.8rem; width:100%; box-sizing:border-box;" oninput="compileDynamicSums()"></div>
+                    <div><span style="font-size:0.6rem; color:#b45309; font-weight:bold;">MOP</span><input type="number" id="vDiscMoped" class="field-input input-lockable" value="0" style="padding:6px; margin:0; font-size:0.8rem; width:100%; box-sizing:border-box;" oninput="compileDynamicSums()"></div>
+                    <div><span style="font-size:0.6rem; color:#b45309; font-weight:bold;">LAB</span><input type="number" id="vDiscLabour" class="field-input input-lockable" value="0" style="padding:6px; margin:0; font-size:0.8rem; width:100%; box-sizing:border-box;" oninput="compileDynamicSums()"></div>
+                    <div><span style="font-size:0.6rem; color:#b45309; font-weight:bold;">LTH</span><input type="number" id="vDiscLathe" class="field-input input-lockable" value="0" style="padding:6px; margin:0; font-size:0.8rem; width:100%; box-sizing:border-box;" oninput="compileDynamicSums()"></div>
                 </div>
                 <div id="serviceDiscBalance" style="font-size:0.75rem; font-weight:bold; margin-top:8px; color:var(--success);">Remaining to Allocate: ₹0</div>
             </div>
@@ -461,12 +474,12 @@
         const brandEl = document.getElementById('nBrand');
 
         if (type === 'Lube') {
-            packSizeEl.style.display = 'inline-block';
+            packSizeEl.style.display = '';
             qtyEl.placeholder = 'Bottle Count';
-            qtyEl.style.display = 'inline-block';
-            rateEl.style.display = 'inline-block';
-            mrpEl.style.display = 'inline-block';
-            brandEl.disabled = false; brandEl.style.background = 'white';
+            qtyEl.style.display = '';
+            rateEl.style.display = '';
+            mrpEl.style.display = '';
+            brandEl.disabled = false; brandEl.style.display = ''; brandEl.style.background = 'white';
             toggleCustomML();
         } else if (type === '⚙️ Custom Labour' || type === '⚙️ Custom Lathe' || type === '⚙️ Fixed Protocol') {
             packSizeEl.style.display = 'none';
@@ -474,26 +487,25 @@
             qtyEl.style.display = 'none';
             qtyEl.value = '1';
             mrpEl.style.display = 'none';
-            rateEl.style.display = 'inline-block';
+            rateEl.style.display = '';
             rateEl.placeholder = 'Charge (₹)';
-            // FIX: Lock and clear brand for services
-            brandEl.value = ''; brandEl.disabled = true; brandEl.style.background = '#f1f5f9';
+            brandEl.value = ''; brandEl.disabled = true; brandEl.style.display = 'none';
         } else {
             packSizeEl.style.display = 'none';
             customMLEl.style.display = 'none';
-            qtyEl.style.display = 'inline-block';
+            qtyEl.style.display = '';
             qtyEl.placeholder = 'Qty';
-            rateEl.style.display = 'inline-block';
-            mrpEl.style.display = 'inline-block';
+            rateEl.style.display = '';
+            mrpEl.style.display = '';
             rateEl.placeholder = 'Rate (₹)';
-            brandEl.disabled = false; brandEl.style.background = 'white';
+            brandEl.disabled = false; brandEl.style.display = ''; brandEl.style.background = 'white';
         }
     }
 
     function toggleCustomML() {
         const pack = document.getElementById('nPackSize').value;
         const customMLEl = document.getElementById('nCustomML');
-        if (pack === 'Custom') customMLEl.style.display = 'inline-block'; else customMLEl.style.display = 'none';
+        if (pack === 'Custom') customMLEl.style.display = ''; else customMLEl.style.display = 'none';
     }
 
     function setupRoleBasedDropdown() {
@@ -509,6 +521,7 @@
 
     async function initializeJobContext() {
         setupRoleBasedDropdown();
+        toggleLubeUI();
 
         if (sessionRole === 'green' || sessionRole === 'moped') { 
             document.getElementById('draftActionBlock').style.display = 'block'; 
@@ -535,7 +548,6 @@
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt; 
 
-        // FIX: Parallel Data Fetching to cut loading time
         const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
         const catalogPromise = prefetchCentralCatalog();
         
@@ -556,7 +568,6 @@
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
             
-            // Parallelize Customer and Ledger parsing
             const promises = [loadInventoryLedgers()];
             if (job.customer_mobile) {
                 promises.push(fetchCustomerContext(job));
@@ -564,7 +575,6 @@
                 document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
             }
             await Promise.all(promises);
-            // Re-compile after both are loaded to ensure max points logic hits
             compileDynamicSums();
 
             if(job.status === 'Closed' || job.status === 'Cancelled') {
@@ -643,14 +653,14 @@
         lineItemsLocalMemory.forEach((line, idx) => { 
             const dropAuth = (!isLocked) && (sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase()); 
             let evaluatedLineTotal = parseFloat(line.total_price); 
-            if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
+            if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); 
+            evaluatedLineTotal = evaluatedLineTotal || 0;
             const issuerName = line.mechanics?.name || '--'; 
             
             let displayRole = line.warehouse_type;
             let cssClass = `ware-${line.warehouse_type.toLowerCase()}`;
             let displayItemName = line.item_name;
             
-            // FIX: Clean up Lathe/Service tags for UI
             if(line.warehouse_type === 'Service') {
                 const isLathe = line.item_name.startsWith('[LATHE]');
                 const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); 
@@ -676,11 +686,26 @@
     }
 
     document.getElementById('nPart').addEventListener('keydown', function(e) {
-        let x = document.getElementById("autolist-n");
-        if (x) x = x.getElementsByClassName("autocomplete-item");
-        if (e.key === "ArrowDown") { currentFocus++; addActive(x); } 
-        else if (e.key === "ArrowUp") { currentFocus--; addActive(x); } 
-        else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); if (currentFocus > -1 && x) if (x[currentFocus]) x[currentFocus].dispatchEvent(new MouseEvent('mousedown')); }
+        let listContainer = document.getElementById("autolist-n");
+        if (!listContainer || listContainer.style.display === 'none') return;
+        
+        let x = listContainer.getElementsByClassName("autocomplete-item");
+        if (x.length === 0) return;
+
+        if (e.key === "ArrowDown") { 
+            currentFocus++; 
+            addActive(x); 
+        } 
+        else if (e.key === "ArrowUp") { 
+            currentFocus--; 
+            addActive(x); 
+        } 
+        else if (e.key === "Enter" || e.key === "Tab") { 
+            if (currentFocus > -1) {
+                e.preventDefault(); 
+                x[currentFocus].click(); 
+            }
+        }
     });
 
     function addActive(x) {
@@ -709,47 +734,25 @@
         if (q.length < 2) return;
         
         const tokens = q.split(' ').filter(t=>t.length>0);
-        const vehicleModel = activeJobContext?.vehicles?.make_model?.toUpperCase()||null;
 
         let results = [];
         
+        // PURE TEXT SEARCH: Bug-Free and Fast
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') {
             let pResults = globalCatalogCache.filter(p => p.source === 'product');
-            if (vehicleModel) {
-                const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model', vehicleModel);
-                let groupIds = [];
-                if (gLinks?.length>0) {
-                    const {data:grps} = await supabaseClient.from('product_groups').select('product_master_id').in('id', gLinks.map(g=>g.group_id));
-                    groupIds = (grps||[]).map(g=>g.product_master_id);
-                }
-                pResults = pResults.filter(p => {
-                    const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
-                    if (!tokens.every(t=>txt.includes(t.toLowerCase()))) return false;
-                    return p.scope==='universal' || groupIds.includes(p.id) || (p.compatibility_tags?.toUpperCase().split(',').map(s=>s.trim()).includes(vehicleModel));
-                });
-            } else {
-                pResults = pResults.filter(p => {
-                    const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase();
-                    return tokens.every(t=>txt.includes(t.toLowerCase()));
-                });
-            }
+            pResults = pResults.filter(p => {
+                const txt = (p.item_name + ' ' + (p.brand || '')).toLowerCase();
+                return tokens.every(t => txt.includes(t.toLowerCase()));
+            });
             results.push(...pResults);
         }
 
         if(sessionRole === 'service' || sessionRole === 'admin') {
             let sResults = globalCatalogCache.filter(p => p.source === 'service');
             sResults = sResults.filter(s => {
-                const txt=(s.item_name+' '+(s.compatibility_tags||'')).toLowerCase();
-                return tokens.every(t=>txt.includes(t.toLowerCase()));
+                const txt = (s.item_name).toLowerCase();
+                return tokens.every(t => txt.includes(t.toLowerCase()));
             });
-            
-            if(vehicleModel) {
-                sResults.sort((a, b) => {
-                    const aMatch = (a.compatibility_tags || '').toUpperCase().includes(vehicleModel) ? 1 : 0;
-                    const bMatch = (b.compatibility_tags || '').toUpperCase().includes(vehicleModel) ? 1 : 0;
-                    return bMatch - aMatch;
-                });
-            }
             results.push(...sResults);
         }
 
@@ -760,28 +763,27 @@
                 const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`;
                 const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : '';
                 listContainer.innerHTML += `
-                    <div class="autocomplete-item" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})">
+                    <div class="autocomplete-item" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})">
                         <div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div>
                         <div style="display:flex;gap:6px;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div>
                     </div>`;
             } else {
                 listContainer.innerHTML += `
-                    <div class="autocomplete-item" style="background:#fef3c7;" onmousedown="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '', 0, ${p.default_price||0}, 'Pkg', '⚙️ Fixed Protocol', null, 0)">
+                    <div class="autocomplete-item" style="background:#fef3c7;" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '', 0, ${p.default_price||0}, 'Pkg', '⚙️ Fixed Protocol', null, 0)">
                         <div><strong style="color:#b45309;">🏷️ ${p.item_name}</strong></div>
                         <div style="display:flex;gap:6px;"><span style="font-weight:700;">₹${p.default_price||0}</span></div>
                     </div>`;
             }
         });
         
-        listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onmousedown="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`;
-        listContainer.style.display = results.length>0||true ? 'block':'none';
+        listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onclick="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`;
+        listContainer.style.display = 'block';
     }
 
     function flagNewItemForReview() {
         const inp = document.getElementById('nPart');
-        const veh = activeJobContext?.vehicles?.make_model?.toUpperCase()||'';
         const raw = inp.value.trim().toUpperCase();
-        inp.value = (!raw.includes(veh)&&veh) ? raw+' '+veh : raw;
+        inp.value = raw;
         document.getElementById('autolist-n').style.display='none';
         window._pendingItemUnverified = true;
     }
@@ -818,7 +820,7 @@
         if (sessionRole === 'service' || sessionRole === 'admin') {
             const { data: servs } = await supabaseClient.from('service_packages').select('*'); 
             servs?.forEach(s => {
-                globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', compatibility_tags: s.vehicle_category, source: 'service' });
+                globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', source: 'service' });
             });
         }
     }
@@ -843,9 +845,8 @@
         
         let finalItemName = cleanNameRaw;
         
-        // FIX: Ensure Services never have a brand, but tag Lathe items properly
         if(isServiceGroup) {
-            cleanBrand = ''; // Force strip brand
+            cleanBrand = ''; 
             if(typeSelect === '⚙️ Custom Lathe') {
                 finalItemName = `[LATHE] ${cleanNameRaw}`;
             }
@@ -860,7 +861,6 @@
             finalItemName += ` (${volumeMlVal} ML)`;
         }
 
-        // FIX: DB Constraint Compliance (Service/Lathe must use 'Service' column)
         let wareTarget = 'Green';
         if(sessionRole === 'moped') wareTarget = 'Moped';
         if(isServiceGroup) wareTarget = 'Service'; 
@@ -868,7 +868,6 @@
         let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; 
         const calcInitialCost = qVal * rVal; 
         
-        // FIX: Absolute Database Save Compliance
         if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) {
             await supabaseClient.from('product_master').upsert({
                 item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
@@ -914,7 +913,6 @@
             let greenNet = 0; let mopedNet = 0; let lubeNet = 0; 
             
             lineItemsLocalMemory.forEach(line => { 
-                // FIX: Fallback to 0 if database yields null/NaN
                 let rowNet = parseFloat(line.total_price); 
                 if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); 
                 rowNet = rowNet || 0; 
@@ -991,14 +989,14 @@
                 }
             }
             
-            internalGreenNet = greenNet;
-            internalMopedNet = mopedNet;
-            internalLubeNet = lubeNet; 
+            internalGreenNet = greenNet || 0;
+            internalMopedNet = mopedNet || 0;
+            internalLubeNet = lubeNet || 0; 
 
             const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
             const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
             
-            const totalLabor = servicePkgGrossTotal;
+            const totalLabor = servicePkgGrossTotal || 0;
             const coMechNode = document.getElementById('coMech');
             const coMechVal = coMechNode ? coMechNode.value : null;
             const splitIndicator = document.getElementById('splitIndicator');
@@ -1022,7 +1020,7 @@
             const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
             if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } 
             
-            document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
+            document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed) || 0; 
             
             clearTimeout(saveDraftTimeout);
             saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000);
@@ -1038,7 +1036,6 @@
         const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
         const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
-        // FIX: No-Null Safety fallbacks for database inserts
         await supabaseClient.from('job_cards').update({
             total_invoice_value: netVal || 0,
             labour_charges: servicePkgGrossTotal || 0,
