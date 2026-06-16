@@ -319,6 +319,7 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Spares:</span><strong id="thPartsSum">₹0</strong></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow"><span>Auto Spares Disc:</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Labor:</span><strong id="thLaborSum">₹0</strong></div>
+
             <div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;"><span>Lathe Work:</span><strong id="thLatheSum">₹0</strong></div>
             
             <div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div>
@@ -457,6 +458,7 @@
         const qtyEl = document.getElementById('nQty');
         const rateEl = document.getElementById('nRate');
         const mrpEl = document.getElementById('nMrp');
+        const brandEl = document.getElementById('nBrand');
 
         if (type === 'Lube') {
             packSizeEl.style.display = 'inline-block';
@@ -464,6 +466,7 @@
             qtyEl.style.display = 'inline-block';
             rateEl.style.display = 'inline-block';
             mrpEl.style.display = 'inline-block';
+            brandEl.disabled = false; brandEl.style.background = 'white';
             toggleCustomML();
         } else if (type === '⚙️ Custom Labour' || type === '⚙️ Custom Lathe' || type === '⚙️ Fixed Protocol') {
             packSizeEl.style.display = 'none';
@@ -473,6 +476,8 @@
             mrpEl.style.display = 'none';
             rateEl.style.display = 'inline-block';
             rateEl.placeholder = 'Charge (₹)';
+            // FIX: Lock and clear brand for services
+            brandEl.value = ''; brandEl.disabled = true; brandEl.style.background = '#f1f5f9';
         } else {
             packSizeEl.style.display = 'none';
             customMLEl.style.display = 'none';
@@ -481,6 +486,7 @@
             rateEl.style.display = 'inline-block';
             mrpEl.style.display = 'inline-block';
             rateEl.placeholder = 'Rate (₹)';
+            brandEl.disabled = false; brandEl.style.background = 'white';
         }
     }
 
@@ -490,7 +496,6 @@
         if (pack === 'Custom') customMLEl.style.display = 'inline-block'; else customMLEl.style.display = 'none';
     }
 
-    // PHASE 4: Dynamic Role Gateway (Intake Dropdown)
     function setupRoleBasedDropdown() {
         const sel = document.getElementById('nType');
         sel.innerHTML = '';
@@ -517,7 +522,6 @@
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin' || sessionRole === 'service') { 
             document.getElementById('inlineAddStrip').style.display = 'flex'; 
             document.getElementById('columnDestroyer').style.display = 'table-cell'; 
-            prefetchCentralCatalog(); 
         }
 
         if (sessionRole === 'service' || sessionRole === 'admin') {
@@ -531,7 +535,13 @@
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt; 
 
-        const { data: job } = await supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
+        // FIX: Parallel Data Fetching to cut loading time
+        const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
+        const catalogPromise = prefetchCentralCatalog();
+        
+        const [jobRes] = await Promise.all([jobPromise, catalogPromise]);
+        const job = jobRes.data;
+
         if(job) {
             activeJobContext = job; 
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; 
@@ -546,10 +556,16 @@
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
             
-            if (job.customer_mobile) await fetchCustomerContext(job);
-            else document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
-            
-            loadInventoryLedgers();
+            // Parallelize Customer and Ledger parsing
+            const promises = [loadInventoryLedgers()];
+            if (job.customer_mobile) {
+                promises.push(fetchCustomerContext(job));
+            } else {
+                document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
+            }
+            await Promise.all(promises);
+            // Re-compile after both are loaded to ensure max points logic hits
+            compileDynamicSums();
 
             if(job.status === 'Closed' || job.status === 'Cancelled') {
                 document.getElementById('lockedStatusWord').innerText = job.status.toUpperCase();
@@ -623,40 +639,42 @@
     function renderDynamicTable() { 
         const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; 
         const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; 
-        let sCount = 0;
         
         lineItemsLocalMemory.forEach((line, idx) => { 
-            const dropAuth = (!isLocked) && (sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || line.warehouse_type === 'Lathe' || sessionRole === line.warehouse_type.toLowerCase()); 
+            const dropAuth = (!isLocked) && (sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase()); 
             let evaluatedLineTotal = parseFloat(line.total_price); 
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
             const issuerName = line.mechanics?.name || '--'; 
             
             let displayRole = line.warehouse_type;
             let cssClass = `ware-${line.warehouse_type.toLowerCase()}`;
+            let displayItemName = line.item_name;
             
-            if(line.warehouse_type === 'Service' || line.warehouse_type === 'Lathe') {
-                sCount++;
+            // FIX: Clean up Lathe/Service tags for UI
+            if(line.warehouse_type === 'Service') {
+                const isLathe = line.item_name.startsWith('[LATHE]');
                 const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); 
-                const icon = line.warehouse_type === 'Lathe' ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️');
-                displayRole = `${icon} ${line.warehouse_type}`;
+                const icon = isLathe ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️');
+                
+                displayRole = isLathe ? icon : `${icon} Service`;
+                if(isLathe) {
+                    cssClass = 'ware-lathe';
+                    displayItemName = line.item_name.replace('[LATHE]', '').trim();
+                }
             } 
             
             const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; 
             const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; 
             
-            // For Custom Labour and Lathe, we disable Qty editing as it defaults to 1.
             let qtyDisplay = `<input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}`;
-            if(line.warehouse_type === 'Service' || line.warehouse_type === 'Lathe') {
-                qtyDisplay = `1 Pkg`;
-            }
+            if(line.warehouse_type === 'Service') qtyDisplay = `1 Pkg`;
 
-            tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${line.item_name}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; 
+            tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${displayItemName}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; 
         }); 
         
         compileDynamicSums(); 
     }
 
-    // PHASE 4: Keyboard Navigation Event Listeners
     document.getElementById('nPart').addEventListener('keydown', function(e) {
         let x = document.getElementById("autolist-n");
         if (x) x = x.getElementsByClassName("autocomplete-item");
@@ -695,7 +713,6 @@
 
         let results = [];
         
-        // Product Search (Green/Moped/Admin)
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') {
             let pResults = globalCatalogCache.filter(p => p.source === 'product');
             if (vehicleModel) {
@@ -719,7 +736,6 @@
             results.push(...pResults);
         }
 
-        // Service Protocol Search (Service/Admin)
         if(sessionRole === 'service' || sessionRole === 'admin') {
             let sResults = globalCatalogCache.filter(p => p.source === 'service');
             sResults = sResults.filter(s => {
@@ -727,7 +743,6 @@
                 return tokens.every(t=>txt.includes(t.toLowerCase()));
             });
             
-            // Boost exact vehicle matches to the top
             if(vehicleModel) {
                 sResults.sort((a, b) => {
                     const aMatch = (a.compatibility_tags || '').toUpperCase().includes(vehicleModel) ? 1 : 0;
@@ -779,7 +794,6 @@
         
         const typeSelect = document.getElementById('nType');
         
-        // Force dropdown selection based on Category
         if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube';
         else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol';
         else typeSelect.value = 'Spare';
@@ -792,7 +806,6 @@
         
         if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none';
         
-        // Push Cursor to relevant Box dynamically
         if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus();
     }
 
@@ -805,17 +818,13 @@
         if (sessionRole === 'service' || sessionRole === 'admin') {
             const { data: servs } = await supabaseClient.from('service_packages').select('*'); 
             servs?.forEach(s => {
-                globalCatalogCache.push({
-                    id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', compatibility_tags: s.vehicle_category, source: 'service'
-                });
+                globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', compatibility_tags: s.vehicle_category, source: 'service' });
             });
         }
     }
 
-    // PHASE 4: Unified Master Injection Engine
     async function pushItemToJobCard() { 
         const rawPartStr = document.getElementById('nPart').value.trim(); 
-        const brandStr = document.getElementById('nBrand').value.trim(); 
         const typeSelect = document.getElementById('nType').value; 
         let qVal = parseFloat(document.getElementById('nQty').value) || 0; 
         const rVal = parseFloat(document.getElementById('nRate').value) || 0; 
@@ -830,10 +839,17 @@
 
         let volumeMlVal = null;
         const cleanNameRaw = rawPartStr.toUpperCase();
-        const cleanBrand = brandStr.toUpperCase();
+        let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase();
         
         let finalItemName = cleanNameRaw;
-        if (!isServiceGroup && cleanBrand !== '' && cleanBrand !== 'STANDARD') {
+        
+        // FIX: Ensure Services never have a brand, but tag Lathe items properly
+        if(isServiceGroup) {
+            cleanBrand = ''; // Force strip brand
+            if(typeSelect === '⚙️ Custom Lathe') {
+                finalItemName = `[LATHE] ${cleanNameRaw}`;
+            }
+        } else if (cleanBrand !== '' && cleanBrand !== 'STANDARD') {
             finalItemName = `${cleanBrand} - ${cleanNameRaw}`;
         }
 
@@ -844,19 +860,20 @@
             finalItemName += ` (${volumeMlVal} ML)`;
         }
 
+        // FIX: DB Constraint Compliance (Service/Lathe must use 'Service' column)
         let wareTarget = 'Green';
         if(sessionRole === 'moped') wareTarget = 'Moped';
-        if(typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Fixed Protocol') wareTarget = 'Service';
-        if(typeSelect === '⚙️ Custom Lathe') wareTarget = 'Lathe';
+        if(isServiceGroup) wareTarget = 'Service'; 
 
         let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; 
         const calcInitialCost = qVal * rVal; 
         
-        if (!isServiceGroup && (window._pendingItemUnverified || typeSelect === 'Lube')) {
+        // FIX: Absolute Database Save Compliance
+        if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) {
             await supabaseClient.from('product_master').upsert({
                 item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
             }, { onConflict: 'item_name' });
-        } else if (!isServiceGroup && !window._pid) {
+        } else if (!window._pid) {
             await supabaseClient.from('product_master').upsert({ 
                 item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect 
             }, { onConflict: 'item_name' }); 
@@ -894,18 +911,25 @@
     function compileDynamicSums() { 
         try {
             partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0;
-            let greenNet = 0; let mopedNet = 0; let serviceNet = 0; let lubeNet = 0; 
+            let greenNet = 0; let mopedNet = 0; let lubeNet = 0; 
             
             lineItemsLocalMemory.forEach(line => { 
+                // FIX: Fallback to 0 if database yields null/NaN
                 let rowNet = parseFloat(line.total_price); 
-                if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
+                if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); 
+                rowNet = rowNet || 0; 
                 
                 if (line.warehouse_type === 'Green') greenNet += rowNet;
                 else if (line.warehouse_type === 'Moped') mopedNet += rowNet;
-                else if (line.warehouse_type === 'Service') { serviceNet += rowNet; servicePkgGrossTotal += rowNet; }
-                else if (line.warehouse_type === 'Lathe') internalLatheNet += rowNet;
+                else if (line.warehouse_type === 'Service') { 
+                    if(line.item_name.startsWith('[LATHE]')) {
+                        internalLatheNet += rowNet;
+                    } else {
+                        servicePkgGrossTotal += rowNet; 
+                    }
+                }
                 
-                if(line.warehouse_type !== 'Service' && line.warehouse_type !== 'Lathe') partsGrossTotal += rowNet; 
+                if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; 
 
                 if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) {
                     lubeNet += rowNet;
@@ -969,7 +993,6 @@
             
             internalGreenNet = greenNet;
             internalMopedNet = mopedNet;
-            internalLabourNet = servicePkgGrossTotal;
             internalLubeNet = lubeNet; 
 
             const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
@@ -1015,23 +1038,24 @@
         const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
         const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
+        // FIX: No-Null Safety fallbacks for database inserts
         await supabaseClient.from('job_cards').update({
-            total_invoice_value: netVal,
-            labour_charges: internalLabourNet,
-            lathe_welding: internalLatheNet,
-            lubricant_total: internalLubeNet,
+            total_invoice_value: netVal || 0,
+            labour_charges: servicePkgGrossTotal || 0,
+            lathe_welding: internalLatheNet || 0,
+            lubricant_total: internalLubeNet || 0,
             future_advice: document.getElementById('vFutureAdvice').value.trim(),
             advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0,
             prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
-            green_total: internalGreenNet,
-            moped_total: internalMopedNet,
-            points_used: pUsed
+            green_total: internalGreenNet || 0,
+            moped_total: internalMopedNet || 0,
+            points_used: pUsed || 0
         }).eq('id', targetJobId);
     }
 
     async function requestAdminOverride() {
         const d = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
-        const grossTotalBeforeDiscount = partsGrossTotal + internalLabourNet + internalLatheNet;
+        const grossTotalBeforeDiscount = partsGrossTotal + servicePkgGrossTotal + internalLatheNet;
 
         document.getElementById('btnReqOverride').style.display = 'none';
         document.getElementById('overridePollingText').style.display = 'block';
@@ -1068,17 +1092,17 @@
         const pointsRedeemed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
         const updates = { 
-            total_invoice_value: netVal, labour_charges: internalLabourNet, lathe_welding: internalLatheNet, lubricant_total: internalLubeNet, 
+            total_invoice_value: netVal || 0, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, 
             future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
             payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null,
-            green_total: internalGreenNet, moped_total: internalMopedNet, points_used: pointsRedeemed 
+            green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, points_used: pointsRedeemed || 0 
         };
         
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
         
         if (statusTarget === 'Closed' && !error) {
-            const totalLabour = internalLabourNet;
+            const totalLabour = servicePkgGrossTotal;
             const hasCo = !!document.getElementById('coMech').value;
             const primaryShare = hasCo ? totalLabour / 2 : totalLabour;
             const coShare = hasCo ? totalLabour / 2 : 0;
@@ -1118,9 +1142,10 @@
             const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0;
             if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp;
 
-            if(line.warehouse_type === 'Service' || line.warehouse_type === 'Lathe') { 
-                const preStr = line.warehouse_type === 'Lathe' ? '[Lathe]' : '[Service]';
-                container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${line.item_name}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; 
+            if(line.warehouse_type === 'Service') { 
+                const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]';
+                const cleanName = line.item_name.replace('[LATHE]', '').trim();
+                container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; 
             } else { 
                 const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); 
                 const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
@@ -1164,7 +1189,7 @@
 
     function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) {
         const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt;
-        const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service' || l.warehouse_type === 'Lathe');
+        const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service');
         const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`;
 
         function buildLineHTML(lines) {
@@ -1174,7 +1199,7 @@
             }).join('');
         }
 
-        const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.warehouse_type}] ${l.item_name}</strong> ₹${l.total_price}</div>`).join('')}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : '';
+        const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : '';
         const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`;
         const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div><div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`;
 
@@ -1200,7 +1225,7 @@
         document.getElementById('tkFrontProblem').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance';
         
         const protocolContainer = document.getElementById('tkFrontProtocols'); let protocolHtml = '';
-        lineItemsLocalMemory.forEach(line => { if (line.warehouse_type === 'Service') protocolHtml += `<span style="display:inline-block; margin-right:8px; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:10px;">${line.item_name}</span>`; });
+        lineItemsLocalMemory.forEach(line => { if (line.warehouse_type === 'Service') protocolHtml += `<span style="display:inline-block; margin-right:8px; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:10px;">${line.item_name.replace('[LATHE]', '').trim()}</span>`; });
         protocolContainer.innerHTML = protocolHtml || '<span style="font-size:10px;">No custom labour assigned</span>';
         
         const pMechSel = document.getElementById('primaryMech'); const cMechSel = document.getElementById('coMech');
