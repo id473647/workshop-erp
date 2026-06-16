@@ -42,6 +42,7 @@
         .field-label { font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 4px; display: block; text-transform: uppercase; }
         .danger-label { color: var(--danger); }
         .field-input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-weight: bold; color: var(--primary); }
+        .field-input:disabled { background: #f1f5f9; cursor: not-allowed; }
         .flex-row { display: flex; gap: 8px; margin-bottom: 12px; }
         
         .concession-block { background: #fffbeb; padding: 14px; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 12px;}
@@ -122,6 +123,7 @@
         🔒 THIS JOB CARD IS <span id="lockedStatusWord">CLOSED</span> AND LOCKED.
         <div id="lockReasonDisplay" style="font-weight:normal; font-size:0.85rem; margin-top:4px; display:none;">Reason: <span id="lockReasonText"></span></div>
         
+        <!-- PHASE 4: Historical Invoice Bridge -->
         <div id="historicalPrintActions" style="margin-top: 16px; display: none; gap: 10px; justify-content: center;">
             <button onclick="showHistoricalInvoice()" style="background:var(--success); color:white; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">📄 VIEW / REPRINT INVOICE</button>
         </div>
@@ -149,10 +151,11 @@
         <div style="flex: 1; text-align: right;"><div id="prepaidPill" class="prepaid-badge">Paid Total Adv: ₹0</div></div>
     </div>
 
+    <!-- PHASE 4: Dimensional Lube Intake & Integrated Service Master UI -->
     <div class="inline-add-strip-wrapper" id="uiPartEntryBlock">
         <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
             <div style="position:relative;">
-                <input type="text" id="nPart" placeholder="Part / Labour Description" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
+                <input type="text" id="nPart" placeholder="Part / Service Description" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
                 <div id="autolist-n" class="autocomplete-container"></div>
             </div>
             <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
@@ -160,9 +163,8 @@
             <input type="number" id="nMrp" placeholder="MRP" value="" min="0" style="padding:8px; border-radius:4px; border:1px solid #7c3aed; color:#7c3aed; font-weight:bold;" oninput="showMrpDriftWarning(this.value)">
 
             <select id="nType" class="type-select" onchange="toggleLubeUI()" style="padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff;">
-                <option value="Spare">Spare (Pcs)</option>
+                <option value="Spare">Standard Item</option>
                 <option value="Lube">Lube (Pack)</option>
-                <option value="⚙️ Custom Labour">⚙️ Custom Labour</option>
             </select>
             
             <select id="nPackSize" onchange="toggleCustomML()" style="display:none; padding:8px; border-radius:4px; border:1px solid var(--info); background:#f0f9ff; font-weight:bold;">
@@ -191,52 +193,57 @@
         </table>
     </div>
 
+    <!-- PHASE 4: Hybrid Parameter Matrix (Option D) -->
     <div class="grid-layout">
         
+        <!-- LEFT COLUMN: Operations & Loyalty -->
         <div class="matrix-panel">
-            <h4 class="panel-header">Fixed Service Protocols & Custom Labor</h4>
+            <h4 class="panel-header">Services & Custom Labor</h4>
             
             <div id="activeProtocolsList" style="flex-grow: 1; min-height: 180px; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 16px; background: #f8fafc; display: flex; flex-direction: column;"></div>
             
             <div id="uiProtocolEntryBlock">
-                <select id="serviceProtocolSelect" onchange="addFixedProtocol()" class="field-input" style="border: 1px solid var(--info); color: var(--info); cursor: pointer;">
+                <select id="serviceProtocolSelect" onchange="addFixedProtocol()" class="field-input input-lockable" style="border: 1px solid var(--info); color: var(--info); cursor: pointer;">
                     <option value="">+ Inject Fixed Protocol Module...</option>
                 </select>
             </div>
             
-            <div class="loyalty-block" id="pointsRedemptionBlock" style="display:none;">
-                <div class="loyalty-header"><span>💳 LOYALTY WALLET REDEMPTION</span> <span style="font-size: 0.75rem; background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #7dd3fc;">Wallet: ₹<span id="maxPointsVal">0</span></span></div>
+            <div class="loyalty-block" id="pointsRedemptionBlock">
+                <div class="loyalty-header"><span>💳 LOYALTY REDEMPTION</span> <span style="font-size: 0.75rem; background: white; padding: 4px 8px; border-radius: 4px; border: 1px solid #7dd3fc;">Wallet: ₹<span id="maxPointsVal">0</span></span></div>
                 <span class="field-label" style="font-size: 0.7rem; color: #0284c7; margin-bottom: 8px;">Max allowable redemption: 20% of Net Bill Value</span>
                 <input type="number" id="vPointsUsed" class="field-input input-lockable" value="0" min="0" oninput="compileDynamicSums()" placeholder="Enter Points to Redeem" style="margin-bottom: 0; border-color: #7dd3fc;">
             </div>
         </div>
         
+        <!-- RIGHT COLUMN: Valuation, Advice, Breakdowns, and Concessions -->
         <div class="matrix-panel" style="background: #f8fafc;">
             
             <span class="field-label danger-label">Future Advice / Remarks (Prints on Invoice)</span>
-            <input type="text" id="vFutureAdvice" class="field-input input-lockable" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 16px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase()">
+            <input type="text" id="vFutureAdvice" class="field-input input-lockable" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 16px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();">
 
             <span class="field-label">Variable Labour (₹) & Breakdown</span>
             <div class="flex-row">
                 <input type="number" id="vLabour" class="field-input input-lockable" value="0" style="flex: 1;" placeholder="Amount" oninput="compileDynamicSums()">
-                <input type="text" id="vLabourNotes" class="field-input input-lockable" placeholder="Generic Labour Breakdown" style="flex: 2.5;" oninput="this.value=this.value.toUpperCase()">
+                <input type="text" id="vLabourNotes" class="field-input input-lockable" placeholder="Generic Labour Breakdown" style="flex: 2.5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();">
             </div>
             <div id="splitIndicator" style="display:none; color:var(--info); font-size:0.75rem; font-weight:bold; margin-top:-8px; margin-bottom:12px;">Labour Split Active: ₹0 each</div>
 
             <span class="field-label">Lathe & External Work (₹) & Breakdown</span>
             <div class="flex-row">
                 <input type="number" id="vLathe" class="field-input input-lockable" value="0" style="flex: 1;" placeholder="Amount" oninput="compileDynamicSums()">
-                <input type="text" id="vLatheNotes" class="field-input input-lockable" placeholder="Lathe Breakdown (e.g. Welding bracket)" style="flex: 2.5;" oninput="this.value=this.value.toUpperCase()">
+                <input type="text" id="vLatheNotes" class="field-input input-lockable" placeholder="Lathe Breakdown (e.g. Welding bracket)" style="flex: 2.5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();">
             </div>
             
+            <!-- Simple Discount for non-service logins -->
             <div class="field-group" id="simpleDiscBlock" style="margin-bottom:12px;">
                 <span class="field-label">Applied Concession (₹)</span>
                 <input type="number" id="vFlatDisc" class="field-input input-lockable" value="0" oninput="compileDynamicSums()">
             </div>
             
+            <!-- Compact Concession Grid for Service/Admin -->
             <div class="concession-block" id="serviceDiscBlock">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="field-label" style="color: #b45309; margin:0;">[-] ADMIN CONCESSION DISTRIBUTION (₹)</span>
+                    <span class="field-label" style="color: #b45309; margin:0;">[-] ADMIN CONCESSION (₹)</span>
                     <input type="number" id="vTotalServiceDisc" class="field-input input-lockable" value="0" placeholder="Total" style="width: 90px; padding: 6px; margin:0; border-color: #f59e0b; background: white;" oninput="compileDynamicSums()">
                 </div>
                 <div class="concession-grid-compact">
@@ -374,6 +381,7 @@
     </div>
 </div>
 
+<!-- PHASE 4: Compressed Mechanic Print Ticket (Single Page Fix) -->
 <div id="mechanic-print-ticket">
     <div class="a5-page">
         <div style="text-align: center; margin-bottom: 6px;">
@@ -433,6 +441,7 @@
             </tbody>
         </table>
 
+        <!-- Optimized Footer with Future Advice -->
         <div style="font-size: 11px; margin-bottom: 10px;">
             <strong style="display:inline-block; border-bottom:1px solid #000; padding-bottom:2px;">Future Advice / Remarks:</strong><br>
             <div style="border-bottom: 1px dotted #000; height: 18px; margin-top: 4px;"></div>
@@ -471,6 +480,7 @@
     let overrideApproved = false;
     let overridePending = false;
     let overridePollingInterval = null;
+    let saveDraftTimeout; // Auto-save debounce timer
     
     // PHASE 4 Keyboard Nav Tracker
     let currentFocus = -1;
@@ -492,32 +502,15 @@
         const packSizeEl = document.getElementById('nPackSize');
         const customMLEl = document.getElementById('nCustomML');
         const qtyEl = document.getElementById('nQty');
-        const rateEl = document.getElementById('nRate');
-        const mrpEl = document.getElementById('nMrp');
 
         if (type === 'Lube') {
             packSizeEl.style.display = 'inline-block';
             qtyEl.placeholder = 'Bottle Count';
-            qtyEl.style.display = 'inline-block';
-            rateEl.style.display = 'inline-block';
-            mrpEl.style.display = 'inline-block';
             toggleCustomML();
-        } else if (type === '⚙️ Custom Labour') {
-            packSizeEl.style.display = 'none';
-            customMLEl.style.display = 'none';
-            qtyEl.style.display = 'none';
-            qtyEl.value = '1';
-            mrpEl.style.display = 'none';
-            rateEl.style.display = 'inline-block';
-            rateEl.placeholder = 'Labour Charge (₹)';
         } else {
             packSizeEl.style.display = 'none';
             customMLEl.style.display = 'none';
-            qtyEl.style.display = 'inline-block';
             qtyEl.placeholder = 'Qty';
-            rateEl.style.display = 'inline-block';
-            mrpEl.style.display = 'inline-block';
-            rateEl.placeholder = 'Rate (₹)';
         }
     }
 
@@ -542,7 +535,11 @@
             document.getElementById('vPrepaid').disabled = true;
             document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
-        if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; prefetchCentralCatalog(); }
+        if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin' || sessionRole === 'service') { 
+            document.getElementById('inlineAddStrip').style.display = 'flex'; 
+            document.getElementById('columnDestroyer').style.display = 'table-cell'; 
+            prefetchCentralCatalog(); 
+        }
 
         if (sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('serviceDiscBlock').style.display = 'block';
@@ -653,12 +650,22 @@
             activeCustomerName = custData.name; 
             activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; 
             customerWalletBalance = parseFloat(custData.loyalty_points) || 0; 
-            if(customerWalletBalance > 0) { document.getElementById('pointsRedemptionBlock').style.display = 'block'; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); } 
             
-            // Phase 4 Display
+            // PHASE 4: Dynamic Loyalty Box Control
+            document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance);
+            if(customerWalletBalance <= 0) {
+                document.getElementById('vPointsUsed').disabled = true;
+                document.getElementById('vPointsUsed').placeholder = "No points available";
+            } else {
+                document.getElementById('vPointsUsed').disabled = false;
+                document.getElementById('vPointsUsed').placeholder = "Enter Points to Redeem";
+            }
+            
             document.getElementById('customerHeaderInfo').innerText = `👤 Client: ${custData.name} | ${custData.mobile_number}`;
         } else {
             document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | ${job.customer_mobile}`;
+            document.getElementById('vPointsUsed').disabled = true;
+            document.getElementById('vPointsUsed').placeholder = "Not enrolled in Loyalty";
         }
         
         const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); 
@@ -729,11 +736,11 @@
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
             const issuerName = line.mechanics?.name || '--'; 
             
+            // PHASE 4: Visual differentiation for Service Items (Fixed vs Custom)
             if(line.warehouse_type === 'Service') { 
                 appliedProtocolNamesForTracking.push(line.item_name); 
                 const dropBtn = dropAuth ? `<button onclick="dropActiveRow('${line.id}')" title="Remove Module">✖</button>` : ''; 
-                // PHASE 4: Distinguish custom labour from fixed protocols visually
-                const isCustom = line.unit_metric === 'Pkg' && !line.item_name.includes('Service'); 
+                const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); 
                 const icon = isCustom ? '⚙️' : '🏷️';
                 pList.innerHTML += `<div class="protocol-pill"><span>${icon} ${line.item_name} : ₹${evaluatedLineTotal.toFixed(0)}</span>${dropBtn}</div>`; 
             } else { 
@@ -871,7 +878,7 @@
         document.getElementById('nRate').value = mrpVal; 
         if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal;
         
-        // PHASE 4: Auto-Select Lube & Trigger UI
+        // Auto-Select Lube & Trigger UI
         const typeSelect = document.getElementById('nType');
         if (cat === 'Lube' || cat === 'Lubricant') {
             typeSelect.value = 'Lube';
@@ -903,7 +910,6 @@
         }
         showMrpDriftWarning(mrpVal);
         
-        // Push Cursor to Qty Box dynamically for speed
         document.getElementById('nQty').focus();
     }
 
@@ -932,7 +938,7 @@
     
     async function prefetchCentralCatalog() { const { data: master } = await supabaseClient.from('product_master').select('*'); globalCatalogCache = master || []; }
 
-    // PHASE 4: Dimensional Lube Engine & Infinite Labor Basket
+    // PHASE 4: Dimensional Lube Engine & Direct Service Injection
     async function pushItemToJobCard() { 
         const rawPartStr = document.getElementById('nPart').value.trim(); 
         const brandStr = document.getElementById('nBrand').value.trim(); 
@@ -942,13 +948,7 @@
         const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal;
         const issuerId = document.getElementById('nIssuer').value || null; 
         
-        if(!rawPartStr) return alert("Valid Description is required."); 
-        if(typeSelect !== '⚙️ Custom Labour' && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes.");
-        
-        // Custom Labour defaults to 1 Qty and routes to Service
-        if (typeSelect === '⚙️ Custom Labour') {
-            qVal = 1; 
-        }
+        if(!rawPartStr || qVal <= 0) return alert("Valid Description and Quantity > 0 are required."); 
 
         let volumeMlVal = null;
         const cleanNameRaw = rawPartStr.toUpperCase();
@@ -964,33 +964,28 @@
             const packSelect = document.getElementById('nPackSize').value;
             volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect);
             if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant.");
-            
-            // Add Volume String to Invoices
             finalItemName += ` (${volumeMlVal} ML)`;
         }
 
-        // Routing Logic
-        let wareTarget = sessionRole === 'moped' ? 'Moped' : 'Green'; 
+        // PHASE 4: Safe Routing based on Login Role (Replaces Custom Labour dropdown logic)
+        let wareTarget = 'Green';
+        if(sessionRole === 'moped') wareTarget = 'Moped';
+        if(sessionRole === 'service') wareTarget = 'Service';
+
         let metricTarget = 'Pcs'; 
-        
-        if (typeSelect === '⚙️ Custom Labour') {
-            wareTarget = 'Service';
-            metricTarget = 'Pkg'; // Labour tags
-        }
+        if(wareTarget === 'Service') metricTarget = 'Pkg'; // Service generated items default to Pkg
         
         const calcInitialCost = qVal * rVal; 
         
-        // PHASE 4: Fixed Unique Constraint & Do not pollute product_master with custom labour
-        if (typeSelect !== '⚙️ Custom Labour') {
-            if (window._pendingItemUnverified || typeSelect === 'Lube') {
-                await supabaseClient.from('product_master').upsert({
-                    item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
-                }, { onConflict: 'item_name' });
-            } else {
-                await supabaseClient.from('product_master').upsert({ 
-                    item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect 
-                }, { onConflict: 'item_name' }); 
-            }
+        // PHASE 4: Safe Catalog UPSERT with Unique Constraint fix
+        if (window._pendingItemUnverified || typeSelect === 'Lube') {
+            await supabaseClient.from('product_master').upsert({
+                item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified'
+            }, { onConflict: 'item_name' });
+        } else {
+            await supabaseClient.from('product_master').upsert({ 
+                item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect 
+            }, { onConflict: 'item_name' }); 
         }
         
         const payload = { 
@@ -1031,113 +1026,158 @@
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
     function compileDynamicSums() { 
-        partsGrossTotal = 0; servicePkgGrossTotal = 0; 
-        
-        let greenNet = 0; let mopedNet = 0; let serviceNet = 0;
-        let lubeNet = 0; 
-        
-        lineItemsLocalMemory.forEach(line => { 
-            let rowNet = parseFloat(line.total_price); 
-            if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
+        try {
+            partsGrossTotal = 0; servicePkgGrossTotal = 0; 
             
-            if (line.warehouse_type === 'Green') greenNet += rowNet;
-            else if (line.warehouse_type === 'Moped') mopedNet += rowNet;
-            else if (line.warehouse_type === 'Service') serviceNet += rowNet;
+            let greenNet = 0; let mopedNet = 0; let serviceNet = 0;
+            let lubeNet = 0; 
             
-            if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
+            lineItemsLocalMemory.forEach(line => { 
+                let rowNet = parseFloat(line.total_price); 
+                if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : (line.qty * line.unit_price); 
+                
+                if (line.warehouse_type === 'Green') greenNet += rowNet;
+                else if (line.warehouse_type === 'Moped') mopedNet += rowNet;
+                else if (line.warehouse_type === 'Service') serviceNet += rowNet;
+                
+                if(line.warehouse_type === 'Service') servicePkgGrossTotal += rowNet; else partsGrossTotal += rowNet; 
 
-            if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) {
-                lubeNet += rowNet;
+                if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) {
+                    lubeNet += rowNet;
+                }
+            }); 
+            
+            let autoPartsDiscountValue = 0; 
+            if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } 
+            
+            let l = parseFloat(document.getElementById('vLabour').value) || 0; 
+            let t = parseFloat(document.getElementById('vLathe').value) || 0; 
+            let d = 0;
+
+            const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + (l + servicePkgGrossTotal) + t;
+            
+            if (sessionRole === 'service' || sessionRole === 'admin') {
+                const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
+                const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0;
+                const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0;
+                const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0;
+                const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0;
+                
+                const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe);
+                const balNode = document.getElementById('serviceDiscBalance');
+                if(balNode) {
+                    balNode.innerText = `Remaining to Allocate: ₹${remaining}`;
+                    if (remaining < 0) balNode.style.color = 'red';
+                    else if (remaining > 0) balNode.style.color = '#d97706';
+                    else balNode.style.color = 'var(--success)';
+                }
+                
+                greenNet = Math.max(0, greenNet - discGreen);
+                mopedNet = Math.max(0, mopedNet - discMoped);
+                l = Math.max(0, l - discLabour);
+                t = Math.max(0, t - discLathe);
+
+                d = totalServiceDisc; 
+                partsGrossTotal = greenNet + mopedNet; 
+            } else {
+                const flatNode = document.getElementById('vFlatDisc');
+                d = flatNode ? (parseFloat(flatNode.value) || 0) : 0;
+                if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
+                else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
             }
-        }); 
-        
-        let autoPartsDiscountValue = 0; 
-        if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } 
-        
-        let l = parseFloat(document.getElementById('vLabour').value) || 0; 
-        let t = parseFloat(document.getElementById('vLathe').value) || 0; 
-        let d = 0;
 
-        const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + (l + servicePkgGrossTotal) + t;
-        
-        if (sessionRole === 'service' || sessionRole === 'admin') {
-            const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0;
-            const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0;
-            const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0;
-            const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0;
-            const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0;
-            
-            const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe);
-            const balNode = document.getElementById('serviceDiscBalance');
-            balNode.innerText = `Remaining to Allocate: ₹${remaining}`;
-            if (remaining < 0) balNode.style.color = 'red';
-            else if (remaining > 0) balNode.style.color = '#d97706';
-            else balNode.style.color = 'var(--success)';
-            
-            greenNet = Math.max(0, greenNet - discGreen);
-            mopedNet = Math.max(0, mopedNet - discMoped);
-            l = Math.max(0, l - discLabour);
-            t = Math.max(0, t - discLathe);
+            const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin');
+            const adminBlock = document.getElementById('adminOverrideBlock');
+            const settleBlock = document.getElementById('settlementActionBlock');
+            const pingBlock = document.getElementById('pingRequestBlock');
 
-            d = totalServiceDisc; 
-            partsGrossTotal = greenNet + mopedNet; 
-        } else {
-            d = parseFloat(document.getElementById('vFlatDisc').value) || 0;
-            if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d);
-            else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d);
-        }
-
-        const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin');
-        const adminBlock = document.getElementById('adminOverrideBlock');
-        const settleBlock = document.getElementById('settlementActionBlock');
-        const pingBlock = document.getElementById('pingRequestBlock');
-
-        if (requiresOverride && !overrideApproved) {
-            if(settleBlock) settleBlock.style.display = 'none';
-            if(pingBlock) pingBlock.style.display = 'none';
-            if(adminBlock) adminBlock.style.display = 'block';
-        } else {
-            if(adminBlock) adminBlock.style.display = 'none';
-            if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') {
-                if(sessionRole !== 'green' && sessionRole !== 'moped') {
-                    if(settleBlock) settleBlock.style.display = 'grid';
-                    if(pingBlock) pingBlock.style.display = 'block';
+            if (requiresOverride && !overrideApproved) {
+                if(settleBlock) settleBlock.style.display = 'none';
+                if(pingBlock) pingBlock.style.display = 'none';
+                if(adminBlock) adminBlock.style.display = 'block';
+            } else {
+                if(adminBlock) adminBlock.style.display = 'none';
+                if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') {
+                    if(sessionRole !== 'green' && sessionRole !== 'moped') {
+                        if(settleBlock) settleBlock.style.display = 'grid';
+                        if(pingBlock) pingBlock.style.display = 'block';
+                    }
                 }
             }
-        }
-        
-        internalGreenNet = greenNet;
-        internalMopedNet = mopedNet;
-        internalLabourNet = l;
-        internalLatheNet = t;
-        internalLubeNet = lubeNet; 
+            
+            internalGreenNet = greenNet;
+            internalMopedNet = mopedNet;
+            internalLabourNet = l;
+            internalLatheNet = t;
+            internalLubeNet = lubeNet; 
 
-        const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
-        const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
-        
-        const totalLabor = l + servicePkgGrossTotal;
-        const coMechVal = document.getElementById('coMech').value;
-        const splitIndicator = document.getElementById('splitIndicator');
-        
-        if (coMechVal) {
-            splitIndicator.style.display = 'block';
-            splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`;
-        } else {
-            splitIndicator.style.display = 'none';
-        }
+            const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
+            const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
+            
+            const totalLabor = l + servicePkgGrossTotal;
+            const coMechNode = document.getElementById('coMech');
+            const coMechVal = coMechNode ? coMechNode.value : null;
+            const splitIndicator = document.getElementById('splitIndicator');
+            
+            if (coMechVal && splitIndicator) {
+                splitIndicator.style.display = 'block';
+                splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`;
+            } else if (splitIndicator) {
+                splitIndicator.style.display = 'none';
+            }
 
-        let netBeforeAdv = 0;
-        if (sessionRole === 'service' || sessionRole === 'admin') {
-            netBeforeAdv = partsGrossTotal + totalLabor + t;
-        } else {
-            netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
+            let netBeforeAdv = 0;
+            if (sessionRole === 'service' || sessionRole === 'admin') {
+                netBeforeAdv = partsGrossTotal + totalLabor + t;
+            } else {
+                netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + t - d; 
+            }
+            
+            const pointsNode = document.getElementById('vPointsUsed');
+            let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; 
+            const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
+            if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } 
+            
+            document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
+            
+            // PHASE 4: Auto-Save Debounce (Crucial for Index.html live tracking)
+            clearTimeout(saveDraftTimeout);
+            saveDraftTimeout = setTimeout(() => {
+                 saveJobState();
+            }, 1000);
+
+        } catch (e) {
+            console.error("Compilation Error: ", e);
         }
+    }
+
+    // PHASE 4: Silent Auto-Save to DB
+    async function saveJobState() {
+        if(!activeJobContext || activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') return;
         
-        let pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; 
-        const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
-        if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); document.getElementById('vPointsUsed').value = pUsed; } 
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
+        const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
         
-        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed); 
+        const labNotes = document.getElementById('vLabourNotes').value.trim();
+        const lthNotes = document.getElementById('vLatheNotes').value.trim();
+        let combinedNotes = "";
+        if(labNotes) combinedNotes += `LABOUR: ${labNotes} `;
+        if(labNotes && lthNotes) combinedNotes += `|| `;
+        if(lthNotes) combinedNotes += `LATHE: ${lthNotes}`;
+
+        await supabaseClient.from('job_cards').update({
+            total_invoice_value: netVal,
+            labour_charges: internalLabourNet,
+            lathe_welding: internalLatheNet,
+            lubricant_total: internalLubeNet,
+            external_work_notes: combinedNotes.trim(),
+            future_advice: document.getElementById('vFutureAdvice').value.trim(),
+            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0,
+            prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
+            green_total: internalGreenNet,
+            moped_total: internalMopedNet,
+            points_used: pUsed
+        }).eq('id', targetJobId);
     }
 
     async function requestAdminOverride() {
