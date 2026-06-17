@@ -69,7 +69,7 @@
         .receipt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
         .receipt-logo-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 4px; } .receipt-logo-container img { height: 30px; filter: grayscale(100%); }
         .receipt-shop-title { font-size: 1.1rem; font-weight: bold; margin: 2px 0; } .receipt-meta { font-size: 0.75rem; margin: 1px 0; } .receipt-divider { border-top: 1px dashed black; margin: 6px 0; }
-        .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; } .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; } .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; } .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; } .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
+        .receipt-item-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; font-size: 0.75rem; } .receipt-item-desc { flex: 1; padding-right: 4px; word-break: break-word; white-space: normal; } .receipt-item-val { font-weight: bold; text-align: right; white-space: nowrap; } .receipt-item-sub { color: #444; font-size: 0.7rem; margin-top: 1px; display: flex; justify-content: space-between; } .receipt-footer { font-size: 0.7rem; text-align: center; margin-top: 12px; border-top: 1px dashed black; padding-top: 8px; }
         .action-strip-bar { display: flex; gap: 8px; margin-top: auto; } .btn-ui-action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; font-size: 0.85rem; }
         .a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; border: 1px solid #000 !important; }
         #lockedBanner { display:none; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:16px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:20px; }
@@ -651,7 +651,14 @@
         const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; 
         
         lineItemsLocalMemory.forEach((line, idx) => { 
-            const dropAuth = (!isLocked) && (sessionRole === 'admin' || sessionRole === 'service' || line.warehouse_type === 'Service' || sessionRole === line.warehouse_type.toLowerCase()); 
+            let dropAuth = false;
+            if (!isLocked) {
+                if (sessionRole === 'admin') { dropAuth = true; }
+                else if (sessionRole === 'service' && line.warehouse_type === 'Service') { dropAuth = true; }
+                else if (sessionRole === 'green' && line.warehouse_type === 'Green') { dropAuth = true; }
+                else if (sessionRole === 'moped' && line.warehouse_type === 'Moped') { dropAuth = true; }
+            }
+            
             let evaluatedLineTotal = parseFloat(line.total_price); 
             if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); 
             evaluatedLineTotal = evaluatedLineTotal || 0;
@@ -845,13 +852,19 @@
         
         let finalItemName = cleanNameRaw;
         
+        // Brand Enforcement Logic
         if(isServiceGroup) {
             cleanBrand = ''; 
             if(typeSelect === '⚙️ Custom Lathe') {
                 finalItemName = `[LATHE] ${cleanNameRaw}`;
             }
-        } else if (cleanBrand !== '' && cleanBrand !== 'STANDARD') {
-            finalItemName = `${cleanBrand} - ${cleanNameRaw}`;
+        } else {
+            if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') {
+                // If it isn't already inside the name, definitively prepend it
+                if (!cleanNameRaw.includes(cleanBrand)) {
+                    finalItemName = `${cleanBrand} - ${cleanNameRaw}`;
+                }
+            }
         }
 
         if (typeSelect === 'Lube') {
@@ -1037,7 +1050,7 @@
         const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
         await supabaseClient.from('job_cards').update({
-            total_invoice_value: netVal, // FIX 1: This now guarantees real-time total updates
+            total_invoice_value: netVal,
             labour_charges: servicePkgGrossTotal || 0,
             lathe_welding: internalLatheNet || 0,
             lubricant_total: internalLubeNet || 0,
@@ -1046,7 +1059,7 @@
             prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
             green_total: internalGreenNet || 0,
             moped_total: internalMopedNet || 0,
-            points_used: pUsed || 0 // FIX 2: Ensuring Loyalty updates correctly here
+            points_used: pUsed || 0 
         }).eq('id', targetJobId);
     }
 
@@ -1093,7 +1106,7 @@
             future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
             payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null,
             green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, 
-            points_used: pointsRedeemed || 0 // FIX 2: Ensuring Loyalty updates correctly here too
+            points_used: pointsRedeemed || 0
         };
         
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
@@ -1145,7 +1158,8 @@
                 const cleanName = line.item_name.replace('[LATHE]', '').trim();
                 container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; 
             } else { 
-                const truncName = line.item_name.length > 26 ? line.item_name.substring(0, 24) + '..' : line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); 
+                const truncName = line.item_name; // NO MORE TRUNCATION LIMIT
+                let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); 
                 const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
                 container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; 
             } 
@@ -1192,7 +1206,8 @@
 
         function buildLineHTML(lines) {
             return lines.map(l=>{
-                const nm=l.item_name.length>22?l.item_name.substring(0,20)+'..':l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
+                const nm = l.item_name; // NO MORE TRUNCATION LIMIT
+                const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
                 return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`;
             }).join('');
         }
@@ -1205,12 +1220,27 @@
     }
     
     function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
+    
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
+    
     function executePrint(mode) { 
         document.body.className = ''; const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none';
-        if (isMulti) { document.body.classList.add('print-multi'); if (mode === 'landscape') document.body.classList.add('print-landscape'); } 
-        else { document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') container.classList.add('a5-mode'); else container.classList.remove('a5-mode'); }
-        document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.print(); document.body.className = ''; }, 200); 
+        if (isMulti) { 
+            document.body.classList.add('print-multi'); 
+            if (mode === 'landscape') document.body.classList.add('print-landscape'); 
+        } else { 
+            document.body.classList.add('print-receipt'); 
+            const container = document.getElementById('renderThermalReceiptTarget'); 
+            if (mode === 'a5') container.classList.add('a5-mode'); 
+            else container.classList.remove('a5-mode'); 
+        }
+        document.getElementById('modalPrintChoice').style.display = 'none'; 
+        
+        // Timeout expanded to guarantee CSS loads before the print spooler takes a snapshot
+        setTimeout(() => { 
+            window.onafterprint = function() { document.body.className = ''; window.onafterprint = null; };
+            window.print(); 
+        }, 400); 
     }
     
     function printMechanicTicket() { 
@@ -1231,12 +1261,14 @@
         const pMechSel = document.getElementById('primaryMech'); const cMechSel = document.getElementById('coMech');
         document.getElementById('tkFrontPMech').innerText = pMechSel.options[pMechSel.selectedIndex]?.text || '-- Unassigned --'; document.getElementById('tkFrontCMech').innerText = (cMechSel.value && cMechSel.value !== '') ? cMechSel.options[cMechSel.selectedIndex]?.text : '--';
         
-        // FIX 3: Replaced the timeout with an event listener to guarantee the print dialogue opens safely before restoring UI
-        window.onafterprint = function() {
-            document.body.classList.remove('print-mechanic');
-            window.onafterprint = null;
-        };
-        window.print(); 
+        // A 400ms delay protects against the browser print race condition
+        setTimeout(() => {
+            window.onafterprint = function() {
+                document.body.classList.remove('print-mechanic');
+                window.onafterprint = null;
+            };
+            window.print(); 
+        }, 400);
     }
 
     async function dispatchPaymentPing() {
