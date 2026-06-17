@@ -245,15 +245,16 @@
 </div>
 
 <script>
-// --- CRITICAL DOM WRAPPER: Prevents "Cannot set properties of null" errors ---
+// --- CRITICAL TDZ FIX: Initialize Role securely in global scope BEFORE any logic runs ---
+const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase();
+
 document.addEventListener('DOMContentLoaded', async () => {
     
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     
-    // Normalizer Force lowercase for safety
-    const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase();
+    // Inject normalized role into UI instantly
     const roleDisplay = document.getElementById('roleDisplay');
     if(roleDisplay) roleDisplay.innerText = activeRole.toUpperCase();
 
@@ -263,13 +264,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- INITIALIZATION ---
     async function initializeLedgerEnvironment() {
         const today = new Date().toISOString().split('T')[0];
-        if(document.getElementById('dlStart')) document.getElementById('dlStart').value = today; 
-        if(document.getElementById('clStart')) document.getElementById('clStart').value = today;
+        const dlStart = document.getElementById('dlStart');
+        const clStart = document.getElementById('clStart');
+        if(dlStart) dlStart.value = today; 
+        if(clStart) clStart.value = today;
         
         const scopeDropdown = document.getElementById('dlDeptScope');
         const drawerSelect = document.getElementById('exSourceDrawer');
         
-        // Scope locking logic safely
+        // Safe UI locking logic
         if(scopeDropdown && drawerSelect) {
             if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
             else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
@@ -301,21 +304,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.generateDailyLedger = async function() {
         const targetDate = document.getElementById('dlStart').value; 
         const scope = document.getElementById('dlDeptScope').value;
-        document.getElementById('dlDateDisplay').innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
+        const displayLabel = document.getElementById('dlDateDisplay');
+        if(displayLabel) displayLabel.innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
         
-        document.getElementById('stackWorkshop').innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
+        const stackWs = document.getElementById('stackWorkshop');
+        if(stackWs) stackWs.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
         const stackPOS = document.getElementById('stackPOS');
         if(stackPOS) stackPOS.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
         // 1. Fetch Closed Job Cards
-        let jcClosedQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, payment_mode, status').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        let jcClosedQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, payment_mode, status, advance_paid, mech_id, co_mech_id').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         // 2. Fetch Open Job Cards
-        let jcOpenQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, status').eq('status', 'Open');
+        let jcOpenQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, status, advance_paid').eq('status', 'Open');
         
-        // 3. Fetch Items Decoupled
+        // 3. Fetch Items Decoupled (Safe from Wildcard rejections)
         let itemsQuery = supabaseClient.from('job_card_items').select('job_card_id, warehouse_type, total_price');
 
-        // 4. POS
+        // 4. POS (Fuzzy Matching)
         let posQuery = supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         if (scope === 'Green') posQuery = posQuery.or('source_role.ilike.%green%,source_role.is.null');
         else if (scope === 'Moped') posQuery = posQuery.ilike('source_role', '%moped%');
@@ -323,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 5. Payments, Expenses, Advances
         let paysQuery = supabaseClient.from('credit_payments').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
         let expQuery = supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
-        let advQuery = supabaseClient.from('job_cards').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
+        let advQuery = supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
 
         const [jcClosedRes, jcOpenRes, itemsRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcClosedQuery, jcOpenQuery, itemsQuery, posQuery, paysQuery, expQuery, advQuery]);
         
@@ -334,7 +339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const expenses = expRes.data || [];
         const advances = advRes.data || [];
 
-        // Manual Join to prevent crashes
+        // Manual Javascript Join mapping to prevent crashes
         jobs.forEach(j => {
             j.mapped_items = allItems.filter(i => i.job_card_id === j.id);
         });
@@ -416,17 +421,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>'; pHtmlJ += '</tbody></table>';
         const pNet = (pGross - pCredit) + pOld - pExp;
         
-        document.getElementById('stackWorkshop').innerHTML = `
-            <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
-            ${buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
-            ${buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen.toFixed(2)}`, wHtmlB)}
-            ${buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit.toFixed(2)}`, wHtmlC)}
-            ${buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
-            ${buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld.toFixed(2)}`, wHtmlE)}
-            ${buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp.toFixed(2)}`, wHtmlF)}
-            <div class="net-drawer-box"><div class="net-drawer-title">Net Workshop Cash</div><div class="net-drawer-val">₹${wNet.toFixed(2)}</div></div>
-            <div style="text-align:right;"><span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger</span></div>
-        `;
+        if(stackWs) {
+            stackWs.innerHTML = `
+                <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
+                ${buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
+                ${buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen.toFixed(2)}`, wHtmlB)}
+                ${buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit.toFixed(2)}`, wHtmlC)}
+                ${buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
+                ${buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+wOld.toFixed(2)}`, wHtmlE)}
+                ${buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp.toFixed(2)}`, wHtmlF)}
+                <div class="net-drawer-box"><div class="net-drawer-title">Net Workshop Cash</div><div class="net-drawer-val">₹${wNet.toFixed(2)}</div></div>
+                <div style="text-align:right;"><span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger</span></div>
+            `;
+        }
 
         if(stackPOS) {
             stackPOS.innerHTML = `
@@ -437,6 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${buildAccordionHtml('J', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp.toFixed(2)}`, pHtmlJ)}
                 <div class="net-drawer-box" style="border-color:var(--success);"><div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div><div class="net-drawer-val">₹${pNet.toFixed(2)}</div></div>
             `;
+            // Strictly hide Track 2 for Service and Moped
             stackPOS.style.display = (activeRole === 'service' || activeRole === 'moped') ? 'none' : 'flex';
         }
     };
@@ -457,7 +465,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- NEW: SERVICE MASTER SHEET (TAB A & B & C) ---
     async function generateServiceMasterSheet() {
         const targetDate = document.getElementById('clStart').value;
-        document.getElementById('stmtDateStr').innerText = `Closing Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
+        const stmtLabel = document.getElementById('stmtDateStr');
+        if(stmtLabel) stmtLabel.innerText = `Closing Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
         
         // Tab A Math: Fully paid closed jobs today + Old credit payments today
         const { data: paidJobs } = await supabaseClient.from('job_cards')
@@ -486,7 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!mId || amount <= 0) return;
             if(!mechAgg[mId]) {
                 const mechObj = globalMechanics.find(m => m.id === mId);
-                mechAgg[mId] = { name: mechObj ? mechObj.name : 'Unknown Staff', rate: mechObj ? (mechObj.commission_rate || 60) : 60, totalLabour: 0, commEarned: 0 };
+                mechAgg[mId] = { name: mechObj ? mechObj.name : 'Unknown Staff', rate: mechObj ? (parseFloat(mechObj.commission_rate) || 60) : 60, totalLabour: 0, commEarned: 0 };
             }
             mechAgg[mId].totalLabour += amount;
             mechAgg[mId].commEarned += (amount * mechAgg[mId].rate) / 100;
@@ -501,13 +510,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         // Loop Old Credit Recoveries (Allocate proportional labour based on recovery)
-        // Note: For pure accuracy, if they pay 50%, mechanic gets 50% commission.
         (creditPays || []).forEach(p => {
             if(!p.job_card_id) return;
             const refJob = oldJobsData.find(oj => oj.id === p.job_card_id);
             if(refJob) {
                 const lab = parseFloat(refJob.labour_charges) || 0;
-                // Simplified business rule: Provide full mechanic commission on the labour portion once money is recovered.
                 if(lab > 0) {
                     if(refJob.co_mech_id) { allocateLabour(refJob.mech_id, lab/2); allocateLabour(refJob.co_mech_id, lab/2); } 
                     else allocateLabour(refJob.mech_id, lab);
@@ -522,7 +529,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         if(tHtml === '') tHtml = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No cash labour recovered today.</td></tr>';
         
-        document.getElementById('tbMechPayrollBody').innerHTML = tHtml + `<tr class="tfoot-row"><td colspan="2">TOTALS</td><td>₹${tLab.toFixed(2)}</td><td>-</td><td>₹${tComm.toFixed(2)}</td></tr>`;
+        const tbodyMech = document.getElementById('tbMechPayrollBody');
+        if(tbodyMech) tbodyMech.innerHTML = tHtml + `<tr class="tfoot-row"><td colspan="2">TOTALS</td><td>₹${tLab.toFixed(2)}</td><td>-</td><td>₹${tComm.toFixed(2)}</td></tr>`;
 
         // Tab B: Vendor Payouts
         const { data: exps } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
@@ -538,20 +546,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             vHtml += `<tr><td>${vSno++}</td><td>${tName}</td><td>${e.expense_category}</td><td>${e.note || '-'}</td><td>₹${amt.toFixed(2)}</td></tr>`;
         });
         if(vHtml === '') vHtml = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No external payouts logged today.</td></tr>';
-        document.getElementById('tbVendorPayoutsBody').innerHTML = vHtml + `<tr class="tfoot-row"><td colspan="4" style="text-align:right;">TOTAL DISBURSED</td><td>₹${vTotal.toFixed(2)}</td></tr>`;
+        
+        const tbodyVend = document.getElementById('tbVendorPayoutsBody');
+        if(tbodyVend) tbodyVend.innerHTML = vHtml + `<tr class="tfoot-row"><td colspan="4" style="text-align:right;">TOTAL DISBURSED</td><td>₹${vTotal.toFixed(2)}</td></tr>`;
     }
 
     // --- WAREHOUSE CROSS LEDGER (Unchanged Green/Moped Logic) ---
     window.generateCrossLedger = async function() {
         const target = document.getElementById('clStakeholder').value; const startStr = document.getElementById('clStart').value;
-        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); tbody.innerHTML = ''; if(!target) return;
+        const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); 
+        if(tbody) tbody.innerHTML = ''; 
+        if(!target) return;
         let totalCredit = 0; let totalDebit = 0;
 
         if (target === 'MasterLathe') {
             const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
             const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
-            (jobs || []).forEach(j => { const v = parseFloat(j.lathe_welding) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${new Date(j.closed_at).toLocaleDateString()}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Generated)</td><td>₹${v}</td><td>--</td></tr>`; });
-            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${new Date(e.created_at).toLocaleDateString()}</td><td>Paid to Vendor</td><td>--</td><td>₹${v}</td></tr>`; });
+            (jobs || []).forEach(j => { const v = parseFloat(j.lathe_welding) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${new Date(j.closed_at).toLocaleDateString()}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Generated)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; });
+            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${new Date(e.created_at).toLocaleDateString()}</td><td>Paid to Vendor</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
         }
         else if (target === 'GREEN WAREHOUSE' || target === 'MOPED WAREHOUSE') {
             const shortTarget = target === 'GREEN WAREHOUSE' ? 'green' : 'moped';
@@ -566,14 +578,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
             
-            lines.forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>JC-${l.job_card_id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v}</td><td>--</td></tr>`; });
-            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>Cash Transferred</td><td>--</td><td>₹${v}</td></tr>`; });
+            lines.forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>JC-${l.job_card_id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; });
+            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>Cash Transferred</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
         }
         
-        document.getElementById('clCredit').innerText = `₹${totalCredit}`; document.getElementById('clDebit').innerText = `₹${totalDebit}`; 
-        const net = totalCredit - totalDebit; const netNode = document.getElementById('clNetBalance'); 
-        netNode.innerText = `₹${Math.abs(net)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; 
-        netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
+        const clCred = document.getElementById('clCredit');
+        const clDeb = document.getElementById('clDebit');
+        const netNode = document.getElementById('clNetBalance');
+        if(clCred) clCred.innerText = `₹${totalCredit.toFixed(2)}`; 
+        if(clDeb) clDeb.innerText = `₹${totalDebit.toFixed(2)}`; 
+        
+        const net = totalCredit - totalDebit; 
+        if(netNode) {
+            netNode.innerText = `₹${Math.abs(net).toFixed(2)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; 
+            netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
+        }
     };
 
     // --- UTILITY GLOBALS ---
@@ -592,18 +611,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
     };
 
-    // Add necessary stubs to prevent UI crash for modal functions
+    // Ensure Modals and Buttons still function correctly
     window.executeSessionTermination = function() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; };
     window.printEOD = function() { document.body.classList.add('print-eod'); window.print(); setTimeout(() => { document.body.classList.remove('print-eod'); }, 500); };
     window.printMasterStatement = function() { document.body.classList.add('print-statement'); window.print(); setTimeout(() => { document.body.classList.remove('print-statement'); }, 500); };
-    window.exportViewToJpg = function(id, name) { /* Stub for html2canvas */ };
-    window.exportEODToJpg = function() { /* Stub for html2canvas */ };
-    window.toggleExpenseSubTargets = function() {};
-    window.handleNewVendorCreation = function() {};
-    window.saveNewStakeholder = function() {};
-    window.commitWorkshopExpense = function() {};
-    window.printTicket = function() {};
-    window.waTicket = function() {};
+    window.exportViewToJpg = function(id, name) { const layoutTarget = document.getElementById(id); if(layoutTarget){ html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); } };
+    window.exportEODToJpg = function() { window.exportViewToJpg('exportDailyTarget', 'EOD_Register'); };
+    window.toggleExpenseSubTargets = function() {
+        const cat = document.getElementById('exCat').value; const targetSel = document.getElementById('exTarget'); targetSel.innerHTML = '<option value="">-- Select / N/A --</option>'; document.getElementById('newVendorBlock').style.display = 'none';
+        if(cat === 'Green Spares' || cat === 'Moped Spares') { document.getElementById('exReceiverBlock').style.display = 'flex'; } else { document.getElementById('exReceiverBlock').style.display = 'none'; }
+        if(cat === 'Mechanic Payout') { globalMechanics.forEach(m => { targetSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; }); document.getElementById('exStakeholderBlock').style.display = 'flex'; } else if (cat === 'Lathe/Welding' || cat === 'Other') { globalVendors.filter(v => cat === 'Other' || v.vendor_category === 'Lathe/Welding').forEach(v => { targetSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`; }); targetSel.innerHTML += `<option value="ADD_NEW" style="color:var(--info); font-weight:bold;">+ Add New Stakeholder...</option>`; document.getElementById('exStakeholderBlock').style.display = 'flex'; } else { document.getElementById('exStakeholderBlock').style.display = 'none'; }
+    };
+    window.handleNewVendorCreation = function() { if(document.getElementById('exTarget').value === 'ADD_NEW') { document.getElementById('newVendorBlock').style.display = 'block'; } else { document.getElementById('newVendorBlock').style.display = 'none'; } };
+    window.saveNewStakeholder = async function() {
+        const vName = document.getElementById('newVendorName').value.trim(); const vCat = document.getElementById('exCat').value === 'Lathe/Welding' ? 'Lathe/Welding' : 'Other';
+        if(!vName) return; const { data: newV } = await supabaseClient.from('expense_vendors').insert({ vendor_name: vName, vendor_category: vCat }).select().single();
+        if(newV) { await fetchExternalVendors(); document.getElementById('exTarget').value = newV.id; document.getElementById('newVendorBlock').style.display = 'none'; document.getElementById('newVendorName').value = ''; }
+    };
+    window.commitWorkshopExpense = async function() {
+        const cat = document.getElementById('exCat').value;
+        let target = document.getElementById('exTarget').value;
+        const sourceDrawer = document.getElementById('exSourceDrawer').value;
+        if (cat === 'Green Spares') target = 'GREEN WAREHOUSE';
+        if (cat === 'Moped Spares') target = 'MOPED WAREHOUSE';
+        const amt = parseFloat(document.getElementById('exAmount').value) || 0;
+        let note = document.getElementById('exNote').value.trim();
+        const receiver = document.getElementById('exReceiverName').value.trim();
+
+        if(amt <= 0) return alert("Expense value must exceed absolute zero.");
+        if(target === 'ADD_NEW') return alert("Please save the new stakeholder first.");
+        if((cat === 'Green Spares' || cat === 'Moped Spares') && receiver) { note = `[Receiver: ${receiver}] ${note}`; }
+        
+        const { error } = await supabaseClient.from('workshop_expenses').insert({ expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: sourceDrawer });
+        if (error) return alert("Failed to log expense. Error: " + error.message);
+
+        document.getElementById('modalExpense').style.display = 'none'; document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
+        generateDailyLedger(); routeCrossLedger();
+        
+        document.getElementById('tkDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('tkTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('tkCat').innerText = cat; document.getElementById('tkAmount').innerText = amt; document.getElementById('tkNote').innerText = note || '--';
+        let targetNameText = target; const mech = globalMechanics.find(m => m.id === target); const vend = globalVendors.find(vd => vd.id === target); if(mech) targetNameText = mech.name; if(vend) targetNameText = vend.vendor_name;
+        document.getElementById('tkTarget').innerText = targetNameText;
+        if(receiver) { document.getElementById('rowTkReceiver').style.display = 'flex'; document.getElementById('tkReceiver').innerText = receiver; } else { document.getElementById('rowTkReceiver').style.display = 'none'; }
+        document.getElementById('modalExpenseTicket').style.display = 'flex';
+    };
+    window.printTicket = function() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); };
+    window.waTicket = function() { const layoutTarget = document.getElementById('ticketRender'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Payout_Ticket.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); };
     window.timeMachineJump = function() {
         const currentTarget = new Date(document.getElementById('dlStart').value); currentTarget.setDate(currentTarget.getDate() - 1);
         document.getElementById('dlStart').value = currentTarget.toISOString().split('T')[0]; generateDailyLedger();
