@@ -1244,31 +1244,53 @@
     }
     
     function printMechanicTicket() { 
-        document.body.classList.remove('print-receipt', 'print-multi'); 
-        document.body.classList.add('print-mechanic'); 
-        
-        const jcFormatted = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('tkFrontJc').innerText = jcFormatted;
-        const creationDate = activeJobContext?.created_at ? new Date(activeJobContext.created_at) : new Date(); document.getElementById('tkFrontCreated').innerText = creationDate.toLocaleString('en-IN'); document.getElementById('tkFrontPrinted').innerText = new Date().toLocaleString('en-IN');
-        document.getElementById('tkFrontCustName').innerText = activeCustomerName || 'Walk-in'; document.getElementById('tkFrontCustMobile').innerText = activeJobContext?.customer_mobile || '--';
-        const veh = activeJobContext?.vehicles || {}; document.getElementById('tkFrontVehModel').innerText = veh.make_model || '--'; document.getElementById('tkFrontVehColor').innerText = veh.color || '--'; document.getElementById('tkFrontVehReg').innerText = veh.reg_number || '--';
-        const rawOdo = activeJobContext?.odometer; document.getElementById('tkFrontVehOdo').innerText = (rawOdo && rawOdo !== 'null' && rawOdo !== 'undefined') ? `${rawOdo} km` : '--';
-        document.getElementById('tkFrontProblem').innerText = activeJobContext?.problem_mentioned || 'Routine Maintenance';
-        
-        const protocolContainer = document.getElementById('tkFrontProtocols'); let protocolHtml = '';
-        lineItemsLocalMemory.forEach(line => { if (line.warehouse_type === 'Service') protocolHtml += `<span style="display:inline-block; margin-right:8px; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:10px;">${line.item_name.replace('[LATHE]', '').trim()}</span>`; });
-        protocolContainer.innerHTML = protocolHtml || '<span style="font-size:10px;">No custom labour assigned</span>';
-        
-        const pMechSel = document.getElementById('primaryMech'); const cMechSel = document.getElementById('coMech');
-        document.getElementById('tkFrontPMech').innerText = pMechSel.options[pMechSel.selectedIndex]?.text || '-- Unassigned --'; document.getElementById('tkFrontCMech').innerText = (cMechSel.value && cMechSel.value !== '') ? cMechSel.options[cMechSel.selectedIndex]?.text : '--';
-        
-        // A 400ms delay protects against the browser print race condition
-        setTimeout(() => {
-            window.onafterprint = function() {
-                document.body.classList.remove('print-mechanic');
-                window.onafterprint = null;
-            };
-            window.print(); 
-        }, 400);
+        try {
+            document.body.classList.remove('print-receipt', 'print-multi'); 
+            document.body.classList.add('print-mechanic'); 
+            
+            const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.innerText = txt; };
+
+            const jcFormatted = targetJobId ? `JC-${targetJobId.split('-')[0].toUpperCase()}` : 'JC-NEW'; 
+            setTxt('tkFrontJc', jcFormatted);
+            
+            const creationDate = activeJobContext?.created_at ? new Date(activeJobContext.created_at) : new Date(); 
+            setTxt('tkFrontCreated', creationDate.toLocaleString('en-IN')); 
+            setTxt('tkFrontPrinted', new Date().toLocaleString('en-IN'));
+            
+            setTxt('tkFrontCustName', activeCustomerName || 'Walk-in'); 
+            setTxt('tkFrontCustMobile', activeJobContext?.customer_mobile || '--');
+            
+            const veh = activeJobContext?.vehicles || {}; 
+            setTxt('tkFrontVehModel', veh.make_model || '--'); 
+            setTxt('tkFrontVehColor', veh.color || '--'); 
+            setTxt('tkFrontVehReg', veh.reg_number || '--');
+            
+            const rawOdo = activeJobContext?.odometer; 
+            setTxt('tkFrontVehOdo', (rawOdo && rawOdo !== 'null' && rawOdo !== 'undefined') ? `${rawOdo} km` : '--');
+            setTxt('tkFrontProblem', activeJobContext?.problem_mentioned || 'Routine Maintenance');
+            
+            const protocolContainer = document.getElementById('tkFrontProtocols'); 
+            if (protocolContainer) {
+                let protocolHtml = '';
+                lineItemsLocalMemory.forEach(line => { if (line.warehouse_type === 'Service') protocolHtml += `<span style="display:inline-block; margin-right:8px; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:10px;">${line.item_name.replace('[LATHE]', '').trim()}</span>`; });
+                protocolContainer.innerHTML = protocolHtml || '<span style="font-size:10px;">No custom labour assigned</span>';
+            }
+            
+            const pMechSel = document.getElementById('primaryMech'); 
+            setTxt('tkFrontPMech', pMechSel?.options[pMechSel.selectedIndex]?.text || '-- Unassigned --'); 
+            
+            setTimeout(() => {
+                window.onafterprint = function() {
+                    document.body.classList.remove('print-mechanic');
+                    window.onafterprint = null;
+                };
+                window.print(); 
+            }, 400);
+
+        } catch(e) {
+            console.error("Print Error:", e);
+            alert("Mechanic ticket system error: " + e.message);
+        }
     }
 
     async function dispatchPaymentPing() {
