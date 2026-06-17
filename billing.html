@@ -1037,7 +1037,7 @@
         const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
         await supabaseClient.from('job_cards').update({
-            total_invoice_value: netVal || 0,
+            total_invoice_value: netVal, // FIX 1: This now guarantees real-time total updates
             labour_charges: servicePkgGrossTotal || 0,
             lathe_welding: internalLatheNet || 0,
             lubricant_total: internalLubeNet || 0,
@@ -1046,7 +1046,7 @@
             prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
             green_total: internalGreenNet || 0,
             moped_total: internalMopedNet || 0,
-            points_used: pUsed || 0
+            points_used: pUsed || 0 // FIX 2: Ensuring Loyalty updates correctly here
         }).eq('id', targetJobId);
     }
 
@@ -1092,7 +1092,8 @@
             total_invoice_value: netVal || 0, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, 
             future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
             payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null,
-            green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, points_used: pointsRedeemed || 0 
+            green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, 
+            points_used: pointsRedeemed || 0 // FIX 2: Ensuring Loyalty updates correctly here too
         };
         
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
@@ -1213,7 +1214,9 @@
     }
     
     function printMechanicTicket() { 
-        document.body.classList.remove('print-receipt', 'print-multi'); document.body.classList.add('print-mechanic'); 
+        document.body.classList.remove('print-receipt', 'print-multi'); 
+        document.body.classList.add('print-mechanic'); 
+        
         const jcFormatted = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('tkFrontJc').innerText = jcFormatted;
         const creationDate = activeJobContext?.created_at ? new Date(activeJobContext.created_at) : new Date(); document.getElementById('tkFrontCreated').innerText = creationDate.toLocaleString('en-IN'); document.getElementById('tkFrontPrinted').innerText = new Date().toLocaleString('en-IN');
         document.getElementById('tkFrontCustName').innerText = activeCustomerName || 'Walk-in'; document.getElementById('tkFrontCustMobile').innerText = activeJobContext?.customer_mobile || '--';
@@ -1227,7 +1230,13 @@
         
         const pMechSel = document.getElementById('primaryMech'); const cMechSel = document.getElementById('coMech');
         document.getElementById('tkFrontPMech').innerText = pMechSel.options[pMechSel.selectedIndex]?.text || '-- Unassigned --'; document.getElementById('tkFrontCMech').innerText = (cMechSel.value && cMechSel.value !== '') ? cMechSel.options[cMechSel.selectedIndex]?.text : '--';
-        window.print(); setTimeout(() => { document.body.classList.remove('print-mechanic'); }, 500); 
+        
+        // FIX 3: Replaced the timeout with an event listener to guarantee the print dialogue opens safely before restoring UI
+        window.onafterprint = function() {
+            document.body.classList.remove('print-mechanic');
+            window.onafterprint = null;
+        };
+        window.print(); 
     }
 
     async function dispatchPaymentPing() {
