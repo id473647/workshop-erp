@@ -209,9 +209,10 @@
                 <input type="number" id="vPointsUsed" class="field-input input-lockable" value="0" min="0" oninput="compileDynamicSums()" placeholder="Enter Points to Redeem" style="margin-bottom: 0; border-color: #7dd3fc;">
             </div>
 
-            <div class="flex-row" style="margin-bottom: 0; margin-top: auto;">
-                <div style="flex: 1;"><span class="field-label">Prepaid Deposit (₹)</span><input type="number" id="vPrepaid" class="field-input input-lockable" value="0" style="margin-bottom: 0;" oninput="compileDynamicSums()"></div>
-                <div style="flex: 1;"><span class="field-label">Workshop Advance (₹)</span><input type="number" id="vAdvance" class="field-input input-lockable" value="0" style="margin-bottom: 0;" oninput="compileDynamicSums()"></div>
+            <div class="flex-row" style="margin-bottom: 0; margin-top: auto;" id="advanceBucketsUI">
+                <div style="flex: 1;"><span class="field-label">Service Adv (₹)</span><input type="number" id="vAdvanceService" class="field-input input-lockable" value="0" style="margin-bottom: 0;" oninput="compileDynamicSums()"></div>
+                <div style="flex: 1;"><span class="field-label">Grn Prepaid (₹)</span><input type="number" id="vPrepaidGreen" class="field-input input-lockable" value="0" style="margin-bottom: 0;" oninput="compileDynamicSums()"></div>
+                <div style="flex: 1;"><span class="field-label">Mop Prepaid (₹)</span><input type="number" id="vPrepaidMoped" class="field-input input-lockable" value="0" style="margin-bottom: 0;" oninput="compileDynamicSums()"></div>
             </div>
         </div>
         
@@ -271,7 +272,8 @@
     </div>
 
     <div id="draftActionBlock" style="display:none; margin-bottom:20px;">
-        <button class="btn-action btn-save" style="width:100%;" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 UPDATE DRAFT & RECORD PREPAID</button>
+        <button id="btnLogPrepaid" class="btn-action" style="display:none; background:#059669; width:100%; margin-bottom:10px;" onclick="logMidJobPrepaid()">➕ LOG MID-JOB PREPAID</button>
+        <button class="btn-action btn-save" style="width:100%;" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 UPDATE DRAFT</button>
     </div>
     
     <div id="adminEditBlock" style="display:none; margin-bottom:20px;">
@@ -337,8 +339,11 @@
             
             <div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div>
             <div class="receipt-meta" id="rowPointsSum" style="display:flex; justify-content:space-between; color:#0369a1; font-weight:bold; display:none;"><span>Points Used:</span><strong id="thPointsSum">₹0</strong></div>
-            <div class="receipt-meta" id="rowAdvanceSum" style="display:flex; justify-content:space-between; color:red;"><span>Less Advance:</span><strong id="thAdvanceSum">₹0</strong></div>
-            <div class="receipt-meta" id="rowPrepaidSum" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Prepaid:</span><strong id="thPrepaidSum">₹0</strong></div>
+            
+            <div class="receipt-meta" id="rowAdvSrv" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Service Adv:</span><strong id="thAdvSrv">₹0</strong></div>
+            <div class="receipt-meta" id="rowPrepGrn" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Grn Prepaid:</span><strong id="thPrepGrn">₹0</strong></div>
+            <div class="receipt-meta" id="rowPrepMop" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Mop Prepaid:</span><strong id="thPrepMop">₹0</strong></div>
+            
             <div class="receipt-divider"></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div>
             <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div>
@@ -523,13 +528,17 @@
         setupRoleBasedDropdown();
         toggleLubeUI();
 
+        // TRI-BUCKET ROLE DISABILITY RULES
+        document.getElementById('vAdvanceService').disabled = (sessionRole === 'green' || sessionRole === 'moped');
+        document.getElementById('vPrepaidGreen').disabled = (sessionRole !== 'green' && sessionRole !== 'admin');
+        document.getElementById('vPrepaidMoped').disabled = (sessionRole !== 'moped' && sessionRole !== 'admin');
+
         if (sessionRole === 'green' || sessionRole === 'moped') { 
             document.getElementById('draftActionBlock').style.display = 'block'; 
-            document.getElementById('vAdvance').disabled = true; document.getElementById('vAdvance').style.background = '#f1f5f9';
+            document.getElementById('btnLogPrepaid').style.display = 'block'; // IN-FLIGHT INJECTOR REVEALED
         } else { 
             document.getElementById('settlementActionBlock').style.display = 'grid'; 
             document.getElementById('pingRequestBlock').style.display = 'block';
-            document.getElementById('vPrepaid').disabled = true; document.getElementById('vPrepaid').style.background = '#f1f5f9';
         }
         
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin' || sessionRole === 'service') { 
@@ -558,13 +567,18 @@
             activeJobContext = job; 
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET"; 
             document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`; 
-            document.getElementById('prepaidPill').innerText = `Paid Total Adv: ₹${(parseFloat(job.advance_paid) || 0) + (parseFloat(job.prepaid_amount) || 0)}`; 
+            
+            const totalPrecollected = (parseFloat(job.advance_service) || 0) + (parseFloat(job.prepaid_green) || 0) + (parseFloat(job.prepaid_moped) || 0);
+            document.getElementById('prepaidPill').innerText = `Total Adv/Prep: ₹${totalPrecollected}`; 
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             if (job.mech_id) document.getElementById('primaryMech').value = job.mech_id; if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
             
             document.getElementById('vFutureAdvice').value = job.future_advice || ''; 
-            document.getElementById('vAdvance').value = parseFloat(job.advance_paid) || 0;
-            document.getElementById('vPrepaid').value = parseFloat(job.prepaid_amount) || 0;
+            
+            // POPULATING TRI-BUCKET INPUTS
+            document.getElementById('vAdvanceService').value = parseFloat(job.advance_service) || 0;
+            document.getElementById('vPrepaidGreen').value = parseFloat(job.prepaid_green) || 0;
+            document.getElementById('vPrepaidMoped').value = parseFloat(job.prepaid_moped) || 0;
 
             if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
             
@@ -582,6 +596,30 @@
                 if(job.status === 'Cancelled' && job.cancellation_reason) { document.getElementById('lockReasonDisplay').style.display = 'block'; document.getElementById('lockReasonText').innerText = job.cancellation_reason; }
                 lockUserInterface();
             }
+        }
+    }
+
+    // MID-JOB PREPAID INJECTOR FUNCTION
+    async function logMidJobPrepaid() {
+        if (sessionRole !== 'green' && sessionRole !== 'moped') return;
+        const amtStr = prompt(`Enter prepaid cash/UPI amount collected at ${sessionRole.toUpperCase()} counter:`, "0");
+        const amt = parseFloat(amtStr);
+        if (!amt || amt <= 0) return;
+
+        const elId = sessionRole === 'green' ? 'vPrepaidGreen' : 'vPrepaidMoped';
+        const colName = sessionRole === 'green' ? 'prepaid_green' : 'prepaid_moped';
+        const currentVal = parseFloat(document.getElementById(elId).value) || 0;
+        const newVal = currentVal + amt;
+
+        const { error } = await supabaseClient.from('job_cards').update({ [colName]: newVal }).eq('id', targetJobId);
+        
+        if (!error) {
+            document.getElementById(elId).value = newVal;
+            if(activeJobContext) activeJobContext[colName] = newVal;
+            compileDynamicSums();
+            alert(`✅ Successfully logged ₹${amt} prepaid collection to ${sessionRole.toUpperCase()} ledger.`);
+        } else {
+            alert("Database Error: " + error.message);
         }
     }
 
@@ -744,7 +782,6 @@
 
         let results = [];
         
-        // PURE TEXT SEARCH: Bug-Free and Fast
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') {
             let pResults = globalCatalogCache.filter(p => p.source === 'product');
             pResults = pResults.filter(p => {
@@ -852,7 +889,6 @@
         
         let finalItemName = cleanNameRaw;
         
-        // Brand Enforcement Logic
         if(isServiceGroup) {
             cleanBrand = ''; 
             if(typeSelect === '⚙️ Custom Lathe') {
@@ -860,7 +896,6 @@
             }
         } else {
             if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') {
-                // If it isn't already inside the name, definitively prepend it
                 if (!cleanNameRaw.includes(cleanBrand)) {
                     finalItemName = `${cleanBrand} - ${cleanNameRaw}`;
                 }
@@ -1006,8 +1041,10 @@
             internalMopedNet = mopedNet || 0;
             internalLubeNet = lubeNet || 0; 
 
-            const a = parseFloat(document.getElementById('vAdvance').value) || 0; 
-            const p = parseFloat(document.getElementById('vPrepaid').value) || 0; 
+            // TRI-BUCKET MATH UPDATE
+            const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; 
+            const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; 
+            const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; 
             
             const totalLabor = servicePkgGrossTotal || 0;
             const coMechNode = document.getElementById('coMech');
@@ -1033,7 +1070,7 @@
             const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); 
             if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } 
             
-            document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a - p - pUsed) || 0; 
+            document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a_srv - p_grn - p_mop - pUsed) || 0; 
             
             clearTimeout(saveDraftTimeout);
             saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000);
@@ -1055,8 +1092,9 @@
             lathe_welding: internalLatheNet || 0,
             lubricant_total: internalLubeNet || 0,
             future_advice: document.getElementById('vFutureAdvice').value.trim(),
-            advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0,
-            prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
+            advance_service: parseFloat(document.getElementById('vAdvanceService').value) || 0,
+            prepaid_green: parseFloat(document.getElementById('vPrepaidGreen').value) || 0,
+            prepaid_moped: parseFloat(document.getElementById('vPrepaidMoped').value) || 0,
             green_total: internalGreenNet || 0,
             moped_total: internalMopedNet || 0,
             points_used: pUsed || 0 
@@ -1095,7 +1133,16 @@
         if (btn) { if (Math.abs(remaining) < 0.01) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; } }
     }
     
-    function confirmSplitPayment() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; let upi = parseFloat(document.getElementById('splitUpiInput').value) || 0; if ((cash + upi) !== netVal) return alert("Split amounts must equal Net Payable!"); isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi; commitInvoiceSettlement(`Split (Cash: ₹${cash}, UPI: ₹${upi})`, 'Closed'); document.getElementById('modalSplitPayment').style.display = 'none'; }
+    function confirmSplitPayment() { 
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; 
+        let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; 
+        let upi = parseFloat(document.getElementById('splitUpiInput').value) || 0; 
+        if ((cash + upi) !== netVal) return alert("Split amounts must equal Net Payable!"); 
+        isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi; 
+        // SPLIT PAYMENT REGEX FORMATTER UPDATE
+        commitInvoiceSettlement(`Split (Cash: ${cash}, UPI: ${upi})`, 'Closed'); 
+        document.getElementById('modalSplitPayment').style.display = 'none'; 
+    }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
         const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
@@ -1103,7 +1150,10 @@
 
         const updates = { 
             total_invoice_value: netVal || 0, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, 
-            future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_paid: parseFloat(document.getElementById('vAdvance').value) || 0, prepaid_amount: parseFloat(document.getElementById('vPrepaid').value) || 0,
+            future_advice: document.getElementById('vFutureAdvice').value.trim(), 
+            advance_service: parseFloat(document.getElementById('vAdvanceService').value) || 0, 
+            prepaid_green: parseFloat(document.getElementById('vPrepaidGreen').value) || 0,
+            prepaid_moped: parseFloat(document.getElementById('vPrepaidMoped').value) || 0,
             payment_mode: modeTarget, status: statusTarget, mech_id: document.getElementById('primaryMech').value || null, co_mech_id: document.getElementById('coMech').value || null,
             green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, 
             points_used: pointsRedeemed || 0
@@ -1158,7 +1208,7 @@
                 const cleanName = line.item_name.replace('[LATHE]', '').trim();
                 container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; 
             } else { 
-                const truncName = line.item_name; // NO MORE TRUNCATION LIMIT
+                const truncName = line.item_name; 
                 let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); 
                 const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
                 container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; 
@@ -1187,8 +1237,14 @@
         const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum');
         if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; }
 
-        const dAdv = document.getElementById('rowAdvanceSum'); if (scopeVals.advance_paid > 0) { dAdv.style.display = 'flex'; document.getElementById('thAdvanceSum').innerText = `-₹${scopeVals.advance_paid}`; } else { dAdv.style.display = 'none'; } 
-        const dPre = document.getElementById('rowPrepaidSum'); if (scopeVals.prepaid_amount > 0) { dPre.style.display = 'flex'; document.getElementById('thPrepaidSum').innerText = `-₹${scopeVals.prepaid_amount}`; } else { dPre.style.display = 'none'; } 
+        // TRI-BUCKET RECEIPT PRINTOUT UPDATE
+        const advSrv = parseFloat(scopeVals.advance_service) || 0;
+        const prepGrn = parseFloat(scopeVals.prepaid_green) || 0;
+        const prepMop = parseFloat(scopeVals.prepaid_moped) || 0;
+
+        const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; }
+        const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; }
+        const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; }
         
         document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); 
         if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } 
@@ -1206,7 +1262,7 @@
 
         function buildLineHTML(lines) {
             return lines.map(l=>{
-                const nm = l.item_name; // NO MORE TRUNCATION LIMIT
+                const nm = l.item_name; 
                 const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : '';
                 return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`;
             }).join('');
@@ -1236,7 +1292,6 @@
         }
         document.getElementById('modalPrintChoice').style.display = 'none'; 
         
-        // Timeout expanded to guarantee CSS loads before the print spooler takes a snapshot
         setTimeout(() => { 
             window.onafterprint = function() { document.body.className = ''; window.onafterprint = null; };
             window.print(); 
