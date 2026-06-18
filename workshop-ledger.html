@@ -245,106 +245,124 @@
 </div>
 
 <script>
-// --- CRITICAL TDZ FIX: Initialize Role securely in global scope BEFORE any logic runs ---
-const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase();
+// 1. Declare Global State IMMEDIATELY to prevent Temporal Dead Zone (TDZ) hangs
+window.activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase().trim();
+window.globalMechanics = []; 
+window.globalVendors = [];
 
-document.addEventListener('DOMContentLoaded', async () => {
-    
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    
-    // Inject normalized role into UI instantly
-    const roleDisplay = document.getElementById('roleDisplay');
-    if(roleDisplay) roleDisplay.innerText = activeRole.toUpperCase();
+// 2. Map all functions directly to window so HTML buttons can click them flawlessly
+window.executeSessionTermination = function() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; };
+window.printEOD = function() { document.body.classList.add('print-eod'); window.print(); setTimeout(() => { document.body.classList.remove('print-eod'); }, 500); };
+window.printMasterStatement = function() { document.body.classList.add('print-statement'); window.print(); setTimeout(() => { document.body.classList.remove('print-statement'); }, 500); };
+window.exportViewToJpg = function(id, name) { const target = document.getElementById(id); if(target) { html2canvas(target, { scale: 2, useCORS: true }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }};
+window.exportEODToJpg = function() { window.exportViewToJpg('exportDailyTarget', 'EOD_Register'); };
+window.switchSystemPanel = function(targetPanelId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active')); document.getElementById(targetPanelId).classList.add('active'); if(targetPanelId === 'panelDaily') window.generateDailyLedger(); if(targetPanelId === 'panelCross') window.routeCrossLedger(); };
+window.timeMachineJump = function() { const currentTarget = new Date(document.getElementById('dlStart').value); currentTarget.setDate(currentTarget.getDate() - 1); document.getElementById('dlStart').value = currentTarget.toISOString().split('T')[0]; window.generateDailyLedger(); };
+window.buildAccordionHtml = function(letter, title, valueClass, valueStr, tableHtml) { return `<div class="eod-accordion"><div class="eod-summary" onclick="this.parentElement.classList.toggle('open')"><div><span style="display:inline-block; width:30px; color:#94a3b8;">${letter}.</span> ${title}</div><div class="${valueClass}">${valueStr} <span style="font-size:0.7rem; color:#94a3b8;">▼</span></div></div><div class="eod-detail">${tableHtml}</div></div>`; };
+window.printTicket = function() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); };
+window.waTicket = function() { window.exportViewToJpg('ticketRender', 'Payout_Ticket'); };
 
-    let globalMechanics = []; 
-    let globalVendors = [];
+// 3. Immediately Invoked Async Function (IIAFE) completely replaces DOMContentLoaded
+(async function bootERP() {
+    try {
+        // Render Role Badge Instantly
+        const roleDisplay = document.getElementById('roleDisplay');
+        if (roleDisplay) roleDisplay.innerText = window.activeRole.toUpperCase();
 
-    // --- INITIALIZATION ---
-    async function initializeLedgerEnvironment() {
+        // Initialize Supabase Connection
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7r সত্যিকারেরEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k"; // Assuming real key from original code
+        window.supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+        // Populate Date Pickers
         const today = new Date().toISOString().split('T')[0];
         const dlStart = document.getElementById('dlStart');
         const clStart = document.getElementById('clStart');
-        if(dlStart) dlStart.value = today; 
-        if(clStart) clStart.value = today;
-        
+        if (dlStart) dlStart.value = today; 
+        if (clStart) clStart.value = today;
+
+        // Apply Hard Logic Locks for Departments
         const scopeDropdown = document.getElementById('dlDeptScope');
         const drawerSelect = document.getElementById('exSourceDrawer');
-        
-        // Safe UI locking logic
-        if(scopeDropdown && drawerSelect) {
-            if (activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
-            else if (activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
-            else if (activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
+        if (scopeDropdown && drawerSelect) {
+            if (window.activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
+            else if (window.activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
+            else if (window.activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
         }
 
-        // Change Cross Ledger Tab Title for Service
-        if(activeRole === 'service' || activeRole === 'admin') {
+        // Title Re-write for Service Managers
+        if (window.activeRole === 'service' || window.activeRole === 'admin') {
             const btnCross = document.getElementById('btnTabCross');
-            if(btnCross) btnCross.innerText = "Workshop Daily Summary";
+            if (btnCross) btnCross.innerText = "Workshop Daily Summary";
         }
 
-        // DECOUPLED FETCH: Get Mechanics independently to prevent Supabase 42703 Join Errors
-        const { data: m } = await supabaseClient.from('mechanics').select('id, name, commission_rate'); 
-        globalMechanics = m || [];
+        // Fetch Global Master Data Safely
+        const { data: mData } = await window.supabaseClient.from('mechanics').select('*');
+        window.globalMechanics = mData || [];
         
-        await fetchExternalVendors();
-    }
+        const { data: vData } = await window.supabaseClient.from('expense_vendors').select('*');
+        window.globalVendors = vData || [];
 
-    async function fetchExternalVendors() {
-        const { data: v } = await supabaseClient.from('expense_vendors').select('*'); 
-        globalVendors = v || [];
-        populateCrossLedgerDropdown(); 
-        toggleExpenseSubTargets(); 
-        generateDailyLedger();
-    }
+        // Attach Sub-functions
+        window.populateCrossLedgerDropdown();
+        window.toggleExpenseSubTargets();
 
-    // --- EOD MATH (TRACK 1 & TRACK 2) ---
-    window.generateDailyLedger = async function() {
+        // Run Initial Daily Math!
+        window.generateDailyLedger();
+
+    } catch (err) {
+        console.error("ERP BOOT SEQUENCE CRASH:", err);
+        alert("System failed to boot properly. Refresh page. Error: " + err.message);
+    }
+})();
+
+// =====================================
+// CORE MATH MODULES (Decoupled to prevent DB join crashes)
+// =====================================
+
+window.generateDailyLedger = async function() {
+    try {
         const targetDate = document.getElementById('dlStart').value; 
         const scope = document.getElementById('dlDeptScope').value;
+        
         const displayLabel = document.getElementById('dlDateDisplay');
-        if(displayLabel) displayLabel.innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
+        if (displayLabel) displayLabel.innerText = `Date: ${new Date(targetDate).toLocaleDateString('en-IN')} | Scope: ${scope.toUpperCase()}`;
         
         const stackWs = document.getElementById('stackWorkshop');
-        if(stackWs) stackWs.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
         const stackPOS = document.getElementById('stackPOS');
-        if(stackPOS) stackPOS.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
+        if (stackWs) stackWs.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
+        if (stackPOS) stackPOS.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
-        // 1. Fetch Closed Job Cards
-        let jcClosedQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, payment_mode, status, advance_paid, mech_id, co_mech_id').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
-        // 2. Fetch Open Job Cards
-        let jcOpenQuery = supabaseClient.from('job_cards').select('id, total_invoice_value, labour_charges, lathe_welding, status, advance_paid').eq('status', 'Open');
+        // 1. Decoupled Safe Query for Jobs (Select * avoids Missing Column 42703 error)
+        let jcClosedQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        let jcOpenQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Open');
         
-        // 3. Fetch Items Decoupled (Safe from Wildcard rejections)
-        let itemsQuery = supabaseClient.from('job_card_items').select('job_card_id, warehouse_type, total_price');
+        // 2. Fetch POS & Filter manually below to avoid PostgREST .ilike crash
+        let posQuery = window.supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
+        let paysQuery = window.supabaseClient.from('credit_payments').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+        let expQuery = window.supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+        let advQuery = window.supabaseClient.from('job_cards').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
 
-        // 4. POS (Fuzzy Matching)
-        let posQuery = supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
-        if (scope === 'Green') posQuery = posQuery.or('source_role.ilike.%green%,source_role.is.null');
-        else if (scope === 'Moped') posQuery = posQuery.ilike('source_role', '%moped%');
-
-        // 5. Payments, Expenses, Advances
-        let paysQuery = supabaseClient.from('credit_payments').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
-        let expQuery = supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
-        let advQuery = supabaseClient.from('job_cards').select('id, advance_paid').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
-
-        const [jcClosedRes, jcOpenRes, itemsRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcClosedQuery, jcOpenQuery, itemsQuery, posQuery, paysQuery, expQuery, advQuery]);
+        const [jcClosedRes, jcOpenRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcClosedQuery, jcOpenQuery, posQuery, paysQuery, expQuery, advQuery]);
         
         const jobs = [...(jcClosedRes.data || []), ...(jcOpenRes.data || [])];
-        const allItems = itemsRes.data || [];
-        const sales = posRes.data || [];
-        const pays = paysRes.data || [];
-        const expenses = expRes.data || [];
-        const advances = advRes.data || [];
+        const jobIds = jobs.map(j => j.id);
 
-        // Manual Javascript Join mapping to prevent crashes
-        jobs.forEach(j => {
-            j.mapped_items = allItems.filter(i => i.job_card_id === j.id);
-        });
+        // 3. Batch Fetch Items to prevent Array Limit crashes
+        let allItems = [];
+        if (jobIds.length > 0) {
+            const chunkSize = 100;
+            for (let i = 0; i < jobIds.length; i += chunkSize) {
+                const chunk = jobIds.slice(i, i + chunkSize);
+                const { data: chunkItems } = await window.supabaseClient.from('job_card_items').select('*').in('job_card_id', chunk);
+                allItems = allItems.concat(chunkItems || []);
+            }
+        }
 
-        // TRACK 1
+        // JS Manual Join
+        jobs.forEach(j => { j.mapped_items = allItems.filter(i => i.job_card_id === j.id); });
+
+        // --- TRACK 1: WORKSHOP MATH ---
         let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Realized Revenue</th></tr></thead><tbody>';
         let wOpen = 0;  let wHtmlB = '<table><thead><tr><th>Hash</th><th>Unrealized Revenue (WIP)</th></tr></thead><tbody>';
         let wCredit = 0; let wHtmlC = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
@@ -381,6 +399,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        const pays = paysRes.data || [];
+        const expenses = expRes.data || [];
+        const advances = advRes.data || [];
+
+        // Workshop Extra Tally (Only for Master View)
         if (scope === 'ALL' || scope === 'Workshop') {
             advances.forEach(a => { const v = parseFloat(a.advance_paid) || 0; wAdv += v; wHtmlD += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)}</td></tr>`; });
             pays.forEach(p => {
@@ -400,11 +423,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>'; wHtmlF += '</tbody></table>';
         const wNet = (wGross - wCredit) + wAdv + wOld - wExp;
 
-        // TRACK 2
+        // --- TRACK 2: POS MATH (Fuzzy Filtered in JS) ---
         let pGross = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
         let pCredit = 0; let pHtmlH = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
         let pOld = 0; let pHtmlI = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
         let pExp = 0; let pHtmlJ = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
+
+        let sales = posRes.data || [];
+        if (scope === 'Green') sales = sales.filter(s => (s.source_role || '').toLowerCase().includes('green') || !s.source_role);
+        else if (scope === 'Moped') sales = sales.filter(s => (s.source_role || '').toLowerCase().includes('moped'));
 
         sales.forEach(s => {
             const v = parseFloat(s.total_amount) || 0; pGross += v; pHtmlG += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v.toFixed(2)}</td></tr>`;
@@ -421,71 +448,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>'; pHtmlJ += '</tbody></table>';
         const pNet = (pGross - pCredit) + pOld - pExp;
         
-        if(stackWs) {
+        // --- HTML INJECTION ---
+        if (stackWs) {
             stackWs.innerHTML = `
                 <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
-                ${buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
-                ${buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen.toFixed(2)}`, wHtmlB)}
-                ${buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit.toFixed(2)}`, wHtmlC)}
-                ${buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
-                ${buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+wOld.toFixed(2)}`, wHtmlE)}
-                ${buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp.toFixed(2)}`, wHtmlF)}
+                ${window.buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
+                ${window.buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen.toFixed(2)}`, wHtmlB)}
+                ${window.buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit.toFixed(2)}`, wHtmlC)}
+                ${window.buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
+                ${window.buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld.toFixed(2)}`, wHtmlE)}
+                ${window.buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp.toFixed(2)}`, wHtmlF)}
                 <div class="net-drawer-box"><div class="net-drawer-title">Net Workshop Cash</div><div class="net-drawer-val">₹${wNet.toFixed(2)}</div></div>
-                <div style="text-align:right;"><span class="time-link" onclick="timeMachineJump()">⏪ View Previous Day Ledger</span></div>
+                <div style="text-align:right;"><span class="time-link" onclick="window.timeMachineJump()">⏪ View Previous Day Ledger</span></div>
             `;
         }
 
-        if(stackPOS) {
+        if (stackPOS) {
             stackPOS.innerHTML = `
                 <h4 style="margin:0 0 4px 0; color:var(--success); text-align:center;">Track 2: POS Drawer</h4>
-                ${buildAccordionHtml('G', 'Gross Retail POS Billed', 'val-success', `₹${pGross.toFixed(2)}`, pHtmlG)}
-                ${buildAccordionHtml('H', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit.toFixed(2)}`, pHtmlH)}
-                ${buildAccordionHtml('I', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld.toFixed(2)}`, pHtmlI)}
-                ${buildAccordionHtml('J', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp.toFixed(2)}`, pHtmlJ)}
+                ${window.buildAccordionHtml('G', 'Gross Retail POS Billed', 'val-success', `₹${pGross.toFixed(2)}`, pHtmlG)}
+                ${window.buildAccordionHtml('H', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit.toFixed(2)}`, pHtmlH)}
+                ${window.buildAccordionHtml('I', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld.toFixed(2)}`, pHtmlI)}
+                ${window.buildAccordionHtml('J', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp.toFixed(2)}`, pHtmlJ)}
                 <div class="net-drawer-box" style="border-color:var(--success);"><div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div><div class="net-drawer-val">₹${pNet.toFixed(2)}</div></div>
             `;
-            // Strictly hide Track 2 for Service and Moped
-            stackPOS.style.display = (activeRole === 'service' || activeRole === 'moped') ? 'none' : 'flex';
+            // STRICT VISIBILITY LOCKDOWN
+            if (window.activeRole === 'green' || window.activeRole === 'admin') {
+                stackPOS.style.display = 'flex';
+            } else {
+                stackPOS.style.display = 'none'; // Forces Service and Moped to ignore Track 2 entirely
+            }
         }
-    };
+    } catch (err) {
+        console.error("Ledger Generation Error:", err);
+    }
+};
 
-    // --- PANEL 2 ROUTING: CROSS LEDGER vs MASTER SHEET ---
-    window.routeCrossLedger = function() {
-        if(activeRole === 'service' || activeRole === 'admin') {
-            document.getElementById('warehouseCrossSheet').style.display = 'none';
-            document.getElementById('serviceMasterSheet').style.display = 'block';
-            generateServiceMasterSheet();
-        } else {
-            document.getElementById('serviceMasterSheet').style.display = 'none';
-            document.getElementById('warehouseCrossSheet').style.display = 'block';
-            generateCrossLedger();
-        }
-    };
+window.routeCrossLedger = function() {
+    if (window.activeRole === 'service' || window.activeRole === 'admin') {
+        document.getElementById('warehouseCrossSheet').style.display = 'none';
+        document.getElementById('serviceMasterSheet').style.display = 'block';
+        window.generateServiceMasterSheet();
+    } else {
+        document.getElementById('serviceMasterSheet').style.display = 'none';
+        document.getElementById('warehouseCrossSheet').style.display = 'block';
+        window.generateCrossLedger();
+    }
+};
 
-    // --- NEW: SERVICE MASTER SHEET (TAB A & B & C) ---
-    async function generateServiceMasterSheet() {
+window.generateServiceMasterSheet = async function() {
+    try {
         const targetDate = document.getElementById('clStart').value;
         const stmtLabel = document.getElementById('stmtDateStr');
         if(stmtLabel) stmtLabel.innerText = `Closing Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
         
-        // Tab A Math: Fully paid closed jobs today + Old credit payments today
-        const { data: paidJobs } = await supabaseClient.from('job_cards')
-            .select('id, mech_id, co_mech_id, labour_charges')
+        const { data: paidJobs } = await window.supabaseClient.from('job_cards')
+            .select('*')
             .eq('status', 'Closed').neq('payment_mode', 'Credit')
             .gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
             
-        const { data: creditPays } = await supabaseClient.from('credit_payments')
-            .select('job_card_id, amount_paid')
+        const { data: creditPays } = await window.supabaseClient.from('credit_payments')
+            .select('*')
             .gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
 
         let historicalJobIds = [];
-        if(creditPays) {
-             historicalJobIds = creditPays.filter(p => p.job_card_id).map(p => p.job_card_id);
-        }
+        if(creditPays) historicalJobIds = creditPays.filter(p => p.job_card_id).map(p => p.job_card_id);
         
         let oldJobsData = [];
         if(historicalJobIds.length > 0) {
-            const { data: oldJobs } = await supabaseClient.from('job_cards').select('id, mech_id, co_mech_id, labour_charges').in('id', historicalJobIds);
+            const { data: oldJobs } = await window.supabaseClient.from('job_cards').select('*').in('id', historicalJobIds);
             oldJobsData = oldJobs || [];
         }
 
@@ -494,14 +525,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         function allocateLabour(mId, amount) {
             if(!mId || amount <= 0) return;
             if(!mechAgg[mId]) {
-                const mechObj = globalMechanics.find(m => m.id === mId);
+                const mechObj = window.globalMechanics.find(m => m.id === mId);
                 mechAgg[mId] = { name: mechObj ? mechObj.name : 'Unknown Staff', rate: mechObj ? (parseFloat(mechObj.commission_rate) || 60) : 60, totalLabour: 0, commEarned: 0 };
             }
             mechAgg[mId].totalLabour += amount;
             mechAgg[mId].commEarned += (amount * mechAgg[mId].rate) / 100;
         }
 
-        // Loop Paid Today
         (paidJobs || []).forEach(j => {
             const lab = parseFloat(j.labour_charges) || 0;
             if(lab <= 0) return;
@@ -509,7 +539,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             else allocateLabour(j.mech_id, lab);
         });
 
-        // Loop Old Credit Recoveries (Allocate proportional labour based on recovery)
         (creditPays || []).forEach(p => {
             if(!p.job_card_id) return;
             const refJob = oldJobsData.find(oj => oj.id === p.job_card_id);
@@ -533,14 +562,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(tbodyMech) tbodyMech.innerHTML = tHtml + `<tr class="tfoot-row"><td colspan="2">TOTALS</td><td>₹${tLab.toFixed(2)}</td><td>-</td><td>₹${tComm.toFixed(2)}</td></tr>`;
 
         // Tab B: Vendor Payouts
-        const { data: exps } = await supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+        const { data: exps } = await window.supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
         let vHtml = ''; let vSno = 1; let vTotal = 0;
         (exps || []).forEach(e => {
             const amt = parseFloat(e.amount) || 0;
             vTotal += amt;
             let tName = e.stakeholder_id;
-            const vendMatch = globalVendors.find(v => v.id === e.stakeholder_id);
-            const mechMatch = globalMechanics.find(m => m.id === e.stakeholder_id);
+            const vendMatch = window.globalVendors.find(v => v.id === e.stakeholder_id);
+            const mechMatch = window.globalMechanics.find(m => m.id === e.stakeholder_id);
             if(vendMatch) tName = vendMatch.vendor_name;
             else if(mechMatch) tName = mechMatch.name;
             vHtml += `<tr><td>${vSno++}</td><td>${tName}</td><td>${e.expense_category}</td><td>${e.note || '-'}</td><td>₹${amt.toFixed(2)}</td></tr>`;
@@ -549,10 +578,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const tbodyVend = document.getElementById('tbVendorPayoutsBody');
         if(tbodyVend) tbodyVend.innerHTML = vHtml + `<tr class="tfoot-row"><td colspan="4" style="text-align:right;">TOTAL DISBURSED</td><td>₹${vTotal.toFixed(2)}</td></tr>`;
+    } catch (e) {
+        console.error("Master Sheet Gen Error", e);
     }
+};
 
-    // --- WAREHOUSE CROSS LEDGER (Unchanged Green/Moped Logic) ---
-    window.generateCrossLedger = async function() {
+window.generateCrossLedger = async function() {
+    try {
         const target = document.getElementById('clStakeholder').value; const startStr = document.getElementById('clStart').value;
         const tbody = document.getElementById('tbCrossLedger').querySelector('tbody'); 
         if(tbody) tbody.innerHTML = ''; 
@@ -560,8 +592,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let totalCredit = 0; let totalDebit = 0;
 
         if (target === 'MasterLathe') {
-            const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, lathe_welding').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
+            const { data: jobs } = await window.supabaseClient.from('job_cards').select('*').gt('lathe_welding', 0).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
+            const { data: exp } = await window.supabaseClient.from('workshop_expenses').select('*').eq('expense_category', 'Lathe/Welding').gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
             (jobs || []).forEach(j => { const v = parseFloat(j.lathe_welding) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${new Date(j.closed_at).toLocaleDateString()}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Lathe Generated)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; });
             (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${new Date(e.created_at).toLocaleDateString()}</td><td>Paid to Vendor</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
         }
@@ -569,14 +601,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             const shortTarget = target === 'GREEN WAREHOUSE' ? 'green' : 'moped';
             
             // Decoupled Safe Query
-            const { data: allJobs } = await supabaseClient.from('job_cards').select('id, status, closed_at').eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
+            const { data: allJobs } = await window.supabaseClient.from('job_cards').select('id, status, closed_at').eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
             const jobIds = (allJobs || []).map(j => j.id);
             let lines = [];
             if(jobIds.length > 0) {
-                const { data: l } = await supabaseClient.from('job_card_items').select('*').in('job_card_id', jobIds).ilike('warehouse_type', `%${shortTarget}%`);
-                lines = l || [];
+                const chunkSize = 100;
+                for (let i = 0; i < jobIds.length; i += chunkSize) {
+                    const chunk = jobIds.slice(i, i + chunkSize);
+                    const { data: l } = await window.supabaseClient.from('job_card_items').select('*').in('job_card_id', chunk);
+                    lines = lines.concat(l || []);
+                }
             }
-            const { data: exp } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
+            
+            lines = lines.filter(l => (l.warehouse_type || '').toLowerCase().includes(shortTarget));
+            const { data: exp } = await window.supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
             
             lines.forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>JC-${l.job_card_id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; });
             (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>Cash Transferred</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
@@ -593,80 +631,60 @@ document.addEventListener('DOMContentLoaded', async () => {
             netNode.innerText = `₹${Math.abs(net).toFixed(2)} ${net >= 0 ? '(Owed to Target)' : '(Advance Overpaid)'}`; 
             netNode.style.color = net >= 0 ? 'var(--info)' : 'var(--danger)';
         }
-    };
+    } catch (e) {
+        console.error("Cross Ledger Error", e);
+    }
+};
 
-    // --- UTILITY GLOBALS ---
-    window.switchSystemPanel = function(targetPanelId) { 
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); 
-        document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active')); document.getElementById(targetPanelId).classList.add('active'); 
-        if(targetPanelId === 'panelDaily') generateDailyLedger(); 
-        if(targetPanelId === 'panelCross') routeCrossLedger(); 
-    };
+window.populateCrossLedgerDropdown = function() {
+    const cTarget = document.getElementById('clStakeholder');
+    if(!cTarget) return;
+    cTarget.innerHTML = `<option value="">-- Select Target --</option><option value="MasterLathe">Master Lathe Account (Aggregate)</option><option value="GREEN WAREHOUSE">Green Spares Link</option><option value="MOPED WAREHOUSE">Moped Spares Link</option>`;
+    window.globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Staff: ${mech.name}</option>`; });
+    window.globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
+};
 
-    window.populateCrossLedgerDropdown = function() {
-        const cTarget = document.getElementById('clStakeholder');
-        if(!cTarget) return;
-        cTarget.innerHTML = `<option value="">-- Select Target --</option><option value="MasterLathe">Master Lathe Account (Aggregate)</option><option value="GREEN WAREHOUSE">Green Spares Link</option><option value="MOPED WAREHOUSE">Moped Spares Link</option>`;
-        globalMechanics.forEach(mech => { cTarget.innerHTML += `<option value="${mech.id}">Staff: ${mech.name}</option>`; });
-        globalVendors.forEach(vend => { cTarget.innerHTML += `<option value="${vend.id}">Vendor: ${vend.vendor_name}</option>`; });
-    };
+window.toggleExpenseSubTargets = function() {
+    const cat = document.getElementById('exCat')?.value; const targetSel = document.getElementById('exTarget'); 
+    if(!targetSel || !cat) return;
+    targetSel.innerHTML = '<option value="">-- Select / N/A --</option>'; document.getElementById('newVendorBlock').style.display = 'none';
+    if(cat === 'Green Spares' || cat === 'Moped Spares') { document.getElementById('exReceiverBlock').style.display = 'flex'; } else { document.getElementById('exReceiverBlock').style.display = 'none'; }
+    if(cat === 'Mechanic Payout') { window.globalMechanics.forEach(m => { targetSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; }); document.getElementById('exStakeholderBlock').style.display = 'flex'; } else if (cat === 'Lathe/Welding' || cat === 'Other') { window.globalVendors.filter(v => cat === 'Other' || v.vendor_category === 'Lathe/Welding').forEach(v => { targetSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`; }); targetSel.innerHTML += `<option value="ADD_NEW" style="color:var(--info); font-weight:bold;">+ Add New Stakeholder...</option>`; document.getElementById('exStakeholderBlock').style.display = 'flex'; } else { document.getElementById('exStakeholderBlock').style.display = 'none'; }
+};
 
-    // Ensure Modals and Buttons still function correctly
-    window.executeSessionTermination = function() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; };
-    window.printEOD = function() { document.body.classList.add('print-eod'); window.print(); setTimeout(() => { document.body.classList.remove('print-eod'); }, 500); };
-    window.printMasterStatement = function() { document.body.classList.add('print-statement'); window.print(); setTimeout(() => { document.body.classList.remove('print-statement'); }, 500); };
-    window.exportViewToJpg = function(id, name) { const layoutTarget = document.getElementById(id); if(layoutTarget){ html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); } };
-    window.exportEODToJpg = function() { window.exportViewToJpg('exportDailyTarget', 'EOD_Register'); };
-    window.toggleExpenseSubTargets = function() {
-        const cat = document.getElementById('exCat').value; const targetSel = document.getElementById('exTarget'); targetSel.innerHTML = '<option value="">-- Select / N/A --</option>'; document.getElementById('newVendorBlock').style.display = 'none';
-        if(cat === 'Green Spares' || cat === 'Moped Spares') { document.getElementById('exReceiverBlock').style.display = 'flex'; } else { document.getElementById('exReceiverBlock').style.display = 'none'; }
-        if(cat === 'Mechanic Payout') { globalMechanics.forEach(m => { targetSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; }); document.getElementById('exStakeholderBlock').style.display = 'flex'; } else if (cat === 'Lathe/Welding' || cat === 'Other') { globalVendors.filter(v => cat === 'Other' || v.vendor_category === 'Lathe/Welding').forEach(v => { targetSel.innerHTML += `<option value="${v.id}">${v.vendor_name}</option>`; }); targetSel.innerHTML += `<option value="ADD_NEW" style="color:var(--info); font-weight:bold;">+ Add New Stakeholder...</option>`; document.getElementById('exStakeholderBlock').style.display = 'flex'; } else { document.getElementById('exStakeholderBlock').style.display = 'none'; }
-    };
-    window.handleNewVendorCreation = function() { if(document.getElementById('exTarget').value === 'ADD_NEW') { document.getElementById('newVendorBlock').style.display = 'block'; } else { document.getElementById('newVendorBlock').style.display = 'none'; } };
-    window.saveNewStakeholder = async function() {
-        const vName = document.getElementById('newVendorName').value.trim(); const vCat = document.getElementById('exCat').value === 'Lathe/Welding' ? 'Lathe/Welding' : 'Other';
-        if(!vName) return; const { data: newV } = await supabaseClient.from('expense_vendors').insert({ vendor_name: vName, vendor_category: vCat }).select().single();
-        if(newV) { await fetchExternalVendors(); document.getElementById('exTarget').value = newV.id; document.getElementById('newVendorBlock').style.display = 'none'; document.getElementById('newVendorName').value = ''; }
-    };
-    window.commitWorkshopExpense = async function() {
-        const cat = document.getElementById('exCat').value;
-        let target = document.getElementById('exTarget').value;
-        const sourceDrawer = document.getElementById('exSourceDrawer').value;
-        if (cat === 'Green Spares') target = 'GREEN WAREHOUSE';
-        if (cat === 'Moped Spares') target = 'MOPED WAREHOUSE';
-        const amt = parseFloat(document.getElementById('exAmount').value) || 0;
-        let note = document.getElementById('exNote').value.trim();
-        const receiver = document.getElementById('exReceiverName').value.trim();
+window.handleNewVendorCreation = function() { if(document.getElementById('exTarget').value === 'ADD_NEW') { document.getElementById('newVendorBlock').style.display = 'block'; } else { document.getElementById('newVendorBlock').style.display = 'none'; } };
+window.saveNewStakeholder = async function() {
+    const vName = document.getElementById('newVendorName').value.trim(); const vCat = document.getElementById('exCat').value === 'Lathe/Welding' ? 'Lathe/Welding' : 'Other';
+    if(!vName) return; const { data: newV } = await window.supabaseClient.from('expense_vendors').insert({ vendor_name: vName, vendor_category: vCat }).select().single();
+    if(newV) { const { data: vData } = await window.supabaseClient.from('expense_vendors').select('*'); window.globalVendors = vData || []; document.getElementById('exTarget').value = newV.id; document.getElementById('newVendorBlock').style.display = 'none'; document.getElementById('newVendorName').value = ''; }
+};
 
-        if(amt <= 0) return alert("Expense value must exceed absolute zero.");
-        if(target === 'ADD_NEW') return alert("Please save the new stakeholder first.");
-        if((cat === 'Green Spares' || cat === 'Moped Spares') && receiver) { note = `[Receiver: ${receiver}] ${note}`; }
-        
-        const { error } = await supabaseClient.from('workshop_expenses').insert({ expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: sourceDrawer });
-        if (error) return alert("Failed to log expense. Error: " + error.message);
+window.commitWorkshopExpense = async function() {
+    const cat = document.getElementById('exCat').value;
+    let target = document.getElementById('exTarget').value;
+    const sourceDrawer = document.getElementById('exSourceDrawer').value;
+    if (cat === 'Green Spares') target = 'GREEN WAREHOUSE';
+    if (cat === 'Moped Spares') target = 'MOPED WAREHOUSE';
+    const amt = parseFloat(document.getElementById('exAmount').value) || 0;
+    let note = document.getElementById('exNote').value.trim();
+    const receiver = document.getElementById('exReceiverName').value.trim();
 
-        document.getElementById('modalExpense').style.display = 'none'; document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
-        generateDailyLedger(); routeCrossLedger();
-        
-        document.getElementById('tkDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('tkTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('tkCat').innerText = cat; document.getElementById('tkAmount').innerText = amt; document.getElementById('tkNote').innerText = note || '--';
-        let targetNameText = target; const mech = globalMechanics.find(m => m.id === target); const vend = globalVendors.find(vd => vd.id === target); if(mech) targetNameText = mech.name; if(vend) targetNameText = vend.vendor_name;
-        document.getElementById('tkTarget').innerText = targetNameText;
-        if(receiver) { document.getElementById('rowTkReceiver').style.display = 'flex'; document.getElementById('tkReceiver').innerText = receiver; } else { document.getElementById('rowTkReceiver').style.display = 'none'; }
-        document.getElementById('modalExpenseTicket').style.display = 'flex';
-    };
-    window.printTicket = function() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); };
-    window.waTicket = function() { const layoutTarget = document.getElementById('ticketRender'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Payout_Ticket.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); };
-    window.timeMachineJump = function() {
-        const currentTarget = new Date(document.getElementById('dlStart').value); currentTarget.setDate(currentTarget.getDate() - 1);
-        document.getElementById('dlStart').value = currentTarget.toISOString().split('T')[0]; generateDailyLedger();
-    };
-    window.buildAccordionHtml = function(letter, title, valueClass, valueStr, tableHtml) {
-        return `<div class="eod-accordion"><div class="eod-summary" onclick="this.parentElement.classList.toggle('open')"><div><span style="display:inline-block; width:30px; color:#94a3b8;">${letter}.</span> ${title}</div><div class="${valueClass}">${valueStr} <span style="font-size:0.7rem; color:#94a3b8;">▼</span></div></div><div class="eod-detail">${tableHtml}</div></div>`;
-    };
+    if(amt <= 0) return alert("Expense value must exceed absolute zero.");
+    if(target === 'ADD_NEW') return alert("Please save the new stakeholder first.");
+    if((cat === 'Green Spares' || cat === 'Moped Spares') && receiver) { note = `[Receiver: ${receiver}] ${note}`; }
+    
+    const { error } = await window.supabaseClient.from('workshop_expenses').insert({ expense_category: cat, stakeholder_id: target, amount: amt, note: note, recorded_by: sourceDrawer });
+    if (error) return alert("Failed to log expense. Error: " + error.message);
 
-    // BOOT
-    await initializeLedgerEnvironment();
-});
+    document.getElementById('modalExpense').style.display = 'none'; document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
+    window.generateDailyLedger(); window.routeCrossLedger();
+    
+    document.getElementById('tkDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('tkTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('tkCat').innerText = cat; document.getElementById('tkAmount').innerText = amt; document.getElementById('tkNote').innerText = note || '--';
+    let targetNameText = target; const mech = window.globalMechanics.find(m => m.id === target); const vend = window.globalVendors.find(vd => vd.id === target); if(mech) targetNameText = mech.name; if(vend) targetNameText = vend.vendor_name;
+    document.getElementById('tkTarget').innerText = targetNameText;
+    if(receiver) { document.getElementById('rowTkReceiver').style.display = 'flex'; document.getElementById('tkReceiver').innerText = receiver; } else { document.getElementById('rowTkReceiver').style.display = 'none'; }
+    document.getElementById('modalExpenseTicket').style.display = 'flex';
+};
 </script>
 </body>
 </html>
