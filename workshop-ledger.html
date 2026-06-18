@@ -245,12 +245,12 @@
 </div>
 
 <script>
-// 1. Declare Global State IMMEDIATELY to prevent Temporal Dead Zone (TDZ) hangs
+// 1. Declare Global State IMMEDIATELY (Prevents TDZ crash)
 window.activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase().trim();
 window.globalMechanics = []; 
 window.globalVendors = [];
 
-// 2. Map all functions directly to window so HTML buttons can click them flawlessly
+// 2. Map all functions to window for HTML access
 window.executeSessionTermination = function() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; };
 window.printEOD = function() { document.body.classList.add('print-eod'); window.print(); setTimeout(() => { document.body.classList.remove('print-eod'); }, 500); };
 window.printMasterStatement = function() { document.body.classList.add('print-statement'); window.print(); setTimeout(() => { document.body.classList.remove('print-statement'); }, 500); };
@@ -262,62 +262,66 @@ window.buildAccordionHtml = function(letter, title, valueClass, valueStr, tableH
 window.printTicket = function() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); };
 window.waTicket = function() { window.exportViewToJpg('ticketRender', 'Payout_Ticket'); };
 
-// 3. Immediately Invoked Async Function (IIAFE) completely replaces DOMContentLoaded
+// 3. IIFE Boot Sequence (Fires instantly, decoupling UI lockdown from DB fetches)
 (async function bootERP() {
     try {
-        // Render Role Badge Instantly
+        // --- A. INSTANT UI LOCKDOWN ---
         const roleDisplay = document.getElementById('roleDisplay');
         if (roleDisplay) roleDisplay.innerText = window.activeRole.toUpperCase();
 
-        // Initialize Supabase Connection
-        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k"; 
-        window.supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-
-        // Populate Date Pickers
         const today = new Date().toISOString().split('T')[0];
         const dlStart = document.getElementById('dlStart');
         const clStart = document.getElementById('clStart');
         if (dlStart) dlStart.value = today; 
         if (clStart) clStart.value = today;
 
-        // Apply Hard Logic Locks for Departments
         const scopeDropdown = document.getElementById('dlDeptScope');
         const drawerSelect = document.getElementById('exSourceDrawer');
+        const stackPOS = document.getElementById('stackPOS');
+
         if (scopeDropdown && drawerSelect) {
             if (window.activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
             else if (window.activeRole === 'moped') { scopeDropdown.value = 'Moped'; scopeDropdown.disabled = true; drawerSelect.value = 'moped'; drawerSelect.disabled = true; }
             else if (window.activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
         }
 
-        // Title Re-write for Service Managers
+        // Physically hide Track 2 immediately so it never flashes on screen for Service/Moped
+        if (stackPOS) {
+            if (window.activeRole === 'green' || window.activeRole === 'admin') {
+                stackPOS.style.display = 'flex';
+            } else {
+                stackPOS.style.display = 'none';
+            }
+        }
+
         if (window.activeRole === 'service' || window.activeRole === 'admin') {
             const btnCross = document.getElementById('btnTabCross');
             if (btnCross) btnCross.innerText = "Workshop Daily Summary";
         }
 
-        // Fetch Global Master Data Safely
+        // --- B. DATABASE INITIALIZATION ---
+        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k"; 
+        window.supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
         const { data: mData } = await window.supabaseClient.from('mechanics').select('*');
         window.globalMechanics = mData || [];
         
         const { data: vData } = await window.supabaseClient.from('expense_vendors').select('*');
         window.globalVendors = vData || [];
 
-        // Attach Sub-functions
         window.populateCrossLedgerDropdown();
         window.toggleExpenseSubTargets();
-
-        // Run Initial Daily Math!
         window.generateDailyLedger();
 
     } catch (err) {
         console.error("ERP BOOT SEQUENCE CRASH:", err);
-        alert("System failed to boot properly. Refresh page. Error: " + err.message);
+        alert("System failed to connect to database. Please refresh. Error: " + err.message);
     }
 })();
 
 // =====================================
-// CORE MATH MODULES (Decoupled to prevent DB join crashes)
+// CORE MATH MODULES 
 // =====================================
 
 window.generateDailyLedger = async function() {
@@ -330,14 +334,14 @@ window.generateDailyLedger = async function() {
         
         const stackWs = document.getElementById('stackWorkshop');
         const stackPOS = document.getElementById('stackPOS');
+        
         if (stackWs) stackWs.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
-        if (stackPOS) stackPOS.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
-        // 1. Decoupled Safe Query for Jobs (Select * avoids Missing Column 42703 error)
+        // 1. Decoupled Safe Query for Jobs
         let jcClosedQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         let jcOpenQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Open');
         
-        // 2. Fetch POS & Filter manually below to avoid PostgREST .ilike crash
+        // 2. Fetch POS & Filter manually
         let posQuery = window.supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         let paysQuery = window.supabaseClient.from('credit_payments').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
         let expQuery = window.supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
@@ -348,7 +352,7 @@ window.generateDailyLedger = async function() {
         const jobs = [...(jcClosedRes.data || []), ...(jcOpenRes.data || [])];
         const jobIds = jobs.map(j => j.id);
 
-        // 3. Batch Fetch Items to prevent Array Limit crashes
+        // 3. Batch Fetch Items
         let allItems = [];
         if (jobIds.length > 0) {
             const chunkSize = 100;
@@ -403,7 +407,6 @@ window.generateDailyLedger = async function() {
         const expenses = expRes.data || [];
         const advances = advRes.data || [];
 
-        // Workshop Extra Tally (Only for Master View)
         if (scope === 'ALL' || scope === 'Workshop') {
             advances.forEach(a => { const v = parseFloat(a.advance_paid) || 0; wAdv += v; wHtmlD += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)}</td></tr>`; });
             pays.forEach(p => {
@@ -423,7 +426,7 @@ window.generateDailyLedger = async function() {
         wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>'; wHtmlF += '</tbody></table>';
         const wNet = (wGross - wCredit) + wAdv + wOld - wExp;
 
-        // --- TRACK 2: POS MATH (Fuzzy Filtered in JS) ---
+        // --- TRACK 2: POS MATH ---
         let pGross = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
         let pCredit = 0; let pHtmlH = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
         let pOld = 0; let pHtmlI = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
@@ -473,11 +476,11 @@ window.generateDailyLedger = async function() {
                 <div class="net-drawer-box" style="border-color:var(--success);"><div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div><div class="net-drawer-val">₹${pNet.toFixed(2)}</div></div>
             `;
             
-            // STRICT VISIBILITY LOCKDOWN
+            // REDUNDANCY: Enforce visibility again after injection just to be sure
             if (window.activeRole === 'green' || window.activeRole === 'admin') {
                 stackPOS.style.display = 'flex';
             } else {
-                stackPOS.style.display = 'none'; // Forces Service and Moped to ignore Track 2 entirely
+                stackPOS.style.display = 'none'; 
             }
         }
     } catch (err) {
@@ -601,7 +604,6 @@ window.generateCrossLedger = async function() {
         else if (target === 'GREEN WAREHOUSE' || target === 'MOPED WAREHOUSE') {
             const shortTarget = target === 'GREEN WAREHOUSE' ? 'green' : 'moped';
             
-            // Decoupled Safe Query
             const { data: allJobs } = await window.supabaseClient.from('job_cards').select('id, status, closed_at').eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59');
             const jobIds = (allJobs || []).map(j => j.id);
             let lines = [];
