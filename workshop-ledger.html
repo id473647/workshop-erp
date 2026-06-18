@@ -41,7 +41,7 @@
         .floating-action { position: fixed; bottom: 30px; right: max(20px, calc((100vw - 1200px) / 2 + 20px)); background: var(--danger); color: white; border: none; border-radius: 50px; padding: 16px 24px; font-weight: 700; font-size: 1rem; box-shadow: 0 4px 12px rgba(231,76,60,0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; } .floating-action:hover { transform: scale(1.05); }
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; } .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 500px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;}
 
-        /* PHASE 3 ACCORDION UI */
+        /* ACCORDION UI */
         .bifurcated-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 800px) { .bifurcated-grid { grid-template-columns: 1fr; } }
         
@@ -77,11 +77,11 @@
             body.print-eod #exportDailyTarget { position: absolute; left: 0; top: 0; width: 100%; min-width: 100%; padding: 0; border: none; margin: 0; }
             body.print-eod .eod-detail { display: block !important; }
             
-            body.print-statement #serviceMasterSheet, body.print-statement #serviceMasterSheet * { visibility: visible; }
-            body.print-statement #serviceMasterSheet { position: absolute; left: 0; top: 0; width: 100%; padding: 0; border: none; margin: 0; }
+            body.print-statement #panelMaster, body.print-statement #panelMaster * { visibility: visible; }
+            body.print-statement #panelMaster { position: absolute; left: 0; top: 0; width: 100%; padding: 0; border: none; margin: 0; }
             body.print-statement .statement-header { display: block; }
             body.print-statement .signature-block { display: flex; }
-            body.print-statement .btn-action { display: none !important; }
+            body.print-statement .btn-action, body.print-statement .inputs-grid { display: none !important; }
 
             body.print-ticket #ticketRender, body.print-ticket #ticketRender * { visibility: visible; }
             body.print-ticket #ticketRender { position: absolute; left: 0; top: 0; width: 300px; padding: 0; border: none; margin: 0; }
@@ -108,6 +108,7 @@
         <div class="tabs-header">
             <button class="tab-btn active" onclick="switchSystemPanel('panelDaily')" id="btnTabDaily">Cash Drawer & EOD</button>
             <button class="tab-btn" onclick="switchSystemPanel('panelCross')" id="btnTabCross">Stakeholder Cross Ledger</button>
+            <button class="tab-btn" onclick="switchSystemPanel('panelMaster')" id="btnTabMaster" style="display:none;">Daily Master Statement</button>
         </div>
 
         <div id="panelDaily" class="view-panel active">
@@ -150,10 +151,30 @@
 
         <div id="panelCross" class="view-panel">
             <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
-                <div class="field-group"><label>Target Date / Horizon</label><input type="date" id="clStart" onchange="routeCrossLedger()"></div>
+                <div class="field-group"><label>Target Stakeholder</label><select id="clStakeholder" onchange="generateCrossLedger()"><option value="">-- Select Target --</option></select></div>
+                <div class="field-group"><label>Target Date / Horizon</label><input type="date" id="clStart" onchange="generateCrossLedger()"></div>
+            </div>
+            
+            <div id="warehouseCrossSheet" style="padding:10px; background:white;">
+                <div class="summary-banner" style="grid-template-columns:1fr 1fr;">
+                    <div class="summary-box"><span class="summary-title">Generated Payable Value (Credit)</span><span class="summary-val" id="clCredit" style="color:var(--info);">₹0</span></div>
+                    <div class="summary-box"><span class="summary-title">Disbursed Payments (Debit)</span><span class="summary-val" id="clDebit" style="color:var(--danger);">₹0</span></div>
+                </div>
+                <div class="table-wrapper"><table id="tbCrossLedger"><thead><tr><th>Date</th><th>Reference Context</th><th>Credit (Generated)</th><th>Debit (Paid)</th></tr></thead><tbody></tbody></table></div>
+                <div style="text-align:right; font-size:1.2rem; font-weight:700; margin-top:12px; padding: 12px; background: #f8fafc; border-radius: 8px;">Net Outstanding Balance: <span id="clNetBalance">₹0</span></div>
+            </div>
+        </div>
+
+        <div id="panelMaster" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
+                <div class="field-group"><label>Statement Date</label><input type="date" id="msStart" onchange="generateServiceMasterSheet()"></div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-action btn-info" onclick="exportViewToJpg('panelMaster', 'Daily_Statement')">📤 EXPORT JPG</button>
+                    <button class="btn-action" style="background:var(--primary);" onclick="printMasterStatement()">🖨️ PRINT MASTER STATEMENT</button>
+                </div>
             </div>
 
-            <div id="serviceMasterSheet" style="display:none; padding:10px; background:white;">
+            <div style="padding:10px; background:white;">
                 <div class="statement-header">
                     <h1>Daily Operations Statement</h1>
                     <p id="stmtDateStr">Date: --</p>
@@ -162,7 +183,7 @@
                 <h3 style="color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:5px;">A. Mechanic Charges (Daily Cash Payroll)</h3>
                 <div class="table-wrapper" style="margin-bottom:30px;">
                     <table id="tbMechPayroll">
-                        <thead><tr><th>S.No.</th><th>Mechanic Name</th><th>Labour Charged (Cash/UPI)</th><th>Commission %</th><th>Labour Earned</th></tr></thead>
+                        <thead><tr><th>S.No.</th><th>Mechanic Name</th><th>Labour Handled (Paid Today)</th><th>Commission %</th><th>Labour Earned</th></tr></thead>
                         <tbody id="tbMechPayrollBody"></tbody>
                     </table>
                 </div>
@@ -179,25 +200,9 @@
                     <div class="sig-line">Prepared By (Cashier)</div>
                     <div class="sig-line">Authorized By (Manager)</div>
                 </div>
-
-                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
-                    <button class="btn-action btn-info" onclick="exportViewToJpg('serviceMasterSheet', 'Daily_Statement')">📤 EXPORT JPG</button>
-                    <button class="btn-action" style="background:var(--primary);" onclick="printMasterStatement()">🖨️ PRINT MASTER STATEMENT</button>
-                </div>
-            </div>
-
-            <div id="warehouseCrossSheet" style="display:none; padding:10px; background:white;">
-                <div class="inputs-grid">
-                    <div class="field-group"><label>Target Stakeholder</label><select id="clStakeholder" onchange="routeCrossLedger()"><option value="">-- Select Target --</option></select></div>
-                </div>
-                <div class="summary-banner" style="grid-template-columns:1fr 1fr;">
-                    <div class="summary-box"><span class="summary-title">Generated Payable Value (Credit)</span><span class="summary-val" id="clCredit" style="color:var(--info);">₹0</span></div>
-                    <div class="summary-box"><span class="summary-title">Disbursed Payments (Debit)</span><span class="summary-val" id="clDebit" style="color:var(--danger);">₹0</span></div>
-                </div>
-                <div class="table-wrapper"><table id="tbCrossLedger"><thead><tr><th>Date</th><th>Reference Context</th><th>Credit (Generated)</th><th>Debit (Paid)</th></tr></thead><tbody></tbody></table></div>
-                <div style="text-align:right; font-size:1.2rem; font-weight:700; margin-top:12px; padding: 12px; background: #f8fafc; border-radius: 8px;">Net Outstanding Balance: <span id="clNetBalance">₹0</span></div>
             </div>
         </div>
+
     </div>
 </div>
 
@@ -245,7 +250,7 @@
 </div>
 
 <script>
-// 1. SAFE GLOBAL DECLARATIONS 
+// 1. SAFE GLOBAL DECLARATIONS (Read immediately to secure UI)
 window.activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin').toLowerCase().trim();
 window.globalMechanics = []; 
 window.globalVendors = [];
@@ -256,25 +261,31 @@ window.printEOD = function() { document.body.classList.add('print-eod'); window.
 window.printMasterStatement = function() { document.body.classList.add('print-statement'); window.print(); setTimeout(() => { document.body.classList.remove('print-statement'); }, 500); };
 window.exportViewToJpg = function(id, name) { const target = document.getElementById(id); if(target) { html2canvas(target, { scale: 2, useCORS: true }).then(canvas => { canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}_${new Date().toISOString().split('T')[0]}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }};
 window.exportEODToJpg = function() { window.exportViewToJpg('exportDailyTarget', 'EOD_Register'); };
-window.switchSystemPanel = function(targetPanelId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active')); document.getElementById(targetPanelId).classList.add('active'); if(targetPanelId === 'panelDaily') window.generateDailyLedger(); if(targetPanelId === 'panelCross') window.routeCrossLedger(); };
+window.switchSystemPanel = function(targetPanelId) { 
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); 
+    document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active')); document.getElementById(targetPanelId).classList.add('active'); 
+    if(targetPanelId === 'panelDaily') window.generateDailyLedger(); 
+    if(targetPanelId === 'panelCross') window.generateCrossLedger(); 
+    if(targetPanelId === 'panelMaster') window.generateServiceMasterSheet();
+};
 window.timeMachineJump = function() { const currentTarget = new Date(document.getElementById('dlStart').value); currentTarget.setDate(currentTarget.getDate() - 1); document.getElementById('dlStart').value = currentTarget.toISOString().split('T')[0]; window.generateDailyLedger(); };
 window.buildAccordionHtml = function(letter, title, valueClass, valueStr, tableHtml) { return `<div class="eod-accordion"><div class="eod-summary" onclick="this.parentElement.classList.toggle('open')"><div><span style="display:inline-block; width:30px; color:#94a3b8;">${letter}.</span> ${title}</div><div class="${valueClass}">${valueStr} <span style="font-size:0.7rem; color:#94a3b8;">▼</span></div></div><div class="eod-detail">${tableHtml}</div></div>`; };
 window.printTicket = function() { document.body.classList.add('print-ticket'); window.print(); setTimeout(() => { document.body.classList.remove('print-ticket'); }, 500); };
 window.waTicket = function() { window.exportViewToJpg('ticketRender', 'Payout_Ticket'); };
 
-// 3. SYNCHRONOUS UI PRE-LOCKDOWN (Execute instantly before any loading)
+// 3. SYNCHRONOUS UI PRE-LOCKDOWN (Execute instantly before any network loading)
 const roleDisplay = document.getElementById('roleDisplay');
 if (roleDisplay) roleDisplay.innerText = window.activeRole.toUpperCase();
 
 const today = new Date().toISOString().split('T')[0];
-const dlStart = document.getElementById('dlStart');
-const clStart = document.getElementById('clStart');
-if (dlStart) dlStart.value = today; 
-if (clStart) clStart.value = today;
+if (document.getElementById('dlStart')) document.getElementById('dlStart').value = today; 
+if (document.getElementById('clStart')) document.getElementById('clStart').value = today;
+if (document.getElementById('msStart')) document.getElementById('msStart').value = today;
 
 const scopeDropdown = document.getElementById('dlDeptScope');
 const drawerSelect = document.getElementById('exSourceDrawer');
 const stackPOS = document.getElementById('stackPOS');
+const btnTabMaster = document.getElementById('btnTabMaster');
 
 if (scopeDropdown && drawerSelect) {
     if (window.activeRole === 'green') { scopeDropdown.value = 'Green'; scopeDropdown.disabled = true; drawerSelect.value = 'green'; drawerSelect.disabled = true; }
@@ -282,6 +293,7 @@ if (scopeDropdown && drawerSelect) {
     else if (window.activeRole === 'service') { scopeDropdown.value = 'Workshop'; scopeDropdown.disabled = true; drawerSelect.value = 'workshop'; drawerSelect.disabled = true; }
 }
 
+// Strictly enforce Tab & Track visibility based on Role
 if (stackPOS) {
     if (window.activeRole === 'green' || window.activeRole === 'admin') {
         stackPOS.style.display = 'flex';
@@ -290,16 +302,33 @@ if (stackPOS) {
     }
 }
 
-if (window.activeRole === 'service' || window.activeRole === 'admin') {
-    const btnCross = document.getElementById('btnTabCross');
-    if (btnCross) btnCross.innerText = "Workshop Daily Summary";
+if (btnTabMaster) {
+    if (window.activeRole === 'service' || window.activeRole === 'admin') {
+        btnTabMaster.style.display = 'inline-block'; // Show the 3rd Tab
+    } else {
+        btnTabMaster.style.display = 'none';
+    }
 }
 
-// 4. NETWORK-DEPENDENT BOOT SEQUENCE (Waits for Supabase CDN to fully download)
+// 4. THE SPLIT PAYMENT PARSER (To grab pure Cash from Split strings)
+window.extractPureCash = function(paymentStr, totalValue) {
+    if (!paymentStr) return 0;
+    if (paymentStr === 'Cash') return parseFloat(totalValue) || 0;
+    if (paymentStr === 'UPI' || paymentStr === 'Card' || paymentStr === 'Credit') return 0;
+    
+    // Regex for "Split (Cash: X, UPI: Y)"
+    const splitMatch = paymentStr.match(/Cash:\s*(\d+(\.\d+)?)/i);
+    if (splitMatch) {
+        return parseFloat(splitMatch[1]) || 0;
+    }
+    return 0; // Fallback
+};
+
+// 5. NETWORK-DEPENDENT BOOT SEQUENCE (Waits for Supabase CDN to fully download safely)
 window.addEventListener('load', async function bootERP() {
     try {
         if (typeof supabase === 'undefined') {
-            throw new Error("Supabase CDN failed to load. Please check your internet connection or firewall.");
+            throw new Error("Supabase Database link failed to load. Please check your internet connection.");
         }
 
         const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
@@ -316,7 +345,7 @@ window.addEventListener('load', async function bootERP() {
         window.populateCrossLedgerDropdown();
         window.toggleExpenseSubTargets();
 
-        // Run Initial Math
+        // Run Initial Math!
         window.generateDailyLedger();
 
     } catch (err) {
@@ -326,7 +355,7 @@ window.addEventListener('load', async function bootERP() {
 });
 
 // =====================================
-// CORE MATH MODULES (Decoupled to prevent DB join crashes)
+// CORE MATH MODULES (Decoupled & Financially Patched)
 // =====================================
 
 window.generateDailyLedger = async function() {
@@ -342,14 +371,15 @@ window.generateDailyLedger = async function() {
         if (stackWs) stackWs.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating Workshop Ledgers...</div>';
         if (stackPOS && stackPOS.style.display !== 'none') stackPOS.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">Evaluating POS Ledgers...</div>';
 
-        // 1. Decoupled Safe Query for Jobs (Select * avoids Missing Column 42703 error)
+        // Decoupled Safe Queries
         let jcClosedQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         let jcOpenQuery = window.supabaseClient.from('job_cards').select('*').eq('status', 'Open');
         
-        // 2. Fetch POS & Filter manually below to avoid PostgREST .ilike crash
         let posQuery = window.supabaseClient.from('counter_sales').select('*').eq('status', 'Closed').gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
         let paysQuery = window.supabaseClient.from('credit_payments').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
         let expQuery = window.supabaseClient.from('workshop_expenses').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59');
+        
+        // Fetch ALL jobs that had advances created today (for tracking +a / +pg)
         let advQuery = window.supabaseClient.from('job_cards').select('*').gte('created_at', targetDate).lte('created_at', targetDate + 'T23:59:59').gt('advance_paid', 0);
 
         const [jcClosedRes, jcOpenRes, posRes, paysRes, expRes, advRes] = await Promise.all([jcClosedQuery, jcOpenQuery, posQuery, paysQuery, expQuery, advQuery]);
@@ -357,7 +387,6 @@ window.generateDailyLedger = async function() {
         const jobs = [...(jcClosedRes.data || []), ...(jcOpenRes.data || [])];
         const jobIds = jobs.map(j => j.id);
 
-        // 3. Batch Fetch Items to prevent Array Limit crashes
         let allItems = [];
         if (jobIds.length > 0) {
             const chunkSize = 100;
@@ -368,33 +397,50 @@ window.generateDailyLedger = async function() {
             }
         }
 
-        // JS Manual Join
         jobs.forEach(j => { j.mapped_items = allItems.filter(i => i.job_card_id === j.id); });
 
-        // --- TRACK 1: WORKSHOP MATH ---
-        let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Realized Revenue</th></tr></thead><tbody>';
+        // --- TRACK 1: WORKSHOP MATH (Fixing the a/az/pg/pm logic) ---
+        let wGross = 0; let wHtmlA = '<table><thead><tr><th>Hash</th><th>Checkout Cash (Realized)</th></tr></thead><tbody>';
         let wOpen = 0;  let wHtmlB = '<table><thead><tr><th>Hash</th><th>Unrealized Revenue (WIP)</th></tr></thead><tbody>';
         let wCredit = 0; let wHtmlC = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
-        let wAdv = 0; let wHtmlD = '<table><thead><tr><th>Hash</th><th>Advance Dep</th></tr></thead><tbody>';
+        let wAdv = 0; let wHtmlD = '<table><thead><tr><th>Hash</th><th>Today\'s Advance/Prepaids Collected</th></tr></thead><tbody>';
         let wOld = 0; let wHtmlE = '<table><thead><tr><th>Payment Hash</th><th>Amount</th></tr></thead><tbody>';
         let wExp = 0; let wHtmlF = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
 
+        // Evaluate the Cash paid at Checkout for Jobs closed today
         jobs.forEach(j => {
-            let visible_value = 0;
             if (j.status === 'Closed') {
-                if (scope === 'Green') visible_value = j.mapped_items.filter(i => (i.warehouse_type || '').toLowerCase().includes('green')).reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
-                else if (scope === 'Moped') visible_value = j.mapped_items.filter(i => (i.warehouse_type || '').toLowerCase().includes('moped')).reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
-                else visible_value = parseFloat(j.total_invoice_value) || 0;
+                let pureCashCollectedAtCheckout = window.extractPureCash(j.payment_mode, j.total_invoice_value);
+                
+                // If the job was paid in Credit or UPI, checkout cash is naturally 0.
+                // Subtract Past Advances & Warehouse Prepaids (az, pg, pm) because they aren't part of today's Service Desk Checkout.
+                let advService = parseFloat(j.advance_paid) || 0; // Treat as total advance for now, deduct it to find checkout balance.
+                let pg = parseFloat(j.prepaid_green) || 0;
+                let pm = parseFloat(j.prepaid_moped) || 0;
+                
+                // The DB's total_invoice_value represents the grand total. 
+                // To find what the customer actually handed the cashier today, we subtract what they already paid.
+                if(pureCashCollectedAtCheckout > 0) {
+                    let actualCheckoutCash = pureCashCollectedAtCheckout - advService - pg - pm;
+                    if(actualCheckoutCash < 0) actualCheckoutCash = 0;
+                    
+                    if (scope === 'ALL' || scope === 'Workshop') {
+                        if(actualCheckoutCash > 0) {
+                            wGross += actualCheckoutCash;
+                            wHtmlA += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>₹${actualCheckoutCash.toFixed(2)}</td></tr>`;
+                        }
+                    }
+                }
 
-                if (visible_value > 0) {
-                    wGross += visible_value;
-                    wHtmlA += `<tr><td><a class="jc-link" href="billing.html?id=${j.id}" target="_blank">JC-${j.id.split('-')[0].toUpperCase()}</a></td><td>₹${visible_value.toFixed(2)}</td></tr>`;
-                    if (j.payment_mode === 'Credit') {
-                        wCredit += visible_value;
-                        wHtmlC += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${visible_value.toFixed(2)}</td></tr>`;
+                if (j.payment_mode === 'Credit') {
+                    let creditVal = parseFloat(j.total_invoice_value) || 0;
+                    if (scope === 'ALL' || scope === 'Workshop') {
+                        wCredit += creditVal;
+                        wHtmlC += `<tr><td>JC-${j.id.split('-')[0].toUpperCase()}</td><td>₹${creditVal.toFixed(2)}</td></tr>`;
                     }
                 }
             } else if (j.status === 'Open') {
+                let visible_value = 0;
                 if (scope === 'Green') visible_value = j.mapped_items.filter(i => (i.warehouse_type || '').toLowerCase().includes('green')).reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 else if (scope === 'Moped') visible_value = j.mapped_items.filter(i => (i.warehouse_type || '').toLowerCase().includes('moped')).reduce((sum, i) => sum + (parseFloat(i.total_price) || 0), 0);
                 else {
@@ -412,11 +458,16 @@ window.generateDailyLedger = async function() {
         const expenses = expRes.data || [];
         const advances = advRes.data || [];
 
-        // Workshop Extra Tally (Only for Master View)
+        // Track 1 Advances Collected TODAY (+a)
         if (scope === 'ALL' || scope === 'Workshop') {
-            advances.forEach(a => { const v = parseFloat(a.advance_paid) || 0; wAdv += v; wHtmlD += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)}</td></tr>`; });
+            advances.forEach(a => { 
+                const v = parseFloat(a.advance_paid) || 0; // Service Advance
+                if(v > 0) {
+                    wAdv += v; wHtmlD += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()} (Desk Adv)</td><td>₹${v.toFixed(2)}</td></tr>`; 
+                }
+            });
             pays.forEach(p => {
-                const v = parseFloat(p.amount_paid) || 0;
+                const v = window.extractPureCash(p.payment_mode || 'Cash', p.amount_paid);
                 if (v > 0 && ['admin', 'service'].includes((p.paid_by_role || '').toLowerCase())) {
                     wOld += v; wHtmlE += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)} (${p.note||'Recovery'})</td></tr>`;
                 }
@@ -430,12 +481,12 @@ window.generateDailyLedger = async function() {
         }
 
         wHtmlA += '</tbody></table>'; wHtmlB += '</tbody></table>'; wHtmlC += '</tbody></table>'; wHtmlD += '</tbody></table>'; wHtmlE += '</tbody></table>'; wHtmlF += '</tbody></table>';
-        const wNet = (wGross - wCredit) + wAdv + wOld - wExp;
+        const wNet = wGross + wAdv + wOld - wExp; // Credit is completely stripped out of cash pool.
 
-        // --- TRACK 2: POS MATH (Fuzzy Filtered in JS) ---
-        let pGross = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Amount</th></tr></thead><tbody>';
+        // --- TRACK 2: POS MATH & PREPAIDS ---
+        let pGross = 0; let pHtmlG = '<table><thead><tr><th>Hash</th><th>Retail POS Cash</th></tr></thead><tbody>';
         let pCredit = 0; let pHtmlH = '<table><thead><tr><th>Hash</th><th>Credit Logged</th></tr></thead><tbody>';
-        let pOld = 0; let pHtmlI = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery)</th></tr></thead><tbody>';
+        let pOld = 0; let pHtmlI = '<table><thead><tr><th>Payment Hash</th><th>Amount (Ping/Recovery/Prepaid)</th></tr></thead><tbody>';
         let pExp = 0; let pHtmlJ = '<table><thead><tr><th>Type / Target</th><th>Deducted</th></tr></thead><tbody>';
 
         let sales = posRes.data || [];
@@ -443,29 +494,42 @@ window.generateDailyLedger = async function() {
         else if (scope === 'Moped') sales = sales.filter(s => (s.source_role || '').toLowerCase().includes('moped'));
 
         sales.forEach(s => {
-            const v = parseFloat(s.total_amount) || 0; pGross += v; pHtmlG += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v.toFixed(2)}</td></tr>`;
-            if (s.payment_mode === 'Credit') { pCredit += v; pHtmlH += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)}</td></tr>`; }
+            const v = window.extractPureCash(s.payment_mode, s.total_amount);
+            if(v > 0) { pGross += v; pHtmlG += `<tr><td><a class="jc-link" href="pos-green.html?id=${s.id}" target="_blank">POS-${s.id.split('-')[0].toUpperCase()}</a></td><td>₹${v.toFixed(2)}</td></tr>`; }
+            if (s.payment_mode === 'Credit') { const cv = parseFloat(s.total_amount)||0; pCredit += cv; pHtmlH += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>₹${cv.toFixed(2)}</td></tr>`; }
         });
+        
+        // Add Prepaids (+pg / +pm) collected today into Warehouse Drawer
+        advances.forEach(a => {
+            if(scope === 'Green') {
+                const pg = parseFloat(a.prepaid_green) || 0;
+                if(pg > 0) { pOld += pg; pHtmlI += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${pg.toFixed(2)} (Green Prepaid)</td></tr>`; }
+            } else if (scope === 'Moped') {
+                const pm = parseFloat(a.prepaid_moped) || 0;
+                if(pm > 0) { pOld += pm; pHtmlI += `<tr><td>JC-${a.id.split('-')[0].toUpperCase()}</td><td>₹${pm.toFixed(2)} (Moped Prepaid)</td></tr>`; }
+            }
+        });
+
         pays.forEach(p => {
-            const v = parseFloat(p.amount_paid) || 0;
-            if (v > 0 && ['green', 'moped'].includes((p.paid_by_role || '').toLowerCase())) { pOld += v; pHtmlI += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)}</td></tr>`; }
+            const v = window.extractPureCash(p.payment_mode || 'Cash', p.amount_paid);
+            if (v > 0 && ['green', 'moped'].includes((p.paid_by_role || '').toLowerCase())) { pOld += v; pHtmlI += `<tr><td>P-${p.id.split('-')[0].toUpperCase()}</td><td>₹${v.toFixed(2)} (Recovery)</td></tr>`; }
         });
         expenses.forEach(e => {
             if (['green', 'moped'].includes((e.recorded_by || '').toLowerCase())) { const v = parseFloat(e.amount) || 0; pExp += v; pHtmlJ += `<tr><td>${e.expense_category}</td><td>₹${v.toFixed(2)}</td></tr>`; }
         });
 
         pHtmlG += '</tbody></table>'; pHtmlH += '</tbody></table>'; pHtmlI += '</tbody></table>'; pHtmlJ += '</tbody></table>';
-        const pNet = (pGross - pCredit) + pOld - pExp;
+        const pNet = pGross + pOld - pExp;
         
         // --- HTML INJECTION ---
         if (stackWs) {
             stackWs.innerHTML = `
                 <h4 style="margin:0 0 4px 0; color:var(--primary); text-align:center;">Track 1: Workshop Drawer</h4>
-                ${window.buildAccordionHtml('A', 'Closed Job Cards (Realized Revenue)', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
+                ${window.buildAccordionHtml('A', 'Realized Checkout Cash', 'val-success', `₹${wGross.toFixed(2)}`, wHtmlA)}
                 ${window.buildAccordionHtml('B', 'JC\\'s to be Billed (Unrealized / WIP)', 'val-neutral', `₹${wOpen.toFixed(2)}`, wHtmlB)}
-                ${window.buildAccordionHtml('C', 'Less: JCs Billed to Credit', 'val-negative', `-₹${wCredit.toFixed(2)}`, wHtmlC)}
-                ${window.buildAccordionHtml('D', 'Plus: Advances Deposited Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
-                ${window.buildAccordionHtml('E', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${wOld.toFixed(2)}`, wHtmlE)}
+                ${window.buildAccordionHtml('C', 'JCs Billed to Credit (Non-Cash)', 'val-negative', `₹${wCredit.toFixed(2)}`, wHtmlC)}
+                ${window.buildAccordionHtml('D', 'Plus: Service Advances Taken Today', 'val-positive', `+₹${wAdv.toFixed(2)}`, wHtmlD)}
+                ${window.buildAccordionHtml('E', 'Plus: Old Credit Recoveries', 'val-positive', `+₹${wOld.toFixed(2)}`, wHtmlE)}
                 ${window.buildAccordionHtml('F', 'Less: Workshop Expenses Paid Out', 'val-negative', `-₹${wExp.toFixed(2)}`, wHtmlF)}
                 <div class="net-drawer-box"><div class="net-drawer-title">Net Workshop Cash</div><div class="net-drawer-val">₹${wNet.toFixed(2)}</div></div>
                 <div style="text-align:right;"><span class="time-link" onclick="window.timeMachineJump()">⏪ View Previous Day Ledger</span></div>
@@ -475,46 +539,31 @@ window.generateDailyLedger = async function() {
         if (stackPOS) {
             stackPOS.innerHTML = `
                 <h4 style="margin:0 0 4px 0; color:var(--success); text-align:center;">Track 2: POS Drawer</h4>
-                ${window.buildAccordionHtml('G', 'Gross Retail POS Billed', 'val-success', `₹${pGross.toFixed(2)}`, pHtmlG)}
-                ${window.buildAccordionHtml('H', 'Less: POS Billed to Credit', 'val-negative', `-₹${pCredit.toFixed(2)}`, pHtmlH)}
-                ${window.buildAccordionHtml('I', 'Plus: Recoveries & Pings Collected', 'val-positive', `+₹${pOld.toFixed(2)}`, pHtmlI)}
+                ${window.buildAccordionHtml('G', 'Gross Retail POS Cash', 'val-success', `₹${pGross.toFixed(2)}`, pHtmlG)}
+                ${window.buildAccordionHtml('H', 'POS Billed to Credit (Non-Cash)', 'val-negative', `₹${pCredit.toFixed(2)}`, pHtmlH)}
+                ${window.buildAccordionHtml('I', 'Plus: Recoveries & Prepaids Collected', 'val-positive', `+₹${pOld.toFixed(2)}`, pHtmlI)}
                 ${window.buildAccordionHtml('J', 'Less: POS Expenses Paid Out', 'val-negative', `-₹${pExp.toFixed(2)}`, pHtmlJ)}
                 <div class="net-drawer-box" style="border-color:var(--success);"><div class="net-drawer-title" style="color:var(--success);">Net POS Cash</div><div class="net-drawer-val">₹${pNet.toFixed(2)}</div></div>
             `;
             
-            // REDUNDANCY: Enforce visibility again after injection just to be sure
-            if (window.activeRole === 'green' || window.activeRole === 'admin') {
-                stackPOS.style.display = 'flex';
-            } else {
-                stackPOS.style.display = 'none'; 
-            }
+            if (window.activeRole === 'green' || window.activeRole === 'admin') { stackPOS.style.display = 'flex'; } 
+            else { stackPOS.style.display = 'none'; }
         }
     } catch (err) {
         console.error("Ledger Generation Error:", err);
     }
 };
 
-window.routeCrossLedger = function() {
-    if (window.activeRole === 'service' || window.activeRole === 'admin') {
-        document.getElementById('warehouseCrossSheet').style.display = 'none';
-        document.getElementById('serviceMasterSheet').style.display = 'block';
-        window.generateServiceMasterSheet();
-    } else {
-        document.getElementById('serviceMasterSheet').style.display = 'none';
-        document.getElementById('warehouseCrossSheet').style.display = 'block';
-        window.generateCrossLedger();
-    }
-};
-
 window.generateServiceMasterSheet = async function() {
     try {
-        const targetDate = document.getElementById('clStart').value;
+        const targetDate = document.getElementById('msStart').value;
         const stmtLabel = document.getElementById('stmtDateStr');
         if(stmtLabel) stmtLabel.innerText = `Closing Date: ${new Date(targetDate).toLocaleDateString('en-IN')}`;
         
+        // Fetch Jobs explicitly Paid (Not Credit) closed today
         const { data: paidJobs } = await window.supabaseClient.from('job_cards')
             .select('*')
-            .eq('status', 'Closed').neq('payment_mode', 'Credit')
+            .eq('status', 'Closed')
             .gte('closed_at', targetDate).lte('closed_at', targetDate + 'T23:59:59');
             
         const { data: creditPays } = await window.supabaseClient.from('credit_payments')
@@ -542,21 +591,30 @@ window.generateServiceMasterSheet = async function() {
             mechAgg[mId].commEarned += (amount * mechAgg[mId].rate) / 100;
         }
 
+        // Loop Paid Today (Fix #1: Only apply if actual cash/upi was paid, ensuring Credit jobs aren't double counted)
         (paidJobs || []).forEach(j => {
+            if(j.payment_mode === 'Credit') return;
             const lab = parseFloat(j.labour_charges) || 0;
             if(lab <= 0) return;
             if(j.co_mech_id) { allocateLabour(j.mech_id, lab/2); allocateLabour(j.co_mech_id, lab/2); } 
             else allocateLabour(j.mech_id, lab);
         });
 
+        // Loop Old Credit Recoveries (Fix #1: Proportional Allocation based on recovery amount vs total invoice)
         (creditPays || []).forEach(p => {
             if(!p.job_card_id) return;
             const refJob = oldJobsData.find(oj => oj.id === p.job_card_id);
             if(refJob) {
-                const lab = parseFloat(refJob.labour_charges) || 0;
-                if(lab > 0) {
-                    if(refJob.co_mech_id) { allocateLabour(refJob.mech_id, lab/2); allocateLabour(refJob.co_mech_id, lab/2); } 
-                    else allocateLabour(refJob.mech_id, lab);
+                const totalInv = parseFloat(refJob.total_invoice_value) || 1; // Prevent div/0
+                const recoveryAmt = window.extractPureCash(p.payment_mode || 'Cash', p.amount_paid);
+                
+                // If they pay 50% of the bill, mechanic gets 50% of their total labour chunk.
+                const recoveryRatio = recoveryAmt / totalInv;
+                let validLab = (parseFloat(refJob.labour_charges) || 0) * recoveryRatio;
+                
+                if(validLab > 0) {
+                    if(refJob.co_mech_id) { allocateLabour(refJob.mech_id, validLab/2); allocateLabour(refJob.co_mech_id, validLab/2); } 
+                    else allocateLabour(refJob.mech_id, validLab);
                 }
             }
         });
@@ -627,6 +685,20 @@ window.generateCrossLedger = async function() {
             
             lines.forEach(l => { const v = parseFloat(l.total_price) || 0; totalCredit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>JC-${l.job_card_id.split('-')[0].toUpperCase()} (Parts Issued)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; });
             (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>Cash Transferred</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
+        } else {
+             // Specific Mechanic Lookup (Cross Ledger)
+            const isMechanic = window.globalMechanics.some(m => m.id === target);
+            if(isMechanic) { 
+                const { data: jobs } = await window.supabaseClient.from('job_cards').select('*').or(`mech_id.eq.${target},co_mech_id.eq.${target}`).eq('status', 'Closed').gte('closed_at', startStr).lte('closed_at', startStr + 'T23:59:59'); 
+                (jobs || []).forEach(j => { 
+                    let v = parseFloat(j.labour_charges) || 0;
+                    if(j.co_mech_id) v = v / 2; // Math split
+                    totalCredit += v; 
+                    tbody.innerHTML += `<tr><td>${startStr}</td><td>JC-${j.id.split('-')[0].toUpperCase()} (Labor Yield)</td><td>₹${v.toFixed(2)}</td><td>--</td></tr>`; 
+                }); 
+            }
+            const { data: exp } = await window.supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', target).gte('created_at', startStr).lte('created_at', startStr + 'T23:59:59');
+            (exp || []).forEach(e => { const v = parseFloat(e.amount) || 0; totalDebit += v; tbody.innerHTML += `<tr><td>${startStr}</td><td>Payout: ${e.note || ''}</td><td>--</td><td>₹${v.toFixed(2)}</td></tr>`; });
         }
         
         const clCred = document.getElementById('clCredit');
@@ -686,7 +758,9 @@ window.commitWorkshopExpense = async function() {
     if (error) return alert("Failed to log expense. Error: " + error.message);
 
     document.getElementById('modalExpense').style.display = 'none'; document.getElementById('exAmount').value = '0'; document.getElementById('exNote').value = ''; document.getElementById('exReceiverName').value = '';
-    window.generateDailyLedger(); window.routeCrossLedger();
+    window.generateDailyLedger(); 
+    if (document.getElementById('panelCross').classList.contains('active')) window.generateCrossLedger();
+    if (document.getElementById('panelMaster') && document.getElementById('panelMaster').classList.contains('active')) window.generateServiceMasterSheet();
     
     document.getElementById('tkDate').innerText = new Date().toLocaleDateString('en-IN'); document.getElementById('tkTime').innerText = new Date().toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('tkCat').innerText = cat; document.getElementById('tkAmount').innerText = amt; document.getElementById('tkNote').innerText = note || '--';
     let targetNameText = target; const mech = window.globalMechanics.find(m => m.id === target); const vend = window.globalVendors.find(vd => vd.id === target); if(mech) targetNameText = mech.name; if(vend) targetNameText = vend.vendor_name;
