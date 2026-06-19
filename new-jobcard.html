@@ -48,6 +48,8 @@
     <div class="nav-actions">
         <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <!-- CHANGE 1: LOGOUT button added (Universal Rule 3 compliance) -->
+        <button class="btn-header" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html';">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
 </nav>
@@ -106,7 +108,6 @@
                     <label>Registration Plate</label>
                     <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=(this.value||'').toUpperCase().replace(/\s+/g, '')">
                 </div>
-                
                 <div class="field-group">
                     <label>Brand</label>
                     <input type="text" id="nvBrand" list="brandList" placeholder="Type or Select Brand" oninput="this.value=(this.value||'').toUpperCase(); populateModels()" onchange="populateModels()">
@@ -117,7 +118,6 @@
                     <input type="text" id="nvModel" list="modelList" placeholder="Type or Select Model" oninput="this.value=(this.value||'').toUpperCase()">
                     <datalist id="modelList"></datalist>
                 </div>
-
                 <div class="field-group">
                     <label>Color</label>
                     <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=(this.value||'').toUpperCase()">
@@ -138,13 +138,22 @@
         </div>
         <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> 
             ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint recently. <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"> </div> 
-        </div> 
+        </div>
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
             <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=(this.value||'').toUpperCase()"></div>
+
+            <!--
+                CHANGE 2: Advance/Prepaid field.
+                - Was: only shown for service/admin with a hardcoded label.
+                - Now: shown for ALL roles. Label and note text are set dynamically
+                  by JavaScript based on activeRole. No visual layout change.
+                - Added id="lblAdvanceField" and id="lblAdvanceNote" for JS targeting.
+            -->
             <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
-                <label>Workshop Advance Collected (₹)</label>
+                <label id="lblAdvanceField">Advance / Prepaid Collected (₹)</label>
                 <input type="number" id="jcAdvance" value="0" min="0">
+                <span id="lblAdvanceNote" style="font-size:0.65rem; color:#64748b; margin-top:2px;"></span>
             </div>
         </div>
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
@@ -161,7 +170,34 @@
     if(activeRole !== 'admin' && activeRole !== 'service' && activeRole !== 'green' && activeRole !== 'moped') {
         window.location.href = 'login.html';
     }
-    if (activeRole === 'admin' || activeRole === 'service') document.getElementById('blockWorkshopAdvance').style.display = 'flex';
+
+    /*
+     * CHANGE 3: Role-based advance field setup.
+     * Was: Only showed the field for service/admin with a single hardcoded label.
+     * Now: Shows for ALL authorised roles. The label and note text communicate
+     *      exactly which physical drawer the cash belongs to, preventing confusion.
+     * Nothing else on the page changes.
+     */
+    (function setupAdvanceField() {
+        const advBlock   = document.getElementById('blockWorkshopAdvance');
+        const lblAdv     = document.getElementById('lblAdvanceField');
+        const lblNote    = document.getElementById('lblAdvanceNote');
+
+        if (activeRole === 'admin' || activeRole === 'service') {
+            advBlock.style.display = 'flex';
+            lblAdv.innerText  = 'Workshop Advance Collected (₹)';
+            lblNote.innerText = 'Cash goes to Workshop Drawer';
+        } else if (activeRole === 'green') {
+            advBlock.style.display = 'flex';
+            lblAdv.innerText  = 'Green Parts Prepaid Collected (₹)';
+            lblNote.innerText = 'Cash goes to Green Parts Drawer';
+        } else if (activeRole === 'moped') {
+            advBlock.style.display = 'flex';
+            lblAdv.innerText  = 'Moped Parts Prepaid Collected (₹)';
+            lblNote.innerText = 'Cash goes to Moped Parts Drawer';
+        }
+        // guest: field stays hidden (should never reach here due to redirect above)
+    })();
 
     let globalVehicleMaster = [];
 
@@ -173,7 +209,6 @@
         const { data: vMaster } = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
         globalVehicleMaster = vMaster || [];
         
-        // Populate the Type-and-Select Datalist for Brands
         const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
         const brandList = document.getElementById('brandList');
         brandList.innerHTML = '';
@@ -184,8 +219,6 @@
         const selectedBrand = document.getElementById('nvBrand').value.trim().toUpperCase();
         const modelList = document.getElementById('modelList');
         modelList.innerHTML = '';
-        
-        // Dynamically populate models based on whatever brand was typed or selected
         globalVehicleMaster.filter(item => item.brand.toUpperCase() === selectedBrand).forEach(m => {
             modelList.innerHTML += `<option value="${m.model_name}">`;
         });
@@ -219,11 +252,7 @@
             vSelect.innerHTML = '';
             (cust.vehicles || []).forEach(v => { vSelect.innerHTML += `<option value="${v.id}">${v.reg_number} (${v.brand || ''} ${v.make_model || ''})</option>`; });
             vSelect.innerHTML += `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
-            
-            // Show Odometer block if they have an existing vehicle selected
-            if (cust.vehicles && cust.vehicles.length > 0) {
-                odoBlock.style.display = 'flex';
-            }
+            if (cust.vehicles && cust.vehicles.length > 0) { odoBlock.style.display = 'flex'; }
             toggleNewVehicleFields();
         } else {
             nBadge.style.display = 'inline-block';
@@ -243,10 +272,10 @@
         
         if (vSelectValue === 'NEW') {
             nvBlock.style.display = 'block';
-            odoBlock.style.display = 'flex'; // Ensure odometer is visible for new vehicles
+            odoBlock.style.display = 'flex';
         } else if (vSelectValue !== '') {
             nvBlock.style.display = 'none';
-            odoBlock.style.display = 'flex'; // Ensure odometer is visible for existing vehicles
+            odoBlock.style.display = 'flex';
         } else {
             nvBlock.style.display = 'none';
             odoBlock.style.display = 'none';
@@ -331,15 +360,13 @@
     } 
 
     async function commitNewJobCard() {
-        const mobile = document.getElementById('jcMobile').value.trim();
-        const name = document.getElementById('jcName').value.trim().toUpperCase();
-        const problem = document.getElementById('jcProblem').value.trim().toUpperCase();
+        const mobile   = document.getElementById('jcMobile').value.trim();
+        const name     = document.getElementById('jcName').value.trim().toUpperCase();
+        const problem  = document.getElementById('jcProblem').value.trim().toUpperCase();
         const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
-        const advance = parseFloat(document.getElementById('jcAdvance')?.value) || 0;
+        const advance  = parseFloat(document.getElementById('jcAdvance')?.value) || 0;
         const isNewCust = document.getElementById('newCustBadge').style.display === 'inline-block';
-        const ob = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
-        
-        // ODOMETER FIX: Capture the global odometer input
+        const ob        = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
         const currentOdometer = document.getElementById('nvOdo').value || null;
         
         if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
@@ -361,26 +388,24 @@
 
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
         if (finalVehicleId === 'NEW') {
-            const reg = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
+            const reg   = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
             const brand = document.getElementById('nvBrand').value.trim().toUpperCase();
             const model = document.getElementById('nvModel').value.trim().toUpperCase();
             
-            if (!reg || !brand || !model) { alert("Registration No, Brand, and Model are required."); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
+            if (!reg || !brand || !model) {
+                alert("Registration No, Brand, and Model are required.");
+                btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING";
+                btn.disabled = false;
+                return;
+            }
             
-            // ARCHITECTURE AGREEMENT: "Unclassified" default for custom typed vehicles
             let cat = 'Unclassified'; 
             const matchedModel = globalVehicleMaster.find(m => m.brand.toUpperCase() === brand && m.model_name.toUpperCase() === model);
             
             if (matchedModel) {
                 cat = matchedModel.category_group;
             } else {
-                // ARCHITECTURE AGREEMENT: "Auto-Master Injection"
-                // Brand new Make/Model combination -> Inject into global vehicle_master
-                await supabaseClient.from('vehicle_master').insert({
-                    brand: brand,
-                    model_name: model,
-                    category_group: 'Unclassified'
-                });
+                await supabaseClient.from('vehicle_master').insert({ brand: brand, model_name: model, category_group: 'Unclassified' });
             }
             
             const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({ 
@@ -394,16 +419,66 @@
             
             if (vehErr) { alert("Error: " + vehErr.message); btn.disabled = false; return; }
             finalVehicleId = newVeh.id;
-        } 
+        }
 
-        // ODOMETER FIX: Inject the odometer into the job_cards payload
-        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
-            customer_mobile: mobile, vehicle_id: finalVehicleId, problem_mentioned: problem, estimate_given: estimate, advance_paid: advance,
-            mech_id: document.getElementById('intakePrimaryMech').value || null, co_mech_id: document.getElementById('intakeCoMech').value || null, 
-            status: 'Open', source_role: activeRole, odometer: currentOdometer
-        }).select().single();
+        /*
+         * CHANGE 4: TRI-BUCKET ADVANCE ROUTING
+         *
+         * Was:  advance_paid: advance  (always the same column, no timestamp)
+         *
+         * Now:  The advance amount is routed to the correct dedicated column
+         *       based on which role physically collected the cash. A timestamp
+         *       is stamped at the same moment so the EOD ledger knows WHICH DAY
+         *       the cash entered that specific drawer — even if the job card was
+         *       created on a different day.
+         *
+         *   service / admin  →  advance_service  +  advance_service_paid_at
+         *   green            →  prepaid_green    +  prepaid_green_paid_at
+         *   moped            →  prepaid_moped    +  prepaid_moped_paid_at
+         *
+         * The old advance_paid column is intentionally NOT written to for new
+         * records. The ledger reads both old and new columns with a fallback,
+         * so historical job cards are unaffected.
+         *
+         * PRE-REQUISITE: The three _paid_at timestamp columns must exist in
+         * Supabase before deploying this file. Run this SQL once if not done:
+         *
+         *   ALTER TABLE job_cards
+         *   ADD COLUMN IF NOT EXISTS advance_service_paid_at TIMESTAMPTZ NULL,
+         *   ADD COLUMN IF NOT EXISTS prepaid_green_paid_at   TIMESTAMPTZ NULL,
+         *   ADD COLUMN IF NOT EXISTS prepaid_moped_paid_at   TIMESTAMPTZ NULL;
+         */
+        const nowISO = new Date().toISOString();
 
-        if (jcErr) { alert("Error: " + jcErr.message); btn.disabled = false; return; }
+        const jcPayload = {
+            customer_mobile : mobile,
+            vehicle_id      : finalVehicleId,
+            problem_mentioned: problem,
+            estimate_given  : estimate,
+            mech_id         : document.getElementById('intakePrimaryMech').value || null,
+            co_mech_id      : document.getElementById('intakeCoMech').value || null,
+            status          : 'Open',
+            source_role     : activeRole,
+            odometer        : currentOdometer
+        };
+
+        // Only write advance columns when the amount is actually greater than zero
+        if (advance > 0) {
+            if (activeRole === 'admin' || activeRole === 'service') {
+                jcPayload.advance_service          = advance;
+                jcPayload.advance_service_paid_at  = nowISO;
+            } else if (activeRole === 'green') {
+                jcPayload.prepaid_green            = advance;
+                jcPayload.prepaid_green_paid_at    = nowISO;
+            } else if (activeRole === 'moped') {
+                jcPayload.prepaid_moped            = advance;
+                jcPayload.prepaid_moped_paid_at    = nowISO;
+            }
+        }
+
+        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert(jcPayload).select().single();
+
+        if (jcErr) { alert("Error: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
         window.location.href = `billing.html?id=${jc.id}`;
     }
 
