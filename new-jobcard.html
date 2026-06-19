@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Job Card - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- html2canvas: required for JPG/WhatsApp export of advance receipt -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
@@ -38,50 +36,10 @@
         .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
         .data-table th { padding: 8px 12px; text-align: left; font-size: 0.7rem; color: #64748b; border-bottom: 1px solid var(--border); background: #f8fafc; }
         .data-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
-
-        /* ── ADVANCE RECEIPT MODAL ── */
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 400px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-
-        /* Thermal-style receipt block */
-        .rcpt-wrap { background: white; color: black; font-family: 'Courier New', Courier, monospace; padding: 14px; border: 1px solid #ccc; width: 290px; max-width: 290px; margin: 0 auto; box-sizing: border-box; font-size: 0.78rem; line-height: 1.3; }
-        .rcpt-header { text-align: center; border-bottom: 1px dashed black; padding-bottom: 8px; margin-bottom: 8px; }
-        .rcpt-logos { display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 4px; }
-        .rcpt-logos img { height: 26px; filter: grayscale(100%); }
-        .rcpt-shop { font-size: 0.95rem; font-weight: bold; }
-        .rcpt-meta { display: flex; justify-content: space-between; font-size: 0.7rem; margin: 1px 0; }
-        .rcpt-divider { border-top: 1px dashed black; margin: 6px 0; }
-        .rcpt-type-banner { font-size: 0.65rem; text-transform: uppercase; color: #555; text-align: center; letter-spacing: 1px; }
-        .rcpt-amount-box { font-size: 1.5rem; font-weight: bold; text-align: center; border: 1px dashed black; padding: 8px; margin: 8px 0; }
-        .rcpt-mode-line { text-align: center; font-size: 0.8rem; font-weight: bold; margin-bottom: 4px; }
-        .rcpt-sig { display: flex; justify-content: space-between; font-size: 0.65rem; margin-top: 16px; padding-top: 8px; border-top: 1px dashed black; }
-        .rcpt-sig-col { text-align: center; }
-
-        /* A5 mode for laser print */
-        .rcpt-wrap.a5-mode { width: 100% !important; max-width: 500px !important; padding: 20px !important; font-size: 0.95rem !important; }
-
-        /* Action buttons in receipt modal */
-        .rcpt-action-strip { display: flex; gap: 8px; flex-wrap: wrap; }
-        .rcpt-action-strip button { flex: 1; min-width: 110px; padding: 12px 6px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; color: white; }
-
-        /* ── PRINT CSS ── */
-        @media print {
-            @page { margin: 6mm; }
-            body * { visibility: hidden; }
-            /* Thermal 3-inch */
-            body.print-adv-thermal #advReceiptTarget,
-            body.print-adv-thermal #advReceiptTarget * { visibility: visible; }
-            body.print-adv-thermal #advReceiptTarget { position: absolute; left: 0; top: 0; width: 290px; max-width: 290px; padding: 0; border: none; margin: 0; }
-            /* A5 / A6 laser */
-            body.print-adv-a5 #advReceiptTarget,
-            body.print-adv-a5 #advReceiptTarget * { visibility: visible; }
-            body.print-adv-a5 #advReceiptTarget { position: absolute; left: 0; top: 0; width: 100%; padding: 12mm 16mm; border: none; margin: 0; font-size: 1rem; box-sizing: border-box; }
-        }
     </style>
 </head>
 <body>
 
-<!-- ═══════════════════ NAVIGATION ═══════════════════ -->
 <nav class="sticky-nav">
     <div class="logo-matrix">
         <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care System">
@@ -90,12 +48,12 @@
     <div class="nav-actions">
         <button class="btn-header" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header">🏠 HOME</a>
+        <!-- LOGOUT button — Universal Rule 3 -->
         <button class="btn-header" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html';">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
 </nav>
 
-<!-- ═══════════════════ MAIN FORM ═══════════════════ -->
 <div class="wrapper">
     <div class="card-panel">
         <div class="block-title">Customer & Vehicle Intake Engine</div>
@@ -119,14 +77,14 @@
             💳 ACTIVE CREDIT BALANCE: ₹<span id="unifiedCreditBal">0.00</span> — Click to Open Ledger
         </div>
 
-        <div id="custHistoryPanel" style="display:none; margin-top:20px;"> 
+        <div id="custHistoryPanel" style="display:none; margin-top:20px;">
             <label style="display:block; margin-bottom:6px;">📋 Last 4 Workshop Transactions</label>
-            <div style="overflow-x:auto; border:1px solid var(--border); border-radius:6px;"> 
-                <table class="data-table"> 
-                    <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead> 
-                    <tbody id="custHistoryBody"></tbody> 
-                </table> 
-            </div> 
+            <div style="overflow-x:auto; border:1px solid var(--border); border-radius:6px;">
+                <table class="data-table">
+                    <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead>
+                    <tbody id="custHistoryBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="inputs-grid" style="margin-top: 20px; margin-bottom: 20px;">
@@ -167,7 +125,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="card-panel">
         <div class="block-title">Job Requirements & Assignment</div>
         <div class="inputs-grid" style="margin-bottom: 20px;">
@@ -176,116 +134,25 @@
         </div>
         <div class="field-group" style="margin-bottom: 20px;">
             <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
-            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea> 
+            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea>
         </div>
-        <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;"> 
+        <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;">
             ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint recently.
-            <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"></div> 
+            <div id="warrantFlagDetail" style="font-size:0.8rem; font-weight:normal; margin-top:4px; color:#991b1b;"></div>
         </div>
+        <!-- REMOVED: advance collection field (blockWorkshopAdvance).
+             Advances and prepaids are now logged against the job card
+             inside billing.html by whichever role collected the cash. -->
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
             <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=(this.value||'').toUpperCase()"></div>
-
-            <!--
-                CHANGE A: Advance / Prepaid field with payment mode capture.
-                - Field is shown for ALL roles (label changes per role, set by setupAdvanceField()).
-                - Payment mode (Cash / UPI) captured here alongside the amount.
-                - Both amount AND mode are saved to the correct tri-bucket columns on insert.
-            -->
-            <div class="field-group" id="blockWorkshopAdvance" style="display:none;">
-                <label id="lblAdvanceField">Advance / Prepaid Collected (₹)</label>
-                <input type="number" id="jcAdvance" value="0" min="0">
-                <span id="lblAdvanceNote" style="font-size:0.65rem; color:#64748b; margin-top:2px;"></span>
-                <!-- Payment mode — inline, no extra grid column needed -->
-                <div style="display:flex; gap:20px; margin-top:8px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid var(--border);">
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; text-transform:none; font-size:0.9rem; color:var(--primary);">
-                        <input type="radio" name="advPmtMode" value="Cash" checked style="width:auto; margin:0; accent-color:var(--success);"> 💵 Cash
-                    </label>
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:700; text-transform:none; font-size:0.9rem; color:var(--info);">
-                        <input type="radio" name="advPmtMode" value="UPI" style="width:auto; margin:0; accent-color:var(--info);"> 📱 UPI / Card
-                    </label>
-                </div>
-            </div>
         </div>
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
     </div>
 </div>
 
-<!-- ═══════════════════ ADVANCE RECEIPT MODAL ═══════════════════
-     This modal appears after job card creation when an advance/prepaid was collected.
-     It has three output options: Thermal print, A5/A6 laser print, JPG for WhatsApp.
-     The × close button navigates to billing.html (not just closes) because the JC
-     already exists at this point — there is no going back to the form.
-     
-     REPRINT NOTE: If this modal is closed accidentally, the advance receipt can be
-     reprinted from billing.html using the "🖨️ REPRINT INTAKE RECEIPT" button
-     (visible whenever advance_service / prepaid_green / prepaid_moped > 0).
-     That button will be added when billing.html is updated next.
-═══════════════════════════════════════════════════════════════════ -->
-<div id="modalAdvanceReceipt" class="overlay-modal">
-    <div class="modal-card">
-
-        <!-- Header -->
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
-            <div>
-                <h3 style="margin:0; color:var(--primary);">Advance / Prepaid Receipt</h3>
-                <span style="font-size:0.75rem; color:#64748b;" id="advModalJcRef">JC-XXXXXXXX</span>
-            </div>
-            <!-- × navigates to billing — JC already created, cannot stay here -->
-            <button onclick="goToBilling()" style="border:none; background:none; font-size:1.5rem; font-weight:700; cursor:pointer; color:#64748b;" title="Close and go to Billing">×</button>
-        </div>
-
-        <!-- Thermal-format receipt (the printable/exportable block) -->
-        <div id="advReceiptTarget" class="rcpt-wrap">
-            <div class="rcpt-header">
-                <div class="rcpt-logos">
-                    <img src="logo-main.jpg" onerror="this.style.display='none'" alt="">
-                    <img src="logo-green.png" onerror="this.style.display='none'" alt="">
-                </div>
-                <div class="rcpt-shop">MY CARE SERVICE CENTER</div>
-                <div style="font-size:0.65rem;">GSTIN: 23ANAPB4613K1ZJ</div>
-                <div style="font-size:0.65rem;">Gurudwara Road, Ganj Betul</div>
-                <div style="font-size:0.65rem;">PH: 9425002214 | 8989171751</div>
-            </div>
-
-            <div class="rcpt-meta"><span>Date: <strong id="advRcptDate">--</strong></span><span>Time: <strong id="advRcptTime">--</strong></span></div>
-            <div style="font-size:0.7rem; margin:2px 0;">JC Ref: <strong id="advRcptJcRef">--</strong></div>
-
-            <div class="rcpt-divider"></div>
-
-            <div style="font-size:0.7rem; margin:2px 0;">Customer: <strong id="advRcptCust">--</strong></div>
-            <div style="font-size:0.7rem; margin:2px 0;">Mobile: <strong id="advRcptMobile">--</strong></div>
-            <div style="font-size:0.7rem; margin:2px 0;">Vehicle: <strong id="advRcptVehicle">--</strong></div>
-
-            <div class="rcpt-divider"></div>
-
-            <div class="rcpt-type-banner" id="advRcptType">WORKSHOP ADVANCE</div>
-            <div class="rcpt-amount-box">₹<span id="advRcptAmount">0</span></div>
-            <div class="rcpt-mode-line">Mode: <span id="advRcptMode">Cash</span></div>
-
-            <div class="rcpt-divider"></div>
-
-            <div class="rcpt-sig">
-                <div class="rcpt-sig-col">Authorized By<br><br>___________</div>
-                <div class="rcpt-sig-col">Received By<br><br>___________</div>
-            </div>
-            <div style="font-size:0.65rem; text-align:center; margin-top:10px; border-top:1px dashed black; padding-top:6px;">Computer Generated Receipt. Thank You.</div>
-        </div>
-
-        <!-- Output actions -->
-        <div class="rcpt-action-strip">
-            <button style="background:#1e293b;" onclick="printAdvReceipt('thermal')" title="3-inch thermal roll printer">🖨️ THERMAL</button>
-            <button style="background:var(--info);" onclick="printAdvReceipt('a5')" title="A5 or A6 laser/inkjet paper">📄 A5 / A6</button>
-            <button style="background:#25d366;" onclick="exportAdvReceiptJpg()" title="Save as JPG for WhatsApp">💬 JPG / WA</button>
-            <button style="background:var(--success);" onclick="goToBilling()">➡️ GO TO BILLING</button>
-        </div>
-
-    </div>
-</div>
-
-<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; 
+    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
@@ -294,36 +161,6 @@
     if (activeRole !== 'admin' && activeRole !== 'service' && activeRole !== 'green' && activeRole !== 'moped') {
         window.location.href = 'login.html';
     }
-
-    // Stores the newly created JC id so the receipt modal can navigate to billing
-    let newJcId = null;
-
-    /*
-     * CHANGE A: Role-based advance field setup.
-     * Shows the advance field for ALL authorized roles.
-     * Label and note text differ per role to avoid confusion at the counter.
-     * Payment mode radio buttons are embedded inside the same field group.
-     */
-    (function setupAdvanceField() {
-        const advBlock = document.getElementById('blockWorkshopAdvance');
-        const lblAdv   = document.getElementById('lblAdvanceField');
-        const lblNote  = document.getElementById('lblAdvanceNote');
-
-        if (activeRole === 'admin' || activeRole === 'service') {
-            advBlock.style.display = 'flex';
-            lblAdv.innerText  = 'Workshop Advance Collected (₹)';
-            lblNote.innerText = 'Cash / UPI goes to Workshop Drawer';
-        } else if (activeRole === 'green') {
-            advBlock.style.display = 'flex';
-            lblAdv.innerText  = 'Green Parts Prepaid Collected (₹)';
-            lblNote.innerText = 'Cash / UPI goes to Green Parts Drawer';
-        } else if (activeRole === 'moped') {
-            advBlock.style.display = 'flex';
-            lblAdv.innerText  = 'Moped Parts Prepaid Collected (₹)';
-            lblNote.innerText = 'Cash / UPI goes to Moped Parts Drawer';
-        }
-        // guest: stays hidden (unreachable due to redirect above)
-    })();
 
     let globalVehicleMaster = [];
 
@@ -337,6 +174,7 @@
         globalVehicleMaster = vMaster || [];
         const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
         const brandList = document.getElementById('brandList');
+        brandList.innerHTML = '';
         brands.forEach(b => { brandList.innerHTML += `<option value="${b}">`; });
     }
 
@@ -355,7 +193,7 @@
         const nBadge   = document.getElementById('newCustBadge');
         const obGroup  = document.getElementById('openingBalGroup');
         const odoBlock = document.getElementById('globalOdometerBlock');
-        
+
         if (cleanMobile.length !== 10) {
             document.getElementById('jcName').value = '';
             vSelect.innerHTML = '<option value="">-- Enter Mobile Number First --</option><option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>';
@@ -363,13 +201,13 @@
             odoBlock.style.display = 'none';
             nBadge.style.display = 'none';
             obGroup.style.display = 'none';
-            document.getElementById('custHistoryPanel').style.display = 'none'; 
-            document.getElementById('creditAlertBox').style.display = 'none'; 
+            document.getElementById('custHistoryPanel').style.display = 'none';
+            document.getElementById('creditAlertBox').style.display = 'none';
             return;
         }
 
         const { data: cust } = await supabaseClient.from('customers').select('name, vehicles(*)').eq('mobile_number', cleanMobile).maybeSingle();
-        
+
         if (cust) {
             nBadge.style.display = 'none';
             obGroup.style.display = 'none';
@@ -386,20 +224,22 @@
             vSelect.innerHTML = `<option value="NEW" style="color:var(--info); font-weight:bold;">+ Add New Vehicle</option>`;
             toggleNewVehicleFields();
         }
-        loadIdenticalTwinIntakeData(cleanMobile); 
+
+        loadIdenticalTwinIntakeData(cleanMobile);
     }
 
     function toggleNewVehicleFields() {
         const v = document.getElementById('jcVehicleSelect').value;
         const odoBlock = document.getElementById('globalOdometerBlock');
         const nvBlock  = document.getElementById('newVehicleBlock');
-        if (v === 'NEW')     { nvBlock.style.display = 'block'; odoBlock.style.display = 'flex'; }
-        else if (v !== '')   { nvBlock.style.display = 'none';  odoBlock.style.display = 'flex'; }
-        else                 { nvBlock.style.display = 'none';  odoBlock.style.display = 'none'; }
+        if (v === 'NEW')   { nvBlock.style.display = 'block'; odoBlock.style.display = 'flex'; }
+        else if (v !== '') { nvBlock.style.display = 'none';  odoBlock.style.display = 'flex'; }
+        else               { nvBlock.style.display = 'none';  odoBlock.style.display = 'none'; }
     }
 
     async function loadIdenticalTwinIntakeData(mobile) {
         const alertBox = document.getElementById('creditAlertBox');
+
         const [jcRes, posRes, paysRes] = await Promise.all([
             supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
             supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
@@ -434,52 +274,48 @@
 
         const tbody = document.getElementById('custHistoryBody');
         tbody.innerHTML = '';
-        if (mix.length === 0) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>';
-        else mix.forEach(x => {
-            const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`;
-            tbody.innerHTML += `<tr><td>${refLink}</td><td>${new Date(x.dt).toLocaleDateString('en-IN')}</td><td style="font-weight:bold;">${x.type}</td><td style="font-weight:bold;">₹${x.amt||0}</td><td style="font-weight:bold; color:${x.mode === 'Credit' ? '#b91c1c' : '#15803d'};">${x.mode}</td></tr>`;
-        });
-        document.getElementById('custHistoryPanel').style.display = 'block'; 
+        if (mix.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>';
+        } else {
+            mix.forEach(x => {
+                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`;
+                tbody.innerHTML += `<tr><td>${refLink}</td><td>${new Date(x.dt).toLocaleDateString('en-IN')}</td><td style="font-weight:bold;">${x.type}</td><td style="font-weight:bold;">₹${x.amt||0}</td><td style="font-weight:bold; color:${x.mode === 'Credit' ? '#b91c1c' : '#15803d'};">${x.mode}</td></tr>`;
+            });
+        }
+        document.getElementById('custHistoryPanel').style.display = 'block';
     }
 
-    async function checkRepeatComplaint() { 
-        const mobile     = document.getElementById('jcMobile').value.trim(); 
-        const prob       = document.getElementById('jcProblem').value.trim().toLowerCase(); 
-        const vehicleSel = document.getElementById('jcVehicleSelect').value; 
-        const flagBox    = document.getElementById('warrantFlagBox'); 
-        flagBox.style.display = 'none'; 
-        if (!mobile || mobile.length !== 10 || vehicleSel === '' || vehicleSel === 'NEW' || prob.length < 5) return; 
+    async function checkRepeatComplaint() {
+        const mobile     = document.getElementById('jcMobile').value.trim();
+        const prob       = document.getElementById('jcProblem').value.trim().toLowerCase();
+        const vehicleSel = document.getElementById('jcVehicleSelect').value;
+        const flagBox    = document.getElementById('warrantFlagBox');
+        flagBox.style.display = 'none';
+        if (!mobile || mobile.length !== 10 || vehicleSel === '' || vehicleSel === 'NEW' || prob.length < 5) return;
 
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30); 
+        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { data: recent } = await supabaseClient.from('job_cards')
             .select('id, problem_mentioned, closed_at')
             .eq('customer_mobile', mobile).eq('vehicle_id', vehicleSel).eq('status', 'Closed')
-            .gte('closed_at', thirtyDaysAgo.toISOString()).order('closed_at', { ascending: false }).limit(5); 
-        if (!recent || recent.length === 0) return; 
+            .gte('closed_at', thirtyDaysAgo.toISOString()).order('closed_at', { ascending: false }).limit(5);
+        if (!recent || recent.length === 0) return;
 
-        const tokens = prob.split(/\s+/).filter(t => t.length > 3); 
-        const match  = (recent || []).find(j => tokens.some(t => (j.problem_mentioned || '').toLowerCase().includes(t))); 
-        if (match) { 
-            flagBox.style.display = 'block'; 
-            document.getElementById('warrantFlagDetail').innerText = 'Last closed: JC-' + match.id.split('-')[0].toUpperCase() + ' on ' + new Date(match.closed_at).toLocaleDateString('en-IN') + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"'; 
-        } 
+        const tokens = prob.split(/\s+/).filter(t => t.length > 3);
+        const match  = (recent || []).find(j => tokens.some(t => (j.problem_mentioned || '').toLowerCase().includes(t)));
+        if (match) {
+            flagBox.style.display = 'block';
+            document.getElementById('warrantFlagDetail').innerText = 'Last closed: JC-' + match.id.split('-')[0].toUpperCase() + ' on ' + new Date(match.closed_at).toLocaleDateString('en-IN') + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"';
+        }
     }
 
     async function commitNewJobCard() {
-        const mobile   = document.getElementById('jcMobile').value.trim();
-        const name     = document.getElementById('jcName').value.trim().toUpperCase();
-        const problem  = document.getElementById('jcProblem').value.trim().toUpperCase();
-        const estimate = parseFloat(document.getElementById('jcEstimate').value) || 0;
-        const advance  = parseFloat(document.getElementById('jcAdvance')?.value) || 0;
+        const mobile    = document.getElementById('jcMobile').value.trim();
+        const name      = document.getElementById('jcName').value.trim().toUpperCase();
+        const problem   = document.getElementById('jcProblem').value.trim().toUpperCase();
+        const estimate  = parseFloat(document.getElementById('jcEstimate').value) || 0;
         const isNewCust = document.getElementById('newCustBadge').style.display === 'inline-block';
         const ob        = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
         const currentOdometer = document.getElementById('nvOdo').value || null;
-
-        /*
-         * CHANGE B: Capture payment mode from the radio buttons.
-         * Defaults to 'Cash' if neither is somehow selected.
-         */
-        const advanceMode = document.querySelector('input[name="advPmtMode"]:checked')?.value || 'Cash';
 
         if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
         if (!name || !problem)    return alert("Customer Name and Problem required.");
@@ -496,14 +332,7 @@
             });
         }
 
-        // Capture vehicle display text for the receipt BEFORE any vehicle creation
-        let vehicleDisplayForReceipt = '';
         let finalVehicleId = document.getElementById('jcVehicleSelect').value;
-
-        if (finalVehicleId !== 'NEW') {
-            const vSel = document.getElementById('jcVehicleSelect');
-            vehicleDisplayForReceipt = vSel.options[vSel.selectedIndex]?.text || 'Vehicle';
-        }
 
         if (finalVehicleId === 'NEW') {
             const reg   = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
@@ -514,8 +343,6 @@
                 alert("Registration No, Brand, and Model are required.");
                 btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return;
             }
-
-            vehicleDisplayForReceipt = `${reg} (${brand} ${model})`;
 
             let cat = 'Unclassified';
             const matchedModel = globalVehicleMaster.find(m => m.brand.toUpperCase() === brand && m.model_name.toUpperCase() === model);
@@ -534,30 +361,10 @@
             finalVehicleId = newVeh.id;
         }
 
-        /*
-         * CHANGE C: TRI-BUCKET ADVANCE ROUTING WITH PAYMENT MODE AND TIMESTAMP.
-         *
-         * Each advance/prepaid is saved to the correct column for its role:
-         *   service/admin → advance_service  + advance_service_paid_at  + advance_service_mode
-         *   green         → prepaid_green    + prepaid_green_paid_at    + prepaid_green_mode
-         *   moped         → prepaid_moped    + prepaid_moped_paid_at    + prepaid_moped_mode
-         *
-         * The timestamp ensures the EOD ledger knows WHICH DAY the cash entered that
-         * specific drawer, even if the job card was created on a different day later.
-         * The mode separates Cash from UPI so the dashboard cash metrics are accurate.
-         *
-         * PRE-REQUISITE SQL (run ONCE in Supabase before deploying this file):
-         *   ALTER TABLE job_cards
-         *   ADD COLUMN IF NOT EXISTS advance_service_paid_at TIMESTAMPTZ NULL,
-         *   ADD COLUMN IF NOT EXISTS prepaid_green_paid_at   TIMESTAMPTZ NULL,
-         *   ADD COLUMN IF NOT EXISTS prepaid_moped_paid_at   TIMESTAMPTZ NULL,
-         *   ADD COLUMN IF NOT EXISTS advance_service_mode TEXT DEFAULT 'Cash',
-         *   ADD COLUMN IF NOT EXISTS prepaid_green_mode   TEXT DEFAULT 'Cash',
-         *   ADD COLUMN IF NOT EXISTS prepaid_moped_mode   TEXT DEFAULT 'Cash';
-         */
-        const nowISO = new Date().toISOString();
-
-        const jcPayload = {
+        // NOTE: No advance_paid in this payload.
+        // Any advance or prepaid collection is handled inside billing.html
+        // by the role that physically received the cash, against this JC.
+        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
             customer_mobile  : mobile,
             vehicle_id       : finalVehicleId,
             problem_mentioned: problem,
@@ -567,125 +374,10 @@
             status           : 'Open',
             source_role      : activeRole,
             odometer         : currentOdometer
-        };
+        }).select().single();
 
-        if (advance > 0) {
-            if (activeRole === 'admin' || activeRole === 'service') {
-                jcPayload.advance_service         = advance;
-                jcPayload.advance_service_paid_at = nowISO;
-                jcPayload.advance_service_mode    = advanceMode;
-            } else if (activeRole === 'green') {
-                jcPayload.prepaid_green         = advance;
-                jcPayload.prepaid_green_paid_at = nowISO;
-                jcPayload.prepaid_green_mode    = advanceMode;
-            } else if (activeRole === 'moped') {
-                jcPayload.prepaid_moped         = advance;
-                jcPayload.prepaid_moped_paid_at = nowISO;
-                jcPayload.prepaid_moped_mode    = advanceMode;
-            }
-        }
-
-        const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert(jcPayload).select().single();
-
-        if (jcErr) {
-            alert("Error creating Job Card: " + jcErr.message);
-            btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return;
-        }
-
-        newJcId = jc.id;
-
-        /*
-         * CHANGE D: If an advance was collected, show the receipt modal instead of
-         * immediately redirecting. The user must either print/export or click
-         * "GO TO BILLING" to proceed. If they accidentally close the modal (×),
-         * goToBilling() is also called so they never get stuck.
-         *
-         * If advance = 0, skip the receipt and redirect directly.
-         */
-        if (advance > 0) {
-            showAdvanceReceipt(jc, mobile, name, vehicleDisplayForReceipt, advance, advanceMode);
-        } else {
-            window.location.href = `billing.html?id=${jc.id}`;
-        }
-    }
-
-    /*
-     * Populates and reveals the advance receipt modal.
-     */
-    function showAdvanceReceipt(jc, mobile, custName, vehicleInfo, amount, mode) {
-        const now = new Date();
-        const jcRef = `JC-${jc.id.split('-')[0].toUpperCase()}`;
-
-        document.getElementById('advModalJcRef').innerText = jcRef;
-        document.getElementById('advRcptDate').innerText   = now.toLocaleDateString('en-IN');
-        document.getElementById('advRcptTime').innerText   = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('advRcptJcRef').innerText  = jcRef;
-        document.getElementById('advRcptCust').innerText   = custName;
-        document.getElementById('advRcptMobile').innerText = mobile;
-        document.getElementById('advRcptVehicle').innerText= vehicleInfo;
-        document.getElementById('advRcptAmount').innerText = amount;
-        document.getElementById('advRcptMode').innerText   = mode;
-
-        // Set receipt type label
-        const typeMap = { service: 'WORKSHOP ADVANCE', admin: 'WORKSHOP ADVANCE', green: 'GREEN PARTS PREPAID', moped: 'MOPED PARTS PREPAID' };
-        document.getElementById('advRcptType').innerText = typeMap[activeRole] || 'ADVANCE / PREPAID';
-
-        document.getElementById('modalAdvanceReceipt').style.display = 'flex';
-    }
-
-    /*
-     * Print the advance receipt.
-     * format: 'thermal' → 3-inch narrow width
-     *         'a5'      → full-width A5 / A6 on laser/inkjet
-     */
-    function printAdvReceipt(format) {
-        document.body.classList.remove('print-adv-thermal', 'print-adv-a5');
-        const target = document.getElementById('advReceiptTarget');
-
-        if (format === 'a5') {
-            document.body.classList.add('print-adv-a5');
-            target.classList.add('a5-mode');
-        } else {
-            document.body.classList.add('print-adv-thermal');
-            target.classList.remove('a5-mode');
-        }
-
-        window.onafterprint = function () {
-            document.body.classList.remove('print-adv-thermal', 'print-adv-a5');
-            target.classList.remove('a5-mode');
-            window.onafterprint = null;
-        };
-        // Short delay lets the CSS classes apply before the print dialog opens
-        setTimeout(() => window.print(), 200);
-    }
-
-    /*
-     * Export the receipt as a JPG image (WhatsApp / save to gallery).
-     */
-    function exportAdvReceiptJpg() {
-        const target = document.getElementById('advReceiptTarget');
-        target.classList.remove('a5-mode'); // Always export in thermal compact format
-        const origBorder = target.style.border;
-        target.style.border = 'none';
-        html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
-            target.style.border = origBorder;
-            canvas.toBlob(blob => {
-                const url = URL.createObjectURL(blob);
-                const a   = document.createElement('a');
-                a.href    = url;
-                a.download = `Advance_Receipt_${newJcId ? newJcId.split('-')[0].toUpperCase() : 'RCPT'}.jpg`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }, 'image/jpeg', 0.95);
-        });
-    }
-
-    /*
-     * Navigate to billing.html for the newly created job card.
-     * Called by both the "GO TO BILLING" button and the × close button.
-     */
-    function goToBilling() {
-        if (newJcId) window.location.href = `billing.html?id=${newJcId}`;
+        if (jcErr) { alert("Error: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
+        window.location.href = `billing.html?id=${jc.id}`;
     }
 
     initializeIntake();
