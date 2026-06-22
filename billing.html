@@ -67,6 +67,16 @@
         .settle-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
         .btn-action { padding: 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 0.95rem; cursor: pointer; color: white; text-align: center; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; }
         .btn-cash { background: #16a34a; } .btn-upi { background: #2563eb; } .btn-credit { background: #d97706; } .btn-save { background: #475569; } .btn-split { background: var(--purple); } .btn-cancel { background: var(--danger); }
+
+        /* ── CHANGE 6: Save Total / Pay Now restructure ── */
+        .btn-save-total { width: 100%; background: #f1f5f9; color: var(--primary); border: 1px solid var(--border); padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-bottom: 16px; transition: opacity 0.15s; }
+        .btn-save-total:hover:not(:disabled) { opacity: 0.85; }
+        .btn-save-total:disabled { cursor: default; opacity: 0.9; }
+        .btn-pay-now { width: 100%; background: var(--success); color: white; border: none; padding: 18px; border-radius: 8px; font-weight: 700; font-size: 1.1rem; cursor: pointer; margin-bottom: 10px; transition: opacity 0.15s; }
+        .btn-pay-now:hover { opacity: 0.9; }
+        .settle-secondary-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .settle-secondary-row .btn-action { flex: 1; }
+        .future-advice-box { width: 100%; flex: 1; min-height: 90px; resize: vertical; font-family: inherit; }
         .btn-success { background: #16a34a; } .btn-info { background: #2563eb; } .btn-purple { background: #7c3aed; }
         
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
@@ -201,6 +211,19 @@
         </table>
     </div>
 
+    <!--
+        CHANGE 6: SAVE TOTAL button.
+        Shows the complete/gross valuation (parts + labour + lathe, before any
+        advance, concession, or loyalty point deduction). Visible to ALL roles.
+        Clicking it performs exactly what the old Hold Draft / Update Draft
+        buttons did — saves the job card as an Open/Pending draft. When the job
+        card is locked (Closed/Cancelled), lockUserInterface() disables this
+        button so it just displays the figure, nothing more.
+    -->
+    <button id="btnSaveTotal" class="btn-save-total" onclick="commitInvoiceSettlement('Pending', 'Open')">
+        💾 SAVE TOTAL: ₹<span id="totalValuationDisplay">0</span>
+    </button>
+
     <div class="grid-layout">
         <div class="matrix-panel">
             <h4 class="panel-header">Offsets & Deposits</h4>
@@ -242,7 +265,17 @@
         
         <div class="matrix-panel" style="background: #f8fafc;">
             <span class="field-label danger-label">Future Advice / Remarks (Prints on Invoice)</span>
-            <input type="text" id="vFutureAdvice" class="field-input input-lockable" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 16px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();">
+            <!--
+                CHANGE 6: Future Advice enlarged into a multi-line textarea.
+                Same id, same oninput handler — .value works identically for a
+                textarea as it did for the old single-line input. This also
+                naturally balances panel height against Offsets & Deposits:
+                .matrix-panel is already display:flex; flex-direction:column,
+                so this textarea (flex:1) grows to fill whatever extra height
+                the grid's equal-height stretch allocates, instead of leaving
+                dead space below the concession block.
+            -->
+            <textarea id="vFutureAdvice" class="field-input input-lockable future-advice-box" rows="4" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 16px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();"></textarea>
             
             <div class="field-group" id="simpleDiscBlock" style="margin-bottom:12px;">
                 <span class="field-label">Applied Concession (₹)</span>
@@ -265,8 +298,6 @@
         </div>
     </div>
 
-    <div class="valuation-banner">NET PAYABLE: ₹<span id="netValuationDisplay">0</span></div>
-    
     <div id="masterActionContainer">
         <div id="adminOverrideBlock">
             <h4 style="margin:0 0 8px 0; color:#991b1b;">⚠️ Discount Exceeds 10% Limit</h4>
@@ -275,13 +306,25 @@
             <div id="overridePollingText" style="display:none; font-weight:bold; color:#b45309; margin-top:8px;">⏳ Request sent. Waiting for Admin to approve...</div>
         </div>
 
-        <div id="settlementActionBlock" class="settle-matrix" style="display:none;">
-            <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">CASH</button>
-            <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPI / CARD</button>
-            <button class="btn-action btn-split" onclick="openSplitPaymentModal()">SPLIT</button>
-            <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
-            <button class="btn-action btn-save" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 HOLD DRAFT</button>
-            <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
+        <!--
+            CHANGE 6: Settlement restructure.
+            Old: CASH / UPI / SPLIT / CREDIT / HOLD DRAFT / CANCEL JOB as 6 equal buttons.
+            New: CASH, UPI, and SPLIT are merged into one "PAY NOW" button which opens
+            a single Cash/UPI breakdown modal (openPayNowModal) — the mode (Cash, UPI,
+            or Split) is now determined automatically from what's entered, instead of
+            the user having to pre-guess which button to press.
+            HOLD DRAFT is removed — its job is now done by the universal SAVE TOTAL
+            button above the offsets grid (visible to all roles, not just service/admin).
+            CANCEL JOB and CREDIT BILL remain separate, untouched flows, now shown as
+            two equally-sized secondary buttons below Pay Now.
+            Still service/admin only — Green/Moped never had access to this block.
+        -->
+        <div id="settlementActionBlock" style="display:none;">
+            <button class="btn-pay-now" onclick="openPayNowModal()">💵 PAY NOW · ₹<span id="netValuationDisplay">0</span></button>
+            <div class="settle-secondary-row">
+                <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
+                <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
+            </div>
         </div>
 
         <div class="ping-box" id="pingRequestBlock" style="display:none;">
@@ -295,14 +338,12 @@
     </div>
 
     <!--
-        CHANGE (draftActionBlock): btnLogPrepaid removed.
-        The LOG COLLECTION button in the Offsets panel replaces it for all roles.
-        The UPDATE DRAFT button stays unchanged.
+        CHANGE 6: draftActionBlock removed entirely.
+        It only ever contained the UPDATE DRAFT button for Green/Moped.
+        The universal SAVE TOTAL button (above the offsets grid, visible to
+        every role) now performs that exact save action, so this block and
+        its dedicated button are redundant and have been removed.
     -->
-    <div id="draftActionBlock" style="display:none; margin-bottom:20px;">
-        <button class="btn-action btn-save" style="width:100%;" onclick="commitInvoiceSettlement('Pending', 'Open')">💾 UPDATE DRAFT</button>
-    </div>
-    
     <div id="adminEditBlock" style="display:none; margin-bottom:20px;">
         <div style="background:#fffbeb; border:1px solid #f59e0b; padding:16px; border-radius:8px; text-align:center;">
             <p style="margin:0 0 10px 0; font-weight:bold; color:#b45309;">⚠️ ADMIN BACKDATED EDIT MODE ACTIVE</p>
@@ -318,7 +359,7 @@
 <!-- ══════════════════ EXISTING MODALS (unchanged) ══════════════════ -->
 <div id="modalPhoto" class="overlay-modal"><div class="modal-card" style="text-align:center;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Visual Attachment</h3><button onclick="document.getElementById('modalPhoto').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><img id="attachedImagePreview" src="" style="max-width:100%; max-height:60vh; border-radius:8px; border:1px solid var(--border);"></div></div>
 
-<div id="modalSplitPayment" class="overlay-modal"><div class="modal-card"><h3 style="margin-top:0; color:var(--primary);">Split Payment Settlement</h3><p style="font-size:0.85rem; color:#64748b;">Net Payable: ₹<span id="splitTotalDisplay">0</span></p><div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;"><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">Cash Received (₹)</label><input type="number" id="splitCashInput" value="0" min="0" oninput="calcSplit()" style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box;"></div><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">UPI / Card Received (₹)</label><input type="number" id="splitUpiInput" value="0" min="0" readonly style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box; background:#f1f5f9;"></div></div><div style="display:flex; gap:10px; margin-top:20px;"><button class="btn-action btn-success" style="flex:1;" onclick="confirmSplitPayment()">CONFIRM SPLIT</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalSplitPayment').style.display='none'">CANCEL</button></div></div></div>
+<div id="modalPayNow" class="overlay-modal"><div class="modal-card"><h3 style="margin-top:0; color:var(--primary);">Settle Payment</h3><p style="font-size:0.85rem; color:#64748b;">Total Payable: ₹<span id="payTotalDisplay">0</span></p><div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;"><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">Cash Received (₹)</label><input type="number" id="payCashInput" value="0" min="0" oninput="calcPaySplit()" style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box;"></div><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">UPI / Card Received (₹)</label><input type="number" id="payUpiInput" value="0" min="0" readonly style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box; background:#f1f5f9;"></div></div><p style="font-size:0.7rem; color:#94a3b8; margin-top:8px; margin-bottom:0;">Leave Cash as the full amount for a pure cash payment. Adjust either field and UPI auto-fills the remainder — the system saves it as Cash, UPI, or Split automatically based on what you enter.</p><div style="display:flex; gap:10px; margin-top:16px;"><button id="btnConfirmPayNow" class="btn-action btn-success" style="flex:1;" onclick="confirmPayNow()">CONFIRM PAYMENT</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPayNow').style.display='none'">CANCEL</button></div></div></div>
 
 <div id="modalPrintChoice" class="overlay-modal" style="z-index: 300;">
     <div class="modal-card" style="text-align:center; max-width: 400px;">
@@ -567,6 +608,18 @@
         service: 'Workshop Advance', admin: 'Workshop Advance',
         green: 'Green Parts Prepaid', moped: 'Moped Parts Prepaid'
     };
+    /*
+     * BUG FIX: Receipt header must reflect WHICH COUNTER physically collected the
+     * cash — a fact fixed permanently at the moment of collection — not whichever
+     * role is currently logged in and viewing/reprinting the receipt.
+     * This map goes from collection type (stored against the bucket) to the
+     * correct entity, independent of sessionRole.
+     */
+    const TYPE_TO_ENTITY = {
+        'Workshop Advance'    : COLLECTION_ENTITY.service,
+        'Green Parts Prepaid' : COLLECTION_ENTITY.green,
+        'Moped Parts Prepaid' : COLLECTION_ENTITY.moped
+    };
     /* Bucket config for LOG COLLECTION routing */
     const BUCKET_CFG = {
         service : { inputId: 'vAdvanceService', dbCol: 'advance_service', tsCol: 'advance_service_paid_at', modeCol: 'advance_service_mode' },
@@ -592,13 +645,14 @@
         document.getElementById('vPrepaidMoped').disabled = (sessionRole !== 'moped' && sessionRole !== 'admin');
 
         /*
-         * CHANGE 1 (initializeJobContext):
-         * btnLogPrepaid removed — the new LOG COLLECTION button in the Offsets panel
-         * handles all roles. Green/moped still see draftActionBlock for UPDATE DRAFT.
+         * CHANGE 6 (initializeJobContext):
+         * draftActionBlock removed entirely — the universal SAVE TOTAL button
+         * (always visible, all roles) now performs the save-draft action that
+         * Update Draft / Hold Draft used to do. Only service/admin additionally
+         * get the Pay Now + secondary settlement row (Cancel Job, Credit Bill).
+         * Green/Moped never had access to this block and still don't.
          */
-        if (sessionRole === 'green' || sessionRole === 'moped') {
-            document.getElementById('draftActionBlock').style.display = 'block';
-        } else {
+        if (sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('settlementActionBlock').style.display = 'grid';
             document.getElementById('pingRequestBlock').style.display = 'block';
         }
@@ -715,7 +769,8 @@
     /* ══════════════════ CHANGE 2: COLLECTION RECEIPT FUNCTIONS ══════════════════ */
 
     function showCollectionReceipt(amount, mode, colType) {
-        const entity = COLLECTION_ENTITY[sessionRole] || COLLECTION_ENTITY.service;
+        /* BUG FIX: entity now derived from colType (the bucket), not sessionRole (the viewer) */
+        const entity = TYPE_TO_ENTITY[colType] || COLLECTION_ENTITY.service;
         const now = new Date();
         const jcRef = `JC-${targetJobId?.split('-')[0]?.toUpperCase() || 'XXXXXX'}`;
         const vehInfo = `${activeJobContext?.vehicles?.reg_number || '--'} (${activeJobContext?.vehicles?.make_model || '--'})`;
@@ -738,7 +793,10 @@
 
     function showCollectionReceiptFromHistory(colType, amount, mode, tsISO) {
         /* Called from the reprint button in the collection history strip */
-        const entity = COLLECTION_ENTITY[sessionRole] || COLLECTION_ENTITY.service;
+        /* BUG FIX: entity now derived from colType (the bucket), not sessionRole (the viewer).
+           This is the critical fix — without it, reprinting from a different role than the
+           original collector silently changes the header on an already-issued receipt. */
+        const entity = TYPE_TO_ENTITY[colType] || COLLECTION_ENTITY.service;
         const ts = tsISO ? new Date(tsISO) : new Date();
         const jcRef = `JC-${targetJobId?.split('-')[0]?.toUpperCase() || 'XXXXXX'}`;
         const vehInfo = `${activeJobContext?.vehicles?.reg_number || '--'} (${activeJobContext?.vehicles?.make_model || '--'})`;
@@ -928,13 +986,15 @@
         document.getElementById('lockedBanner').style.display = 'block';
         document.getElementById('uiPartEntryBlock').style.display = 'none';
         document.getElementById('masterActionContainer').style.display = 'none';
-        document.getElementById('draftActionBlock').style.display = 'none';
         document.getElementById('columnDestroyer').style.display = 'none';
         document.getElementById('btnMechPrintTop').style.display = 'none';
         document.getElementById('historicalPrintActions').style.display = 'flex';
         /* CHANGE 1: hide LOG COLLECTION button when locked */
         const lcBtn = document.getElementById('btnLogCollection');
         if (lcBtn) lcBtn.style.display = 'none';
+        /* CHANGE 6: Save Total becomes a read-only figure on a locked job card — disabled, not hidden, so the number stays visible */
+        const stBtn = document.getElementById('btnSaveTotal');
+        if (stBtn) stBtn.disabled = true;
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = true; el.style.background = '#f1f5f9'; });
         if(sessionRole === 'admin') document.getElementById('btnUnlockAdmin').style.display = 'inline-block';
     }
@@ -949,6 +1009,9 @@
         /* CHANGE 1: restore LOG COLLECTION button on unlock */
         const lcBtn = document.getElementById('btnLogCollection');
         if (lcBtn) lcBtn.style.display = 'block';
+        /* CHANGE 6: re-enable Save Total during admin backdated edit */
+        const stBtn = document.getElementById('btnSaveTotal');
+        if (stBtn) stBtn.disabled = false;
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = false; el.style.background = 'white'; });
     }
 
@@ -977,25 +1040,45 @@
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
-    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a_srv - p_grn - p_mop - pUsed) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
+    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; const totalDisplayEl = document.getElementById('totalValuationDisplay'); if (totalDisplayEl) totalDisplayEl.innerText = Math.round(grossTotalBeforeDiscount) || 0; if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a_srv - p_grn - p_mop - pUsed) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
 
     async function saveJobState() { if(!activeJobContext || activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') return; const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; await supabaseClient.from('job_cards').update({ total_invoice_value: netVal, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_service: parseFloat(document.getElementById('vAdvanceService').value) || 0, prepaid_green: parseFloat(document.getElementById('vPrepaidGreen').value) || 0, prepaid_moped: parseFloat(document.getElementById('vPrepaidMoped').value) || 0, green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, points_used: pUsed || 0 }).eq('id', targetJobId); }
 
     async function requestAdminOverride() { const d = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const grossTotalBeforeDiscount = partsGrossTotal + servicePkgGrossTotal + internalLatheNet; document.getElementById('btnReqOverride').style.display = 'none'; document.getElementById('overridePollingText').style.display = 'block'; const payload = { request_type: 'Discount Override', status: 'Pending', target_dept: 'admin', payload: { jc_id: targetJobId, requested_discount: d, total_bill_value: grossTotalBeforeDiscount } }; await supabaseClient.from('approval_requests').insert(payload); overridePending = true; overridePollingInterval = setInterval(pollForAdminOverride, 5000); }
     async function pollForAdminOverride() { if(!overridePending) return; const { data } = await supabaseClient.from('approval_requests').select('status, payload').eq('request_type', 'Discount Override').eq('status', 'Cleared').contains('payload', { jc_id: targetJobId }).order('created_at', { ascending: false }).limit(1); if(data && data.length > 0) { clearInterval(overridePollingInterval); overridePending = false; overrideApproved = true; const dist = data[0].payload.distribution || { green:0, moped:0, labour:0, lathe:0 }; document.getElementById('vTotalServiceDisc').disabled = true; document.getElementById('vDiscGreen').value = dist.green; document.getElementById('vDiscMoped').value = dist.moped; document.getElementById('vDiscLabour').value = dist.labour; document.getElementById('vDiscLathe').value = dist.lathe; document.getElementById('vDiscGreen').disabled = true; document.getElementById('vDiscMoped').disabled = true; document.getElementById('vDiscLabour').disabled = true; document.getElementById('vDiscLathe').disabled = true; alert("✅ Admin Approved! Discount allocated securely. You may now finalize settlement."); compileDynamicSums(); } }
 
-    function openSplitPaymentModal() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; document.getElementById('splitTotalDisplay').innerText = netVal; document.getElementById('splitCashInput').value = netVal; document.getElementById('splitUpiInput').value = 0; document.getElementById('modalSplitPayment').style.display = 'flex'; calcSplit(); }
-    function calcSplit() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('splitCashInput').value) || 0; let upi = netVal - cash; if (upi < 0) upi = 0; document.getElementById('splitUpiInput').value = parseFloat(upi.toFixed(2)); const sum = cash + parseFloat(document.getElementById('splitUpiInput').value); const remaining = Math.round((netVal - sum) * 100) / 100; const btn = document.querySelector('#modalSplitPayment .btn-success'); if (btn) { if (Math.abs(remaining) < 0.01) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; } } }
-    
-    function confirmSplitPayment() {
-        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
-        let cash = parseFloat(document.getElementById('splitCashInput').value) || 0;
-        let upi  = parseFloat(document.getElementById('splitUpiInput').value)  || 0;
-        if ((cash + upi) !== netVal) return alert("Split amounts must equal Net Payable!");
-        isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi;
-        /* CHANGE 4: No ₹ symbol inside the string — regex parser requires plain numbers */
-        commitInvoiceSettlement(`Split (Cash: ${cash}, UPI: ${upi})`, 'Closed');
-        document.getElementById('modalSplitPayment').style.display = 'none';
+    /*
+     * CHANGE 6: Unified PAY NOW flow.
+     * Replaces the old separate CASH / UPI / SPLIT buttons with one entry point.
+     * Opens with Cash pre-filled to the full amount (so a pure-cash payment is
+     * just "open → confirm"). Adjusting either field auto-balances the other,
+     * exactly like the old Split modal did. On confirm, the mode is determined
+     * automatically from what was actually entered:
+     *   Cash = full, UPI = 0   → mode 'Cash'
+     *   UPI = full, Cash = 0   → mode 'UPI'
+     *   anything else          → mode 'Split (Cash: X, UPI: Y)'
+     * Credit Bill and Cancel Job remain separate, untouched flows.
+     */
+    function openPayNowModal() { const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; document.getElementById('payTotalDisplay').innerText = netVal; document.getElementById('payCashInput').value = netVal; document.getElementById('payUpiInput').value = 0; document.getElementById('modalPayNow').style.display = 'flex'; calcPaySplit(); }
+    function calcPaySplit() { const netVal = parseFloat(document.getElementById('payTotalDisplay').innerText) || 0; let cash = parseFloat(document.getElementById('payCashInput').value) || 0; let upi = netVal - cash; if (upi < 0) upi = 0; document.getElementById('payUpiInput').value = parseFloat(upi.toFixed(2)); const sum = cash + parseFloat(document.getElementById('payUpiInput').value); const remaining = Math.round((netVal - sum) * 100) / 100; const btn = document.getElementById('btnConfirmPayNow'); if (btn) { if (Math.abs(remaining) < 0.01) { btn.disabled = false; btn.style.opacity = '1'; } else { btn.disabled = true; btn.style.opacity = '0.5'; } } }
+
+    function confirmPayNow() {
+        const netVal = parseFloat(document.getElementById('payTotalDisplay').innerText) || 0;
+        let cash = parseFloat(document.getElementById('payCashInput').value) || 0;
+        let upi  = parseFloat(document.getElementById('payUpiInput').value)  || 0;
+        if ((cash + upi) !== netVal) return alert("Cash + UPI must equal the Total Payable!");
+        document.getElementById('modalPayNow').style.display = 'none';
+        if (cash === netVal && upi === 0) {
+            isSplitPayment = false;
+            commitInvoiceSettlement('Cash', 'Closed');
+        } else if (upi === netVal && cash === 0) {
+            isSplitPayment = false;
+            commitInvoiceSettlement('UPI', 'Closed');
+        } else {
+            isSplitPayment = true; splitCashVal = cash; splitUpiVal = upi;
+            /* CHANGE 4: No ₹ symbol inside the string — regex parser requires plain numbers */
+            commitInvoiceSettlement(`Split (Cash: ${cash}, UPI: ${upi})`, 'Closed');
+        }
     }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
