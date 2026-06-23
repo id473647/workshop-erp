@@ -127,13 +127,6 @@
 </nav>
 
 <div class="wrapper">
-    <div id="pingQueueBlock" style="display:none; margin-bottom:20px;">
-        <div class="card-panel" style="background:#f0f9ff; border:1px solid #bae6fd; padding:16px;">
-            <h4 style="margin:0 0 12px 0; color:#0369a1;">🔔 Pending Cash Collections</h4>
-            <div id="pingQueueList" style="display:flex; flex-direction:column; gap:10px;"></div>
-        </div>
-    </div>
-
     <!-- ══ STEP 1: Customer lookup + history ══ -->
     <div id="flowHub" class="card-panel active-step">
         <div class="block-title">Customer Contact Verification</div>
@@ -421,7 +414,7 @@
             <div style="font-size:0.7rem;text-align:center;">Computer Generated Document<br>Green Scooter Center</div>
         </div>
         <div style="display:flex;gap:8px;width:100%;max-width:300px;">
-            <button onclick="printPingReceipt()" style="flex:1;background:var(--primary);color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">🖨️ PRINT</button>
+            <button onclick="printPaymentReceipt()" style="flex:1;background:var(--primary);color:white;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">🖨️ PRINT</button>
             <button onclick="document.getElementById('paymentReceiptModal').style.display='none'" style="flex:1;background:#e2e8f0;color:#1e293b;border:none;padding:10px;border-radius:6px;font-weight:bold;cursor:pointer;">CLOSE</button>
         </div>
     </div>
@@ -576,33 +569,31 @@
         evaluatedPhoneContext = cleanStr;
         document.getElementById('masterHistoryBlock').style.display = 'none';
 
+        try {
         /*
-         * PERFORMANCE FIX: All 6 database queries fire in ONE Promise.all.
-         * Before: 3 queries → wait → then 3 more queries (calculateMasterCreditBalance).
-         * After : all 6 fire simultaneously → single network round trip.
-         * Also: select('*') on customers replaced with specific columns only.
-         * Result: response time after 10th digit roughly halved (~300ms vs ~600ms).
+         * PERFORMANCE: 4 queries in one round trip.
+         * Removed: job_cards badge check (cosmetic only, not worth a DB call).
+         * Credit balance computed inline from fetched data — no second await.
+         * outstanding_credit on customer record is the fast-path for the alert;
+         * the 3 credit queries below remain as the accurate fallback for existing data.
          */
-        const [cDataRes, jcRes, posRes, creditJcRes, creditPosRes, paysRes] = await Promise.all([
+        const [cDataRes, posRes, creditJcRes, creditPosRes, paysRes] = await Promise.all([
             supabaseClient.from('customers')
-                .select('name,category,loyalty_points,is_loyalty_member,enrollment_date,referral_code,service_count,free_service_eligible,free_service_used,custom_brand_discounts_green')
+                .select('name,category,loyalty_points,is_loyalty_member,enrollment_date,referral_code,service_count,free_service_eligible,free_service_used,custom_brand_discounts_green,outstanding_credit')
                 .eq('mobile_number', cleanStr).maybeSingle(),
-            supabaseClient.from('job_cards').select('id').eq('customer_mobile', cleanStr).limit(1),
             supabaseClient.from('counter_sales').select('id,created_at,total_amount,payment_mode').eq('customer_mobile', cleanStr).order('created_at',{ascending:false}).limit(3),
-            /* These three replace the separate calculateMasterCreditBalance() call */
             supabaseClient.from('job_cards').select('id,credit_amount').eq('customer_mobile',cleanStr).gt('credit_amount',0).eq('status','Closed'),
             supabaseClient.from('counter_sales').select('id,credit_amount').eq('customer_mobile',cleanStr).gt('credit_amount',0).eq('status','Closed'),
             supabaseClient.from('credit_payments').select('amount_paid,sale_id,job_card_id,payment_mode').eq('customer_mobile',cleanStr)
         ]);
 
-        const cData = cDataRes.data;
-        const hasJc = jcRes.data && jcRes.data.length > 0;
-        const recentHistory = posRes.data;
-        const creditJc  = creditJcRes.data  || [];
-        const creditPos = creditPosRes.data || [];
-        const pays      = paysRes.data      || [];
+        const cData        = cDataRes.data;
+        const recentHistory= posRes.data;
+        const creditJc     = creditJcRes.data  || [];
+        const creditPos    = creditPosRes.data || [];
+        const pays         = paysRes.data      || [];
 
-        /* Compute credit balance inline — no second await needed */
+        /* Compute credit balance inline */
         let totalDebt = 0;
         creditJc.forEach(j => {
             const paid = pays.filter(p=>p.job_card_id===j.id&&parseFloat(p.amount_paid)>0).reduce((s,p)=>s+parseFloat(p.amount_paid),0);
@@ -621,9 +612,6 @@
             document.getElementById('terminalName').value = cData.name;
             const tb = document.getElementById('accountCategoryDisplay');
             tb.innerText = `Category: ${cData.category||'Regular'}`; tb.className = `tier-tag tier-${cData.category||'Regular'}`; tb.style.display = 'inline-block';
-            if (hasJc && recentHistory?.length > 0) wrapper.innerHTML = '<span class="c-tag tag-reg">Customer for both</span>';
-            else if (hasJc) wrapper.innerHTML = '<span class="c-tag tag-work">Workshop customer</span>';
-            else if (recentHistory?.length > 0) wrapper.innerHTML = '<span class="c-tag tag-cash">POS customer</span>';
             /* Credit alert — computed inline above from the merged Promise.all, no second await */
             if (bal > 0) { document.getElementById('unifiedCreditBal').innerText = bal.toFixed(2); document.getElementById('creditAlertBox').style.display = 'block'; }
             else { document.getElementById('creditAlertBox').style.display = 'none'; }
@@ -650,6 +638,18 @@
             } else { lb.style.display = 'none'; }
             transitionFlowPanels('transactionInvoicerFlow'); prefetchCentralCatalog();
         } else { transitionFlowPanels('profileSetupFlow'); document.getElementById('newAccName').focus(); }
+
+        } catch(err) {
+            /* try-catch: prevents page freeze if any query fails (network blip, schema issue etc.) */
+            console.error('Customer lookup error:', err);
+            document.getElementById('terminalName').value = '';
+            document.getElementById('accountCategoryDisplay').style.display = 'none';
+            document.getElementById('creditAlertBox').style.display = 'none';
+            /* Show a non-blocking message in the name field rather than freezing */
+            const nameEl = document.getElementById('terminalName');
+            if (nameEl) { nameEl.value = 'Lookup error — check connection'; nameEl.style.color = '#dc2626'; }
+            setTimeout(() => { if(nameEl){nameEl.value='';nameEl.style.color='';} }, 3000);
+        }
     }
 
     function transitionFlowPanels(targetId) { document.querySelectorAll('.card-panel').forEach(p=>p.classList.remove('active-step')); document.getElementById(targetId).classList.add('active-step'); }
@@ -892,6 +892,9 @@
                    credit_payments table is used when credit is PAID (applyCreditPayment). */
                 if (cr > 0 && evaluatedPhoneContext) {
                     await supabaseClient.from('credit_payments').insert({ customer_mobile: evaluatedPhoneContext, sale_id: finalRecord.id, amount_paid: -cr, payment_mode: 'POS Credit', paid_by_role: activeRole });
+                    /* Update outstanding_credit on customer record — avoids full recalculation on next lookup */
+                    const currentCredit = parseFloat(targetCustomerProfile?.outstanding_credit) || 0;
+                    await supabaseClient.from('customers').update({ outstanding_credit: currentCredit + cr }).eq('mobile_number', evaluatedPhoneContext);
                 }
 
                 /* ── CHANGE 7: Award loyalty points on closed POS sale ── */
@@ -1071,6 +1074,14 @@
         document.getElementById('thDate').innerText=new Date().toLocaleDateString('en-IN');
         document.getElementById('thTime').innerText=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
         document.getElementById('settlementModifierInterface').style.display='none';
+        /* Update outstanding_credit: reduce by however much credit was paid off */
+        const oldCreditAmt = parseFloat(inspectedRecordObject.credit_amount) || 0;
+        const creditReduction = oldCreditAmt - cr;
+        if (creditReduction > 0 && inspectedRecordObject.customer_mobile) {
+            const { data: cust } = await supabaseClient.from('customers').select('outstanding_credit').eq('mobile_number', inspectedRecordObject.customer_mobile).single();
+            const currentCredit = parseFloat(cust?.outstanding_credit) || 0;
+            await supabaseClient.from('customers').update({ outstanding_credit: Math.max(0, currentCredit - creditReduction) }).eq('mobile_number', inspectedRecordObject.customer_mobile);
+        }
         /* CHANGE 3: Show payment receipt paper trail */
         showPaymentReceipt({
             heading: 'SETTLEMENT RECEIPT',
@@ -1133,6 +1144,12 @@
             remaining-=apply;
         }
         await Promise.all(promises);
+        /* Update outstanding_credit on customer record */
+        if (currentCreditLedgerMobile) {
+            const { data: cust } = await supabaseClient.from('customers').select('outstanding_credit').eq('mobile_number', currentCreditLedgerMobile).single();
+            const currentCredit = parseFloat(cust?.outstanding_credit) || 0;
+            await supabaseClient.from('customers').update({ outstanding_credit: Math.max(0, currentCredit - amountVal) }).eq('mobile_number', currentCreditLedgerMobile);
+        }
         const custName = document.getElementById('clCustName').innerText;
         const prevBalance = parseFloat(document.getElementById('clTotalOut').innerText)||0;
         const newBalance = Math.max(0, prevBalance - amountVal);
@@ -1190,7 +1207,8 @@
     function executePosReceipt(mode) { document.getElementById('modalPosPrintChoice').style.display='none'; document.body.className=''; document.body.classList.add('print-pos-receipt'); const c=document.getElementById('renderThermalReceiptTarget'); if(mode==='a5')c.classList.add('a5-mode');else c.classList.remove('a5-mode'); setTimeout(()=>{window.print();document.body.className='';c.classList.remove('a5-mode');},200); }
     function savePosReceiptAsJpg() { const t=document.getElementById('renderThermalReceiptTarget'); const ob=t.style.border; t.style.border='none'; html2canvas(t,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(canvas=>{t.style.border=ob;canvas.toBlob(blob=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`Invoice_POS_${(targetInspectionRecordId||'X').split('-')[0].toUpperCase()}.jpg`;a.click();URL.revokeObjectURL(u);},'image/jpeg',0.95);}); }
     function dispatchWhatsAppImageReceipt() { const t=document.getElementById('renderThermalReceiptTarget'); const ob=t.style.border; t.style.border='none'; html2canvas(t,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(canvas=>{t.style.border=ob;canvas.toBlob(blob=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`Receipt_${targetInspectionRecordId?.split('-')[0]?.toUpperCase()}.jpg`;a.click();URL.revokeObjectURL(u);},'image/jpeg',0.95);}); }
-    function printPingReceipt() { document.body.classList.add('print-ping-mode'); window.print(); setTimeout(()=>document.body.classList.remove('print-ping-mode'),500); }
+    /* printPaymentReceipt: renamed from printPingReceipt — handles all paper trail receipts */
+    function printPaymentReceipt() { document.body.classList.add('print-ping-mode'); window.print(); setTimeout(()=>document.body.classList.remove('print-ping-mode'),500); }
 
     async function loadDraftForEditing() {
         const draftId = targetInspectionRecordId; activeDraftRecordId = draftId; closeInspectionModal();
@@ -1211,6 +1229,7 @@
         compileDynamicInvoicerSums(); transitionFlowPanels('transactionInvoicerFlow');
     }
 
-    async function pollApprovalRequests() {
-        const role=(localStorage.getItem('ERP_ACTIVE_ROLE')||'').toLowerCase();
-        if(role!=='green'&&role!=='moped')
+    initPosTerminal();
+</script>
+</body>
+</html>
