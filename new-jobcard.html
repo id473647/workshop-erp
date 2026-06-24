@@ -145,7 +145,14 @@
              inside billing.html by whichever role collected the cash. -->
         <div class="inputs-grid">
             <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
-            <div class="field-group"><label>Referral Code (If Any)</label><input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX" oninput="this.value=(this.value||'').toUpperCase()"></div>
+            <div class="field-group">
+                <label>Referral Code (If Any)</label>
+                <input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX"
+                    oninput="this.value=(this.value||'').toUpperCase()"
+                    onblur="validateReferralCode(this.value)">
+                <!-- Phase 2: live validation — shows referrer name if found, soft warning if not -->
+                <span id="referralFeedback" style="font-size:0.75rem; margin-top:4px; display:block;"></span>
+            </div>
         </div>
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
     </div>
@@ -240,9 +247,15 @@
     async function loadIdenticalTwinIntakeData(mobile) {
         const alertBox = document.getElementById('creditAlertBox');
 
+        /*
+         * PHASE 2 FIX: credit balance calculation aligned with pos-green.
+         * OLD: filtered by payment_mode = 'Credit' — missed Split bills with partial credit.
+         * NEW: filters by credit_amount > 0 — catches all bills where any credit remains.
+         * Uses credit_amount column directly, not total_invoice_value.
+         */
         const [jcRes, posRes, paysRes] = await Promise.all([
-            supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
-            supabaseClient.from('counter_sales').select('id, total_amount, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed'),
+            supabaseClient.from('job_cards').select('id, credit_amount, created_at, total_invoice_value, payment_mode').eq('customer_mobile', mobile).gt('credit_amount', 0).eq('status', 'Closed'),
+            supabaseClient.from('counter_sales').select('id, credit_amount, created_at, total_amount, payment_mode').eq('customer_mobile', mobile).gt('credit_amount', 0).eq('status', 'Closed'),
             supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id, payment_mode').eq('customer_mobile', mobile)
         ]);
 
@@ -251,14 +264,14 @@
         const pays = paysRes.data || [];
         let totalOut = 0;
 
-        jc.filter(j => j.payment_mode === 'Credit').forEach(j => {
+        jc.forEach(j => {
             const linked = pays.filter(p => p.job_card_id === j.id && parseFloat(p.amount_paid) > 0).reduce((s, p) => s + parseFloat(p.amount_paid), 0);
-            const out = (parseFloat(j.total_invoice_value) || 0) - linked;
+            const out = (parseFloat(j.credit_amount) || 0) - linked;
             if (out > 0) totalOut += out;
         });
-        pos.filter(s => s.payment_mode === 'Credit').forEach(s => {
+        pos.forEach(s => {
             const linked = pays.filter(p => p.sale_id === s.id && parseFloat(p.amount_paid) > 0).reduce((sm, p) => sm + parseFloat(p.amount_paid), 0);
-            const out = (parseFloat(s.total_amount) || 0) - linked;
+            const out = (parseFloat(s.credit_amount) || 0) - linked;
             if (out > 0) totalOut += out;
         });
         pays.filter(p => !p.sale_id && !p.job_card_id && parseFloat(p.amount_paid) < 0 && p.payment_mode === 'Opening Balance').forEach(p => { totalOut += Math.abs(parseFloat(p.amount_paid)); });
@@ -268,7 +281,9 @@
         if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); }
         else              { alertBox.style.display = 'none'; }
 
-        let mix = jc.map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode }));
+        /* History table uses all closed JCs (not just credit) — query separately for display */
+        const { data: jcAll } = await supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed').order('created_at', { ascending: false }).limit(4);
+        let mix = (jcAll || []).map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode }));
         mix.sort((a, b) => new Date(b.dt) - new Date(a.dt));
         mix = mix.slice(0, 4);
 
@@ -364,6 +379,7 @@
         // NOTE: No advance_paid in this payload.
         // Any advance or prepaid collection is handled inside billing.html
         // by the role that physically received the cash, against this JC.
+        const referralCode = document.getElementById('jcReferral').value.trim() || null;
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
             customer_mobile  : mobile,
             vehicle_id       : finalVehicleId,
@@ -373,11 +389,37 @@
             co_mech_id       : document.getElementById('intakeCoMech').value || null,
             status           : 'Open',
             source_role      : activeRole,
-            odometer         : currentOdometer
+            odometer         : currentOdometer,
+            referral_code    : referralCode   /* Phase 2: saves referral code permanently on the JC */
         }).select().single();
 
         if (jcErr) { alert("Error: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
         window.location.href = `billing.html?id=${jc.id}`;
+    }
+
+    /*
+     * validateReferralCode — fires on blur of the referral code field.
+     * Looks up customers.referral_code in the database.
+     * If found: shows referrer name in green — confirms bonus will be awarded at billing.
+     * If not found: shows soft warning in red — does NOT block JC creation.
+     * Code format MC-XXXXXX is auto-generated per customer in mycare.html.
+     */
+    async function validateReferralCode(code) {
+        const feedback = document.getElementById('referralFeedback');
+        const clean = (code || '').trim().toUpperCase();
+        feedback.innerText = '';
+        if (!clean || clean.length < 5) return;
+        const { data } = await supabaseClient.from('customers')
+            .select('name, mobile_number')
+            .eq('referral_code', clean)
+            .maybeSingle();
+        if (data) {
+            feedback.style.color = '#15803d';
+            feedback.innerText = `✅ Valid — Referred by: ${data.name} (${data.mobile_number})`;
+        } else {
+            feedback.style.color = '#dc2626';
+            feedback.innerText = `⚠️ Code not found — JC will be created but referral bonus will not apply`;
+        }
     }
 
     initializeIntake();
