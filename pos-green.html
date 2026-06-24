@@ -343,13 +343,15 @@
             <div id="posExpiryWarning" style="display:none;font-size:0.7rem;color:#b45309;font-weight:700;text-align:center;margin-top:6px;padding:4px;background:#fef3c7;border-radius:4px;"></div>
             <div class="receipt-footer">Computer Generated Document.<br>Thank You for shopping with us!</div>
         </div>
-        <div id="settlementModifierInterface" style="display:none;background:#f8fafc;padding:10px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;">
-            <div style="font-size:0.75rem;font-weight:bold;color:var(--success);margin-bottom:6px;">Settle Outstanding Balance</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <input type="number" id="thSettleCash" placeholder="Cash (₹)" min="0" style="padding:6px;font-size:0.8rem;">
-                <input type="number" id="thSettleUpi" placeholder="UPI/Card (₹)" min="0" style="padding:6px;font-size:0.8rem;">
+        <div id="settlementModifierInterface" style="display:none;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;">
+            <div style="font-size:0.75rem;font-weight:bold;color:var(--primary);margin-bottom:8px;">📋 OUTSTANDING BALANCE</div>
+            <div id="settlementBreakdown"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
+                <input type="number" id="thSettleCash" placeholder="Cash (₹)" min="0" style="padding:6px;font-size:0.8rem;" oninput="validateSettleAmount()">
+                <input type="number" id="thSettleUpi" placeholder="UPI/Card (₹)" min="0" style="padding:6px;font-size:0.8rem;" oninput="validateSettleAmount()">
             </div>
-            <button onclick="commitPosSettlement()" style="background:var(--success);color:white;border:none;padding:8px 12px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;width:100%;">AUTHORIZE PAYMENT</button>
+            <div id="settleValidationMsg" style="display:none;font-size:0.7rem;color:var(--danger);margin-bottom:6px;font-weight:bold;"></div>
+            <button id="btnAuthorizePayment" onclick="commitPosSettlement()" style="background:var(--success);color:white;border:none;padding:8px 12px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;width:100%;">AUTHORIZE PAYMENT</button>
         </div>
         <div class="action-strip-bar">
             <button class="btn-ui-action" style="background:var(--primary);color:white;" onclick="triggerPosPrintSelection()">🖨️ PRINT</button>
@@ -537,7 +539,22 @@
         if(endVal) q=q.lte(dateCol,endVal+'T23:59:59');
         const { data: registers } = await q;
         const tbody = document.getElementById('posHistoryTableBody'); tbody.innerHTML='';
-        const filtered = (registers||[]).filter(r=>!phoneVal||(r.customer_mobile&&r.customer_mobile.toLowerCase().includes(phoneVal)));
+
+        /* AgedCredit: filter out bills fully paid — check credit_payments for each bill */
+        let filteredByMode = (registers||[]);
+        if (currentPosTabMode === 'AgedCredit' && filteredByMode.length > 0) {
+            const saleIds = filteredByMode.map(r => r.id);
+            const { data: billPays } = await supabaseClient.from('credit_payments')
+                .select('sale_id,amount_paid').in('sale_id', saleIds).gt('amount_paid', 0);
+            const paysBySale = {};
+            (billPays||[]).forEach(p => { paysBySale[p.sale_id] = (paysBySale[p.sale_id]||0) + parseFloat(p.amount_paid); });
+            filteredByMode = filteredByMode.filter(r => {
+                const remaining = (parseFloat(r.credit_amount)||0) - (paysBySale[r.id]||0);
+                return remaining > 0.01; /* tolerance for floating point */
+            });
+        }
+
+        const filtered = filteredByMode.filter(r=>!phoneVal||(r.customer_mobile&&r.customer_mobile.toLowerCase().includes(phoneVal)));
         if(filtered.length>0) {
             filtered.forEach(sale => {
                 const pill = sale.status==='Open'?'background:#fef3c7;color:#b45309;':'background:#f1f5f9;color:#475569;';
@@ -862,7 +879,15 @@
         let cr = finalNet - (c + u); if (cr < 0) cr = 0;
         let detectedMode = 'Split';
         if (statusTarget === 'Open') { detectedMode = 'Pending'; }
-        else { let channels=0; if(c>0)channels++; if(u>0)channels++; if(cr>0)channels++; if(channels<=1){if(c>0)detectedMode='Cash';else if(u>0)detectedMode='UPI';else if(cr>0)detectedMode='Credit';else detectedMode='Cash';} }
+        else {
+            /* Precise mode: Cash+Credit is NOT Split — Split means Cash+UPI only */
+            if      (c > 0 && u === 0 && cr === 0) detectedMode = 'Cash';
+            else if (u > 0 && c === 0 && cr === 0) detectedMode = 'UPI';
+            else if (cr > 0 && c === 0 && u === 0) detectedMode = 'Credit';
+            else if (c > 0 && cr > 0 && u === 0)   detectedMode = 'Partial Cash';
+            else if (u > 0 && cr > 0 && c === 0)   detectedMode = 'Partial UPI';
+            else detectedMode = 'Split'; /* Cash + UPI only, no credit */
+        }
         const mappedName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE')||'green';
         const cashierId = document.getElementById('posCashierSelect').value||null;
@@ -1008,15 +1033,16 @@
             const lRow = document.getElementById('thLoyaltyRow');
             if (pts > 0) { lRow.style.display='flex'; document.getElementById('thLoyaltyAmt').innerText=`-₹${pts}`; } else { lRow.style.display='none'; }
             const bd = document.getElementById('thPaymentBreakdown');
-            if (record.payment_mode==='Split'||record.payment_mode==='Credit'||(cash>0&&upi>0)||cred>0) {
+            if (record.payment_mode==='Split'||record.payment_mode==='Credit'||record.payment_mode==='Partial Cash'||record.payment_mode==='Partial UPI'||(cash>0&&upi>0)||cred>0) {
                 bd.style.display='block';
                 if(cash>0){document.getElementById('thCashLine').style.display='flex';document.getElementById('thCashAmt').innerText=`₹${cash}`;}else{document.getElementById('thCashLine').style.display='none';}
                 if(upi>0){document.getElementById('thUpiLine').style.display='flex';document.getElementById('thUpiAmt').innerText=`₹${upi}`;}else{document.getElementById('thUpiLine').style.display='none';}
                 if(cred>0){document.getElementById('thCreditLine').style.display='flex';document.getElementById('thCreditAmt').innerText=`₹${cred}`;}else{document.getElementById('thCreditLine').style.display='none';}
             } else { bd.style.display='none'; }
-            document.getElementById('settlementModifierInterface').style.display = (record.status==='Open'||cred>0)?'block':'none';
             document.getElementById('btnEditDraftModal').style.display = record.status==='Open'?'block':'none';
             await refreshInspectionLineItems();
+            /* Show settle interface only if bill has genuine remaining credit — checked inside setupSettleInterface */
+            await setupSettleInterface(record);
             /* CHANGE 10: Check for expiring points and show warning on receipt */
             if (record.customer_mobile) {
                 const warn = await checkExpiringPoints(record.customer_mobile);
@@ -1060,40 +1086,79 @@
        CHANGE 3: commitPosSettlement — paper trail receipt added
     ══════════════════════════════════════════════════ */
     async function commitPosSettlement() {
-        const total = parseFloat(inspectedRecordObject.total_amount)||0;
         const c = parseFloat(document.getElementById('thSettleCash').value)||0;
         const u = parseFloat(document.getElementById('thSettleUpi').value)||0;
-        let cr = total-(c+u); if(cr<0)cr=0;
-        let mode='Split'; let ch=0; if(c>0)ch++; if(u>0)ch++; if(cr>0)ch++;
-        if(ch<=1){if(c>0)mode='Cash';else if(u>0)mode='UPI';else if(cr>0)mode='Credit';else mode='Cash';}
+        const billCreditAmt = parseFloat(inspectedRecordObject.credit_amount)||0;
+        const max = window._settleMax || billCreditAmt;
+
+        if ((c + u) <= 0) return alert("Enter a payment amount.");
+        if ((c + u) > max) return alert(`Cannot exceed ₹${max.toFixed(0)} outstanding on this bill.`);
+
+        /* Remaining credit on this bill after this payment */
+        const cr = Math.max(0, billCreditAmt - (c + u));
+
+        /* Precise mode — Partial Cash/UPI if credit still remains */
+        let mode = 'Split';
+        if      (c > 0 && u === 0 && cr === 0) mode = 'Cash';
+        else if (u > 0 && c === 0 && cr === 0) mode = 'UPI';
+        else if (c > 0 && cr > 0 && u === 0)   mode = 'Partial Cash';
+        else if (u > 0 && cr > 0 && c === 0)   mode = 'Partial UPI';
+        else if (cr === 0)                      mode = 'Split';
+
         const now = new Date().toISOString();
-        await supabaseClient.from('counter_sales').update({payment_mode:mode,cash_amount:c,upi_amount:u,credit_amount:cr,status:'Closed',closed_at:now}).eq('id',targetInspectionRecordId);
-        if(cr>0&&inspectedRecordObject.customer_mobile){await supabaseClient.from('credit_payments').insert({customer_mobile:inspectedRecordObject.customer_mobile,sale_id:targetInspectionRecordId,amount_paid:-cr,payment_mode:'POS Credit',paid_by_role:localStorage.getItem('ERP_ACTIVE_ROLE')||'green'});}
-        inspectedRecordObject.payment_mode=mode; inspectedRecordObject.status='Closed'; inspectedRecordObject.closed_at=now;
-        document.getElementById('thMode').innerText=mode;
-        document.getElementById('thDate').innerText=new Date().toLocaleDateString('en-IN');
-        document.getElementById('thTime').innerText=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-        document.getElementById('settlementModifierInterface').style.display='none';
-        /* Update outstanding_credit: reduce by however much credit was paid off */
-        const oldCreditAmt = parseFloat(inspectedRecordObject.credit_amount) || 0;
-        const creditReduction = oldCreditAmt - cr;
-        if (creditReduction > 0 && inspectedRecordObject.customer_mobile) {
+        const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
+        const sourceEntity = window._settleSourceEntity || (activeRole === 'moped' ? 'moped_pos' : 'green_pos');
+
+        /* Update the sale record */
+        const totalAmt = parseFloat(inspectedRecordObject.total_amount) || 0;
+        const newCashAmt = (parseFloat(inspectedRecordObject.cash_amount)||0) + c;
+        const newUpiAmt  = (parseFloat(inspectedRecordObject.upi_amount)||0)  + u;
+        await supabaseClient.from('counter_sales').update({
+            payment_mode: cr > 0 ? mode : (c > 0 && u > 0 ? 'Split' : (c > 0 ? 'Cash' : 'UPI')),
+            cash_amount: newCashAmt, upi_amount: newUpiAmt, credit_amount: cr,
+            status: cr > 0 ? 'Closed' : 'Closed', closed_at: now
+        }).eq('id', targetInspectionRecordId);
+
+        /* Record the payment in credit_payments with source_entity */
+        const paymentAmt = c + u;
+        await supabaseClient.from('credit_payments').insert({
+            customer_mobile: inspectedRecordObject.customer_mobile,
+            sale_id: targetInspectionRecordId,
+            amount_paid: paymentAmt,
+            payment_mode: c > 0 && u > 0 ? 'Split' : (c > 0 ? 'Cash' : 'UPI'),
+            paid_by_role: activeRole,
+            source_entity: sourceEntity
+        });
+
+        /* Update outstanding_credit on customer record */
+        if (inspectedRecordObject.customer_mobile) {
             const { data: cust } = await supabaseClient.from('customers').select('outstanding_credit').eq('mobile_number', inspectedRecordObject.customer_mobile).single();
             const currentCredit = parseFloat(cust?.outstanding_credit) || 0;
-            await supabaseClient.from('customers').update({ outstanding_credit: Math.max(0, currentCredit - creditReduction) }).eq('mobile_number', inspectedRecordObject.customer_mobile);
+            await supabaseClient.from('customers').update({ outstanding_credit: Math.max(0, currentCredit - paymentAmt) }).eq('mobile_number', inspectedRecordObject.customer_mobile);
         }
-        /* CHANGE 3: Show payment receipt paper trail */
+
+        /* Update local object so receipt reflects new state */
+        inspectedRecordObject.payment_mode = mode;
+        inspectedRecordObject.credit_amount = cr;
+        inspectedRecordObject.closed_at = now;
+        document.getElementById('thMode').innerText = mode;
+        document.getElementById('thDate').innerText = new Date().toLocaleDateString('en-IN');
+        document.getElementById('thTime').innerText = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+        document.getElementById('settlementModifierInterface').style.display = 'none';
+
+        /* Paper trail receipt */
         showPaymentReceipt({
-            heading: 'SETTLEMENT RECEIPT',
+            heading: 'PAYMENT RECEIPT',
             billRef: `POS-${targetInspectionRecordId?.split('-')[0]?.toUpperCase()}`,
             customer: `${inspectedRecordObject.customer_mobile||''} | ${inspectedRecordObject.customer_name||'Walk-in'}`,
             lines: [
-                {label:'Bill Total', val:`₹${total}`},
+                {label:'Bill Total',       val:`₹${totalAmt}`},
                 ...(c>0?[{label:'Cash Received', val:`₹${c}`}]:[]),
-                ...(u>0?[{label:'UPI Received', val:`₹${u}`}]:[]),
+                ...(u>0?[{label:'UPI Received',  val:`₹${u}`}]:[]),
                 ...(cr>0?[{label:'Credit Remaining', val:`₹${cr}`, danger:true}]:[]),
+                {label:'Mode', val:mode}
             ],
-            mode, collectedBy: (localStorage.getItem('ERP_ACTIVE_ROLE')||'pos').toUpperCase()
+            mode, collectedBy: activeRole.toUpperCase()
         });
         queryPosHistoryEngine();
     }
@@ -1200,6 +1265,113 @@
         html += `<div style="border-bottom:1px dashed #000;margin:6px 0;"></div><em style="font-size:0.75rem;">Collected By: ${collectedBy}</em>`;
         document.getElementById('prtContent').innerHTML = html;
         document.getElementById('paymentReceiptModal').style.display = 'flex';
+    }
+
+    /*
+     * setupSettleInterface — called from instantiateInspectionScope after receipt renders.
+     * 1. Fetches credit_payments for this specific bill to get TRUE remaining balance.
+     * 2. If fully paid: hides settle interface (fixes the "always shows pay" bug).
+     * 3. If remaining > 0: fetches entity breakdown for the customer and builds
+     *    the breakdown panel showing Green POS / Moped POS / Workshop outstanding
+     *    with clear labels on which are collectible by the current role.
+     * 4. Stores window._settleMax so commitPosSettlement can enforce the cap.
+     */
+    async function setupSettleInterface(record) {
+        const smi = document.getElementById('settlementModifierInterface');
+        smi.style.display = 'none';
+        window._settleMax = 0;
+        window._settleBillId = null;
+        window._settleSourceEntity = null;
+
+        const creditAmt = parseFloat(record.credit_amount) || 0;
+        /* Only credit bills or open drafts need this interface */
+        if (creditAmt <= 0 && record.status !== 'Open') return;
+        if (record.status === 'Open') {
+            /* Draft bill — just show the settle interface for payment collection */
+            smi.style.display = 'block';
+            document.getElementById('settlementBreakdown').innerHTML =
+                `<div style="font-size:0.75rem;color:#64748b;margin-bottom:8px;">Open draft — enter amounts to finalise.</div>`;
+            window._settleMax = parseFloat(record.total_amount) || 0;
+            return;
+        }
+
+        /* Fetch payments already received for this specific bill */
+        const { data: billPays } = await supabaseClient.from('credit_payments')
+            .select('amount_paid').eq('sale_id', record.id).gt('amount_paid', 0);
+        const billPaid     = (billPays||[]).reduce((s,p) => s + parseFloat(p.amount_paid), 0);
+        const billRemaining = Math.max(0, creditAmt - billPaid);
+
+        if (billRemaining < 0.01) return; /* Fully settled — hide interface */
+
+        /* Fetch entity breakdown for the customer to show the full picture */
+        const role = localStorage.getItem('ERP_ACTIVE_ROLE') || 'green';
+        let greenPosOut = 0, mopedPosOut = 0, workshopOut = 0;
+
+        if (record.customer_mobile) {
+            const [gpRes, mpRes, wsRes, paysRes] = await Promise.all([
+                supabaseClient.from('counter_sales').select('id,credit_amount').eq('customer_mobile',record.customer_mobile).gt('credit_amount',0).eq('status','Closed').eq('source_role','green'),
+                supabaseClient.from('counter_sales').select('id,credit_amount').eq('customer_mobile',record.customer_mobile).gt('credit_amount',0).eq('status','Closed').eq('source_role','moped'),
+                supabaseClient.from('job_cards').select('id,credit_amount').eq('customer_mobile',record.customer_mobile).gt('credit_amount',0).eq('status','Closed'),
+                supabaseClient.from('credit_payments').select('amount_paid,sale_id,job_card_id').eq('customer_mobile',record.customer_mobile).gt('amount_paid',0)
+            ]);
+            const pays = paysRes.data || [];
+            const remaining = (bills, idField) => bills.forEach(b => {
+                const paid = pays.filter(p=>p[idField]===b.id).reduce((s,p)=>s+parseFloat(p.amount_paid),0);
+                const out = (parseFloat(b.credit_amount)||0) - paid;
+                return out;
+            });
+            (gpRes.data||[]).forEach(b => { const p=pays.filter(x=>x.sale_id===b.id).reduce((s,x)=>s+parseFloat(x.amount_paid),0); const o=Math.max(0,(parseFloat(b.credit_amount)||0)-p); greenPosOut+=o; });
+            (mpRes.data||[]).forEach(b => { const p=pays.filter(x=>x.sale_id===b.id).reduce((s,x)=>s+parseFloat(x.amount_paid),0); const o=Math.max(0,(parseFloat(b.credit_amount)||0)-p); mopedPosOut+=o; });
+            (wsRes.data||[]).forEach(b => { const p=pays.filter(x=>x.job_card_id===b.id).reduce((s,x)=>s+parseFloat(x.amount_paid),0); const o=Math.max(0,(parseFloat(b.credit_amount)||0)-p); workshopOut+=o; });
+        }
+
+        const totalOut = greenPosOut + mopedPosOut + workshopOut;
+        const isMoped  = role === 'moped';
+        const sourceEntity = record.source_role === 'moped' ? 'moped_pos' : 'green_pos';
+
+        let html = `<div style="background:white;border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px;font-size:0.75rem;">`;
+        html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;font-weight:bold;color:#0369a1;"><span>This bill remaining</span><span>₹${billRemaining.toFixed(0)}</span></div>`;
+
+        if (record.customer_mobile && totalOut > 0) {
+            html += `<div style="border-top:1px solid #f1f5f9;padding-top:6px;margin-top:4px;font-size:0.7rem;color:#64748b;margin-bottom:4px;">Customer full picture:</div>`;
+            if (greenPosOut > 0)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;${!isMoped?'color:#15803d;font-weight:600;':'color:#94a3b8;'}"><span>🟢 Green POS${isMoped?' (Green counter only)':''}</span><span>₹${greenPosOut.toFixed(0)}</span></div>`;
+            if (mopedPosOut > 0)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;${isMoped?'color:#2563eb;font-weight:600;':'color:#94a3b8;'}"><span>🔵 Moped POS${!isMoped?' (Moped counter only)':''}</span><span>₹${mopedPosOut.toFixed(0)}</span></div>`;
+            if (workshopOut > 0)  html += `<div style="display:flex;justify-content:space-between;margin:2px 0;color:#b45309;"><span>🔧 Workshop JC <span style="font-size:0.65rem;">(use CRM)</span></span><span>₹${workshopOut.toFixed(0)}</span></div>`;
+            html += `<div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:4px;border-top:1px solid #e2e8f0;font-weight:bold;"><span>Total Enterprise Due</span><span>₹${totalOut.toFixed(0)}</span></div>`;
+        }
+        html += `</div>`;
+
+        document.getElementById('settlementBreakdown').innerHTML = html;
+        window._settleMax         = billRemaining;
+        window._settleBillId      = record.id;
+        window._settleSourceEntity = sourceEntity;
+
+        document.getElementById('thSettleCash').value = '';
+        document.getElementById('thSettleUpi').value  = '';
+        document.getElementById('settleValidationMsg').style.display = 'none';
+        const btn = document.getElementById('btnAuthorizePayment');
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        smi.style.display = 'block';
+    }
+
+    /* validateSettleAmount — fires on every keystroke in Cash/UPI fields */
+    function validateSettleAmount() {
+        const max = window._settleMax || 0;
+        const c = parseFloat(document.getElementById('thSettleCash').value)||0;
+        const u = parseFloat(document.getElementById('thSettleUpi').value)||0;
+        const total = c + u;
+        const msg = document.getElementById('settleValidationMsg');
+        const btn = document.getElementById('btnAuthorizePayment');
+        /* Auto-fill UPI as remainder when Cash is entered */
+        if (c > 0 && u === 0) { const upiRemainder = max - c; if (upiRemainder > 0) document.getElementById('thSettleUpi').value = 0; }
+        if (total > max) {
+            msg.innerText = `Cannot exceed ₹${max.toFixed(0)} (this bill's remaining balance).`;
+            msg.style.display = 'block';
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+        } else {
+            msg.style.display = 'none';
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        }
     }
 
     function closeInspectionModal() { document.getElementById('modalInspectInvoice').style.display='none'; if(posCheckoutCompleted)window.location.reload(); }
