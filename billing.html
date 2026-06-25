@@ -722,12 +722,35 @@
             if (job.customer_mobile) promises.push(fetchCustomerContext(job));
             else document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
             await Promise.all(promises);
-            /* PHASE 3: Validate and auto-apply referral coupon if present on this JC */
+            /*
+             * PHASE 3: Referral coupon display on JC load.
+             * OPEN JC   → run full validation (check DB for first visit, find referrer name).
+             * CLOSED JC → read stored flags only. Do NOT re-validate: the customer now has ≥1
+             *             closed JC so re-validation would incorrectly show "returning customer"
+             *             even when the discount was legitimately applied on the first visit.
+             */
             if (job.referral_code && job.customer_mobile) {
-                await validateAndApplyCoupon(job.referral_code, job.customer_mobile);
+                if (job.status === 'Closed' || job.status === 'Cancelled') {
+                    const couponBlock   = document.getElementById('couponBlock');
+                    const couponContent = document.getElementById('couponContent');
+                    if (job.referral_discount_applied && parseFloat(job.referral_discount_amount) > 0) {
+                        /* Discount was applied — show confirmed state */
+                        referralDiscountActive = true;
+                        referralDiscountAmount = parseFloat(job.referral_discount_amount);
+                        couponBlock.className = 'coupon-block coupon-active';
+                        couponContent.innerHTML = `<div style="font-size:0.8rem;font-weight:700;color:#15803d;">🎟 ${job.referral_code} applied</div>
+                            <div style="font-size:0.75rem;color:#166534;margin-top:2px;">Referral discount ₹${Math.round(referralDiscountAmount)} was applied on this bill.</div>`;
+                    } else {
+                        /* Code was on JC but discount was not applied (returning customer or invalid at time of creation) */
+                        couponBlock.className = 'coupon-block coupon-inactive';
+                        couponContent.innerHTML = `<div style="font-size:0.75rem;color:#b45309;">⚠ ${job.referral_code} — discount was not applied on this bill.</div>`;
+                    }
+                } else {
+                    await validateAndApplyCoupon(job.referral_code, job.customer_mobile);
+                }
             }
             compileDynamicSums();
-            buildCollectionHistory(); // CHANGE 3: populate reprint strip on load
+            buildCollectionHistory();
 
             if(job.status === 'Closed' || job.status === 'Cancelled') {
                 document.getElementById('lockedStatusWord').innerText = job.status.toUpperCase();
@@ -1251,12 +1274,14 @@
             const totalLabour = servicePkgGrossTotal; const hasCo = !!document.getElementById('coMech').value; const primaryShare = hasCo ? totalLabour / 2 : totalLabour; const coShare = hasCo ? totalLabour / 2 : 0; const primaryMechId = document.getElementById('primaryMech').value; const coMechId = document.getElementById('coMech').value; const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const ledgerEntries = []; if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` }); if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` }); if (ledgerEntries.length > 0) await supabaseClient.from('staff_ledger').insert(ledgerEntries);
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
-                 * PHASE 3: LOYALTY EARN — fixed to green_total × 1% (was incorrectly netVal × 1%).
-                 * Policy: points earned only on Green products per billing session.
-                 * Gold/Platinum earn but cannot self-redeem at POS (handled in fetchCustomerContext).
+                 * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
+                 * Moped is a separate entity and does not issue loyalty points.
+                 * Lubricants are Green warehouse items and are included automatically.
+                 * Base is AFTER entity-specific admin concessions, BEFORE referral discount
+                 * (referral is a global bill adjustment, not a per-entity reduction).
                  */
-                const greenEarnBase = internalGreenNet || 0;
-                const pointsEarned  = Math.floor(greenEarnBase * 0.01);
+                const myCarEarnBase = (internalGreenNet || 0) + (servicePkgGrossTotal || 0) + (internalLatheNet || 0);
+                const pointsEarned  = Math.floor(myCarEarnBase * 0.01);
                 let currentPoints   = parseFloat(activeCustomerProfile.loyalty_points) || 0;
                 if (pointsRedeemed > 0) currentPoints -= pointsRedeemed;
                 if (pointsEarned > 0 && activeCustomerProfile.is_loyalty_member) {
@@ -1266,7 +1291,8 @@
                         supabaseClient.from('customers').update({ loyalty_points: Math.max(0, currentPoints) }).eq('mobile_number', activeCustomerProfile.mobile_number),
                         supabaseClient.from('loyalty_points_log').insert({
                             customer_mobile: activeCustomerProfile.mobile_number, points: pointsEarned,
-                            type: 'credit', reason: `Workshop Green Products — JC-${targetJobId.split('-')[0].toUpperCase()}`,
+                            type: 'credit',
+                            reason: `My Care earn (Green+Labour+Lathe) — JC-${targetJobId.split('-')[0].toUpperCase()}`,
                             earn_type: 'base', source_type: 'workshop_jc', source_id: targetJobId,
                             point_value: 1.0, expires_at: expiry.toISOString().split('T')[0], recorded_by: sessionRole
                         })
@@ -1303,8 +1329,17 @@
              * Also saves referral_discount_applied and referral_discount_amount on the job card.
              */
             if (referralDiscountActive && referrerMobile && referralDiscountAmount > 0) {
-                const greenForReferral = internalGreenNet || 0;
-                const referrerBonus = Math.floor(greenForReferral * 0.03);
+                /*
+                 * REFERRAL BONUS — 3% of Green paid value AFTER referral discount.
+                 * Referral discount is global (on full bill), so each entity effectively
+                 * bears a proportional share. Green's paid value = greenNet × (1 - referralRate).
+                 * Referrer earns 3% of what My Care actually collected from Green products
+                 * after the referral benefit was granted — fair to all parties.
+                 */
+                const grossForRate   = (internalGreenNet || 0) + (internalMopedNet || 0) + (servicePkgGrossTotal || 0) + (internalLatheNet || 0);
+                const referralRate   = grossForRate > 0 ? (referralDiscountAmount / grossForRate) : 0;
+                const greenPaidValue = (internalGreenNet || 0) * (1 - referralRate);
+                const referrerBonus  = Math.floor(greenPaidValue * 0.03);
                 await supabaseClient.from('job_cards').update({
                     referral_discount_applied: true,
                     referral_discount_amount: referralDiscountAmount
@@ -1317,7 +1352,8 @@
                         supabaseClient.from('customers').update({ loyalty_points: refPoints + referrerBonus }).eq('mobile_number', referrerMobile),
                         supabaseClient.from('loyalty_points_log').insert({
                             customer_mobile: referrerMobile, points: referrerBonus,
-                            type: 'credit', reason: `Referral bonus — ${activeCustomerName}'s first visit JC-${targetJobId.split('-')[0].toUpperCase()}`,
+                            type: 'credit',
+                            reason: `Referral bonus — ${activeCustomerName}'s first visit JC-${targetJobId.split('-')[0].toUpperCase()} (Green paid value ₹${Math.round(greenPaidValue)})`,
                             earn_type: 'referral_bonus', source_type: 'workshop_jc', source_id: targetJobId,
                             point_value: 1.0, expires_at: expiry.toISOString().split('T')[0], recorded_by: sessionRole
                         })
