@@ -76,7 +76,14 @@
         .btn-pay-now:hover { opacity: 0.9; }
         .settle-secondary-row { display: flex; gap: 10px; margin-bottom: 20px; }
         .settle-secondary-row .btn-action { flex: 1; }
-        .future-advice-box { width: 100%; flex: 1; min-height: 90px; resize: vertical; font-family: inherit; }
+        .future-advice-box { width: 100%; min-height: 52px; resize: vertical; font-family: inherit; }
+        /* PHASE 3: Coupon block — three visual states */
+        .coupon-block { border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+        .coupon-active   { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .coupon-inactive { background: #fffbeb; border: 1px solid #fde68a; }
+        .coupon-empty    { background: #f8fafc; border: 1px solid var(--border); }
+        /* PHASE 3: Free service eligible banner */
+        .free-service-banner { background: #dcfce7; border: 2px solid #16a34a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-weight: 700; color: #15803d; font-size: 0.9rem; display: none; text-align: center; }
         .btn-success { background: #16a34a; } .btn-info { background: #2563eb; } .btn-purple { background: #7c3aed; }
         
         .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.7); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
@@ -184,6 +191,11 @@
         <div style="flex: 1; text-align: right;"><div id="prepaidPill" class="prepaid-badge">Paid Total Adv: ₹0</div></div>
     </div>
 
+    <!-- PHASE 3: Free service eligible banner — shown when customer has completed 5 services -->
+    <div id="freeServiceBanner" class="free-service-banner">
+        🎁 FREE SERVICE PACKAGE ELIGIBLE — This customer completed 5 paid services! Waive the service package charge on this visit.
+    </div>
+
     <div class="inline-add-strip-wrapper" id="uiPartEntryBlock">
         <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
             <div style="position:relative;">
@@ -266,16 +278,21 @@
         <div class="matrix-panel" style="background: #f8fafc;">
             <span class="field-label danger-label">Future Advice / Remarks (Prints on Invoice)</span>
             <!--
-                CHANGE 6: Future Advice enlarged into a multi-line textarea.
-                Same id, same oninput handler — .value works identically for a
-                textarea as it did for the old single-line input. This also
-                naturally balances panel height against Offsets & Deposits:
-                .matrix-panel is already display:flex; flex-direction:column,
-                so this textarea (flex:1) grows to fill whatever extra height
-                the grid's equal-height stretch allocates, instead of leaving
-                dead space below the concession block.
+                PHASE 3: rows reduced from 4 to 2 to make space for coupon block.
+                Still scrollable if staff types more text.
             -->
-            <textarea id="vFutureAdvice" class="field-input input-lockable future-advice-box" rows="4" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 16px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();"></textarea>
+            <textarea id="vFutureAdvice" class="field-input input-lockable future-advice-box" rows="2" placeholder="e.g. Chain sprocket needs replacement next service" style="margin-bottom: 10px; border-color: #fca5a5;" oninput="this.value=this.value.toUpperCase(); compileDynamicSums();"></textarea>
+
+            <!--
+                PHASE 3: Coupon / Referral section.
+                Three states: active (green), inactive-returning-customer (amber), empty (grey).
+                validateAndApplyCoupon() populates this on JC load.
+                compileDynamicSums() updates the displayed discount amount live.
+            -->
+            <div id="couponBlock" class="coupon-block coupon-empty">
+                <div id="couponContent" style="font-size:0.75rem; color:#94a3b8;">🎟 No referral code on this job card</div>
+                <button id="btnRemoveCoupon" onclick="removeCoupon()" class="input-lockable" style="display:none; margin-top:6px; background:none; border:1px solid #fca5a5; color:#b91c1c; padding:2px 8px; border-radius:4px; font-size:0.7rem; cursor:pointer; font-weight:700;">× Remove Discount</button>
+            </div>
             
             <div class="field-group" id="simpleDiscBlock" style="margin-bottom:12px;">
                 <span class="field-label">Applied Concession (₹)</span>
@@ -403,6 +420,8 @@
             <div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Labor:</span><strong id="thLaborSum">₹0</strong></div>
             <div class="receipt-meta" id="rowLatheSum" style="display:flex; justify-content:space-between;"><span>Lathe Work:</span><strong id="thLatheSum">₹0</strong></div>
             <div class="receipt-meta" id="rowDiscSum" style="display:flex; justify-content:space-between;"><span>Concession Rebate:</span><strong id="thDiscSum">₹0</strong></div>
+            <!-- PHASE 3: Referral discount row — first-visit coupon -->
+            <div class="receipt-meta" id="rowReferralDisc" style="display:none; justify-content:space-between; color:#15803d; font-weight:bold;"><span>Referral Discount (<span id="thReferralCode">--</span>):</span><strong id="thReferralAmt">₹0</strong></div>
             <div class="receipt-meta" id="rowPointsSum" style="display:flex; justify-content:space-between; color:#0369a1; font-weight:bold; display:none;"><span>Points Used:</span><strong id="thPointsSum">₹0</strong></div>
             <div class="receipt-meta" id="rowAdvSrv" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Service Adv:</span><strong id="thAdvSrv">₹0</strong></div>
             <div class="receipt-meta" id="rowPrepGrn" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Grn Prepaid:</span><strong id="thPrepGrn">₹0</strong></div>
@@ -596,6 +615,10 @@
     window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false; let activeCustomerProfile = { category: 'Regular' };
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
     let overrideApproved = false; let overridePending = false; let overridePollingInterval = null; let saveDraftTimeout; let currentFocus = -1;
+    /* PHASE 3: Referral discount globals */
+    let referralDiscountActive = false;
+    let referralDiscountAmount = 0;
+    let referrerMobile = null;
 
     /* ── Entity map for collection receipts ── */
     const COLLECTION_ENTITY = {
@@ -699,6 +722,10 @@
             if (job.customer_mobile) promises.push(fetchCustomerContext(job));
             else document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | --`;
             await Promise.all(promises);
+            /* PHASE 3: Validate and auto-apply referral coupon if present on this JC */
+            if (job.referral_code && job.customer_mobile) {
+                await validateAndApplyCoupon(job.referral_code, job.customer_mobile);
+            }
             compileDynamicSums();
             buildCollectionHistory(); // CHANGE 3: populate reprint strip on load
 
@@ -982,6 +1009,60 @@
 
     function showHistoricalInvoice() { if(!activeJobContext) return; populateReceiptDocument(activeJobContext.payment_mode, activeJobContext.total_invoice_value, activeJobContext); }
 
+    /*
+     * PHASE 3: validateAndApplyCoupon
+     * Called on JC load when referral_code is present.
+     * Checks: (1) code exists in customers.referral_code, (2) this is customer's first closed JC.
+     * Three states: active (green), not-applicable-returning-customer (amber), invalid-code (amber).
+     * compileDynamicSums() reads referralDiscountActive and applies 5% on grossTotalBeforeDiscount.
+     */
+    async function validateAndApplyCoupon(code, customerMobile) {
+        if (!code) return;
+        const couponBlock   = document.getElementById('couponBlock');
+        const couponContent = document.getElementById('couponContent');
+        const removeBtn     = document.getElementById('btnRemoveCoupon');
+        /* 1. Find referrer by code */
+        const { data: referrer } = await supabaseClient.from('customers')
+            .select('mobile_number, name').eq('referral_code', code).maybeSingle();
+        if (!referrer) {
+            couponBlock.className = 'coupon-block coupon-inactive';
+            couponContent.innerHTML = `<div style="font-size:0.75rem;color:#b45309;font-weight:700;">⚠ ${code} — Referral code not found</div>`;
+            return;
+        }
+        /* 2. Check if first closed JC for this customer (excludes current open JC) */
+        const { count } = await supabaseClient.from('job_cards')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_mobile', customerMobile).eq('status', 'Closed');
+        if ((count || 0) > 0) {
+            /* Returning customer — code recorded but discount not applied, nothing prints */
+            couponBlock.className = 'coupon-block coupon-inactive';
+            couponContent.innerHTML = `<div style="font-size:0.75rem;color:#b45309;font-weight:700;">⚠ ${code} — Returning customer</div>
+                <div style="font-size:0.7rem;color:#92400e;margin-top:2px;">First-visit discount applies on first JC only. Code recorded, discount not applied.</div>`;
+            referralDiscountActive = false;
+            return;
+        }
+        /* 3. Valid first visit — activate discount */
+        referralDiscountActive = true;
+        referrerMobile = referrer.mobile_number;
+        couponBlock.className = 'coupon-block coupon-active';
+        couponContent.innerHTML = `<div style="font-size:0.8rem;font-weight:700;color:#15803d;">🎟 ${code} applied</div>
+            <div style="font-size:0.75rem;color:#166534;margin-top:2px;">Referred by: ${referrer.name} (${referrer.mobile_number})</div>
+            <div style="font-size:0.75rem;color:#166534;margin-top:2px;">First visit confirmed — 5% off gross total = ₹<span id="couponDiscountAmt">0</span></div>`;
+        if (removeBtn) removeBtn.style.display = 'block';
+        compileDynamicSums();
+    }
+
+    function removeCoupon() {
+        referralDiscountActive = false;
+        referrerMobile = null;
+        referralDiscountAmount = 0;
+        const couponBlock = document.getElementById('couponBlock');
+        couponBlock.className = 'coupon-block coupon-empty';
+        document.getElementById('couponContent').innerHTML = '<span style="font-size:0.75rem;color:#94a3b8;">🎟 Coupon removed — discount not applied</span>';
+        document.getElementById('btnRemoveCoupon').style.display = 'none';
+        compileDynamicSums();
+    }
+
     function lockUserInterface() {
         document.getElementById('lockedBanner').style.display = 'block';
         document.getElementById('uiPartEntryBlock').style.display = 'none';
@@ -1017,7 +1098,40 @@
 
     async function cancelJobCard() { const reason = prompt("Please provide a reason for cancelling this job card:"); if(!reason || reason.trim() === '') return alert("Cancellation requires a valid reason."); if(confirm("Are you absolutely sure you want to CANCEL this Job Card?")) { await supabaseClient.from('job_cards').update({ status: 'Cancelled', cancellation_reason: reason.trim() }).eq('id', targetJobId); alert("Job Card Cancelled."); window.location.href = 'index.html'; } }
 
-    async function fetchCustomerContext(job) { const { data: custData } = await supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single(); if (custData) { activeCustomerProfile = custData; activeCustomerName = custData.name; activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0; customerWalletBalance = parseFloat(custData.loyalty_points) || 0; document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance); if(customerWalletBalance <= 0) { document.getElementById('vPointsUsed').disabled = true; document.getElementById('vPointsUsed').placeholder = "No points available"; } else { document.getElementById('vPointsUsed').disabled = false; document.getElementById('vPointsUsed').placeholder = "Enter Points to Redeem"; } document.getElementById('customerHeaderInfo').innerText = `👤 Client: ${custData.name} | ${custData.mobile_number}`; } else { document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | ${job.customer_mobile}`; document.getElementById('vPointsUsed').disabled = true; document.getElementById('vPointsUsed').placeholder = "Not enrolled in Loyalty"; } const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString()); if(subs && subs.length > 0) document.getElementById('receiptPromoHindi').style.display = 'none'; else document.getElementById('receiptPromoHindi').style.display = 'block'; }
+    async function fetchCustomerContext(job) {
+        const { data: custData } = await supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single();
+        if (custData) {
+            activeCustomerProfile = custData;
+            activeCustomerName = custData.name;
+            activeGlobalDiscountPercent = parseFloat(custData.global_discount_coupon) || 0;
+            customerWalletBalance = parseFloat(custData.loyalty_points) || 0;
+            const cat = (custData.category || 'Regular').toLowerCase();
+            const canSelfRedeem = cat === 'regular' || cat === 'silver';
+            /* PHASE 3: Gold/Platinum cannot self-redeem — hide the loyalty redemption field */
+            const lBlock = document.getElementById('pointsRedemptionBlock');
+            if (lBlock) lBlock.style.display = (custData.is_loyalty_member && canSelfRedeem) ? 'block' : 'none';
+            document.getElementById('maxPointsVal').innerText = Math.floor(customerWalletBalance);
+            if (!custData.is_loyalty_member || customerWalletBalance <= 0 || !canSelfRedeem) {
+                document.getElementById('vPointsUsed').disabled = true;
+                document.getElementById('vPointsUsed').placeholder = custData.is_loyalty_member ? 'No points available' : 'Not enrolled in Loyalty';
+            } else {
+                document.getElementById('vPointsUsed').disabled = false;
+                document.getElementById('vPointsUsed').placeholder = 'Enter Points to Redeem';
+            }
+            document.getElementById('customerHeaderInfo').innerText = `👤 Client: ${custData.name} | ${custData.mobile_number}`;
+            /* PHASE 3: Free service eligible banner */
+            const fsb = document.getElementById('freeServiceBanner');
+            if (fsb) fsb.style.display = (custData.free_service_eligible && !custData.free_service_used) ? 'block' : 'none';
+        } else {
+            document.getElementById('customerHeaderInfo').innerText = `👤 Client: Walk-in | ${job.customer_mobile}`;
+            document.getElementById('vPointsUsed').disabled = true;
+            document.getElementById('vPointsUsed').placeholder = 'Not enrolled in Loyalty';
+            document.getElementById('pointsRedemptionBlock').style.display = 'none';
+        }
+        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
+        if (subs && subs.length > 0) document.getElementById('receiptPromoHindi').style.display = 'none';
+        else document.getElementById('receiptPromoHindi').style.display = 'block';
+    }
     
     async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true }); lineItemsLocalMemory = items || []; renderDynamicTable(); }
     
@@ -1040,7 +1154,13 @@
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
-    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; const totalDisplayEl = document.getElementById('totalValuationDisplay'); if (totalDisplayEl) totalDisplayEl.innerText = Math.round(grossTotalBeforeDiscount) || 0; if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; } document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - a_srv - p_grn - p_mop - pUsed) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
+    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; const totalDisplayEl = document.getElementById('totalValuationDisplay'); if (totalDisplayEl) totalDisplayEl.innerText = Math.round(grossTotalBeforeDiscount) || 0;
+        /* PHASE 3: Referral 5% on gross total — applied first, before admin concession is subtracted from net */
+        referralDiscountAmount = referralDiscountActive ? Math.round(grossTotalBeforeDiscount * 0.05) : 0;
+        const couponAmtEl = document.getElementById('couponDiscountAmt'); if (couponAmtEl) couponAmtEl.innerText = referralDiscountAmount;
+        if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; }
+        /* PHASE 3: referralDiscountAmount deducted from net after admin concession — per confirmed sequencing */
+        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - referralDiscountAmount - a_srv - p_grn - p_mop - pUsed) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
 
     async function saveJobState() { if(!activeJobContext || activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') return; const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; await supabaseClient.from('job_cards').update({ total_invoice_value: netVal, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_service: parseFloat(document.getElementById('vAdvanceService').value) || 0, prepaid_green: parseFloat(document.getElementById('vPrepaidGreen').value) || 0, prepaid_moped: parseFloat(document.getElementById('vPrepaidMoped').value) || 0, green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, points_used: pUsed || 0 }).eq('id', targetJobId); }
 
@@ -1129,15 +1249,93 @@
 
         if (statusTarget === 'Closed' && !error) {
             const totalLabour = servicePkgGrossTotal; const hasCo = !!document.getElementById('coMech').value; const primaryShare = hasCo ? totalLabour / 2 : totalLabour; const coShare = hasCo ? totalLabour / 2 : 0; const primaryMechId = document.getElementById('primaryMech').value; const coMechId = document.getElementById('coMech').value; const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const ledgerEntries = []; if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` }); if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` }); if (ledgerEntries.length > 0) await supabaseClient.from('staff_ledger').insert(ledgerEntries);
-            if (activeCustomerProfile && activeCustomerProfile.mobile_number) { let currentPoints = parseInt(activeCustomerProfile.loyalty_points) || 0; if (pointsRedeemed > 0) currentPoints -= pointsRedeemed; if (activeCustomerProfile.is_loyalty_member === true) { const pointsEarned = Math.floor(netVal * 0.01); currentPoints += pointsEarned; } await supabaseClient.from('customers').update({ loyalty_points: currentPoints }).eq('mobile_number', activeCustomerProfile.mobile_number); }
+            if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
+                /*
+                 * PHASE 3: LOYALTY EARN — fixed to green_total × 1% (was incorrectly netVal × 1%).
+                 * Policy: points earned only on Green products per billing session.
+                 * Gold/Platinum earn but cannot self-redeem at POS (handled in fetchCustomerContext).
+                 */
+                const greenEarnBase = internalGreenNet || 0;
+                const pointsEarned  = Math.floor(greenEarnBase * 0.01);
+                let currentPoints   = parseFloat(activeCustomerProfile.loyalty_points) || 0;
+                if (pointsRedeemed > 0) currentPoints -= pointsRedeemed;
+                if (pointsEarned > 0 && activeCustomerProfile.is_loyalty_member) {
+                    currentPoints += pointsEarned;
+                    const expiry = new Date(); expiry.setDate(expiry.getDate() + 365);
+                    await Promise.all([
+                        supabaseClient.from('customers').update({ loyalty_points: Math.max(0, currentPoints) }).eq('mobile_number', activeCustomerProfile.mobile_number),
+                        supabaseClient.from('loyalty_points_log').insert({
+                            customer_mobile: activeCustomerProfile.mobile_number, points: pointsEarned,
+                            type: 'credit', reason: `Workshop Green Products — JC-${targetJobId.split('-')[0].toUpperCase()}`,
+                            earn_type: 'base', source_type: 'workshop_jc', source_id: targetJobId,
+                            point_value: 1.0, expires_at: expiry.toISOString().split('T')[0], recorded_by: sessionRole
+                        })
+                    ]);
+                } else if (pointsRedeemed > 0) {
+                    await supabaseClient.from('customers').update({ loyalty_points: Math.max(0, currentPoints) }).eq('mobile_number', activeCustomerProfile.mobile_number);
+                }
+                /*
+                 * PHASE 3: SERVICE COUNT — increment for 5+1 free service tracking.
+                 * Only for enrolled customers. If count reaches 5 within 2 years of enrollment,
+                 * set free_service_eligible = true (banner shown on next JC load).
+                 */
+                if (activeCustomerProfile.is_loyalty_member) {
+                    const currentCount = parseInt(activeCustomerProfile.service_count) || 0;
+                    const newCount = currentCount + 1;
+                    const enrollDate = activeCustomerProfile.enrollment_date ? new Date(activeCustomerProfile.enrollment_date) : null;
+                    const offerExpired = enrollDate ? (new Date() > new Date(enrollDate.getFullYear() + 2, enrollDate.getMonth(), enrollDate.getDate())) : false;
+                    const countUpdates = { service_count: newCount };
+                    if (!activeCustomerProfile.free_service_used && !offerExpired && newCount >= 5) {
+                        countUpdates.free_service_eligible = true;
+                    }
+                    await supabaseClient.from('customers').update(countUpdates).eq('mobile_number', activeCustomerProfile.mobile_number);
+                }
+                /*
+                 * PHASE 3: OUTSTANDING CREDIT — write on credit close so all pages can read it directly.
+                 */
+                if (creditAmtVal > 0) {
+                    const currentCredit = parseFloat(activeCustomerProfile.outstanding_credit) || 0;
+                    await supabaseClient.from('customers').update({ outstanding_credit: currentCredit + creditAmtVal }).eq('mobile_number', activeCustomerProfile.mobile_number);
+                }
+            }
+            /*
+             * PHASE 3: REFERRAL BONUS — award 3% of green_total to referrer on first JC close.
+             * Also saves referral_discount_applied and referral_discount_amount on the job card.
+             */
+            if (referralDiscountActive && referrerMobile && referralDiscountAmount > 0) {
+                const greenForReferral = internalGreenNet || 0;
+                const referrerBonus = Math.floor(greenForReferral * 0.03);
+                await supabaseClient.from('job_cards').update({
+                    referral_discount_applied: true,
+                    referral_discount_amount: referralDiscountAmount
+                }).eq('id', targetJobId);
+                if (referrerBonus > 0) {
+                    const { data: refData } = await supabaseClient.from('customers').select('loyalty_points').eq('mobile_number', referrerMobile).single();
+                    const refPoints = parseFloat(refData?.loyalty_points) || 0;
+                    const expiry = new Date(); expiry.setDate(expiry.getDate() + 365);
+                    await Promise.all([
+                        supabaseClient.from('customers').update({ loyalty_points: refPoints + referrerBonus }).eq('mobile_number', referrerMobile),
+                        supabaseClient.from('loyalty_points_log').insert({
+                            customer_mobile: referrerMobile, points: referrerBonus,
+                            type: 'credit', reason: `Referral bonus — ${activeCustomerName}'s first visit JC-${targetJobId.split('-')[0].toUpperCase()}`,
+                            earn_type: 'referral_bonus', source_type: 'workshop_jc', source_id: targetJobId,
+                            point_value: 1.0, expires_at: expiry.toISOString().split('T')[0], recorded_by: sessionRole
+                        })
+                    ]);
+                }
+            }
         }
 
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; else document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
     }
 
-    function populateReceiptDocument(paymentMode, finalNet, scopeVals) { const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; } }); const totalSavings = totalMrpValue - totalActualValue; if (totalSavings > 0) { const savingsEl = document.getElementById('receiptSavingsSummary'); savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;"><span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span></div>`; } document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; } const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; } const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; } const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; } const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; } document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } const promoDiv = document.getElementById('receiptPromoHindi'); if(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true) promoDiv.style.display = 'none'; else promoDiv.style.display = 'block'; document.getElementById('modalReceipt').style.display = 'flex'; }
+    function populateReceiptDocument(paymentMode, finalNet, scopeVals) { const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; } }); const totalSavings = totalMrpValue - totalActualValue; if (totalSavings > 0) { const savingsEl = document.getElementById('receiptSavingsSummary'); savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;"><span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span></div>`; } document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; }
+        /* PHASE 3: Referral discount row — show only when first-visit coupon is active */
+        const dRef = document.getElementById('rowReferralDisc');
+        if (referralDiscountActive && referralDiscountAmount > 0 && dRef) { dRef.style.display = 'flex'; document.getElementById('thReferralCode').innerText = activeJobContext.referral_code || '--'; document.getElementById('thReferralAmt').innerText = `-₹${referralDiscountAmount}`; } else if (dRef) { dRef.style.display = 'none'; }
+        const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; } const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; } const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; } const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; } document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } const promoDiv = document.getElementById('receiptPromoHindi'); if(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true) promoDiv.style.display = 'none'; else promoDiv.style.display = 'block'; document.getElementById('modalReceipt').style.display = 'flex'; }
 
-    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : ''; const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div><div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = myCareHTML + mopedHTML + summaryHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; document.getElementById('btnLandscapePrint').style.display = 'block'; }
+    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : ''; const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + summaryHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; document.getElementById('btnLandscapePrint').style.display = 'block'; }
 
     function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
