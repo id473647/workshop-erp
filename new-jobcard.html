@@ -144,13 +144,37 @@
              Advances and prepaids are now logged against the job card
              inside billing.html by whichever role collected the cash. -->
         <div class="inputs-grid">
-            <div class="field-group"><label>Budget Estimate Given (₹)</label><input type="number" id="jcEstimate" value="0" min="0"></div>
+            <div class="field-group">
+                <label>Estimate Given to Customer</label>
+                <!--
+                    PHASE 4b: Changed from number input to textarea.
+                    estimate_given column is now TEXT in DB (altered from NUMERIC).
+                    Staff can write multiple line estimates.
+                    Prints verbatim on the intake ticket.
+                    Each line = one work item with its estimate.
+                -->
+                <textarea id="jcEstimate" rows="3"
+                    placeholder="e.g. Servicing: ₹1000&#10;Front fork seals: ₹400&#10;Chain/sprocket (if needed): ₹800"
+                    oninput="this.value=(this.value||'').toUpperCase()"
+                    style="resize:vertical;"></textarea>
+                <span style="font-size:0.7rem;color:#64748b;margin-top:2px;">One item per line. Prints on intake ticket.</span>
+            </div>
+            <div class="field-group">
+                <label>Expected Delivery Date</label>
+                <!--
+                    PHASE 4b: New field — expected_delivery_date column in DB.
+                    Shown on intake ticket customer tear-off so customer knows
+                    when to collect. Also shown in billing.html header.
+                    Min date set to today in initializeIntake().
+                -->
+                <input type="date" id="jcExpectedDate">
+                <span style="font-size:0.7rem;color:#64748b;margin-top:2px;">Prints on customer token. Visible in billing.</span>
+            </div>
             <div class="field-group">
                 <label>Referral Code (If Any)</label>
                 <input type="text" id="jcReferral" placeholder="e.g. MC-XXXXXX"
                     oninput="this.value=(this.value||'').toUpperCase()"
                     onblur="validateReferralCode(this.value)">
-                <!-- Phase 2: live validation — shows referrer name if found, soft warning if not -->
                 <span id="referralFeedback" style="font-size:0.75rem; margin-top:4px; display:block;"></span>
             </div>
         </div>
@@ -173,6 +197,8 @@
 
     async function initializeIntake() {
         const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('staff_role', 'Mechanic').eq('is_active', true);
+        /* PHASE 4b: Set min date on expected delivery field to today */
+        document.getElementById('jcExpectedDate').min = new Date().toISOString().split('T')[0];
         const pSel = document.getElementById('intakePrimaryMech');
         const cSel = document.getElementById('intakeCoMech');
         (staff || []).forEach(m => { pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
@@ -327,7 +353,7 @@
         const mobile    = document.getElementById('jcMobile').value.trim();
         const name      = document.getElementById('jcName').value.trim().toUpperCase();
         const problem   = document.getElementById('jcProblem').value.trim().toUpperCase();
-        const estimate  = parseFloat(document.getElementById('jcEstimate').value) || 0;
+        const estimate  = (document.getElementById('jcEstimate').value || '').trim();  /* PHASE 4b: TEXT not number */
         const isNewCust = document.getElementById('newCustBadge').style.display === 'inline-block';
         const ob        = parseFloat(document.getElementById('jcOpeningBal').value) || 0;
         const currentOdometer = document.getElementById('nvOdo').value || null;
@@ -384,7 +410,8 @@
             customer_mobile  : mobile,
             vehicle_id       : finalVehicleId,
             problem_mentioned: problem,
-            estimate_given   : estimate,
+            estimate_given          : estimate || null,
+            expected_delivery_date  : document.getElementById('jcExpectedDate').value || null,  /* PHASE 4b */
             mech_id          : document.getElementById('intakePrimaryMech').value || null,
             co_mech_id       : document.getElementById('intakeCoMech').value || null,
             status           : 'Open',
