@@ -77,7 +77,36 @@
         .settle-secondary-row { display: flex; gap: 10px; margin-bottom: 20px; }
         .settle-secondary-row .btn-action { flex: 1; }
         .future-advice-box { width: 100%; min-height: 52px; resize: vertical; font-family: inherit; }
-        /* PHASE 3: Coupon block — three visual states */
+        /* PHASE 4c: Intake + Mechanic print mode */
+        #intake-print-container { display: none; }
+        @media print {
+            body.print-intake > *:not(#intake-print-container) { display: none !important; }
+            body.print-intake #intake-print-container { display: block !important; }
+            .intake-page {
+                width: 148mm; min-height: 210mm; padding: 6mm 8mm;
+                box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 8px; color: #000; background: #fff;
+                page-break-after: always;
+            }
+            .mechanic-page {
+                width: 148mm; min-height: 147mm; padding: 6mm 8mm;
+                box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 8px; color: #000; background: #fff;
+            }
+            .ip-section { margin-bottom: 0; }
+            .ip-divider { border-top: 1px dashed #000; margin: 3px 0; }
+            .ip-cut { border-top: 2px dashed #000; margin: 3px 0; text-align: center; font-size: 7px; color: #666; }
+            .ip-tc { font-size: 6.5px; line-height: 1.4; text-align: justify; }
+            .ip-sig { display: flex; justify-content: space-between; margin-top: 4px; font-size: 7px; }
+            .ip-sig span { border-top: 1px solid #000; min-width: 50mm; padding-top: 2px; }
+            .mp-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-top: 3px; }
+            .mp-table th, .mp-table td { border: 0.5px solid #000; padding: 2px 3px; }
+            .mp-table th { background: #f0f0f0; font-size: 7px; }
+        }
+        /* Parking banner */
+        .parking-banner { background: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: none; }
+        /* Ready for delivery badge */
+        .ready-badge { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
         .coupon-block { border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
         .coupon-active   { background: #f0fdf4; border: 1px solid #bbf7d0; }
         .coupon-inactive { background: #fffbeb; border: 1px solid #fde68a; }
@@ -188,12 +217,33 @@
             <button id="btnViewPhoto" onclick="document.getElementById('modalPhoto').style.display='flex'" style="display:none; background:var(--info); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer; margin: 0 auto 6px auto; width: fit-content;">📸 View Attached Photo</button>
             <div id="splitIndicator" style="display:none; color:var(--info); font-size:0.75rem; font-weight:bold; margin-top:4px;">Labour Split Active</div>
         </div>
-        <div style="flex: 1; text-align: right;"><div id="prepaidPill" class="prepaid-badge">Paid Total Adv: ₹0</div></div>
+        <div style="flex: 1; text-align: right;">
+            <div id="prepaidPill" class="prepaid-badge">Paid Total Adv: ₹0</div>
+            <!-- PHASE 4c: Open JC actions bar -->
+            <div id="openJcActionsBar" style="display:none; margin-top:6px; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                <span id="expectedDeliveryDisplay" style="font-size:0.7rem; color:#64748b;"></span>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                    <button onclick="openIntakePrintModal()" style="background:var(--primary); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;">📋 INTAKE / MECHANIC TICKET</button>
+                    <button id="btnMarkReady" onclick="markReadyForDelivery()" style="background:var(--success); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;">✓ MARK READY</button>
+                </div>
+            </div>
+            <div id="deliveryReadyBadge" style="display:none; margin-top:6px;"><span class="ready-badge">✓ Ready for Delivery — <span id="readySinceDays">0</span> days waiting</span></div>
+        </div>
     </div>
 
-    <!-- PHASE 3: Free service eligible banner — shown when customer has completed 5 services -->
+    <!-- PHASE 3: Free service eligible banner -->
     <div id="freeServiceBanner" class="free-service-banner">
         🎁 FREE SERVICE PACKAGE ELIGIBLE — This customer completed 5 paid services! Waive the service package charge on this visit.
+    </div>
+
+    <!-- PHASE 4c: Parking charge banner — shown when delivery_ready_at > 20 days -->
+    <div id="parkingBanner" class="parking-banner">
+        <div style="font-weight:700; color:#dc2626; margin-bottom:4px; font-size:0.9rem;">🚗 VEHICLE STORAGE ALERT</div>
+        <div id="parkingBannerText" style="font-size:0.82rem; color:#991b1b; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btnAddParking" onclick="addParkingCharge()" style="background:#dc2626; color:white; border:none; padding:6px 14px; border-radius:4px; font-weight:700; cursor:pointer; font-size:0.8rem;">ADD PARKING CHARGE TO BILL</button>
+            <button id="btnWaiveParking" onclick="waiveParkingCharge()" style="display:none; background:#64748b; color:white; border:none; padding:6px 14px; border-radius:4px; font-weight:700; cursor:pointer; font-size:0.8rem;">WAIVE — ADMIN ONLY</button>
+        </div>
     </div>
 
     <div class="inline-add-strip-wrapper" id="uiPartEntryBlock">
@@ -522,7 +572,178 @@
 </div>
 
 <!-- ══════════════════ CHANGE 5: MECHANIC TICKET (A5, dynamic rows) ══════════════════ -->
-<div id="mechanic-print-ticket">
+<!-- PHASE 4c: Intake / Mechanic print modal -->
+<div id="modalIntakePrint" class="overlay-modal">
+    <div class="modal-card" style="max-width:580px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:14px;">
+            <h3 style="margin:0; color:var(--primary); font-size:1rem;">📋 Intake / Mechanic Ticket</h3>
+            <button onclick="document.getElementById('modalIntakePrint').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        </div>
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:8px 12px; font-size:0.75rem; color:#15803d; margin-bottom:14px;">
+            💡 Print preview will show <strong>2 pages</strong>. In the print dialog — select <strong>Page 1</strong> for intake only, <strong>Page 2</strong> for mechanic only, or <strong>All</strong> for both sides.
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+                <label style="font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">COMPLAINT / PROBLEM</label>
+                <textarea id="ipComplaint" rows="2" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; box-sizing:border-box; font-size:0.88rem;" oninput="this.value=this.value.toUpperCase()"></textarea>
+            </div>
+            <div>
+                <label style="font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">OBSERVATION (optional — technician's note)</label>
+                <textarea id="ipObservation" rows="2" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; box-sizing:border-box; font-size:0.88rem;" placeholder="Visual or diagnostic observation..." oninput="this.value=this.value.toUpperCase()"></textarea>
+            </div>
+            <div>
+                <label style="font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">ESTIMATE (one item per line)</label>
+                <textarea id="ipEstimate" rows="3" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; box-sizing:border-box; font-size:0.88rem;" oninput="this.value=this.value.toUpperCase()"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label style="font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">EXPECTED DELIVERY DATE</label>
+                    <input type="date" id="ipExpectedDate" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; box-sizing:border-box; font-size:0.88rem;">
+                </div>
+                <div>
+                    <label style="font-size:0.72rem; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">CHECKED BY</label>
+                    <input type="text" id="ipCheckedBy" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; box-sizing:border-box; font-size:0.88rem; text-transform:uppercase;" placeholder="Name..." oninput="this.value=this.value.toUpperCase()">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:4px;">
+                <button onclick="saveAndPrintIntake()" style="flex:2; background:var(--primary); color:white; border:none; padding:10px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.9rem;">SAVE & PRINT</button>
+                <button onclick="printIntakeWithoutSaving()" style="flex:1; background:#64748b; color:white; border:none; padding:10px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.88rem;">PRINT WITHOUT SAVING</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PHASE 4c: Two-page print template (hidden, shown only on body.print-intake) -->
+<div id="intake-print-container">
+
+    <!-- PAGE 1: FRONT OF A5 — Intake + Delivery + Customer Token -->
+    <div class="intake-page">
+
+        <!-- TOP 40%: INTAKE SECTION -->
+        <div class="ip-section" style="height:82mm; overflow:hidden;">
+            <div style="text-align:center; margin-bottom:3px;">
+                <div style="font-size:12px; font-weight:900; text-transform:uppercase;">माई केयर सर्विस सेंटर</div>
+                <div style="font-size:8px;">गुरुद्वारा रोड, गंज बैतूल | 9425002214</div>
+            </div>
+            <div class="ip-divider"></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                <span><strong>JC: <span id="ip-jcno">--</span></strong></span>
+                <span>दिनांक: <span id="ip-date">--</span></span>
+                <span>अपेक्षित: <span id="ip-expected">--</span></span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; margin-bottom:2px; font-size:7.5px;">
+                <span>ग्राहक: <strong id="ip-name">--</strong></span>
+                <span>संपर्क: <strong id="ip-mob">--</strong></span>
+                <span>नंबर: <strong id="ip-vreg">--</strong></span>
+                <span>मॉडल: <strong id="ip-model">--</strong></span>
+            </div>
+            <div style="margin-bottom:2px;"><strong>शिकायत:</strong> <span id="ip-complaint">--</span></div>
+            <div style="margin-bottom:2px;"><strong>अनुमान:</strong> <span id="ip-estimate">--</span></div>
+            <div style="margin-bottom:2px; font-size:7.5px;">टेकनीशियन: <span id="ip-mech">--</span> &nbsp;|&nbsp; चेक्ड: <span id="ip-checkedby">--</span></div>
+            <div class="ip-divider"></div>
+            <!-- Hindi Intake T&Cs -->
+            <div class="ip-tc" style="margin-bottom:3px;">
+                मैं / हम शिकायतों को हल करने के लिए अपने वाहन के हिस्सों को बदलने या मरम्मत करने के लिए माई केयर सर्विस सेंटर को अधिकृत करता हूं। मैं / हम अपने नाम पर उत्पादों को खरीदने के लिए मेरा देखभाल सेवा केंद्र भी अधिकृत करते हैं। मैं अपनी देखभाल सेवा केंद्र में बिल राशि का भुगतान करने के लिए बाध्य हूं। मैं वाहन को अपने जोखिम पर छोड़ रहा हूं और यदि कोई दुर्घटना होती है तो इसके लिए मेरे देखभाल सेवा केंद्र के किसी भी सदस्य या प्रबंधन को दोष नहीं देगी। <strong>गाड़ी का काम पूरा हो जाने पर अगर ग्राहक नहीं ले जाता है तो १० रुपये प्रति दिन चार्ज किया जावेगा।</strong> गाड़ी अगर वर्कशॉप पर ३ महीने या उससे ऊपर रहती है तो पार्ट्स की कोई जिम्मेवारी नहीं रहेगी।
+            </div>
+            <div class="ip-sig">
+                <span>ग्राहक हस्ताक्षर: ___________________</span>
+                <span>मैनेजर: ___________________</span>
+            </div>
+        </div>
+
+        <!-- MID 30%: DELIVERY SATISFACTION SECTION -->
+        <div class="ip-section" style="height:63mm; overflow:hidden; border-top:1px solid #000; padding-top:2px;">
+            <div style="font-weight:700; font-size:9px; margin-bottom:2px; text-align:center; text-transform:uppercase;">डिलीवरी संतुष्टि नोट</div>
+            <div style="margin-bottom:2px; font-size:7.5px;"><strong>भविष्य की सलाह:</strong> ________________________________________________________________________________________________________</div>
+            <div style="display:flex; gap:8px; margin-bottom:2px; font-size:7.5px;">
+                <span>बिल नंबर: _____________</span>
+                <span>राशि: ₹_____________</span>
+                <span>तिथि: _____________</span>
+            </div>
+            <div class="ip-divider"></div>
+            <div class="ip-tc" style="margin-bottom:3px;">
+                मैं इस प्रकार प्रमाणित करता हूं कि उल्लिखित सभी नौकरियां संतुष्टि के स्तर पर पूर्ण हो गई हैं और प्रतिस्थापित किए जाने वाले सभी हिस्सों को वास्तव में मेरे नाम पर लाया गया है। मैं काम से पूरी तरह से संतुष्ट हूं और माई केयर सर्विस सेंटर को कहा गया भव्य टोटल का भुगतान करने के लिए बाध्य हूं। मैं माई केयर सर्विस सेंटर के तकनीशियन / कर्मचारी / प्रबंधन द्वारा बताई गई भविष्य की सलाहओं से पूरी तरह से अवगत हूं। माई केयर सर्विस सेंटर या उसके सहयोगियों के खिलाफ किसी भी गलती के लिए मेरे द्वारा कोई दावा नहीं किया जाएगा।
+            </div>
+            <div class="ip-sig">
+                <span>ग्राहक हस्ताक्षर (डिलीवरी): _______________</span>
+                <span>सुपरवाइजर: _______________</span>
+            </div>
+        </div>
+
+        <!-- BOTTOM 30%: CUSTOMER TOKEN (CUT HERE) -->
+        <div class="ip-cut">✂ ─────────────────── कृपया यहाँ काटें ─────────────────── ✂</div>
+        <div class="ip-section" style="height:57mm; overflow:hidden; padding-top:2px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="font-size:10px; font-weight:900;">माई केयर सर्विस सेंटर</div>
+                    <div style="font-size:7px;">9425002214 | गंज बैतूल</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:13px; font-weight:900; letter-spacing:1px; color:#000;" id="tk-jcno">--</div>
+                    <div style="font-size:7px;" id="tk-date">--</div>
+                </div>
+            </div>
+            <div class="ip-divider"></div>
+            <div style="font-size:7.5px; margin-bottom:1px;"><strong>वाहन:</strong> <span id="tk-vreg">--</span> (<span id="tk-model">--</span>)</div>
+            <div style="font-size:7.5px; margin-bottom:1px;"><strong>संपर्क:</strong> <span id="tk-mob">--</span></div>
+            <div style="font-size:7.5px; margin-bottom:1px;"><strong>अनुमान:</strong> <span id="tk-estimate">--</span></div>
+            <div style="font-size:7.5px; margin-bottom:1px;"><strong>अपेक्षित तिथि:</strong> <span id="tk-expected">--</span></div>
+            <div class="ip-divider"></div>
+            <div class="ip-tc">कॉल करते समय JC नंबर अवश्य बताएं। वाहन को अपने जोखिम पर छोड़ा गया है। काम पूरा होने के बाद न लेने पर ₹10/दिन प्रभारित होगा।</div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: BACK OF A5 — Mechanic Work Order (top 70%) + Blank bottom 30% -->
+    <div class="mechanic-page">
+        <div style="text-align:center; margin-bottom:3px;">
+            <div style="font-size:12px; font-weight:900;">MECHANIC WORK ORDER — <span id="mp-jcno">--</span></div>
+            <div style="font-size:7.5px;">दिनांक: <span id="mp-date">--</span> | वाहन: <span id="mp-vreg">--</span> (<span id="mp-model">--</span>) | ग्राहक: <span id="mp-mob">--</span></div>
+        </div>
+        <div class="ip-divider"></div>
+        <div style="font-size:7.5px; margin-bottom:2px;"><strong>टेकनीशियन:</strong> <span id="mp-mech">--</span> &nbsp;|&nbsp; <strong>चेक्ड बाए:</strong> <span id="mp-checkedby">--</span></div>
+        <div style="font-size:7.5px; margin-bottom:2px;"><strong>शिकायत:</strong> <span id="mp-complaint">--</span></div>
+        <div style="font-size:7.5px; margin-bottom:2px;"><strong>ऑब्जर्वेशन:</strong> <span id="mp-observation">--</span></div>
+        <div style="font-size:7.5px; margin-bottom:2px;"><strong>अनुमान:</strong> <span id="mp-estimate">--</span></div>
+        <div class="ip-divider"></div>
+        <!-- Parts table -->
+        <table class="mp-table">
+            <thead>
+                <tr>
+                    <th style="width:38%;">बदले गए पार्ट अ</th>
+                    <th style="width:12%;">दर</th>
+                    <th style="width:38%;">बदले गए पार्ट ब</th>
+                    <th style="width:12%;">दर</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr><td style="height:8mm;"></td><td></td><td></td><td></td></tr>
+                <tr>
+                    <td><strong>कुल पार्ट अ:</strong></td><td></td>
+                    <td><strong>कुल पार्ट ब:</strong></td><td></td>
+                </tr>
+                <tr>
+                    <td><strong>मजदूरी दर:</strong></td><td></td>
+                    <td><strong>कुल योग:</strong></td><td></td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="ip-sig" style="margin-top:4px;">
+            <span>टेक अ हस्ताक्षर: ___________</span>
+            <span>टेक ब हस्ताक्षर: ___________</span>
+            <span>मैनेजर: ___________</span>
+        </div>
+        <!-- Bottom 30% blank — aligns with customer token cut line on front -->
+        <div style="height:63mm; border-top:1px dashed #ccc; margin-top:4px; display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:7px; color:#ccc;">( कस्टमर टोकन काटने के बाद खाली जगह )</span>
+        </div>
+    </div>
+
+</div><!-- end intake-print-container -->
     <div class="a5-page">
         <!-- Header -->
         <div style="text-align:center; margin-bottom:4px;">
@@ -706,7 +927,9 @@
         if(job) {
             activeJobContext = job;
             document.getElementById('regPlate').innerText = job.vehicles?.reg_number || "ASSET";
-            document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | Budget: ₹${job.estimate_given || 0}`;
+            /* PHASE 4c: Show estimate text (now TEXT type) and expected delivery date */
+            const estimateShort = (job.estimate_given || '').split('\n')[0] || '';
+            document.getElementById('modelLabel').innerText = `${job.vehicles?.make_model || ''} | ${estimateShort ? estimateShort.substring(0,30) : 'No estimate'}`;
             const totalPrecollected = (parseFloat(job.advance_service) || 0) + (parseFloat(job.prepaid_green) || 0) + (parseFloat(job.prepaid_moped) || 0);
             document.getElementById('prepaidPill').innerText = `Total Adv/Prep: ₹${totalPrecollected}`;
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
@@ -751,6 +974,16 @@
             }
             compileDynamicSums();
             buildCollectionHistory();
+            /* PHASE 4c: Show open JC actions bar + expected delivery + parking check */
+            if (job.status !== 'Closed' && job.status !== 'Cancelled') {
+                document.getElementById('openJcActionsBar').style.display = 'flex';
+                updateExpectedDeliveryDisplay();
+                if (job.delivery_ready_at) {
+                    checkParkingCharge();
+                } else {
+                    document.getElementById('btnMarkReady').style.display = 'inline-block';
+                }
+            }
 
             if(job.status === 'Closed' || job.status === 'Cancelled') {
                 document.getElementById('lockedStatusWord').innerText = job.status.toUpperCase();
@@ -1084,6 +1317,197 @@
         document.getElementById('couponContent').innerHTML = '<span style="font-size:0.75rem;color:#94a3b8;">🎟 Coupon removed — discount not applied</span>';
         document.getElementById('btnRemoveCoupon').style.display = 'none';
         compileDynamicSums();
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PHASE 4c — INTAKE TICKET, MARK READY, PARKING CHARGES
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Show/populate intake print modal */
+    function openIntakePrintModal() {
+        if (!activeJobContext) return;
+        const pMech = document.getElementById('primaryMech');
+        const mechName = pMech ? (pMech.options[pMech.selectedIndex]?.text || '') : '';
+        document.getElementById('ipComplaint').value   = (activeJobContext.problem_mentioned || '').toUpperCase();
+        document.getElementById('ipObservation').value = '';
+        document.getElementById('ipEstimate').value    = (activeJobContext.estimate_given || '').toUpperCase();
+        document.getElementById('ipExpectedDate').value= activeJobContext.expected_delivery_date || '';
+        document.getElementById('ipCheckedBy').value   = '';
+        document.getElementById('modalIntakePrint').style.display = 'flex';
+    }
+
+    /* Save updated fields to DB then print */
+    async function saveAndPrintIntake() {
+        const complaint    = document.getElementById('ipComplaint').value.trim().toUpperCase();
+        const estimate     = document.getElementById('ipEstimate').value.trim().toUpperCase();
+        const expectedDate = document.getElementById('ipExpectedDate').value || null;
+        try {
+            await supabaseClient.from('job_cards').update({
+                problem_mentioned      : complaint,
+                estimate_given         : estimate,
+                expected_delivery_date : expectedDate
+            }).eq('id', targetJobId);
+            /* Update local context so display refreshes */
+            activeJobContext.problem_mentioned      = complaint;
+            activeJobContext.estimate_given         = estimate;
+            activeJobContext.expected_delivery_date = expectedDate;
+            document.getElementById('complaintLabel').innerText = `Problem: ${complaint || 'Routine Maintenance'}`;
+            updateExpectedDeliveryDisplay();
+        } catch(e) { console.error('Intake save error:', e); }
+        document.getElementById('modalIntakePrint').style.display = 'none';
+        triggerIntakePrint();
+    }
+
+    /* Print without saving to DB */
+    function printIntakeWithoutSaving() {
+        document.getElementById('modalIntakePrint').style.display = 'none';
+        triggerIntakePrint();
+    }
+
+    /* Populate the hidden print template and trigger browser print */
+    function triggerIntakePrint() {
+        const complaint    = document.getElementById('ipComplaint').value    || activeJobContext.problem_mentioned || '--';
+        const observation  = document.getElementById('ipObservation').value  || '--';
+        const estimate     = document.getElementById('ipEstimate').value     || activeJobContext.estimate_given   || '--';
+        const expectedDate = document.getElementById('ipExpectedDate').value || activeJobContext.expected_delivery_date || '';
+        const checkedBy    = document.getElementById('ipCheckedBy').value    || '--';
+        const pMech        = document.getElementById('primaryMech');
+        const mechName     = pMech ? (pMech.options[pMech.selectedIndex]?.text || '--') : '--';
+        const jcShort      = (targetJobId || '').split('-')[0].toUpperCase();
+        const dateStr      = new Date().toLocaleDateString('en-IN');
+        const expectedStr  = expectedDate ? new Date(expectedDate).toLocaleDateString('en-IN') : '--';
+        const estimateLines= (estimate || '').split('\n').filter(l => l.trim()).map(l => `<div>${l}</div>`).join('') || estimate;
+
+        /* Page 1 — Intake */
+        const setT = (id, val) => { const el=document.getElementById(id); if(el) el.innerText=val; };
+        const setH = (id, val) => { const el=document.getElementById(id); if(el) el.innerHTML=val; };
+        setT('ip-jcno', `JC-${jcShort}`);      setT('ip-date', dateStr);
+        setT('ip-name', activeCustomerName);     setT('ip-mob', activeJobContext.customer_mobile || '--');
+        setT('ip-vreg', activeJobContext.vehicles?.reg_number || '--');
+        setT('ip-model', activeJobContext.vehicles?.make_model || '--');
+        setT('ip-complaint', complaint);          setH('ip-estimate', estimateLines);
+        setT('ip-expected', expectedStr);         setT('ip-mech', mechName);
+        setT('ip-checkedby', checkedBy);
+        /* Token */
+        setT('tk-jcno', `JC-${jcShort}`);        setT('tk-date', dateStr);
+        setT('tk-vreg', activeJobContext.vehicles?.reg_number || '--');
+        setT('tk-model', activeJobContext.vehicles?.make_model || '--');
+        setT('tk-mob', activeJobContext.customer_mobile || '--');
+        setH('tk-estimate', estimateLines);        setT('tk-expected', expectedStr);
+        /* Page 2 — Mechanic */
+        setT('mp-jcno', `JC-${jcShort}`);        setT('mp-date', dateStr);
+        setT('mp-vreg', activeJobContext.vehicles?.reg_number || '--');
+        setT('mp-model', activeJobContext.vehicles?.make_model || '--');
+        setT('mp-mob', activeJobContext.customer_mobile || '--');
+        setT('mp-complaint', complaint);           setT('mp-observation', observation);
+        setT('mp-mech', mechName);                 setT('mp-checkedby', checkedBy);
+        setH('mp-estimate', estimateLines);
+
+        document.body.classList.add('print-intake');
+        window.print();
+        setTimeout(() => document.body.classList.remove('print-intake'), 600);
+    }
+
+    /* Update expected delivery display in header */
+    function updateExpectedDeliveryDisplay() {
+        const el = document.getElementById('expectedDeliveryDisplay');
+        if (!el) return;
+        if (activeJobContext.expected_delivery_date) {
+            const d = new Date(activeJobContext.expected_delivery_date).toLocaleDateString('en-IN');
+            el.innerText = `Expected: ${d}`;
+        } else {
+            el.innerText = '';
+        }
+    }
+
+    /* Mark vehicle as ready for delivery */
+    async function markReadyForDelivery() {
+        if (!confirm('Mark this vehicle READY FOR DELIVERY?\n\nThis will:\n• Set the delivery ready date to now\n• Start the 20-day grace period before parking charges apply\n• Allow sending a delivery notification to the customer')) return;
+        const now = new Date().toISOString();
+        try {
+            await supabaseClient.from('job_cards').update({ delivery_ready_at: now }).eq('id', targetJobId);
+            activeJobContext.delivery_ready_at = now;
+            document.getElementById('btnMarkReady').style.display = 'none';
+            document.getElementById('deliveryReadyBadge').style.display = 'block';
+            document.getElementById('readySinceDays').innerText = '0';
+            alert('✅ Vehicle marked as ready for delivery.\n\nParking charges of ₹10/day will apply after 20 days if vehicle is not collected.');
+        } catch(e) { console.error('Mark ready error:', e); alert('Error — please try again.'); }
+    }
+
+    /* Check and show parking charge banner on page load */
+    function checkParkingCharge() {
+        if (!activeJobContext.delivery_ready_at) return;
+        if (activeJobContext.status === 'Closed') return;
+        const readyDate   = new Date(activeJobContext.delivery_ready_at);
+        const daysWaiting = Math.floor((Date.now() - readyDate) / (1000*60*60*24));
+        const chargeable  = Math.max(0, daysWaiting - 20);
+        const parkingAmt  = chargeable * 10;
+
+        /* Update ready badge */
+        document.getElementById('deliveryReadyBadge').style.display = 'block';
+        document.getElementById('readySinceDays').innerText = daysWaiting;
+        document.getElementById('btnMarkReady').style.display = 'none';
+
+        /* Show parking banner only if chargeable and not already added */
+        if (chargeable > 0 && !activeJobContext.parking_charge_added) {
+            const banner = document.getElementById('parkingBanner');
+            banner.style.display = 'block';
+            document.getElementById('parkingBannerText').innerHTML =
+                `Vehicle marked ready on <strong>${readyDate.toLocaleDateString('en-IN')}</strong> — ` +
+                `<strong>${daysWaiting} days</strong> waiting. Grace period: 20 days. ` +
+                `Chargeable: <strong>${chargeable} days × ₹10 = ₹${parkingAmt}</strong>`;
+            if (sessionRole === 'admin') {
+                document.getElementById('btnWaiveParking').style.display = 'inline-block';
+            }
+        }
+    }
+
+    /* Add parking charge as a Service line item */
+    async function addParkingCharge() {
+        if (!activeJobContext.delivery_ready_at) return;
+        const readyDate   = new Date(activeJobContext.delivery_ready_at);
+        const daysWaiting = Math.floor((Date.now() - readyDate) / (1000*60*60*24));
+        const chargeable  = Math.max(0, daysWaiting - 20);
+        const parkingAmt  = chargeable * 10;
+        if (parkingAmt <= 0) return;
+
+        /* Insert as a service protocol item into job_card_items */
+        const { error } = await supabaseClient.from('job_card_items').insert({
+            job_card_id   : targetJobId,
+            item_name     : `[PARKING] Vehicle storage — ${chargeable} days × ₹10/day`,
+            brand         : 'MY CARE',
+            category      : 'Other',
+            warehouse_type: 'Service',
+            qty           : 1,
+            unit_metric   : 'Pcs',
+            unit_price    : parkingAmt,
+            total_price   : parkingAmt,
+            mrp_at_billing: parkingAmt,
+            volume_ml     : 0,
+            mac_at_billing: 0,
+            issued_by_id  : null
+        });
+        if (error) { alert('Error adding parking charge: ' + error.message); return; }
+
+        /* Mark as added on job card */
+        await supabaseClient.from('job_cards').update({ parking_charge_added: true }).eq('id', targetJobId);
+        activeJobContext.parking_charge_added = true;
+        document.getElementById('parkingBanner').style.display = 'none';
+
+        /* Reload line items so the new item appears in the table */
+        await loadInventoryLedgers();
+        alert(`✅ Parking charge of ₹${parkingAmt} added to bill.`);
+    }
+
+    /* Waive parking charges (admin only) */
+    async function waiveParkingCharge() {
+        if (sessionRole !== 'admin') return;
+        const note = prompt('Reason for waiving parking charges (will be recorded):');
+        if (note === null) return;
+        await supabaseClient.from('job_cards').update({ parking_charge_added: true }).eq('id', targetJobId);
+        activeJobContext.parking_charge_added = true;
+        document.getElementById('parkingBanner').style.display = 'none';
+        alert(`Parking charges waived.\nReason: ${note}`);
     }
 
     function lockUserInterface() {
