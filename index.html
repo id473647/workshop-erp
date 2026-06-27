@@ -1,89 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Command Center Dashboard - My Care ERP</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root { 
-            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; 
-            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c;
-            --purple: #8e44ad; --utility: #64748b;
-        }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); }
-        
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; }
-        .logo-matrix img { height: 32px; object-fit: contain; }
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; }
-        .btn-back { background: white; color: var(--primary); }
-        .btn-home { background: #f1f5f9; color: var(--primary); }
-        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .badge-role { background: var(--primary); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center — My Care ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+    --primary:#2c3e50; --success:#27ae60; --moped:#3498db; --service:#f39c12;
+    --light:#f8fafc; --border:#e2e8f0; --text:#1e293b; --danger:#e74c3c;
+    --purple:#8e44ad; --utility:#64748b; --info:#0ea5e9;
+}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);padding:0;margin:0;color:var(--text);}
 
-        .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-        .card-panel { background: white; padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
-        .block-title { font-size: 1rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-        
-        .dashboard-matrix-strip { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-behavior: smooth; margin-bottom: 20px; }
-        .matrix-card { min-width: 210px; flex: 1; background: white; padding: 16px; border-radius: 8px; border: 1px solid var(--border); box-sizing: border-box; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; }
-        .matrix-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .card-meta-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
-        .card-big-num { font-size: 1.4rem; font-weight: 700; color: var(--primary); margin: 2px 0; }
-        .card-sub-metric { font-size: 0.75rem; color: #64748b; display: block; margin-top: 4px; }
-        
-        .border-combo { border-left: 4px solid var(--success); border-bottom: 4px solid var(--moped); }
-        .border-lube { border-left: 4px solid var(--purple); }
-        .border-staff { border-left: 4px solid var(--service); }
-        .border-pos { border-left: 4px solid var(--danger); }
-        .border-moped-pos { border-left: 4px solid var(--moped); }
-        .border-ledger { border-left: 4px solid #0f172a; }
+/* ── Nav ── */
+.sticky-nav{max-width:960px;margin:0 auto;background:white;padding:10px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.logo-matrix{display:flex;align-items:center;gap:8px;}
+.logo-matrix img{height:30px;object-fit:contain;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.btn-header{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:0.8rem;font-weight:700;cursor:pointer;text-decoration:none;}
+.btn-back{background:white;color:var(--primary);}
+.btn-home{background:#f1f5f9;color:var(--primary);}
+.btn-logout{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.badge-role{background:var(--primary);color:white;padding:4px 10px;border-radius:4px;font-size:0.75rem;font-weight:700;text-transform:uppercase;margin-left:6px;}
 
-        .navigation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-        .action-btn { padding: 14px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; text-decoration: none; color: white; text-align: center; display: block; transition: opacity 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .action-btn:hover { opacity: 0.9; }
-        .bg-green { background: var(--success); }
-        .bg-moped { background: var(--moped); }
-        .bg-service { background: var(--service); }
-        .bg-retail { background: var(--danger); }
-        .bg-utility { background: var(--utility); }
+/* ── Layout ── */
+.wrapper{max-width:960px;margin:0 auto;padding:16px 20px;}
+.card-panel{background:white;padding:16px;border-radius:10px;border:1px solid var(--border);margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.02);}
+.block-title{font-size:0.95rem;font-weight:700;color:var(--primary);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
 
-        .search-strip { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .search-strip input, .search-strip select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; box-sizing: border-box; }
-        .search-strip input[type="text"] { flex: 1; min-width: 200px; }
-        
-        .view-switcher-bar { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
-        .switch-btn { padding: 6px 12px; border: none; background: none; font-size: 0.8rem; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 4px; white-space: nowrap; }
-        .switch-btn.active { background: var(--primary); color: white; }
-        
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; max-height: 400px; }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
-        
-        .clickable-ref { color: var(--info); font-weight: 700; text-decoration: none; cursor: pointer; display: block; font-size: 0.95rem; }
-        .clickable-ref:hover { text-decoration: underline; }
-        
-        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 800px; box-sizing: border-box; max-height: 90vh; overflow-y: auto; }
-        .status-pill { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
+/* ── Metric cards ── */
+.dashboard-matrix-strip{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px;scroll-behavior:smooth;}
+.matrix-card{min-width:190px;flex:1;background:white;padding:14px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;}
+.matrix-card:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,0.06);}
+.card-meta-label{font-size:0.68rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px;}
+.card-big-num{font-size:1.3rem;font-weight:700;color:var(--primary);margin:2px 0;}
+.card-sub-metric{font-size:0.72rem;color:#64748b;display:block;margin-top:4px;}
+.border-combo{border-left:4px solid var(--success);border-bottom:4px solid var(--moped);}
+.border-lube{border-left:4px solid var(--purple);}
+.border-staff{border-left:4px solid var(--service);}
+.border-pos{border-left:4px solid var(--danger);}
+.border-moped-pos{border-left:4px solid var(--moped);}
+.border-ledger{border-left:4px solid #0f172a;}
 
-        /* PHASE 3 ADMIN UI STYLES */
-        .override-queue-item { display:flex; justify-content:space-between; align-items:center; background:white; padding:12px 16px; border-radius:8px; border:1px solid #fca5a5; margin-bottom:8px; border-left:4px solid var(--danger); }
-        .btn-review { background:var(--danger); color:white; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; }
-        .margin-col { display: none; background: #ecfdf5; color: #166534; font-weight: bold; } /* Pro Mode Hidden by Default */
-        .alloc-input { padding: 8px; border: 1px solid var(--border); border-radius: 6px; width: 100%; box-sizing: border-box; font-weight: bold; }
-        .alloc-group { flex: 1; }
-    </style>
+/* ── Nav grid ── */
+.navigation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;}
+.action-btn{padding:12px;border-radius:8px;font-weight:700;font-size:0.85rem;text-decoration:none;color:white;text-align:center;display:block;transition:opacity 0.15s;border:none;cursor:pointer;}
+.action-btn:hover{opacity:0.9;}
+.bg-green{background:var(--success);}
+.bg-moped{background:var(--moped);}
+.bg-service{background:var(--service);}
+.bg-retail{background:var(--danger);}
+.bg-utility{background:var(--utility);}
+
+/* ── Search & tabs ── */
+.search-strip{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.search-strip input,.search-strip select{padding:9px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;}
+.search-strip input[type="text"]{flex:1;min-width:180px;}
+.view-switcher-bar{display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:14px;overflow-x:auto;padding-bottom:2px;}
+.switch-btn{padding:6px 12px;border:none;background:none;font-size:0.78rem;font-weight:700;color:#64748b;cursor:pointer;border-radius:4px;white-space:nowrap;}
+.switch-btn.active{background:var(--primary);color:white;}
+
+/* ── Table ── */
+.table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;max-height:420px;}
+table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+th{background:#f8fafc;padding:9px 12px;font-size:0.68rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;}
+td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+.clickable-ref{color:var(--info);font-weight:700;text-decoration:none;cursor:pointer;display:block;font-size:0.9rem;}
+.clickable-ref:hover{text-decoration:underline;}
+.status-pill{font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px;}
+
+/* ── Row highlights ── */
+.row-overdue-mild{background:#fffbeb !important;}
+.row-overdue-severe{background:#fef2f2 !important;}
+.row-ready{background:#f0fdf4 !important;}
+
+/* ── Modals ── */
+.overlay-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.55);z-index:200;display:none;justify-content:center;align-items:center;padding:16px;}
+.modal-card{background:white;padding:20px;border-radius:12px;width:100%;max-width:820px;max-height:92vh;overflow-y:auto;}
+
+/* ── Admin override ── */
+.override-queue-item{display:flex;justify-content:space-between;align-items:center;background:white;padding:12px 16px;border-radius:8px;border:1px solid #fca5a5;margin-bottom:8px;border-left:4px solid var(--danger);}
+.btn-review{background:var(--danger);color:white;border:none;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer;}
+.margin-col{display:none;}
+.alloc-input{padding:8px;border:1px solid var(--border);border-radius:6px;width:100%;font-weight:700;}
+.alloc-group{flex:1;}
+</style>
 </head>
 <body>
 
 <nav class="sticky-nav">
     <div class="logo-matrix">
-        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care Core">
-        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Center">
+        <img src="logo-main.jpg" onerror="this.style.display='none'" alt="My Care">
+        <img src="logo-green.png" onerror="this.style.display='none'" alt="Green Scooter">
     </div>
     <div class="nav-actions">
         <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
@@ -95,103 +105,113 @@
 
 <div class="wrapper">
 
-    <div id="overrideQueueBlock" style="display:none; margin-bottom:20px; background:#fef2f2; padding:16px; border-radius:10px; border:1px solid #fecaca;">
-        <h3 style="margin:0 0 12px 0; color:#991b1b; display:flex; align-items:center; gap:8px;">🚨 Pending Admin Approvals (Discount Overrides)</h3>
+    <!-- Admin discount override queue -->
+    <div id="overrideQueueBlock" style="display:none;margin-bottom:16px;background:#fef2f2;padding:14px;border-radius:10px;border:1px solid #fecaca;">
+        <h3 style="margin:0 0 10px;color:#991b1b;font-size:0.95rem;">🚨 Pending Admin Approvals — Discount Overrides</h3>
         <div id="overrideQueueList"></div>
     </div>
 
+    <!-- Metric cards -->
     <div class="dashboard-matrix-strip">
-        <div id="cardCombinedFlow" class="matrix-card border-combo" style="display:none;" onclick="instantiateMetricDetailsModal('CombinedFlow')">
+        <div id="cardCombinedFlow" class="matrix-card border-combo" style="display:none;" onclick="window.location.href='workshop-ledger.html?tab=spares&date='+todayDateStr()">
             <span class="card-meta-label">Spares Flow (Grn & Mop)</span>
-            <div style="font-size:0.85rem; font-weight:700; margin-top:8px;">
-                <div style="display:flex; justify-content:space-between; color:var(--success);"><span>Grn Net: <span id="mGrnNet">₹0</span></span> <span>Paid: <span id="mGrnPaid">₹0</span></span></div>
-                <div style="display:flex; justify-content:space-between; color:var(--moped); margin-top:6px;"><span>Mop Net: <span id="mMopNet">₹0</span></span> <span>Paid: <span id="mMopPaid">₹0</span></span></div>
+            <div style="font-size:0.8rem;font-weight:700;margin-top:6px;">
+                <div style="display:flex;justify-content:space-between;color:var(--success);">
+                    <span>Grn Net: <span id="mGrnNet">₹0</span></span>
+                    <span>Paid: <span id="mGrnPaid">₹0</span></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:var(--moped);margin-top:5px;">
+                    <span>Mop Net: <span id="mMopNet">₹0</span></span>
+                    <span>Paid: <span id="mMopPaid">₹0</span></span>
+                </div>
             </div>
-            <span class="card-sub-metric" style="margin-top:8px;">Click to view dual tables →</span>
+            <span class="card-sub-metric" style="color:var(--info);font-weight:700;margin-top:6px;">Open Workshop Ledger →</span>
         </div>
 
-        <div id="cardGreenFlow" class="matrix-card border-green" style="display:none;" onclick="instantiateMetricDetailsModal('GreenFlow')">
+        <div id="cardGreenFlow" class="matrix-card" style="display:none;border-left:4px solid var(--success);" onclick="window.location.href='workshop-ledger.html?tab=green-spares&date='+todayDateStr()">
             <span class="card-meta-label">Green Spares Flow</span>
             <div id="mGreenFlowSingle" class="card-big-num">₹0</div>
             <span id="mGreenPaidSingle" class="card-sub-metric">Paid in Workshop: ₹0</span>
         </div>
 
-        <div id="cardMopedFlow" class="matrix-card border-moped" style="display:none;" onclick="instantiateMetricDetailsModal('MopedFlow')">
+        <div id="cardMopedFlow" class="matrix-card border-moped-pos" style="display:none;" onclick="window.location.href='workshop-ledger.html?tab=moped-spares&date='+todayDateStr()">
             <span class="card-meta-label">Moped Warehouse Net</span>
             <div id="mMopedFlowSingle" class="card-big-num">₹0</div>
             <span id="mMopedPaidSingle" class="card-sub-metric">Paid in Workshop: ₹0</span>
         </div>
 
-        <div id="cardLubeFlow" class="matrix-card border-lube" onclick="instantiateMetricDetailsModal('LubeFlow')">
-            <span class="card-meta-label">Lube Allocation (Liters)</span>
-            <div style="display:flex; justify-content:space-between; align-items:baseline; margin:4px 0;">
-                <span id="mLubeGreen" style="font-size:1.1rem; font-weight:700; color:#15803d; display:none;">Grn: 0 L</span>
-                <span id="mLubeMoped" style="font-size:1.1rem; font-weight:700; color:#b91c1c; display:none;">Mop: 0 L</span>
+        <div id="cardLubeFlow" class="matrix-card border-lube" onclick="window.location.href='workshop-ledger.html?tab=lube&date='+todayDateStr()">
+            <span class="card-meta-label">Lube Allocation (Litres)</span>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0;flex-wrap:wrap;gap:4px;">
+                <span id="mLubeGreen" style="font-size:1rem;font-weight:700;color:#15803d;display:none;">Grn: 0.00 L</span>
+                <span id="mLubeMoped" style="font-size:1rem;font-weight:700;color:#b91c1c;display:none;">Mop: 0.00 L</span>
             </div>
+            <span id="mLubeQty" class="card-sub-metric" style="font-weight:700;color:var(--primary);">Qty: 0 pcs</span>
             <span class="card-sub-metric">Total dynamic capacity issued</span>
         </div>
 
-        <div id="cardStaffFlow" class="matrix-card border-staff" style="display:none;" onclick="instantiateMetricDetailsModal('StaffFlow')">
+        <div id="cardStaffFlow" class="matrix-card border-staff" style="display:none;" onclick="window.location.href='workshop-ledger.html?tab=labour&date='+todayDateStr()">
             <span class="card-meta-label">Net Staff Payable</span>
             <div id="mStaffPaid" class="card-big-num" style="color:#0284c7;">₹0</div>
             <span id="mStaffTotal" class="card-sub-metric">Overall Invoices: ₹0</span>
         </div>
 
-        <div id="cardWorkshopLedger" class="matrix-card border-ledger" style="display:none;" onclick="window.location.href='workshop-ledger.html'">
+        <div id="cardWorkshopLedger" class="matrix-card border-ledger" style="display:none;" onclick="window.location.href='workshop-ledger.html?date='+todayDateStr()">
             <span class="card-meta-label">Workshop Ledger Details</span>
-            <div style="font-size:0.85rem; font-weight:700; margin-top:8px; color:var(--primary);">
-                <div style="display:flex; justify-content:space-between;"><span>JC Cash:</span><span id="mJcCash">₹0</span></div>
-                <div style="display:flex; justify-content:space-between; margin-top:6px;"><span>JC UPI/Card:</span><span id="mJcUpi">₹0</span></div>
+            <div style="font-size:0.8rem;font-weight:700;margin-top:6px;color:var(--primary);">
+                <div style="display:flex;justify-content:space-between;"><span>JC Cash:</span><span id="mJcCash">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;"><span>JC UPI/Card:</span><span id="mJcUpi">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;color:#dc2626;"><span>Credit JC:</span><span id="mJcCredit">₹0</span></div>
             </div>
-            <span class="card-sub-metric" style="color:var(--info); font-weight:700; margin-top:8px;">Open Full Ledger →</span>
+            <span class="card-sub-metric" style="color:var(--info);font-weight:700;margin-top:6px;">Open Full Ledger →</span>
         </div>
 
-        <div id="cardPosFlow" class="matrix-card border-pos" style="display:none;" onclick="window.location.href='workshop-ledger.html'">
-            <span class="card-meta-label">Green Retail Sales</span>
-            <div style="font-size:0.8rem; font-weight:700; color:var(--text); margin-top:4px;">
-                <div style="display:flex; justify-content:space-between;"><span>Cash:</span><span id="mPosCash">₹0</span></div>
-                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span>UPI/Card:</span><span id="mPosUpi">₹0</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mPosCredit">₹0</span></div>
-            </div>
-        </div>
-
-        <div id="cardMopedPosFlow" class="matrix-card border-moped-pos" style="display:none;" onclick="window.location.href='workshop-ledger.html'">
-            <span class="card-meta-label">Moped Retail Sales</span>
-            <div style="font-size:0.8rem; font-weight:700; color:var(--text); margin-top:4px;">
-                <div style="display:flex; justify-content:space-between;"><span>Cash:</span><span id="mMopPosCash">₹0</span></div>
-                <div style="display:flex; justify-content:space-between; margin:2px 0;"><span>UPI/Card:</span><span id="mMopPosUpi">₹0</span></div>
-                <div style="display:flex; justify-content:space-between;"><span>Credit:</span><span id="mMopPosCredit">₹0</span></div>
+        <div id="cardPosFlow" class="matrix-card border-pos" style="display:none;" onclick="window.location.href='workshop-ledger.html?tab=green-counter&date='+todayDateStr()">
+            <span class="card-meta-label">Green Counter</span>
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-top:4px;">
+                <div style="display:flex;justify-content:space-between;"><span>Cash:</span><span id="mPosCash">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin:3px 0;"><span>UPI/Card:</span><span id="mPosUpi">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;"><span>Credit:</span><span id="mPosCredit">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);color:#0284c7;"><span>Workshop Pymt:</span><span id="mGreenWsPymt">₹0</span></div>
             </div>
         </div>
 
-        <div id="cardStockValuation" class="matrix-card" style="border-left: 4px solid var(--success); display:none;">
+        <div id="cardMopedPosFlow" class="matrix-card border-moped-pos" style="display:none;" onclick="window.location.href='workshop-ledger.html?tab=moped-counter&date='+todayDateStr()">
+            <span class="card-meta-label">Moped Counter</span>
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-top:4px;">
+                <div style="display:flex;justify-content:space-between;"><span>Cash:</span><span id="mMopPosCash">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin:3px 0;"><span>UPI/Card:</span><span id="mMopPosUpi">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;"><span>Credit:</span><span id="mMopPosCredit">₹0</span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);color:#0284c7;"><span>Workshop Pymt:</span><span id="mMopWsPymt">₹0</span></div>
+            </div>
+        </div>
+
+        <div id="cardStockValuation" class="matrix-card" style="border-left:4px solid var(--success);display:none;">
             <span class="card-meta-label">Total Stock Value</span>
             <div id="stockValContent" class="card-big-num" style="color:var(--success);">₹0</div>
             <span id="stockValSub" class="card-sub-metric">MRP Value: ₹0</span>
         </div>
     </div>
 
+    <!-- Navigation buttons -->
     <div class="navigation-grid">
-        <a href="new-jobcard.html" id="navGreenJc" class="action-btn bg-green" style="display:none;">Green Job Card</a>
-        <a href="new-jobcard.html" id="navMopedJc" class="action-btn bg-moped" style="display:none;">Moped Job Card</a>
-        <a href="new-jobcard.html" id="navNewJc" class="action-btn bg-service" style="display:none;">New JC</a>
-        
-        <a href="pos-green.html" id="navGreenPos" class="action-btn bg-retail" style="display:none;">Green POS</a>
-        <a href="pos-green.html" id="navMopedPos" class="action-btn bg-moped" style="display:none;">Moped POS</a>
-        
-        <a href="inventory-lookup.html" id="navInventoryLookup" class="action-btn" style="background:#059669; display:none;">Stock Lookup</a>
-        <a href="product-master-console.html" id="navProductCatalog" class="action-btn" style="background:var(--purple); display:none;">Product Catalog</a>
-        
-        <a href="purchase-manager.html" id="navPurchase" class="action-btn" style="background:#f59e0b; display:none;">Purchase / GRN</a>
-        
-        <a href="utility-router.html" id="navUtility" class="action-btn bg-utility">Utility</a>
+        <a href="new-jobcard.html" id="navGreenJc"  class="action-btn bg-green"   style="display:none;">Green Job Card</a>
+        <a href="new-jobcard.html" id="navMopedJc"  class="action-btn bg-moped"   style="display:none;">Moped Job Card</a>
+        <a href="new-jobcard.html" id="navNewJc"    class="action-btn bg-service"  style="display:none;">New JC</a>
+        <a href="pos-green.html"   id="navGreenPos" class="action-btn bg-retail"   style="display:none;">Green POS</a>
+        <a href="pos-green.html"   id="navMopedPos" class="action-btn bg-moped"    style="display:none;">Moped POS</a>
+        <a href="inventory-lookup.html"        id="navInventoryLookup" class="action-btn" style="background:#059669;display:none;">Stock Lookup</a>
+        <a href="product-master-console.html"  id="navProductCatalog"  class="action-btn" style="background:var(--purple);display:none;">Product Catalog</a>
+        <a href="purchase-manager.html"        id="navPurchase"         class="action-btn" style="background:#f59e0b;display:none;">Purchase / GRN</a>
+        <a href="utility-router.html"          id="navUtility"          class="action-btn bg-utility">Utility</a>
     </div>
 
+    <!-- Master JC table -->
     <div class="card-panel">
         <div class="block-title">Master Workflow Registers</div>
-        
+
         <div class="search-strip">
-            <input type="text" id="sQuery" placeholder="Search by Contact, Identity, or Document Hash..." oninput="queryMasterJobRegisters()">
+            <input type="text" id="sQuery" placeholder="Search by contact, registration, or JC hash..." oninput="queryMasterJobRegisters()">
             <select id="sMode" onchange="queryMasterJobRegisters()">
                 <option value="ALL">All Modes</option>
                 <option value="Cash">Cash</option>
@@ -202,369 +222,648 @@
         </div>
 
         <div class="view-switcher-bar">
-            <button class="switch-btn active" onclick="switchListCategory('Running')">Active Running</button>
-            <button class="switch-btn" onclick="switchListCategory('AgedOpen')">Aged Open Bays</button>
-            <button class="switch-btn" onclick="switchListCategory('PendingDelivery')">Pending Checkouts</button>
-            <button class="switch-btn" onclick="switchListCategory('Historical')">Historical Registers</button>
+            <button class="switch-btn active" onclick="switchListCategory('TodayActive', this)">Today's Active</button>
+            <button class="switch-btn"        onclick="switchListCategory('Overdue', this)">Overdue</button>
+            <button class="switch-btn"        onclick="switchListCategory('ReadyDelivery', this)">Ready for Delivery</button>
+            <button class="switch-btn"        onclick="switchListCategory('Historical', this)">Historical</button>
+        </div>
+
+        <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:8px;" id="tabHintText">
+            Showing job cards opened today. Amber rows = open &gt;24h. Red rows = open &gt;3 days.
         </div>
 
         <div class="table-wrapper">
             <table>
-                <thead><tr><th>Model / Chassis</th><th>Registration / Contact</th><th>Valuation</th><th>Status Flag</th><th>Assigned Tech</th></tr></thead>
-                <tbody id="masterJobsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Fetching operational ledgers...</td></tr></tbody>
+                <thead>
+                    <tr>
+                        <th>Model / Problem</th>
+                        <th>Registration / Contact</th>
+                        <th>Advances / Invoice</th>
+                        <th>Status / Days</th>
+                        <th>Assigned Tech</th>
+                    </tr>
+                </thead>
+                <tbody id="masterJobsTableBody">
+                    <tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">Loading registers...</td></tr>
+                </tbody>
             </table>
         </div>
     </div>
 </div>
 
+<!-- Metric detail modal -->
 <div id="modalMetricDetails" class="overlay-modal">
     <div class="modal-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
-            <h3 style="margin:0; color:var(--primary);" id="modalMetricTitle">Dynamic Metric Evaluation Scope</h3>
-            <button onclick="document.getElementById('modalMetricDetails').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
+            <h3 style="margin:0;color:var(--primary);" id="modalMetricTitle">Metric Detail</h3>
+            <button onclick="document.getElementById('modalMetricDetails').style.display='none'" style="border:none;background:none;font-size:1.2rem;font-weight:700;cursor:pointer;">×</button>
         </div>
         <div id="modalMetricTablesContainer"></div>
     </div>
 </div>
 
-<div id="modalAdminOverride" class="overlay-modal" style="z-index: 400;">
-    <div class="modal-card" style="max-width: 900px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:16px;">
+<!-- Admin override modal -->
+<div id="modalAdminOverride" class="overlay-modal" style="z-index:400;">
+    <div class="modal-card" style="max-width:900px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
             <div>
-                <h3 style="margin:0; color:var(--danger);">Review Discount Override</h3>
-                <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">Reference: <strong id="orRefHash">--</strong></div>
+                <h3 style="margin:0;color:var(--danger);">Review Discount Override</h3>
+                <div style="font-size:0.78rem;color:#64748b;margin-top:3px;">Reference: <strong id="orRefHash">--</strong></div>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <label style="font-size:0.75rem; font-weight:bold; color:#166534; display:flex; align-items:center; gap:4px; cursor:pointer;">
-                    <input type="checkbox" id="toggleProMode" onchange="toggleProMarginMode(this.checked)"> Enable Profit Margin Analysis (Beta)
+            <div style="display:flex;align-items:center;gap:12px;">
+                <label style="font-size:0.72rem;font-weight:700;color:#166534;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="toggleProMode" onchange="toggleProMarginMode(this.checked)">
+                    Margin Analysis (Beta)
                 </label>
-                <button onclick="closeOverrideModal()" style="border:none; background:none; font-size:1.5rem; font-weight:700; cursor:pointer; color:#64748b;">×</button>
+                <button onclick="closeOverrideModal()" style="border:none;background:none;font-size:1.4rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
             </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:16px;">
-            <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid var(--border);">
-                <div style="font-size:0.7rem; color:#64748b; text-transform:uppercase; font-weight:bold;">Total Bill Valuation</div>
-                <div style="font-size:1.5rem; font-weight:900; color:var(--primary);">₹<span id="orTotalBill">0</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div style="background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border);">
+                <div style="font-size:0.68rem;color:#64748b;text-transform:uppercase;font-weight:700;">Total Bill</div>
+                <div style="font-size:1.4rem;font-weight:900;color:var(--primary);">₹<span id="orTotalBill">0</span></div>
             </div>
-            <div style="background:#fef2f2; padding:12px; border-radius:8px; border:1px solid #fecaca;">
-                <div style="font-size:0.7rem; color:#991b1b; text-transform:uppercase; font-weight:bold;">Discount Requested</div>
-                <div style="font-size:1.5rem; font-weight:900; color:#dc2626;">₹<span id="orRequestedDisc">0</span></div>
+            <div style="background:#fef2f2;padding:12px;border-radius:8px;border:1px solid #fecaca;">
+                <div style="font-size:0.68rem;color:#991b1b;text-transform:uppercase;font-weight:700;">Discount Requested</div>
+                <div style="font-size:1.4rem;font-weight:900;color:#dc2626;">₹<span id="orRequestedDisc">0</span></div>
             </div>
         </div>
 
-        <h4 style="margin:0 0 8px 0; color:var(--primary);">Itemized Ledger Context</h4>
-        <div class="table-wrapper" style="max-height: 250px; margin-bottom: 20px;">
+        <h4 style="margin:0 0 8px;color:var(--primary);font-size:0.9rem;">Itemised Ledger</h4>
+        <div class="table-wrapper" style="max-height:240px;margin-bottom:16px;">
             <table id="orTable">
-                <thead>
-                    <tr>
-                        <th>Department</th>
-                        <th>Brand / Item</th>
-                        <th>Qty</th>
-                        <th>Billed Rate</th>
-                        <th>Gross Value</th>
-                        <th class="margin-col">Est. Unit Cost</th>
-                        <th class="margin-col">Actual Profit</th>
-                    </tr>
-                </thead>
+                <thead><tr>
+                    <th>Dept</th><th>Brand / Item</th><th>Qty</th>
+                    <th>Rate</th><th>Gross</th>
+                    <th class="margin-col">Est. Cost</th><th class="margin-col">Profit</th>
+                </tr></thead>
                 <tbody id="orTableBody"></tbody>
             </table>
         </div>
 
-        <div style="background:#fffbeb; padding:16px; border-radius:8px; border:1px solid #fcd34d;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h4 style="margin:0; color:#b45309;">Allocate Write-Off Burden</h4>
-                <span style="font-size:0.8rem; font-weight:bold; color:var(--danger);" id="orRemainingToAlloc">Remaining: ₹0</span>
+        <div style="background:#fffbeb;padding:14px;border-radius:8px;border:1px solid #fcd34d;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h4 style="margin:0;color:#b45309;font-size:0.88rem;">Allocate Write-Off Burden</h4>
+                <span style="font-size:0.78rem;font-weight:700;color:var(--danger);" id="orRemainingToAlloc">Remaining: ₹0</span>
             </div>
-            
-            <div style="display:flex; gap:12px; margin-bottom:16px;">
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
                 <div class="alloc-group">
-                    <label style="font-size:0.7rem; font-weight:bold; color:#15803d; display:block; margin-bottom:4px;">Green Spares (Max: ₹<span id="maxGrn">0</span>)</label>
+                    <label style="font-size:0.68rem;font-weight:700;color:#15803d;display:block;margin-bottom:3px;">Green Spares (Max: ₹<span id="maxGrn">0</span>)</label>
                     <input type="number" id="allocGrn" class="alloc-input" value="0" min="0" oninput="validateAllocations()">
                 </div>
                 <div class="alloc-group">
-                    <label style="font-size:0.7rem; font-weight:bold; color:var(--moped); display:block; margin-bottom:4px;">Moped Spares (Max: ₹<span id="maxMop">0</span>)</label>
+                    <label style="font-size:0.68rem;font-weight:700;color:var(--moped);display:block;margin-bottom:3px;">Moped Spares (Max: ₹<span id="maxMop">0</span>)</label>
                     <input type="number" id="allocMop" class="alloc-input" value="0" min="0" oninput="validateAllocations()">
                 </div>
                 <div class="alloc-group">
-                    <label style="font-size:0.7rem; font-weight:bold; color:var(--service); display:block; margin-bottom:4px;">Labour (Max: ₹<span id="maxLab">0</span>)</label>
+                    <label style="font-size:0.68rem;font-weight:700;color:var(--service);display:block;margin-bottom:3px;">Labour (Max: ₹<span id="maxLab">0</span>)</label>
                     <input type="number" id="allocLab" class="alloc-input" value="0" min="0" oninput="validateAllocations()">
                 </div>
                 <div class="alloc-group">
-                    <label style="font-size:0.7rem; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">Lathe (Max: ₹<span id="maxLathe">0</span>)</label>
+                    <label style="font-size:0.68rem;font-weight:700;color:#475569;display:block;margin-bottom:3px;">Lathe (Max: ₹<span id="maxLathe">0</span>)</label>
                     <input type="number" id="allocLathe" class="alloc-input" value="0" min="0" oninput="validateAllocations()">
                 </div>
             </div>
-
-            <div style="display:flex; gap:10px;">
-                <button id="btnConfirmAlloc" class="action-btn" style="flex:2; background:var(--danger); opacity:0.5;" disabled onclick="commitAdminOverride()">APPROVE & APPLY ALLOCATION</button>
-                <button class="action-btn" style="flex:1; background:#64748b;" onclick="rejectAdminOverride()">REJECT REQUEST</button>
+            <div style="display:flex;gap:10px;">
+                <button id="btnConfirmAlloc" class="action-btn" style="flex:2;background:var(--danger);opacity:0.5;" disabled onclick="commitAdminOverride()">APPROVE & APPLY ALLOCATION</button>
+                <button class="action-btn" style="flex:1;background:#64748b;" onclick="rejectAdminOverride()">REJECT REQUEST</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-    const safeNum = (data, key) => {
-        if (!data) return 0;
-        const row = Array.isArray(data) ? data[0] : data;
-        if (!row) return 0;
-        const v = parseFloat(row[key]);
-        return isNaN(v) ? 0 : v;
-    };
+const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+let currentListCategory = 'TodayActive';
+let cachedMechanicsMap  = {};
 
-    const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
-    let currentListCategory = 'Running';
-    let cachedMechanicsMap = {};
-    
-    // PHASE 3 Override Variables
-    let activeOverrideReqId = null;
-    let requiredOverrideAmount = 0;
-    let overrideMaxLimits = { grn: 0, mop: 0, lab: 0, lathe: 0 };
+/* Admin override state */
+let activeOverrideReqId      = null;
+let requiredOverrideAmount   = 0;
+let overrideMaxLimits        = { grn:0, mop:0, lab:0, lathe:0 };
 
-    function enforceRbacVisibilityConstraints() {
-        document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
-        
-        if(sessionRole === 'service' || sessionRole === 'admin') {
-            document.getElementById('cardCombinedFlow').style.display = 'block';
-            document.getElementById('cardStaffFlow').style.display = 'block';
-            document.getElementById('cardWorkshopLedger').style.display = 'block';
-        } else if (sessionRole === 'green') {
-            document.getElementById('cardGreenFlow').style.display = 'block';
-        } else if (sessionRole === 'moped') {
-            document.getElementById('cardMopedFlow').style.display = 'block';
-        }
+const fmt = n => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
-        if(sessionRole === 'admin') {
-            document.getElementById('cardPosFlow').style.display = 'block';
-            document.getElementById('cardMopedPosFlow').style.display = 'block';
-            document.getElementById('navProductCatalog').style.display = 'block';
-            document.getElementById('cardStockValuation').style.display = 'block';
-            loadStockValuation(); 
-            
-            // PHASE 3: Start polling for overrides only for Admin
-            setInterval(pollAdminOverrides, 15000);
-            setTimeout(pollAdminOverrides, 1500);
-        } else if(sessionRole === 'green') {
-            document.getElementById('cardPosFlow').style.display = 'block';
-        } else if(sessionRole === 'moped') {
-            document.getElementById('cardMopedPosFlow').style.display = 'block';
-        }
-        
-        const lubeGrn = document.getElementById('mLubeGreen');
-        const lubeMop = document.getElementById('mLubeMoped');
-        if(sessionRole !== 'moped') lubeGrn.style.display = 'inline-block';
-        if(sessionRole !== 'green') lubeMop.style.display = 'inline-block';
+/* ── RBAC ──────────────────────────────────────────── */
+function enforceRbacVisibilityConstraints() {
+    document.getElementById('roleDisplay').innerText = sessionRole.toUpperCase();
 
-        if(sessionRole === 'green') document.getElementById('navGreenJc').style.display = 'block';
-        if(sessionRole === 'moped') document.getElementById('navMopedJc').style.display = 'block';
-        if(sessionRole === 'service' || sessionRole === 'admin') document.getElementById('navNewJc').style.display = 'block';
-        
-        if(sessionRole === 'green' || sessionRole === 'admin') document.getElementById('navGreenPos').style.display = 'block';
-        if(sessionRole === 'moped' || sessionRole === 'admin') document.getElementById('navMopedPos').style.display = 'block';
-        
-        if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') document.getElementById('navPurchase').style.display = 'block';
-        if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'service') {
-            document.getElementById('navInventoryLookup').style.display = 'block';
-        }
-        
-        prefetchSystemMechanics();
-        triggerDashboardDataAggregators();
+    if (sessionRole === 'service' || sessionRole === 'admin') {
+        document.getElementById('cardCombinedFlow').style.display    = 'block';
+        document.getElementById('cardStaffFlow').style.display       = 'block';
+        document.getElementById('cardWorkshopLedger').style.display  = 'block';
     }
+    if (sessionRole === 'green')  document.getElementById('cardGreenFlow').style.display  = 'block';
+    if (sessionRole === 'moped')  document.getElementById('cardMopedFlow').style.display  = 'block';
 
-    async function prefetchSystemMechanics() { const { data: crew } = await supabaseClient.from('mechanics').select('*'); crew?.forEach(m => { cachedMechanicsMap[m.id] = m.name; }); queryMasterJobRegisters(); }
-    async function loadStockValuation() { const {data:prods} = await supabaseClient.from('product_master').select('current_stock,mac,mrp,retail_price').eq('track_stock',true).gt('current_stock',0); const cv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mac||0)),0); const mv=(prods||[]).reduce((s,p)=>s+(p.current_stock*(p.mrp||0)),0); document.getElementById('stockValContent').innerText = `₹${Math.round(cv).toLocaleString('en-IN')}`; document.getElementById('stockValSub').innerText = `MRP Value: ₹${Math.round(mv).toLocaleString('en-IN')}`; }
-    async function triggerDashboardDataAggregators() {
-        const dateStringToday = new Date().toISOString().split('T')[0];
-        supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Green', target_date: dateStringToday }).then(({ data }) => { if(document.getElementById('cardCombinedFlow').style.display === 'block') { document.getElementById('mGrnNet').innerText = `₹${Math.round(safeNum(data, 'total_flow'))}`; document.getElementById('mGrnPaid').innerText = `₹${Math.round(safeNum(data, 'paid_flow'))}`; } else if(document.getElementById('cardGreenFlow').style.display === 'block') { document.getElementById('mGreenFlowSingle').innerText = `₹${Math.round(safeNum(data, 'total_flow'))}`; document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(safeNum(data, 'paid_flow'))}`; } });
-        supabaseClient.rpc('get_daily_warehouse_flow', { target_ware: 'Moped', target_date: dateStringToday }).then(({ data }) => { if(document.getElementById('cardCombinedFlow').style.display === 'block') { document.getElementById('mMopNet').innerText = `₹${Math.round(safeNum(data, 'total_flow'))}`; document.getElementById('mMopPaid').innerText = `₹${Math.round(safeNum(data, 'paid_flow'))}`; } else if(document.getElementById('cardMopedFlow').style.display === 'block') { document.getElementById('mMopedFlowSingle').innerText = `₹${Math.round(safeNum(data, 'total_flow'))}`; document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ₹${Math.round(safeNum(data, 'paid_flow'))}`; } });
-        if(sessionRole === 'service' || sessionRole === 'admin') { supabaseClient.rpc('get_daily_jc_payments', { target_date: dateStringToday }).then(({ data }) => { document.getElementById('mJcCash').innerText = `₹${Math.round(safeNum(data, 'cash_total'))}`; document.getElementById('mJcUpi').innerText = `₹${Math.round(safeNum(data, 'upi_total'))}`; }); supabaseClient.rpc('get_daily_staff_payable', { target_date: dateStringToday }).then(({ data }) => { document.getElementById('mStaffPaid').innerText = `₹${Math.round(safeNum(data, 'paid_labor'))}`; document.getElementById('mStaffTotal').innerText = `Overall Invoices: ₹${Math.round(safeNum(data, 'total_labor'))}`; }); }
-        supabaseClient.rpc('get_daily_lube_flow', { target_date: dateStringToday }).then(({ data }) => { document.getElementById('mLubeGreen').innerText = `Grn: ${safeNum(data, 'green_liters').toFixed(2)} L`; document.getElementById('mLubeMoped').innerText = `Mop: ${safeNum(data, 'moped_liters').toFixed(2)} L`; });
-        if(sessionRole === 'admin' || sessionRole === 'green' || sessionRole === 'moped') { const { data: posData } = await supabaseClient.from('counter_sales').select('cash_amount, upi_amount, credit_amount, source_role').eq('status', 'Closed').gte('closed_at', dateStringToday + 'T00:00:00'); let gCash = 0, gUpi = 0, gCred = 0; let mCash = 0, mUpi = 0, mCred = 0; (posData || []).forEach(p => { if (p.source_role === 'moped') { mCash += parseFloat(p.cash_amount) || 0; mUpi += parseFloat(p.upi_amount) || 0; mCred += parseFloat(p.credit_amount) || 0; } else { gCash += parseFloat(p.cash_amount) || 0; gUpi += parseFloat(p.upi_amount) || 0; gCred += parseFloat(p.credit_amount) || 0; } }); if (document.getElementById('cardPosFlow').style.display === 'block') { document.getElementById('mPosCash').innerText = `₹${Math.round(gCash)}`; document.getElementById('mPosUpi').innerText = `₹${Math.round(gUpi)}`; document.getElementById('mPosCredit').innerText = `₹${Math.round(gCred)}`; } if (document.getElementById('cardMopedPosFlow').style.display === 'block') { document.getElementById('mMopPosCash').innerText = `₹${Math.round(mCash)}`; document.getElementById('mMopPosUpi').innerText = `₹${Math.round(mUpi)}`; document.getElementById('mMopPosCredit').innerText = `₹${Math.round(mCred)}`; } }
+    if (sessionRole === 'admin') {
+        document.getElementById('cardPosFlow').style.display         = 'block';
+        document.getElementById('cardMopedPosFlow').style.display    = 'block';
+        document.getElementById('navProductCatalog').style.display   = 'block';
+        document.getElementById('cardStockValuation').style.display  = 'block';
+        loadStockValuation();
+        setInterval(pollAdminOverrides, 15000);
+        setTimeout(pollAdminOverrides, 2000);
     }
-    function switchListCategory(categoryStr) { document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); currentListCategory = categoryStr; queryMasterJobRegisters(); }
-    async function queryMasterJobRegisters() { const queryVal = document.getElementById('sQuery').value.trim().toLowerCase(); const modeVal = document.getElementById('sMode').value; const dateVal = document.getElementById('sDate').value; const todayString = new Date().toISOString().split('T')[0]; let baseQuery = supabaseClient.from('job_cards').select('*, vehicles(reg_number, make_model, color)'); if(currentListCategory === 'Running') { baseQuery = baseQuery.eq('status', 'Open').order('created_at', { ascending: false }); } else if(currentListCategory === 'AgedOpen') { baseQuery = baseQuery.eq('status', 'Open').lt('created_at', todayString).order('created_at', { ascending: true }); } else if(currentListCategory === 'PendingDelivery') { baseQuery = baseQuery.not('mech_completion_time', 'is', null).eq('status', 'Open'); } else if(currentListCategory === 'Historical') { baseQuery = baseQuery.eq('status', 'Closed').order('closed_at', { ascending: false }).limit(40); } if(dateVal) { baseQuery = baseQuery.gte('created_at', dateVal).lte('created_at', dateVal + 'T23:59:59'); } const { data: records, error } = await baseQuery; const tbody = document.getElementById('masterJobsTableBody'); tbody.innerHTML = ''; if(error) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); text-align:center; padding:16px;">Ledger Retrieval Fault: ${error.message}</td></tr>`; return; } const filteredArray = (records || []).filter(row => { const matchClient = (row.customer_mobile && row.customer_mobile.includes(queryVal)) || (row.vehicles?.reg_number && row.vehicles.reg_number.toLowerCase().includes(queryVal)); const matchHash = row.id && row.id.toLowerCase().includes(queryVal); return (!queryVal || matchClient || matchHash); }); if(filteredArray.length > 0) { filteredArray.forEach(job => { const assignedName = cachedMechanicsMap[job.mech_id] || 'Unassigned'; const stylePill = job.status === 'Open' ? 'background:#fef3c7; color:#b45309;' : 'background:#f1f5f9; color:#475569;'; const colorStr = job.vehicles?.color ? ` - ${job.vehicles.color}` : ''; const modelDisplay = job.vehicles?.make_model ? `${job.vehicles.make_model}${colorStr}` : 'Unknown Asset'; const openDateObj = new Date(job.created_at); const openDateStr = openDateObj.toLocaleDateString('en-IN') + ' ' + openDateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); let timeDisplayHtml = `<span style="font-size:0.7rem; color:var(--info); font-weight:bold;">Opened: ${openDateStr}</span>`; if (job.status === 'Closed' && job.closed_at) { const closeDateObj = new Date(job.closed_at); const closeDateStr = closeDateObj.toLocaleDateString('en-IN') + ' ' + closeDateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); timeDisplayHtml += `<br><span style="font-size:0.7rem; color:var(--success); font-weight:bold;">Settled: ${closeDateStr}</span>`; } tbody.innerHTML += `<tr><td><a class="clickable-ref" href="billing.html?id=${job.id}">${modelDisplay}</a><span style="font-size:0.7rem; color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span><br>${timeDisplayHtml}</td><td><strong>${job.vehicles?.reg_number || 'UNMAPPED'}</strong><br><span style="font-size:0.75rem; color:#64748b;">${job.customer_mobile || ''}</span></td><td><strong>₹${job.total_invoice_value || 0}</strong></td><td><span class="status-pill" style="${stylePill}">${job.status}</span></td><td>${assignedName}</td></tr>`; }); } else { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:#94a3b8;">No records match selected parameters.</td></tr>`; } }
-    async function instantiateMetricDetailsModal(metricType) { /* Keep existing modal logic */ }
+    if (sessionRole === 'green') document.getElementById('cardPosFlow').style.display     = 'block';
+    if (sessionRole === 'moped') document.getElementById('cardMopedPosFlow').style.display= 'block';
 
+    const lubeGrn = document.getElementById('mLubeGreen');
+    const lubeMop = document.getElementById('mLubeMoped');
+    if (sessionRole !== 'moped') lubeGrn.style.display = 'inline-block';
+    if (sessionRole !== 'green') lubeMop.style.display = 'inline-block';
 
-    // --- PHASE 3: HYBRID ADMIN OVERRIDE ENGINE ---
+    if (sessionRole === 'green')                                           document.getElementById('navGreenJc').style.display   = 'block';
+    if (sessionRole === 'moped')                                           document.getElementById('navMopedJc').style.display   = 'block';
+    if (sessionRole === 'service' || sessionRole === 'admin')              document.getElementById('navNewJc').style.display     = 'block';
+    if (sessionRole === 'green'   || sessionRole === 'admin')              document.getElementById('navGreenPos').style.display  = 'block';
+    if (sessionRole === 'moped'   || sessionRole === 'admin')              document.getElementById('navMopedPos').style.display  = 'block';
+    if (['admin','green','moped'].includes(sessionRole))                   document.getElementById('navPurchase').style.display  = 'block';
+    if (['admin','green','moped','service'].includes(sessionRole))         document.getElementById('navInventoryLookup').style.display = 'block';
 
-    async function pollAdminOverrides() {
-        const { data, error } = await supabaseClient.from('approval_requests')
-            .select('*').eq('status', 'Pending').eq('request_type', 'Discount Override');
-        
-        const block = document.getElementById('overrideQueueBlock');
-        const list = document.getElementById('overrideQueueList');
-        
-        if(error || !data || data.length === 0) { block.style.display = 'none'; return; }
-        
-        block.style.display = 'block';
-        list.innerHTML = data.map(req => {
-            const jcId = req.payload?.jc_id || 'UNKNOWN';
-            const discAmt = req.payload?.requested_discount || 0;
-            const totalBill = req.payload?.total_bill_value || 0;
-            const shortJc = jcId.split('-')[0].toUpperCase();
-            
-            return `
-                <div class="override-queue-item">
-                    <div>
-                        <strong style="color:var(--danger); font-size:1.1rem;">JC-${shortJc} requires Exception</strong><br>
-                        <span style="font-size:0.85rem; color:#64748b;">Manager requesting <b>₹${discAmt}</b> discount on ₹${totalBill} bill.</span>
-                    </div>
-                    <button class="btn-review" onclick="openOverrideModal('${req.id}', '${jcId}', ${discAmt}, ${totalBill})">REVIEW & ALLOCATE</button>
-                </div>
-            `;
-        }).join('');
-    }
+    prefetchSystemMechanics();
+    triggerDashboardDataAggregators();
+}
 
-    async function openOverrideModal(reqId, jcId, discAmt, totalBill) {
-        activeOverrideReqId = reqId;
-        requiredOverrideAmount = parseFloat(discAmt);
-        
-        document.getElementById('orRefHash').innerText = `JC-${jcId.split('-')[0].toUpperCase()}`;
-        document.getElementById('orTotalBill').innerText = totalBill;
-        document.getElementById('orRequestedDisc').innerText = discAmt;
-        
-        // Reset inputs
-        document.getElementById('toggleProMode').checked = false;
-        toggleProMarginMode(false);
-        ['allocGrn', 'allocMop', 'allocLab', 'allocLathe'].forEach(id => {
-            document.getElementById(id).value = 0;
-            document.getElementById(id).style.borderColor = "var(--border)";
+/* ── Mechanics cache ── */
+async function prefetchSystemMechanics() {
+    const { data: crew } = await supabaseClient.from('mechanics').select('id,name');
+    (crew || []).forEach(m => { cachedMechanicsMap[m.id] = m.name; });
+    queryMasterJobRegisters();
+}
+
+/* ── Stock valuation ── */
+async function loadStockValuation() {
+    const { data: prods } = await supabaseClient.from('product_master').select('current_stock,mac,mrp').eq('track_stock', true).gt('current_stock', 0);
+    const cv = (prods||[]).reduce((s,p) => s + (p.current_stock*(p.mac||0)), 0);
+    const mv = (prods||[]).reduce((s,p) => s + (p.current_stock*(p.mrp||0)), 0);
+    document.getElementById('stockValContent').innerText = fmt(cv);
+    document.getElementById('stockValSub').innerText     = `MRP Value: ${fmt(mv)}`;
+}
+
+/* ── Dashboard metric aggregators ── */
+function todayDateStr() { return new Date().toISOString().split('T')[0]; }
+
+async function triggerDashboardDataAggregators() {
+    const todayStart = todayDateStr() + 'T00:00:00';
+
+    try {
+        /* ── Q1: All JCs relevant today (closed today OR open created today) ── */
+        const [closedRes, openTodayRes] = await Promise.all([
+            supabaseClient.from('job_cards')
+                .select('id,green_total,moped_total,labour_charges,lathe_welding,cash_amount,upi_amount,credit_amount,mech_id')
+                .eq('status','Closed').gte('closed_at', todayStart),
+            supabaseClient.from('job_cards')
+                .select('id,green_total,moped_total')
+                .eq('status','Open').gte('created_at', todayStart)
+        ]);
+
+        const closedJCs   = closedRes.data   || [];
+        const openTodayJCs= openTodayRes.data || [];
+
+        /* Closed JC aggregates */
+        let greenClosedNet=0, mopedClosedNet=0, labourNet=0, latheNet=0;
+        let jcCashRaw=0, jcUpiRaw=0, jcCreditNew=0;
+        const closedIds = [];
+        closedJCs.forEach(jc => {
+            greenClosedNet += parseFloat(jc.green_total)    || 0;
+            mopedClosedNet += parseFloat(jc.moped_total)   || 0;
+            labourNet      += parseFloat(jc.labour_charges) || 0;
+            latheNet       += parseFloat(jc.lathe_welding)  || 0;
+            jcCashRaw      += parseFloat(jc.cash_amount)    || 0;
+            jcUpiRaw       += parseFloat(jc.upi_amount)     || 0;
+            jcCreditNew    += parseFloat(jc.credit_amount)  || 0;
+            closedIds.push(jc.id);
         });
 
-        // 1. Fetch JC Headers for Labour/Lathe
-        const { data: jc } = await supabaseClient.from('job_cards').select('labour_charges, lathe_welding').eq('id', jcId).single();
-        const labRaw = parseFloat(jc?.labour_charges) || 0;
-        const latheRaw = parseFloat(jc?.lathe_welding) || 0;
+        /* Open JC spares (work in progress today) */
+        let greenOpenNet=0, mopedOpenNet=0;
+        const openIds = [];
+        openTodayJCs.forEach(jc => {
+            greenOpenNet  += parseFloat(jc.green_total)  || 0;
+            mopedOpenNet  += parseFloat(jc.moped_total)  || 0;
+            openIds.push(jc.id);
+        });
 
-        // 2. Fetch Line Items
-        const { data: items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id', jcId);
-        
-        let gGross = 0; let mGross = 0; let sGross = 0; // service packages
-        const tbody = document.getElementById('orTableBody');
+        const allJCIds    = [...closedIds, ...openIds];
+        const greenNet    = greenClosedNet  + greenOpenNet;
+        const mopedNet    = mopedClosedNet  + mopedOpenNet;
+        const totalClosed = greenClosedNet  + mopedClosedNet + labourNet + latheNet;
+        const totalNet    = greenNet + mopedNet + labourNet + latheNet;
+
+        /* Paid = workshop collected on behalf of each entity (proportional to closed net) */
+        const jcCollected  = jcCashRaw + jcUpiRaw;
+        const greenPaid    = totalClosed > 0 ? Math.round(jcCollected * (greenClosedNet  / totalClosed)) : 0;
+        const mopedPaid    = totalClosed > 0 ? Math.round(jcCollected * (mopedClosedNet  / totalClosed)) : 0;
+
+        /* ── Q2: Advances collected today (workshop counter cash not yet in closed JC) ── */
+        /* ── Q3: Credit collections at workshop (service/admin collected for old JCs) ── */
+        /* ── Q4: Green counter workshop pymt (prepaid_green + green credit collections) ── */
+        /* ── Q5: Moped counter workshop pymt (prepaid_moped + moped credit collections) ── */
+        /* ── Q6: POS sales today ── */
+        const [advRes, wsCreditRes, greenCPRes, mopedCPRes, posRes] = await Promise.all([
+            supabaseClient.from('job_cards')
+                .select('advance_service,advance_service_mode,prepaid_green,prepaid_green_mode,prepaid_moped,prepaid_moped_mode,prepaid_green_paid_at,prepaid_moped_paid_at,advance_service_paid_at')
+                .or(`advance_service_paid_at.gte.${todayStart},prepaid_green_paid_at.gte.${todayStart},prepaid_moped_paid_at.gte.${todayStart}`),
+            supabaseClient.from('credit_payments')
+                .select('amount_paid,payment_mode').in('paid_by_role',['service','admin'])
+                .gte('created_at', todayStart).gt('amount_paid', 0),
+            supabaseClient.from('credit_payments')
+                .select('amount_paid').eq('paid_by_role','green')
+                .gte('created_at', todayStart).gt('amount_paid', 0),
+            supabaseClient.from('credit_payments')
+                .select('amount_paid').eq('paid_by_role','moped')
+                .gte('created_at', todayStart).gt('amount_paid', 0),
+            supabaseClient.from('counter_sales')
+                .select('cash_amount,upi_amount,credit_amount,source_role')
+                .eq('status','Closed').gte('closed_at', todayStart)
+        ]);
+
+        /* Workshop cash/UPI includes: JC settlement + advances (by mode) + credit collections */
+        let wsCashAdv=0, wsUpiAdv=0;
+        (advRes.data||[]).forEach(jc => {
+            const adv = parseFloat(jc.advance_service)||0;
+            const mode= (jc.advance_service_mode||'Cash');
+            if (jc.advance_service_paid_at >= todayStart) { if(mode==='UPI') wsUpiAdv+=adv; else wsCashAdv+=adv; }
+        });
+
+        let wsCreditCash=0, wsCreditUpi=0;
+        (wsCreditRes.data||[]).forEach(p => {
+            if ((p.payment_mode||'Cash').includes('UPI')) wsCreditUpi += parseFloat(p.amount_paid)||0;
+            else wsCashAdv += parseFloat(p.amount_paid)||0;
+        });
+
+        const jcCash = jcCashRaw + wsCashAdv + wsCreditCash;
+        const jcUpi  = jcUpiRaw  + wsUpiAdv  + wsCreditUpi;
+
+        /* Green counter workshop pymt: prepaid_green collected today + green credit collections */
+        let greenWsPymt=0;
+        (advRes.data||[]).forEach(jc => {
+            if (jc.prepaid_green_paid_at && jc.prepaid_green_paid_at >= todayStart)
+                greenWsPymt += parseFloat(jc.prepaid_green)||0;
+        });
+        (greenCPRes.data||[]).forEach(p => { greenWsPymt += parseFloat(p.amount_paid)||0; });
+
+        /* Moped counter workshop pymt: prepaid_moped collected today + moped credit collections */
+        let mopedWsPymt=0;
+        (advRes.data||[]).forEach(jc => {
+            if (jc.prepaid_moped_paid_at && jc.prepaid_moped_paid_at >= todayStart)
+                mopedWsPymt += parseFloat(jc.prepaid_moped)||0;
+        });
+        (mopedCPRes.data||[]).forEach(p => { mopedWsPymt += parseFloat(p.amount_paid)||0; });
+
+        /* POS breakdown */
+        let gCash=0,gUpi=0,gCred=0, mCash=0,mUpi=0,mCred=0;
+        (posRes.data||[]).forEach(p => {
+            if(p.source_role==='moped'){ mCash+=parseFloat(p.cash_amount)||0; mUpi+=parseFloat(p.upi_amount)||0; mCred+=parseFloat(p.credit_amount)||0; }
+            else                       { gCash+=parseFloat(p.cash_amount)||0; gUpi+=parseFloat(p.upi_amount)||0; gCred+=parseFloat(p.credit_amount)||0; }
+        });
+
+        /* ── Q7: Lube — job_card_items from all today's JCs + POS ── */
+        const allJCIdsFinal = allJCIds;
+        const posIds = (posRes.data||[]).map((_,i) => i); /* placeholder — need sale IDs */
+        /* Fetch lube from job_card_items */
+        let gML=0, mML=0, lubeQty=0;
+        if (allJCIdsFinal.length > 0) {
+            const { data: lubeJC } = await supabaseClient
+                .from('job_card_items').select('volume_ml,qty,warehouse_type')
+                .in('job_card_id', allJCIdsFinal).gt('volume_ml', 0);
+            (lubeJC||[]).forEach(i => {
+                gML     += parseFloat(i.volume_ml)||0;
+                lubeQty += parseFloat(i.qty)||0;
+            });
+        }
+        /* Fetch lube from counter_sale_items for today's POS */
+        const { data: posSales } = await supabaseClient.from('counter_sales').select('id').eq('status','Closed').gte('closed_at',todayStart);
+        const posSaleIds = (posSales||[]).map(s => s.id);
+        if (posSaleIds.length > 0) {
+            const { data: lubePos } = await supabaseClient
+                .from('counter_sale_items').select('volume_ml,qty,counter_sales!inner(source_role)')
+                .in('sale_id', posSaleIds).gt('volume_ml', 0);
+            (lubePos||[]).forEach(i => {
+                const ml = parseFloat(i.volume_ml)||0;
+                if (i.counter_sales?.source_role==='moped') mML += ml;
+                else gML += ml;
+                lubeQty += parseFloat(i.qty)||0;
+            });
+        }
+
+        /* ── UPDATE ALL CARDS ── */
+
+        /* Combined spares (service/admin) */
+        if (document.getElementById('cardCombinedFlow').style.display !== 'none') {
+            document.getElementById('mGrnNet').innerText  = fmt(greenNet);
+            document.getElementById('mGrnPaid').innerText = fmt(greenPaid);
+            document.getElementById('mMopNet').innerText  = fmt(mopedNet);
+            document.getElementById('mMopPaid').innerText = fmt(mopedPaid);
+        }
+        /* Green-only */
+        if (document.getElementById('cardGreenFlow').style.display !== 'none') {
+            document.getElementById('mGreenFlowSingle').innerText = fmt(greenNet);
+            document.getElementById('mGreenPaidSingle').innerText = `Paid in Workshop: ${fmt(greenPaid)}`;
+        }
+        /* Moped-only */
+        if (document.getElementById('cardMopedFlow').style.display !== 'none') {
+            document.getElementById('mMopedFlowSingle').innerText = fmt(mopedNet);
+            document.getElementById('mMopedPaidSingle').innerText = `Paid in Workshop: ${fmt(mopedPaid)}`;
+        }
+        /* Lube */
+        document.getElementById('mLubeGreen').innerText = `Grn: ${(gML/1000).toFixed(2)} L`;
+        document.getElementById('mLubeMoped').innerText = `Mop: ${(mML/1000).toFixed(2)} L`;
+        document.getElementById('mLubeQty').innerText   = `Qty: ${Math.round(lubeQty)} pcs`;
+        /* Staff payable */
+        if (document.getElementById('cardStaffFlow').style.display !== 'none') {
+            document.getElementById('mStaffPaid').innerText  = fmt(jcCash + jcUpi);
+            document.getElementById('mStaffTotal').innerText = `Overall Invoices: ${fmt(totalNet)}`;
+        }
+        /* Workshop ledger */
+        if (document.getElementById('cardWorkshopLedger').style.display !== 'none') {
+            document.getElementById('mJcCash').innerText   = fmt(jcCash);
+            document.getElementById('mJcUpi').innerText    = fmt(jcUpi);
+            document.getElementById('mJcCredit').innerText = fmt(jcCreditNew);
+        }
+        /* Green counter */
+        if (document.getElementById('cardPosFlow').style.display !== 'none') {
+            document.getElementById('mPosCash').innerText    = fmt(gCash);
+            document.getElementById('mPosUpi').innerText     = fmt(gUpi);
+            document.getElementById('mPosCredit').innerText  = fmt(gCred);
+            document.getElementById('mGreenWsPymt').innerText= fmt(greenWsPymt);
+        }
+        /* Moped counter */
+        if (document.getElementById('cardMopedPosFlow').style.display !== 'none') {
+            document.getElementById('mMopPosCash').innerText  = fmt(mCash);
+            document.getElementById('mMopPosUpi').innerText   = fmt(mUpi);
+            document.getElementById('mMopPosCredit').innerText= fmt(mCred);
+            document.getElementById('mMopWsPymt').innerText   = fmt(mopedWsPymt);
+        }
+        /* Stock valuation already handled separately */
+
+    } catch(err) {
+        console.error('Dashboard aggregation error:', err);
+    }
+}
+
+/* ── Tab switcher ── */
+const tabHints = {
+    TodayActive:    'Job cards opened today. 🟡 Amber = open >24h   🔴 Red = open >3 days.',
+    Overdue:        'Open job cards older than 24 hours — needs follow-up.',
+    ReadyDelivery:  'Vehicles marked ready for delivery. Days waiting and parking charges shown.',
+    Historical:     'Last 40 closed job cards.'
+};
+function switchListCategory(cat, btn) {
+    document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    currentListCategory = cat;
+    document.getElementById('tabHintText').innerText = tabHints[cat] || '';
+    queryMasterJobRegisters();
+}
+
+/* ── Master JC table ── */
+async function queryMasterJobRegisters() {
+    const queryVal   = (document.getElementById('sQuery').value || '').trim().toLowerCase();
+    const dateVal    = document.getElementById('sDate').value;
+    const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00';
+    const yesterday  = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const tbody      = document.getElementById('masterJobsTableBody');
+    tbody.innerHTML  = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">Loading…</td></tr>`;
+
+    try {
+        let q = supabaseClient.from('job_cards')
+            .select('*,vehicles(reg_number,make_model,color)');
+
+        if (currentListCategory === 'TodayActive') {
+            q = q.eq('status','Open').gte('created_at', todayStart).order('created_at',{ascending:false});
+        } else if (currentListCategory === 'Overdue') {
+            q = q.eq('status','Open').lt('created_at', yesterday).order('created_at',{ascending:true});
+        } else if (currentListCategory === 'ReadyDelivery') {
+            q = q.eq('status','Open').not('delivery_ready_at','is',null).order('delivery_ready_at',{ascending:true});
+        } else if (currentListCategory === 'Historical') {
+            q = q.eq('status','Closed').order('closed_at',{ascending:false}).limit(40);
+        }
+
+        if (dateVal) q = q.gte('created_at', dateVal+'T00:00:00').lte('created_at', dateVal+'T23:59:59');
+
+        const { data: records, error } = await q;
+        if (error) { tbody.innerHTML=`<tr><td colspan="5" style="color:var(--danger);text-align:center;padding:16px;">${error.message}</td></tr>`; return; }
+
+        const filtered = (records||[]).filter(row => {
+            if (!queryVal) return true;
+            return (row.customer_mobile && row.customer_mobile.includes(queryVal))
+                || (row.vehicles?.reg_number && row.vehicles.reg_number.toLowerCase().includes(queryVal))
+                || (row.id && row.id.toLowerCase().includes(queryVal));
+        });
+
+        if (!filtered.length) { tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">No records found.</td></tr>`; return; }
+
+        /* Batch customer query — one round trip for all badges */
+        const mobiles = [...new Set(filtered.map(r=>r.customer_mobile).filter(Boolean))];
+        let custMap = {};
+        if (mobiles.length > 0) {
+            try {
+                const { data: custs } = await supabaseClient
+                    .from('customers')
+                    .select('mobile_number,outstanding_credit,free_service_eligible')
+                    .in('mobile_number', mobiles);
+                (custs||[]).forEach(c => { custMap[c.mobile_number] = { credit: parseFloat(c.outstanding_credit)||0, freeService: c.free_service_eligible===true }; });
+            } catch(e) { /* badges non-critical */ }
+        }
+
         tbody.innerHTML = '';
+        filtered.forEach(job => {
+            const mech   = cachedMechanicsMap[job.mech_id] || 'Unassigned';
+            const cust   = custMap[job.customer_mobile]    || {};
+            const now    = Date.now();
+            const opened = new Date(job.created_at);
+            const hrsOpen= (now - opened) / (1000*60*60);
 
-        (items || []).forEach(i => {
-            const tp = parseFloat(i.total_price) || 0;
-            const up = parseFloat(i.unit_price) || 0;
-            const mac = parseFloat(i.mac_at_billing) || 0;
-            
-            if(i.warehouse_type === 'Green') gGross += tp;
-            else if(i.warehouse_type === 'Moped') mGross += tp;
-            else if(i.warehouse_type === 'Service') sGross += tp;
+            /* Row background */
+            let rowBg = '';
+            if (job.status === 'Open') {
+                if (hrsOpen > 72)      rowBg = 'class="row-overdue-severe"';
+                else if (hrsOpen > 24) rowBg = 'class="row-overdue-mild"';
+            }
+            if (currentListCategory === 'ReadyDelivery') rowBg = 'class="row-ready"';
 
-            let macUi = `₹${mac}`;
-            let profitUi = `₹${(up - mac) * (parseFloat(i.qty)||1)}`;
-            
-            if(mac === 0 && i.warehouse_type !== 'Service') {
-                macUi = `<span style="font-size:0.65rem; background:#f1f5f9; padding:2px 4px; border-radius:4px;">Awaiting GRN Data</span>`;
-                profitUi = `<span style="font-size:0.65rem;">N/A</span>`;
-            } else if (i.warehouse_type === 'Service') {
-                macUi = '-'; profitUi = `₹${tp}`;
+            /* Valuation: advances for open JCs, invoice value for closed */
+            let valHtml;
+            if (job.status === 'Open') {
+                const adv = (parseFloat(job.advance_service)||0) + (parseFloat(job.prepaid_green)||0) + (parseFloat(job.prepaid_moped)||0);
+                if (adv > 0) {
+                    const parts = [];
+                    if (parseFloat(job.advance_service)||0 > 0) parts.push(`Svc: ₹${job.advance_service}`);
+                    if (parseFloat(job.prepaid_green)||0   > 0) parts.push(`Grn: ₹${job.prepaid_green}`);
+                    if (parseFloat(job.prepaid_moped)||0   > 0) parts.push(`Mop: ₹${job.prepaid_moped}`);
+                    valHtml = `<strong style="color:#15803d;cursor:help;" title="${parts.join(' | ')}">Adv: ₹${adv} ℹ</strong>`;
+                } else {
+                    valHtml = `<span style="color:#94a3b8;font-size:0.78rem;">No advance</span>`;
+                }
+            } else {
+                valHtml = `<strong>₹${job.total_invoice_value||0}</strong>`;
             }
 
-            const deptPill = `<span class="status-pill" style="background:${i.warehouse_type === 'Green' ? '#dcfce7; color:#15803d' : (i.warehouse_type==='Moped' ? '#e0f2fe; color:#0369a1' : '#fef3c7; color:#b45309')}">${i.warehouse_type}</span>`;
+            /* Badges */
+            const creditBadge     = cust.credit > 0 ? `<span style="background:#fee2e2;color:#b91c1c;font-size:0.6rem;font-weight:700;padding:1px 5px;border-radius:10px;margin-left:4px;">₹ DUE</span>` : '';
+            const fsBadge         = (cust.freeService && (sessionRole==='service'||sessionRole==='admin')) ? `<span style="margin-left:4px;" title="Free service eligible">🎁</span>` : '';
 
-            tbody.innerHTML += `
-                <tr>
-                    <td>${deptPill}</td>
-                    <td>${i.item_name}</td>
-                    <td>${i.qty}</td>
-                    <td>₹${up}</td>
-                    <td style="font-weight:bold;">₹${tp}</td>
-                    <td class="margin-col">${macUi}</td>
-                    <td class="margin-col">${profitUi}</td>
-                </tr>
-            `;
+            /* Problem preview */
+            const prob = (job.problem_mentioned||'').substring(0,48);
+            const probHtml = prob ? `<span style="font-size:0.67rem;color:#64748b;display:block;margin-top:2px;">${prob}${job.problem_mentioned?.length>48?'…':''}</span>` : '';
+
+            /* Dates */
+            const openStr = opened.toLocaleDateString('en-IN') + ' ' + opened.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+            let timeHtml  = `<span style="font-size:0.67rem;color:#94a3b8;">Opened: ${openStr}</span>`;
+            if (job.status==='Closed' && job.closed_at) {
+                const cd = new Date(job.closed_at);
+                timeHtml += `<br><span style="font-size:0.67rem;color:#15803d;font-weight:700;">Settled: ${cd.toLocaleDateString('en-IN')} ${cd.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>`;
+            }
+
+            /* Status cell */
+            let statusHtml;
+            if (currentListCategory === 'ReadyDelivery' && job.delivery_ready_at) {
+                const days   = Math.floor((now - new Date(job.delivery_ready_at))/(1000*60*60*24));
+                const park   = Math.max(0, days - 20);
+                const dcol   = days > 30 ? '#dc2626' : days > 20 ? '#d97706' : '#15803d';
+                statusHtml   = `<span class="status-pill" style="background:#dcfce7;color:#15803d;">Ready ✓</span>
+                    <span style="font-size:0.67rem;color:${dcol};font-weight:700;display:block;margin-top:3px;">
+                        ${days}d waiting${park>0?' | Parking ₹'+(park*10):''}
+                    </span>`;
+            } else {
+                const ps = job.status==='Open'?'background:#fef3c7;color:#b45309;':'background:#dcfce7;color:#15803d;';
+                statusHtml = `<span class="status-pill" style="${ps}">${job.status}</span>`;
+                if (job.status==='Open' && hrsOpen > 24) {
+                    const dLabel = Math.floor(hrsOpen/24);
+                    const dcol2  = hrsOpen > 72 ? '#dc2626' : '#d97706';
+                    statusHtml  += `<span style="font-size:0.67rem;color:${dcol2};font-weight:700;display:block;margin-top:2px;">${dLabel}d open</span>`;
+                }
+            }
+
+            const model = job.vehicles?.make_model || 'Unknown';
+            const color = job.vehicles?.color ? ` — ${job.vehicles.color}` : '';
+
+            tbody.innerHTML += `<tr ${rowBg}>
+                <td>
+                    <a class="clickable-ref" href="billing.html?id=${job.id}">${model}${color}</a>
+                    <span style="font-size:0.67rem;color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span>
+                    ${probHtml}
+                    ${timeHtml}
+                </td>
+                <td>
+                    <strong>${job.vehicles?.reg_number||'UNMAPPED'}</strong>${creditBadge}${fsBadge}
+                    <br><span style="font-size:0.75rem;color:#64748b;">${job.customer_mobile||''}</span>
+                </td>
+                <td>${valHtml}</td>
+                <td>${statusHtml}</td>
+                <td style="font-size:0.82rem;">${mech}</td>
+            </tr>`;
         });
 
-        const totalLab = labRaw + sGross;
-
-        // Set Failsafe Maximums
-        overrideMaxLimits = { grn: gGross, mop: mGross, lab: totalLab, lathe: latheRaw };
-        
-        document.getElementById('maxGrn').innerText = gGross;
-        document.getElementById('maxMop').innerText = mGross;
-        document.getElementById('maxLab').innerText = totalLab;
-        document.getElementById('maxLathe').innerText = latheRaw;
-
-        validateAllocations();
-        document.getElementById('modalAdminOverride').style.display = 'flex';
+    } catch(err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);text-align:center;padding:16px;">Load error — refresh page</td></tr>`;
+        console.error('JC table error:', err);
     }
+}
 
-    function toggleProMarginMode(isActive) {
-        document.querySelectorAll('.margin-col').forEach(el => {
-            el.style.display = isActive ? 'table-cell' : 'none';
-        });
-    }
+function instantiateMetricDetailsModal(type) {
+    document.getElementById('modalMetricTitle').innerText = type + ' — Detail View';
+    document.getElementById('modalMetricTablesContainer').innerHTML = '<p style="color:#64748b;font-size:0.85rem;">Detailed breakdown coming in Phase 5 (Workshop Ledger).</p>';
+    document.getElementById('modalMetricDetails').style.display = 'flex';
+}
 
-    function validateAllocations() {
-        const g = parseFloat(document.getElementById('allocGrn').value) || 0;
-        const m = parseFloat(document.getElementById('allocMop').value) || 0;
-        const l = parseFloat(document.getElementById('allocLab').value) || 0;
-        const t = parseFloat(document.getElementById('allocLathe').value) || 0;
+/* ── Admin discount override engine ── */
+async function pollAdminOverrides() {
+    const { data, error } = await supabaseClient.from('approval_requests')
+        .select('*').eq('status','Pending').eq('request_type','Discount Override');
+    const block = document.getElementById('overrideQueueBlock');
+    const list  = document.getElementById('overrideQueueList');
+    if (error||!data||!data.length) { block.style.display='none'; return; }
+    block.style.display='block';
+    list.innerHTML = data.map(req => {
+        const jcId   = req.payload?.jc_id||'UNKNOWN';
+        const disc   = req.payload?.requested_discount||0;
+        const total  = req.payload?.total_bill_value||0;
+        const short  = jcId.split('-')[0].toUpperCase();
+        return `<div class="override-queue-item">
+            <div><strong style="color:var(--danger);">JC-${short} — Override Needed</strong><br>
+            <span style="font-size:0.82rem;color:#64748b;">Requesting <b>₹${disc}</b> discount on ₹${total} bill.</span></div>
+            <button class="btn-review" onclick="openOverrideModal('${req.id}','${jcId}',${disc},${total})">REVIEW</button>
+        </div>`;
+    }).join('');
+}
 
-        let hasError = false;
+async function openOverrideModal(reqId, jcId, discAmt, totalBill) {
+    activeOverrideReqId    = reqId;
+    requiredOverrideAmount = parseFloat(discAmt);
+    document.getElementById('orRefHash').innerText       = `JC-${jcId.split('-')[0].toUpperCase()}`;
+    document.getElementById('orTotalBill').innerText     = totalBill;
+    document.getElementById('orRequestedDisc').innerText = discAmt;
+    document.getElementById('toggleProMode').checked     = false;
+    toggleProMarginMode(false);
+    ['allocGrn','allocMop','allocLab','allocLathe'].forEach(id => { document.getElementById(id).value=0; document.getElementById(id).style.borderColor='var(--border)'; });
 
-        // Ceiling Failsafes
-        if(g > overrideMaxLimits.grn) { document.getElementById('allocGrn').style.borderColor = "red"; hasError = true; } else { document.getElementById('allocGrn').style.borderColor = "var(--border)"; }
-        if(m > overrideMaxLimits.mop) { document.getElementById('allocMop').style.borderColor = "red"; hasError = true; } else { document.getElementById('allocMop').style.borderColor = "var(--border)"; }
-        if(l > overrideMaxLimits.lab) { document.getElementById('allocLab').style.borderColor = "red"; hasError = true; } else { document.getElementById('allocLab').style.borderColor = "var(--border)"; }
-        if(t > overrideMaxLimits.lathe) { document.getElementById('allocLathe').style.borderColor = "red"; hasError = true; } else { document.getElementById('allocLathe').style.borderColor = "var(--border)"; }
+    const { data:jc    } = await supabaseClient.from('job_cards').select('labour_charges,lathe_welding').eq('id',jcId).single();
+    const { data:items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id',jcId);
+    let gGross=0, mGross=0, sGross=0;
+    const tbody = document.getElementById('orTableBody'); tbody.innerHTML='';
+    (items||[]).forEach(i=>{
+        const tp=parseFloat(i.total_price)||0; const up=parseFloat(i.unit_price)||0; const mac=parseFloat(i.mac_at_billing)||0;
+        if(i.warehouse_type==='Green') gGross+=tp; else if(i.warehouse_type==='Moped') mGross+=tp; else sGross+=tp;
+        const deptPill=`<span class="status-pill" style="background:${i.warehouse_type==='Green'?'#dcfce7;color:#15803d':i.warehouse_type==='Moped'?'#e0f2fe;color:#0369a1':'#fef3c7;color:#b45309'}">${i.warehouse_type}</span>`;
+        const macUi = mac>0?`₹${mac}`:i.warehouse_type==='Service'?'-':'<span style="font-size:0.65rem;color:#94a3b8;">No GRN</span>';
+        const profUi= mac>0?`₹${(up-mac)*(parseFloat(i.qty)||1)}`:i.warehouse_type==='Service'?`₹${tp}`:'N/A';
+        tbody.innerHTML+=`<tr><td>${deptPill}</td><td>${i.item_name}</td><td>${i.qty}</td><td>₹${up}</td><td><b>₹${tp}</b></td><td class="margin-col">${macUi}</td><td class="margin-col">${profUi}</td></tr>`;
+    });
+    const labRaw=parseFloat(jc?.labour_charges)||0; const latheRaw=parseFloat(jc?.lathe_welding)||0;
+    overrideMaxLimits={ grn:gGross, mop:mGross, lab:labRaw+sGross, lathe:latheRaw };
+    document.getElementById('maxGrn').innerText=gGross; document.getElementById('maxMop').innerText=mGross;
+    document.getElementById('maxLab').innerText=labRaw+sGross; document.getElementById('maxLathe').innerText=latheRaw;
+    validateAllocations();
+    document.getElementById('modalAdminOverride').style.display='flex';
+}
 
-        const sum = g + m + l + t;
-        const remaining = requiredOverrideAmount - sum;
-        
-        const remNode = document.getElementById('orRemainingToAlloc');
-        remNode.innerText = `Remaining: ₹${remaining}`;
-        
-        const btn = document.getElementById('btnConfirmAlloc');
-        if(remaining === 0 && !hasError) {
-            remNode.style.color = "var(--success)";
-            btn.disabled = false;
-            btn.style.opacity = "1";
-        } else {
-            remNode.style.color = "var(--danger)";
-            btn.disabled = true;
-            btn.style.opacity = "0.5";
-        }
-    }
+function toggleProMarginMode(on) { document.querySelectorAll('.margin-col').forEach(el=>el.style.display=on?'table-cell':'none'); }
+function closeOverrideModal()    { document.getElementById('modalAdminOverride').style.display='none'; }
 
-    async function commitAdminOverride() {
-        const g = parseFloat(document.getElementById('allocGrn').value) || 0;
-        const m = parseFloat(document.getElementById('allocMop').value) || 0;
-        const l = parseFloat(document.getElementById('allocLab').value) || 0;
-        const t = parseFloat(document.getElementById('allocLathe').value) || 0;
+function validateAllocations() {
+    const g=parseFloat(document.getElementById('allocGrn').value)||0;
+    const m=parseFloat(document.getElementById('allocMop').value)||0;
+    const l=parseFloat(document.getElementById('allocLab').value)||0;
+    const t=parseFloat(document.getElementById('allocLathe').value)||0;
+    let err=false;
+    if(g>overrideMaxLimits.grn) { document.getElementById('allocGrn').style.borderColor='red'; err=true; } else document.getElementById('allocGrn').style.borderColor='var(--border)';
+    if(m>overrideMaxLimits.mop) { document.getElementById('allocMop').style.borderColor='red'; err=true; } else document.getElementById('allocMop').style.borderColor='var(--border)';
+    if(l>overrideMaxLimits.lab) { document.getElementById('allocLab').style.borderColor='red'; err=true; } else document.getElementById('allocLab').style.borderColor='var(--border)';
+    if(t>overrideMaxLimits.lathe){ document.getElementById('allocLathe').style.borderColor='red'; err=true;} else document.getElementById('allocLathe').style.borderColor='var(--border)';
+    const remaining = requiredOverrideAmount-(g+m+l+t);
+    const remEl=document.getElementById('orRemainingToAlloc'); remEl.innerText=`Remaining: ₹${remaining}`;
+    const btn=document.getElementById('btnConfirmAlloc');
+    if(remaining===0&&!err){ remEl.style.color='var(--success)'; btn.disabled=false; btn.style.opacity='1'; }
+    else { remEl.style.color='var(--danger)'; btn.disabled=true; btn.style.opacity='0.5'; }
+}
 
-        const payloadUpdate = {
-            distribution: { green: g, moped: m, labour: l, lathe: t },
-            approved_by: 'admin',
-            approved_at: new Date().toISOString()
-        };
+async function commitAdminOverride() {
+    const g=parseFloat(document.getElementById('allocGrn').value)||0;
+    const m=parseFloat(document.getElementById('allocMop').value)||0;
+    const l=parseFloat(document.getElementById('allocLab').value)||0;
+    const t=parseFloat(document.getElementById('allocLathe').value)||0;
+    await supabaseClient.from('approval_requests').update({ status:'Cleared', payload:{ distribution:{green:g,moped:m,labour:l,lathe:t}, approved_by:'admin', approved_at:new Date().toISOString() } }).eq('id',activeOverrideReqId);
+    closeOverrideModal(); pollAdminOverrides();
+    alert('Allocation approved. Billing console is now unlocked.');
+}
 
-        await supabaseClient.from('approval_requests')
-            .update({ status: 'Cleared', payload: payloadUpdate })
-            .eq('id', activeOverrideReqId);
+async function rejectAdminOverride() {
+    if(!confirm('Reject this discount request?')) return;
+    await supabaseClient.from('approval_requests').update({status:'Rejected'}).eq('id',activeOverrideReqId);
+    closeOverrideModal(); pollAdminOverrides();
+}
 
-        document.getElementById('modalAdminOverride').style.display = 'none';
-        pollAdminOverrides();
-        alert("Allocation successful. The billing console is now unlocked for the manager.");
-    }
+function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'; }
 
-    async function rejectAdminOverride() {
-        if(!confirm("Are you sure you want to reject this discount request?")) return;
-        await supabaseClient.from('approval_requests').update({ status: 'Rejected' }).eq('id', activeOverrideReqId);
-        document.getElementById('modalAdminOverride').style.display = 'none';
-        pollAdminOverrides();
-    }
-
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
-    enforceRbacVisibilityConstraints();
+enforceRbacVisibilityConstraints();
 </script>
 </body>
 </html>
