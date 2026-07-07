@@ -6,58 +6,67 @@
 <title>Workshop Master Ledger — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root { --primary:#2c3e50; --success:#27ae60; --info:#2980b9; --light:#f8fafc; --border:#e2e8f0; --text:#1e293b; --danger:#e74c3c; --warning:#f59e0b; --green:#27ae60; --moped:#3498db; }
-* { box-sizing:border-box; }
-body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--light); margin:0; padding:0; color:var(--text); padding-bottom:60px; }
-.sticky-nav { max-width:1200px; margin:0 auto; background:white; padding:12px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.02); position:sticky; top:0; z-index:100; }
-.logo-matrix { display:flex; align-items:center; gap:8px; } .logo-matrix img { height:32px; object-fit:contain; }
-.nav-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.btn-header { padding:5px 12px; border-radius:6px; border:1px solid var(--border); font-size:0.8rem; font-weight:700; text-decoration:none; cursor:pointer; background:#f1f5f9; color:var(--primary); }
-.btn-logout { background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
-.badge-role { background:#0f172a; color:white; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase; margin-left:8px; }
-.wrapper { max-width:1200px; margin:0 auto; padding:20px; }
-.card-panel { background:white; padding:18px; border-radius:10px; border:1px solid var(--border); margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,0.02); }
-.tab-bar { display:flex; gap:6px; border-bottom:2px solid var(--border); margin-bottom:18px; overflow-x:auto; padding-bottom:4px; }
-.tab-btn { padding:9px 14px; border:none; background:none; font-size:0.82rem; font-weight:700; color:#64748b; cursor:pointer; border-radius:6px 6px 0 0; border-bottom:3px solid transparent; white-space:nowrap; }
-.tab-btn.active { color:var(--primary); border-bottom-color:var(--info); background:#f1f5f9; }
-.view-panel { display:none; } .view-panel.active { display:block; }
-.date-bar { display:flex; gap:10px; align-items:center; background:#f1f5f9; padding:10px 14px; border-radius:8px; margin-bottom:16px; flex-wrap:wrap; }
-.date-bar label { font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; }
-.date-bar input, .date-bar select { padding:8px; border:1px solid var(--border); border-radius:6px; font-size:0.85rem; }
-.btn-action { background:var(--success); color:white; border:none; padding:9px 16px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.82rem; }
-.btn-info { background:var(--info); } .btn-primary { background:var(--primary); } .btn-warn { background:var(--warning); color:#000; } .btn-danger { background:var(--danger); }
-.summary-grid { display:grid; grid-template-columns: 110px repeat(5,1fr) 1.2fr; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:10px; font-size:0.82rem; }
-.summary-grid > div { background:white; padding:8px 10px; }
-.summary-grid .hdr { background:#f8fafc; font-weight:700; font-size:0.7rem; text-transform:uppercase; color:#64748b; }
-.summary-grid .lbl { font-weight:700; color:#64748b; font-size:0.75rem; }
-.summary-grid .flag { background:#fee2e2 !important; color:#b91c1c; font-weight:700; }
-.crosscheck-line { padding:10px 14px; border-radius:8px; font-weight:700; font-size:0.85rem; margin-bottom:16px; }
-.cc-ok { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
-.cc-warn { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
-.cc-bad { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
-th { background:#f8fafc; padding:9px 10px; font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; border-bottom:1px solid var(--border); text-align:left; }
-td { padding:8px 10px; border-bottom:1px solid #f1f5f9; }
-.table-wrapper { border-radius:8px; border:1px solid var(--border); overflow-x:auto; margin-bottom:16px; }
-.jc-row { cursor:pointer; } .jc-row:hover { background:#f8fafc; }
-.jc-detail-row td { background:#f8fafc; padding:12px; }
-.jc-detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; font-size:0.8rem; }
-.jc-detail-box { background:white; border:1px solid var(--border); border-radius:6px; padding:10px; }
-.jc-detail-box b { color:var(--primary); }
-.dash { color:#94a3b8; }
-.arrow { display:inline-block; width:14px; }
-.field-group { display:flex; flex-direction:column; gap:4px; }
-.field-group label { font-size:0.7rem; font-weight:700; color:#64748b; text-transform:uppercase; }
-input, select, textarea { padding:8px; border:1px solid var(--border); border-radius:6px; font-size:0.85rem; }
-.denom-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(75px,1fr)); gap:8px; margin:10px 0; }
-.denom-cell { background:white; border:1px solid var(--border); border-radius:6px; padding:6px; text-align:center; }
-.denom-cell label { font-size:0.75rem; font-weight:700; color:var(--primary); display:block; margin-bottom:4px; }
-.denom-cell input { width:100%; text-align:center; }
-.log-summary { background:white; border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:8px; font-size:0.85rem; }
-.log-summary .disc-ok { color:#166534; font-weight:700; } .log-summary .disc-bad { color:#b91c1c; font-weight:700; }
-.expense-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; align-items:end; background:#f8fafc; padding:14px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px; }
-.print-btns { display:flex; gap:8px; flex-wrap:wrap; }
-@media print { body * { visibility:hidden; } }
+:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warning:#f59e0b;--green:#27ae60;--moped:#3498db;}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:0;padding:0;color:var(--text);padding-bottom:60px;}
+.sticky-nav{max-width:1200px;margin:0 auto;background:white;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.02);position:sticky;top:0;z-index:100;}
+.logo-matrix{display:flex;align-items:center;gap:8px;}.logo-matrix img{height:32px;object-fit:contain;}
+.nav-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.btn-header{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:.8rem;font-weight:700;text-decoration:none;cursor:pointer;background:#f1f5f9;color:var(--primary);}
+.btn-logout{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.badge-role{background:#0f172a;color:white;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;text-transform:uppercase;margin-left:8px;}
+.wrapper{max-width:1200px;margin:0 auto;padding:20px;}
+.card-panel{background:white;padding:18px;border-radius:10px;border:1px solid var(--border);margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.02);}
+.tab-bar{display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;padding-bottom:4px;}
+.tab-btn{padding:9px 14px;border:none;background:none;font-size:.82rem;font-weight:700;color:#64748b;cursor:pointer;border-radius:6px 6px 0 0;border-bottom:3px solid transparent;white-space:nowrap;}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--info);background:#f1f5f9;}
+.view-panel{display:none;}.view-panel.active{display:block;}
+.date-bar{display:flex;gap:10px;align-items:center;background:#f1f5f9;padding:10px 14px;border-radius:8px;margin-bottom:16px;flex-wrap:wrap;}
+.date-bar label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
+.date-bar input,.date-bar select{padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;}
+.btn-action{background:var(--success);color:white;border:none;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.82rem;}
+.btn-info{background:var(--info);}.btn-primary{background:var(--primary);}.btn-warn{background:var(--warning);color:#000;}.btn-danger{background:var(--danger);}
+.btn-action:disabled{opacity:.5;cursor:not-allowed;}
+/* FIX9: summary-table used in print — proper table, not CSS grid */
+.summary-grid{display:grid;grid-template-columns:110px repeat(5,1fr) 1.2fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;font-size:.82rem;}
+.summary-grid>div{background:white;padding:8px 10px;}
+.summary-grid .hdr{background:#f8fafc;font-weight:700;font-size:.7rem;text-transform:uppercase;color:#64748b;}
+.summary-grid .lbl{font-weight:700;color:#64748b;font-size:.75rem;}
+.crosscheck-line{padding:10px 14px;border-radius:8px;font-weight:700;font-size:.85rem;margin-bottom:8px;}
+.cc-ok{background:#dcfce7;color:#166534;border:1px solid #bbf7d0;}
+.cc-warn{background:#fef9c3;color:#854d0e;border:1px solid #fde68a;}
+.cc-bad{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;}
+.open-jc-note{background:#fff7ed;border:1px solid #fed7aa;padding:8px 14px;border-radius:8px;font-size:.82rem;color:#9a3412;margin-bottom:16px;}
+table{width:100%;border-collapse:collapse;font-size:.82rem;}
+th{background:#f8fafc;padding:9px 10px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9;}
+.table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;margin-bottom:16px;}
+.jc-row{cursor:pointer;}.jc-row:hover{background:#f8fafc;}
+/* FIX6: open JC row highlight */
+.jc-row-open{background:#fffbeb;}.jc-row-open:hover{background:#fef3c7;}
+.badge-open{background:#f59e0b;color:white;font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;}
+.jc-detail-row td{background:#f8fafc;padding:12px;}
+.jc-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;font-size:.8rem;}
+.jc-detail-box{background:white;border:1px solid var(--border);border-radius:6px;padding:10px;}
+.jc-detail-box b{color:var(--primary);}
+.dash{color:#94a3b8;}
+.arrow{display:inline-block;width:14px;}
+.field-group{display:flex;flex-direction:column;gap:4px;}
+.field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
+input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;}
+.denom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(75px,1fr));gap:8px;margin:10px 0;}
+.denom-cell{background:white;border:1px solid var(--border);border-radius:6px;padding:6px;text-align:center;}
+.denom-cell label{font-size:.75rem;font-weight:700;color:var(--primary);display:block;margin-bottom:4px;}
+.denom-cell input{width:100%;text-align:center;}
+.denom-cell input:disabled{background:#f1f5f9;color:#64748b;}
+.log-summary{background:white;border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px;font-size:.85rem;}
+.disc-ok{color:#166534;font-weight:700;}.disc-bad{color:#b91c1c;font-weight:700;}
+/* FIX3: Finalised EOD banner */
+.eod-locked-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:12px;}
+.eod-locked-banner.confirmed{background:#f0fdf4;border-color:#bbf7d0;}
+.expense-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;background:#f8fafc;padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;}
+.print-btns{display:flex;gap:8px;flex-wrap:wrap;}
+@media print{body *{visibility:hidden;}}
 </style>
 </head>
 <body>
@@ -79,17 +88,21 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
   <div class="card-panel">
     <div class="tab-bar" id="tabBar"></div>
 
+    <!-- Shared date bar — NO Full Day Print here (FIX2: moved to EOD tab) -->
     <div class="date-bar" id="mainDateBar">
       <label>Ledger Date</label>
       <input type="date" id="mainDate" onchange="onMainDateChange()">
-      <div class="print-btns" id="combinedPrintBtns"></div>
     </div>
 
-    <!-- JC DETAILS -->
+    <!-- ══ JC DETAILS TAB ══ -->
     <div id="tab-jc" class="view-panel">
       <div class="summary-grid" id="jcSummaryGrid"></div>
-      <div id="jcCrosscheck" class="crosscheck-line"></div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printJcDetails()">🖨️ PRINT JC LIST</button></div>
+      <div id="jcCrosscheck" class="crosscheck-line" style="display:none;"></div>
+      <div id="jcOpenNote" class="open-jc-note" style="display:none;"></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+        <!-- FIX2: Only JC List print here, no Full Day Print -->
+        <button class="btn-action btn-info" onclick="printJcDetails()">🖨️ PRINT JC LIST</button>
+      </div>
       <div class="table-wrapper">
         <table>
           <thead><tr><th></th><th>JC / Vehicle</th><th>Mechanic</th><th>Net Green</th><th>Net Moped</th><th>Net Labour+Lathe</th><th>Payment</th></tr></thead>
@@ -98,10 +111,12 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       </div>
     </div>
 
-    <!-- EOD SUMMARY -->
+    <!-- ══ EOD SUMMARY TAB ══ -->
     <div id="tab-eod" class="view-panel">
       <div id="eodContent"></div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:16px 0;">
+
+      <!-- Log Note section -->
+      <div id="logNoteSection" style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:16px 0;">
         <div style="font-weight:700;color:#92400e;margin-bottom:6px;">LOG NOTE COUNT — Physical Cash Verification (Mandatory before print)</div>
         <div class="field-group" style="max-width:220px;margin-bottom:8px;">
           <label>Counter Change Float (₹)</label>
@@ -114,14 +129,39 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
           Expected Total: <b id="logExpected">₹0</b><br>
           Discrepancy: <span id="logDiscrepancy">—</span>
         </div>
-        <button class="btn-action btn-warn" style="margin-top:10px;" onclick="saveLogNote()">💾 SAVE LOG NOTE</button>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+          <button id="btnSaveLogNote" class="btn-action btn-warn" onclick="saveLogNote()">💾 SAVE LOG NOTE</button>
+          <!-- FIX3: Finalise EOD button — hidden until log note is saved -->
+          <button id="btnFinaliseEod" class="btn-action btn-primary" onclick="finaliseEod()" style="display:none;">✅ FINALISE EOD</button>
+        </div>
       </div>
-      <div class="print-btns">
+
+      <!-- FIX3: Locked EOD banner — shown after finalisation -->
+      <div id="eodLockedBanner" class="eod-locked-banner confirmed" style="display:none;">
+        <div style="font-weight:700;color:#166534;margin-bottom:4px;" id="eodLockedMsg">✅ EOD FINALISED</div>
+        <div style="font-size:.82rem;color:#166534;" id="eodLockedSub"></div>
+        <div style="margin-top:6px;font-size:.78rem;color:#854d0e;background:#fffbeb;padding:8px;border-radius:6px;border:1px solid #fde68a;">
+          ⚠️ This Log Note Count is locked and cannot be changed. Contact Admin to unlock if corrections are needed.
+        </div>
+        <!-- FIX4: Admin unlock button -->
+        <button id="btnAdminUnlock" class="btn-action btn-danger" onclick="adminUnlockEod()" style="display:none;margin-top:10px;">🔓 ADMIN UNLOCK</button>
+      </div>
+
+      <!-- FIX2: Full Day Print — only after Finalise EOD -->
+      <div id="eodFullDaySection" style="display:none;">
+        <div class="print-btns">
+          <button class="btn-action btn-info" onclick="printEodOnly()">🖨️ PRINT EOD ONLY</button>
+          <button id="btnFullDayPrint" class="btn-action btn-primary" onclick="triggerFullDayPrint()">🖨️ FULL DAY PRINT (JC+EOD+Mechanic)</button>
+        </div>
+      </div>
+
+      <!-- Always-visible EOD print for non-service roles or reprint needs -->
+      <div id="eodPrintBasic" class="print-btns" style="margin-top:10px;display:none;">
         <button class="btn-action btn-info" onclick="printEodOnly()">🖨️ PRINT EOD</button>
       </div>
     </div>
 
-    <!-- LUBE ISSUED -->
+    <!-- ══ LUBE ISSUED TAB ══ -->
     <div id="tab-lube" class="view-panel">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printLube()">🖨️ PRINT</button></div>
       <div class="table-wrapper">
@@ -130,7 +170,7 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       </div>
     </div>
 
-    <!-- MECHANIC EARNINGS -->
+    <!-- ══ MECHANIC EARNINGS TAB ══ -->
     <div id="tab-mech" class="view-panel">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printMech()">🖨️ PRINT</button></div>
       <div class="table-wrapper">
@@ -139,7 +179,7 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       </div>
     </div>
 
-    <!-- GREEN POS -->
+    <!-- ══ GREEN POS TAB ══ -->
     <div id="tab-greenpos" class="view-panel">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printPos('green')">🖨️ PRINT</button></div>
       <h4 style="color:var(--green);">Today's Counter Sales</h4>
@@ -148,7 +188,7 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       <div class="table-wrapper"><table><thead><tr><th>Date Paid</th><th>Ref</th><th>Customer</th><th>Amount Paid</th><th>Cash</th><th>UPI</th></tr></thead><tbody id="greenposBody2"></tbody></table></div>
     </div>
 
-    <!-- MOPED POS -->
+    <!-- ══ MOPED POS TAB ══ -->
     <div id="tab-mopedpos" class="view-panel">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printPos('moped')">🖨️ PRINT</button></div>
       <h4 style="color:var(--moped);">Today's Counter Sales</h4>
@@ -157,7 +197,7 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       <div class="table-wrapper"><table><thead><tr><th>Date Paid</th><th>Ref</th><th>Customer</th><th>Amount Paid</th><th>Cash</th><th>UPI</th></tr></thead><tbody id="mopedposBody2"></tbody></table></div>
     </div>
 
-    <!-- CREDIT COLLECTIONS -->
+    <!-- ══ CREDIT COLLECTIONS TAB ══ -->
     <div id="tab-credit" class="view-panel">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printCredit()">🖨️ PRINT</button></div>
       <div class="table-wrapper">
@@ -166,7 +206,7 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
       </div>
     </div>
 
-    <!-- CROSS ACCOUNTS -->
+    <!-- ══ CROSS ACCOUNTS TAB ══ -->
     <div id="tab-cross" class="view-panel">
       <div class="date-bar">
         <div id="crossStakeholderWrap" style="display:none;"><label>Target</label><select id="crossStakeholder" onchange="loadCrossAccounts()"></select></div>
@@ -175,13 +215,14 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
         <button class="btn-action btn-info" onclick="printCross()">🖨️ PRINT</button>
       </div>
       <div id="crossOldBalance" style="font-weight:700;margin-bottom:8px;"></div>
+      <!-- FIX8: Debit / Credit / Outstanding columns -->
       <div class="table-wrapper">
-        <table><thead><tr><th>Date</th><th>Net Due (Products−Prepaid−Credit)</th><th>Transfer</th><th>Running Balance</th></tr></thead>
+        <table><thead><tr><th>Date</th><th>Products Issued (₹)</th><th>Prepaid + Transfers (₹)</th><th>Outstanding (₹)</th></tr></thead>
         <tbody id="crossTableBody"></tbody></table>
       </div>
     </div>
 
-    <!-- EXPENSES -->
+    <!-- ══ EXPENSES TAB ══ -->
     <div id="tab-expenses" class="view-panel">
       <div class="expense-form-grid">
         <div class="field-group"><label>Category</label><select id="expCategory"></select></div>
@@ -201,56 +242,53 @@ input, select, textarea { padding:8px; border:1px solid var(--border); border-ra
 </div>
 
 <script>
-const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest').toLowerCase();
-document.getElementById('roleDisplay').innerText = activeRole.toUpperCase();
-function executeSessionTermination(){ localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'; }
+const SB_URL="https://jycoirrphpvxkrwrjcwf.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
+const supabaseClient=supabase.createClient(SB_URL,SB_KEY);
+const activeRole=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase();
+document.getElementById('roleDisplay').innerText=activeRole.toUpperCase();
+function executeSessionTermination(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
-const urlParams = new URLSearchParams(window.location.search);
-const todayStr = new Date().toISOString().split('T')[0];
-let activeDate = urlParams.get('date') || todayStr;
-let activeTab = urlParams.get('tab') || 'jc-details';
+const urlParams=new URLSearchParams(window.location.search);
+const todayStr=new Date().toISOString().split('T')[0];
+let activeDate=urlParams.get('date')||todayStr;
+let activeTab=urlParams.get('tab')||'jc-details';
 
-let jcCache = []; let itemsCache = {}; let mechanicsCache = []; let denomCache = []; let categoryCache = [];
+let jcCache=[]; let itemsCache={}; let mechanicsCache=[]; let denomCache=[]; let categoryCache=[];
 
-// ---- TAB DEFINITIONS & ROLE ACCESS ----
-const TABS = [
-  {id:'jc-details', label:'JC Details', panel:'tab-jc', roles:['admin','service','green','moped']},
-  {id:'eod', label:'EOD Summary', panel:'tab-eod', roles:['admin','service','green','moped']},
-  {id:'lube', label:'Lube Issued', panel:'tab-lube', roles:['admin','service','green','moped']},
-  {id:'mech', label:'Mechanic Earnings', panel:'tab-mech', roles:['admin','service']},
-  {id:'greenpos', label:'Green POS', panel:'tab-greenpos', roles:['admin','green']},
-  {id:'mopedpos', label:'Moped POS', panel:'tab-mopedpos', roles:['admin','moped']},
-  {id:'credit', label:'Credit Collections', panel:'tab-credit', roles:['admin','service','green','moped']},
-  {id:'cross', label:'Cross Accounts', panel:'tab-cross', roles:['admin','service','green','moped']},
-  {id:'expenses', label:'Expenses', panel:'tab-expenses', roles:['admin','service','green','moped']}
+// ─── TAB DEFINITIONS & ROLE ACCESS ───────────────────────────────────────────
+const TABS=[
+  {id:'jc-details',label:'JC Details',panel:'tab-jc',roles:['admin','service','green','moped']},
+  {id:'eod',label:'EOD Summary',panel:'tab-eod',roles:['admin','service','green','moped']},
+  {id:'lube',label:'Lube Issued',panel:'tab-lube',roles:['admin','service','green','moped']},
+  {id:'mech',label:'Mechanic Earnings',panel:'tab-mech',roles:['admin','service']},
+  {id:'greenpos',label:'Green POS',panel:'tab-greenpos',roles:['admin','green']},
+  {id:'mopedpos',label:'Moped POS',panel:'tab-mopedpos',roles:['admin','moped']},
+  {id:'credit',label:'Credit Collections',panel:'tab-credit',roles:['admin','service','green','moped']},
+  {id:'cross',label:'Cross Accounts',panel:'tab-cross',roles:['admin','service','green','moped']},
+  {id:'expenses',label:'Expenses',panel:'tab-expenses',roles:['admin','service','green','moped']}
 ];
 
 function buildTabBar(){
-  const bar = document.getElementById('tabBar'); bar.innerHTML='';
+  const bar=document.getElementById('tabBar'); bar.innerHTML='';
   TABS.filter(t=>t.roles.includes(activeRole)).forEach(t=>{
-    const b = document.createElement('button');
-    b.className='tab-btn'; b.id='btn-'+t.id; b.innerText=t.label;
-    b.onclick=()=>switchTab(t.id);
-    bar.appendChild(b);
+    const b=document.createElement('button'); b.className='tab-btn'; b.id='btn-'+t.id; b.innerText=t.label;
+    b.onclick=()=>switchTab(t.id); bar.appendChild(b);
   });
 }
 
 function switchTab(tabId){
-  activeTab = tabId;
+  activeTab=tabId;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
-  const btn = document.getElementById('btn-'+tabId); if(btn) btn.classList.add('active');
-  const tdef = TABS.find(t=>t.id===tabId);
-  if(!tdef) return;
+  const btn=document.getElementById('btn-'+tabId); if(btn) btn.classList.add('active');
+  const tdef=TABS.find(t=>t.id===tabId); if(!tdef) return;
   document.getElementById(tdef.panel).classList.add('active');
-  document.getElementById('mainDateBar').style.display = (tabId==='cross') ? 'none' : 'flex';
+  document.getElementById('mainDateBar').style.display=(tabId==='cross')?'none':'flex';
   loadTabData(tabId);
 }
 
-async function onMainDateChange(){ activeDate = document.getElementById('mainDate').value; loadTabData(activeTab); }
+async function onMainDateChange(){activeDate=document.getElementById('mainDate').value; loadTabData(activeTab);}
 
 async function loadTabData(tabId){
   if(tabId==='jc-details') await loadJcDetails();
@@ -264,96 +302,116 @@ async function loadTabData(tabId){
   else if(tabId==='expenses') await loadExpenses();
 }
 
-// ---- SHARED HELPERS ----
-function fmt(n){ n = parseFloat(n)||0; return '₹'+Math.round(n).toLocaleString('en-IN'); }
-function dashOrFmt(n){ n = parseFloat(n)||0; return n===0 ? '<span class="dash">—</span>' : fmt(n); }
-function jcRef(id){ return 'JC-'+id.split('-')[0].toUpperCase(); }
+// ─── SHARED HELPERS ──────────────────────────────────────────────────────────
+function fmt(n){n=parseFloat(n)||0; return '₹'+Math.round(n).toLocaleString('en-IN');}
+function dashOrFmt(n){n=parseFloat(n)||0; return n===0?'<span class="dash">—</span>':fmt(n);}
+function jcRef(id){return 'JC-'+id.split('-')[0].toUpperCase();}
 
 async function prefetchStaticData(){
-  const {data:mechs} = await supabaseClient.from('mechanics').select('id,name,commission_rate').eq('is_active',true);
-  mechanicsCache = mechs||[];
-  const {data:cats} = await supabaseClient.from('expense_categories').select('*').order('sort_order');
-  categoryCache = cats||[];
-  const {data:dens} = await supabaseClient.from('currency_denominations').select('*').eq('is_active',true).order('sort_order');
-  denomCache = dens||[];
+  const {data:mechs}=await supabaseClient.from('mechanics').select('id,name,commission_rate').eq('is_active',true);
+  mechanicsCache=mechs||[];
+  const {data:cats}=await supabaseClient.from('expense_categories').select('*').order('sort_order');
+  categoryCache=cats||[];
+  const {data:dens}=await supabaseClient.from('currency_denominations').select('*').eq('is_active',true).order('sort_order');
+  denomCache=dens||[];
 }
-function mechName(id){ const m=mechanicsCache.find(x=>x.id===id); return m?m.name:'—'; }
+function mechName(id){const m=mechanicsCache.find(x=>x.id===id); return m?m.name:'—';}
 
-// ============ JC DETAILS TAB ============
+// ─── FIX9: Build print-safe summary table (real HTML table, no CSS grid) ─────
+function buildPrintSummaryTable(rows){
+  const closed=rows.filter(j=>j.status==='Closed');
+  let gn=0,mn=0,ln=0,tn=0,ca=0,up=0,cr=0;
+  closed.forEach(j=>{gn+=parseFloat(j.green_total)||0;mn+=parseFloat(j.moped_total)||0;ln+=parseFloat(j.labour_charges)||0;tn+=parseFloat(j.lathe_welding)||0;ca+=parseFloat(j.cash_amount)||0;up+=parseFloat(j.upi_amount)||0;cr+=parseFloat(j.credit_amount)||0;});
+  const tot=gn+mn+ln+tn;
+  const td='border:1px solid #ccc;padding:6px;',th='border:1px solid #ccc;padding:6px;background:#f1f5f9;font-weight:700;';
+  return `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+    <thead><tr><th style="${th}"></th><th style="${th}">GREEN</th><th style="${th}">MOPED</th><th style="${th}">LABOUR</th><th style="${th}">LATHE</th><th style="${th}">TOTAL</th><th style="${th}">PAYMENTS</th></tr></thead>
+    <tbody><tr><td style="${td}font-weight:700;">Net</td><td style="${td}">${fmt(gn)}</td><td style="${td}">${fmt(mn)}</td><td style="${td}">${fmt(ln)}</td><td style="${td}">${fmt(tn)}</td><td style="${td}font-weight:700;">${fmt(tot)}</td><td style="${td}">Cash: ${fmt(ca)}<br>UPI: ${fmt(up)}<br>Credit: ${fmt(cr)}</td></tr></tbody>
+  </table>`;
+}
+
+// ─── JC DETAILS TAB ──────────────────────────────────────────────────────────
 async function loadJcDetails(){
-  const tbody = document.getElementById('jcTableBody');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>';
+  const tbody=document.getElementById('jcTableBody');
+  tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>';
 
-  let q = supabaseClient.from('job_cards').select('*, vehicles(reg_number,make_model)')
+  const {data,error}=await supabaseClient.from('job_cards').select('*,vehicles(reg_number,make_model)')
     .or(`and(status.eq.Closed,closed_at.gte.${activeDate}T00:00:00,closed_at.lte.${activeDate}T23:59:59),and(advance_service_paid_at.gte.${activeDate}T00:00:00,advance_service_paid_at.lte.${activeDate}T23:59:59),and(prepaid_green_paid_at.gte.${activeDate}T00:00:00,prepaid_green_paid_at.lte.${activeDate}T23:59:59),and(prepaid_moped_paid_at.gte.${activeDate}T00:00:00,prepaid_moped_paid_at.lte.${activeDate}T23:59:59)`);
 
-  const {data, error} = await q;
-  if(error){ tbody.innerHTML = `<tr><td colspan="7" style="color:red;text-align:center;">${error.message}</td></tr>`; return; }
+  if(error){tbody.innerHTML=`<tr><td colspan="7" style="color:red;text-align:center;">${error.message}</td></tr>`;return;}
 
-  let rows = data||[];
-  if(activeRole==='green') rows = rows.filter(j=> (parseFloat(j.green_total)||0)>0 || j.prepaid_green_paid_at);
-  if(activeRole==='moped') rows = rows.filter(j=> (parseFloat(j.moped_total)||0)>0 || j.prepaid_moped_paid_at);
+  let rows=data||[];
+  if(activeRole==='green') rows=rows.filter(j=>(parseFloat(j.green_total)||0)>0||j.prepaid_green_paid_at);
+  if(activeRole==='moped') rows=rows.filter(j=>(parseFloat(j.moped_total)||0)>0||j.prepaid_moped_paid_at);
 
-  jcCache = rows;
+  jcCache=rows;
   renderJcSummary(rows);
 
-  // background batch fetch of items
-  const ids = rows.map(r=>r.id);
-  itemsCache = {};
+  // Background batch fetch of items
+  const ids=rows.map(r=>r.id); itemsCache={};
   if(ids.length>0){
-    const {data:items} = await supabaseClient.from('job_card_items').select('*').in('job_card_id', ids);
-    (items||[]).forEach(it=>{ if(!itemsCache[it.job_card_id]) itemsCache[it.job_card_id]=[]; itemsCache[it.job_card_id].push(it); });
+    const {data:items}=await supabaseClient.from('job_card_items').select('*').in('job_card_id',ids);
+    (items||[]).forEach(it=>{if(!itemsCache[it.job_card_id])itemsCache[it.job_card_id]=[];itemsCache[it.job_card_id].push(it);});
   }
 
   tbody.innerHTML='';
-  if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No job cards for this date.</td></tr>'; return; }
+  if(rows.length===0){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No job cards for this date.</td></tr>';return;}
 
   rows.forEach((j,idx)=>{
-    const grn = parseFloat(j.green_total)||0, mop = parseFloat(j.moped_total)||0;
-    const lab = (parseFloat(j.labour_charges)||0) + (parseFloat(j.lathe_welding)||0);
-    const cash = parseFloat(j.cash_amount)||0, upi = parseFloat(j.upi_amount)||0, cr = parseFloat(j.credit_amount)||0;
-    let payStr = '';
-    if(cash>0) payStr += `Cash ${fmt(cash)} `;
-    if(upi>0) payStr += `UPI ${fmt(upi)} `;
-    if(cr>0) payStr += `Cr ${fmt(cr)}`;
-    if(!payStr) payStr = '<span class="dash">—</span>';
+    const grn=parseFloat(j.green_total)||0,mop=parseFloat(j.moped_total)||0;
+    const lab=(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);
+    const cash=parseFloat(j.cash_amount)||0,upi=parseFloat(j.upi_amount)||0,cr=parseFloat(j.credit_amount)||0;
+    const isOpen=j.status!=='Closed';
 
-    const tr = document.createElement('tr'); tr.className='jc-row';
-    tr.innerHTML = `<td><span class="arrow" id="arr-${idx}">▶</span></td>
-      <td><b>${jcRef(j.id)}</b><br><span style="font-size:0.75rem;color:#64748b;">${j.vehicles?.reg_number||''} ${j.vehicles?.make_model||''}</span></td>
+    // FIX6: payment display
+    let payStr='';
+    if(isOpen){
+      payStr=`<span style="color:#d97706;font-weight:700;font-size:.75rem;">Advance ${fmt(j.advance_service||0)} — JC Still Open</span>`;
+    } else {
+      if(cash>0) payStr+=`Cash ${fmt(cash)} `;
+      if(upi>0) payStr+=`UPI ${fmt(upi)} `;
+      if(cr>0) payStr+=`Cr ${fmt(cr)}`;
+      if(!payStr) payStr='<span class="dash">—</span>';
+    }
+
+    // FIX6: open JC badge and row class
+    const openBadge=isOpen?'<span class="badge-open">OPEN</span>':'';
+    const rowClass=isOpen?'jc-row jc-row-open':'jc-row';
+
+    const tr=document.createElement('tr'); tr.className=rowClass;
+    tr.innerHTML=`<td><span class="arrow" id="arr-${idx}">▶</span></td>
+      <td><b>${jcRef(j.id)}</b>${openBadge}<br><span style="font-size:.75rem;color:#64748b;">${j.vehicles?.reg_number||''} ${j.vehicles?.make_model||''}</span></td>
       <td>${mechName(j.mech_id)}</td>
       <td>${dashOrFmt(grn)}</td><td>${dashOrFmt(mop)}</td><td>${dashOrFmt(lab)}</td><td>${payStr}</td>`;
-    tr.onclick = ()=>toggleJcRow(idx, j);
+    tr.onclick=()=>toggleJcRow(idx,j);
     tbody.appendChild(tr);
 
-    const detailTr = document.createElement('tr'); detailTr.id='detail-'+idx; detailTr.style.display='none';
-    const td = document.createElement('td'); td.colSpan=7; td.className='jc-detail-row';
-    detailTr.appendChild(td);
-    tbody.appendChild(detailTr);
+    const detailTr=document.createElement('tr'); detailTr.id='detail-'+idx; detailTr.style.display='none';
+    const td=document.createElement('td'); td.colSpan=7; td.className='jc-detail-row';
+    detailTr.appendChild(td); tbody.appendChild(detailTr);
   });
 }
 
-function toggleJcRow(idx, j){
-  const detailRow = document.getElementById('detail-'+idx);
-  const arrow = document.getElementById('arr-'+idx);
+function toggleJcRow(idx,j){
+  const detailRow=document.getElementById('detail-'+idx);
+  const arrow=document.getElementById('arr-'+idx);
   if(detailRow.style.display==='none'){
     detailRow.style.display='table-row'; arrow.innerText='▼';
-    const items = itemsCache[j.id]||[];
-    let grnGross=0, mopGross=0, labGross=0;
+    const items=itemsCache[j.id]||[];
+    let grnGross=0,mopGross=0;
     items.forEach(it=>{
-      let v = parseFloat(it.total_price); if(isNaN(v)) v = it.unit_metric==='ML'? parseFloat(it.unit_price) : (it.qty*it.unit_price);
+      let v=parseFloat(it.total_price); if(isNaN(v)) v=it.unit_metric==='ML'?parseFloat(it.unit_price):(it.qty*it.unit_price); v=v||0;
       if(it.warehouse_type==='Green') grnGross+=v;
       else if(it.warehouse_type==='Moped') mopGross+=v;
-      else if(it.warehouse_type==='Service') labGross+=v;
     });
-    const grnNet = parseFloat(j.green_total)||0, mopNet = parseFloat(j.moped_total)||0;
-    const labour = parseFloat(j.labour_charges)||0, lathe = parseFloat(j.lathe_welding)||0;
-    const labNet = labour + labGross;
-    const td = detailRow.querySelector('td');
-    td.innerHTML = `<div class="jc-detail-grid">
+    const grnNet=parseFloat(j.green_total)||0,mopNet=parseFloat(j.moped_total)||0;
+    // FIX1 (expanded view): labour gross = labour_charges (already the sum — no double-counting service items)
+    const labour=parseFloat(j.labour_charges)||0,lathe=parseFloat(j.lathe_welding)||0;
+    const td=detailRow.querySelector('td');
+    td.innerHTML=`<div class="jc-detail-grid">
       <div class="jc-detail-box"><b>Green</b><br>Gross: ${fmt(grnGross)} | Disc: ${fmt(Math.max(0,grnGross-grnNet))} | Net: ${fmt(grnNet)}</div>
       <div class="jc-detail-box"><b>Moped</b><br>Gross: ${fmt(mopGross)} | Disc: ${fmt(Math.max(0,mopGross-mopNet))} | Net: ${fmt(mopNet)}</div>
-      <div class="jc-detail-box"><b>Labour</b><br>Gross: ${fmt(labNet)} | Co-Mech: ${j.co_mech_id?mechName(j.co_mech_id):'<span class="dash">—</span>'}</div>
+      <div class="jc-detail-box"><b>Labour</b><br>Net: ${fmt(labour)} | Co-Mech: ${j.co_mech_id?mechName(j.co_mech_id):'<span class="dash">—</span>'}</div>
       <div class="jc-detail-box"><b>Lathe</b><br>${fmt(lathe)} | Referral Disc: ${fmt(j.referral_discount_amount)}</div>
       <div class="jc-detail-box"><b>Advances</b><br>Service: ${fmt(j.advance_service)} | Prepaid Grn: ${fmt(j.prepaid_green)} | Prepaid Mop: ${fmt(j.prepaid_moped)}</div>
       <div class="jc-detail-box"><b>Settlement</b><br>Cash: ${fmt(j.cash_amount)} | UPI: ${fmt(j.upi_amount)} | Credit: ${fmt(j.credit_amount)}</div>
@@ -364,118 +422,170 @@ function toggleJcRow(idx, j){
 }
 
 function renderJcSummary(rows){
-  let grnGross=0, mopGross=0, labGross=0, latheGross=0;
-  let grnNet=0, mopNet=0, labNet=0, latheNet=0;
-  let cash=0, upi=0, cr=0;
+  // FIX5/6: Separate open vs closed for correct crosscheck
+  const closed=rows.filter(j=>j.status==='Closed');
+  const open=rows.filter(j=>j.status!=='Closed');
+
+  // Summary displays ALL rows' totals
+  let grnNet=0,mopNet=0,labNet=0,latheNet=0,cash=0,upi=0,cr=0;
   rows.forEach(j=>{
-    const items = itemsCache[j.id]||[]; // may be empty first pass — fine, recompute on items load
-    grnNet += parseFloat(j.green_total)||0;
-    mopNet += parseFloat(j.moped_total)||0;
-    labNet += parseFloat(j.labour_charges)||0;
-    latheNet += parseFloat(j.lathe_welding)||0;
-    cash += parseFloat(j.cash_amount)||0; upi += parseFloat(j.upi_amount)||0; cr += parseFloat(j.credit_amount)||0;
+    grnNet+=parseFloat(j.green_total)||0; mopNet+=parseFloat(j.moped_total)||0;
+    labNet+=parseFloat(j.labour_charges)||0; latheNet+=parseFloat(j.lathe_welding)||0;
+    cash+=parseFloat(j.cash_amount)||0; upi+=parseFloat(j.upi_amount)||0; cr+=parseFloat(j.credit_amount)||0;
   });
-  const totalNet = grnNet+mopNet+labNet+latheNet;
-  const grid = document.getElementById('jcSummaryGrid');
-  grid.innerHTML = `
+  const totalNet=grnNet+mopNet+labNet+latheNet;
+  const grid=document.getElementById('jcSummaryGrid');
+  grid.innerHTML=`
     <div class="hdr"></div><div class="hdr">GREEN</div><div class="hdr">MOPED</div><div class="hdr">LABOUR</div><div class="hdr">LATHE</div><div class="hdr">TOTAL</div><div class="hdr">PAYMENTS</div>
     <div class="lbl">Net</div><div>${fmt(grnNet)}</div><div>${fmt(mopNet)}</div><div>${fmt(labNet)}</div><div>${fmt(latheNet)}</div><div><b>${fmt(totalNet)}</b></div>
     <div>Cash: ${fmt(cash)}<br>UPI: ${fmt(upi)}<br>Credit: ${fmt(cr)}</div>`;
 
-  const sumAll = totalNet + (rows.reduce((s,j)=>s+(parseFloat(j.advance_service)||0),0));
-  const sumPay = cash+upi+cr + rows.reduce((s,j)=>s+(parseFloat(j.prepaid_green)||0)+(parseFloat(j.prepaid_moped)||0),0);
-  const diff = Math.abs(sumAll - sumPay);
-  const ccDiv = document.getElementById('jcCrosscheck');
-  let cls = diff<=1 ? 'cc-ok' : (diff<=100?'cc-warn':'cc-bad');
-  let icon = diff<=1 ? '✅ BALANCED' : (diff<=100?'🟡 MINOR DIFF':'🔴 CHECK REQUIRED');
-  ccDiv.className = 'crosscheck-line '+cls;
-  ccDiv.innerText = `CROSSCHECK: ${fmt(sumAll)} = ${fmt(sumPay)}  ${icon}  (Diff: ${fmt(diff)})`;
+  // FIX5: Crosscheck only on CLOSED JCs
+  // Correct formula: T(billing) = cash + upi + credit + prepaid_green + prepaid_moped + advance_service
+  if(closed.length>0){
+    let cT=0,cCash=0,cUpi=0,cCr=0,cPg=0,cPm=0,cAdv=0;
+    closed.forEach(j=>{
+      cT+=parseFloat(j.green_total)||0; cT+=parseFloat(j.moped_total)||0;
+      cT+=parseFloat(j.labour_charges)||0; cT+=parseFloat(j.lathe_welding)||0;
+      cCash+=parseFloat(j.cash_amount)||0; cUpi+=parseFloat(j.upi_amount)||0; cCr+=parseFloat(j.credit_amount)||0;
+      cPg+=parseFloat(j.prepaid_green)||0; cPm+=parseFloat(j.prepaid_moped)||0; cAdv+=parseFloat(j.advance_service)||0;
+    });
+    const ccRight=cCash+cUpi+cCr+cPg+cPm+cAdv;
+    const diff=Math.abs(cT-ccRight);
+    const ccDiv=document.getElementById('jcCrosscheck'); ccDiv.style.display='block';
+    let cls=diff<=1?'cc-ok':diff<=100?'cc-warn':'cc-bad';
+    let icon=diff<=1?'✅ BALANCED':diff<=100?'🟡 MINOR DIFF':'🔴 CHECK REQUIRED';
+    ccDiv.className='crosscheck-line '+cls;
+    ccDiv.innerText=`CROSSCHECK (Closed JCs): Billing ${fmt(cT)} = Collections ${fmt(ccRight)}  ${icon}  (Diff: ${fmt(diff)})`;
+  } else {
+    document.getElementById('jcCrosscheck').style.display='none';
+  }
+
+  // FIX6: Open JC warning note
+  const noteEl=document.getElementById('jcOpenNote');
+  if(open.length>0){
+    noteEl.style.display='block';
+    const openList=open.map(j=>`${jcRef(j.id)} (Advance: ${fmt(j.advance_service)}, Billing: ${fmt((parseFloat(j.green_total)||0)+(parseFloat(j.moped_total)||0)+(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0))})`).join(', ');
+    noteEl.innerHTML=`⚠️ <b>${open.length} OPEN JC(s)</b> shown because advance was collected on this date — not included in crosscheck. Formal closure pending: ${openList}`;
+  } else {
+    noteEl.style.display='none';
+  }
 }
 
-// ============ EOD SUMMARY TAB ============
+// ─── EOD SUMMARY TAB ─────────────────────────────────────────────────────────
 async function loadEodSummary(){
   buildDenomGrid();
-  const container = document.getElementById('eodContent');
-  container.innerHTML = '<div style="text-align:center;padding:20px;">Compiling EOD...</div>';
+  // Reset EOD UI state
+  document.getElementById('eodLockedBanner').style.display='none';
+  document.getElementById('eodFullDaySection').style.display='none';
+  document.getElementById('btnFinaliseEod').style.display='none';
+  document.getElementById('logNoteSection').style.display='block';
+  document.getElementById('eodPrintBasic').style.display='none';
+  setDenomLocked(false);
 
-  const {data:jobs} = await supabaseClient.from('job_cards').select('id,payment_mode,cash_amount,upi_amount,credit_amount,advance_service,advance_service_mode,prepaid_green,prepaid_moped,green_total,moped_total,labour_charges,lathe_welding,status,closed_at')
-    .gte('closed_at', activeDate+'T00:00:00').lte('closed_at', activeDate+'T23:59:59').eq('status','Closed');
-  const {data:exp} = await supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59');
-  const {data:credPays} = await supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59');
+  // Admin unlock button — show only for admin
+  const unlockBtn=document.getElementById('btnAdminUnlock');
+  if(unlockBtn) unlockBtn.style.display=(activeRole==='admin')?'block':'none';
 
-  let grnNet=0,mopNet=0,labNet=0,latheNet=0,cash=0,upi=0,credit=0,adv=0;
-  (jobs||[]).forEach(j=>{ grnNet+=parseFloat(j.green_total)||0; mopNet+=parseFloat(j.moped_total)||0; labNet+=parseFloat(j.labour_charges)||0; latheNet+=parseFloat(j.lathe_welding)||0;
-    cash+=parseFloat(j.cash_amount)||0; upi+=parseFloat(j.upi_amount)||0; credit+=parseFloat(j.credit_amount)||0; adv+=parseFloat(j.advance_service)||0; });
-  const T = grnNet+mopNet+labNet+latheNet;
+  // Green/Moped: show basic print button (no Full Day Print for them until finalised)
+  if(activeRole==='green'||activeRole==='moped'){
+    document.getElementById('eodPrintBasic').style.display='flex';
+  }
 
-  let ocCash=0, ouUpi=0;
-  (credPays||[]).forEach(p=>{ const amt=parseFloat(p.amount_paid)||0; if(amt>0){ if((p.payment_mode||'').toLowerCase().includes('upi')) ouUpi+=amt; else ocCash+=amt; } });
+  const container=document.getElementById('eodContent');
+  container.innerHTML='<div style="text-align:center;padding:20px;">Compiling EOD...</div>';
 
-  let expCash=0, expUpi=0; let tpg=0, tpm=0; let expByCat={};
-  (exp||[]).forEach(e=>{ const amt=parseFloat(e.amount)||0;
+  const [jobsRes,expRes,credPaysRes]=await Promise.all([
+    supabaseClient.from('job_cards').select('id,cash_amount,upi_amount,credit_amount,advance_service,prepaid_green,prepaid_moped,green_total,moped_total,labour_charges,lathe_welding,status,closed_at')
+      .gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59').eq('status','Closed'),
+    supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59'),
+    supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59')
+  ]);
+
+  const jobs=jobsRes.data||[], exp=expRes.data||[], credPays=credPaysRes.data||[];
+
+  let grnNet=0,mopNet=0,labNet=0,latheNet=0,cash=0,upi=0,credit=0,pgTotal=0,pmTotal=0,advTotal=0;
+  jobs.forEach(j=>{
+    grnNet+=parseFloat(j.green_total)||0; mopNet+=parseFloat(j.moped_total)||0;
+    labNet+=parseFloat(j.labour_charges)||0; latheNet+=parseFloat(j.lathe_welding)||0;
+    cash+=parseFloat(j.cash_amount)||0; upi+=parseFloat(j.upi_amount)||0; credit+=parseFloat(j.credit_amount)||0;
+    pgTotal+=parseFloat(j.prepaid_green)||0; pmTotal+=parseFloat(j.prepaid_moped)||0; advTotal+=parseFloat(j.advance_service)||0;
+  });
+  const T=grnNet+mopNet+labNet+latheNet;
+
+  let ocCash=0,ouUpi=0;
+  credPays.forEach(p=>{const amt=parseFloat(p.amount_paid)||0; if(amt>0){if((p.payment_mode||'').toLowerCase().includes('upi')) ouUpi+=amt; else ocCash+=amt;}});
+
+  let expCash=0,expUpi=0,tpg=0,tpm=0; let expByCat={};
+  exp.forEach(e=>{const amt=parseFloat(e.amount)||0;
     if((e.payment_mode||'Cash')==='UPI') expUpi+=amt; else expCash+=amt;
     if((e.expense_category||'').toLowerCase().includes('transfer to green')) tpg+=amt;
     if((e.expense_category||'').toLowerCase().includes('transfer to moped')) tpm+=amt;
     expByCat[e.expense_category]=(expByCat[e.expense_category]||0)+amt;
   });
 
-  const cashIn = cash + adv + ocCash; // approximation: advance assumed cash unless mode says otherwise
-  const upiIn = upi + ouUpi;
-  const cashInHand = cashIn - expCash - tpg - tpm;
-  window._systemCIH = cashInHand;
+  const cashIn=cash+advTotal+ocCash;
+  const upiIn=upi+ouUpi;
+  const cashInHand=cashIn-expCash-tpg-tpm;
+  window._systemCIH=cashInHand;
 
-  if(activeRole==='service' || activeRole==='admin'){
-    container.innerHTML = `
-      <h3 style="color:var(--primary);">WORKSHOP COLLECTIONS — ${activeDate}</h3>
+  if(activeRole==='service'||activeRole==='admin'){
+    // FIX5: Correct crosscheck — T = cash + upi + credit + prepaid_green + prepaid_moped + advance_service
+    const ccLeft=T;
+    const ccRight=cash+upi+credit+pgTotal+pmTotal+advTotal;
+    const diff=Math.abs(ccLeft-ccRight);
+    const ccCls=diff<=1?'cc-ok':diff<=100?'cc-warn':'cc-bad';
+    const ccIcon=diff<=1?'✅ BALANCED':diff<=100?'🟡 MINOR DIFF':'🔴 CHECK REQUIRED';
+    const ccText=`CROSSCHECK: Billing ${fmt(ccLeft)} = Cash+UPI+Credit+Prepaid+Advance ${fmt(ccRight)}  ${ccIcon}  (Diff: ${fmt(diff)})`;
+
+    container.innerHTML=`
+      <h3 style="color:var(--primary);margin-bottom:12px;">WORKSHOP COLLECTIONS — ${activeDate}</h3>
       <div class="jc-detail-grid">
         <div class="jc-detail-box">Green Net: <b>${fmt(grnNet)}</b></div>
         <div class="jc-detail-box">Moped Net: <b>${fmt(mopNet)}</b></div>
         <div class="jc-detail-box">Labour Net: <b>${fmt(labNet)}</b></div>
         <div class="jc-detail-box">Lathe Net: <b>${fmt(latheNet)}</b></div>
-        <div class="jc-detail-box">Total (T): <b>${fmt(T)}</b></div>
-        <div class="jc-detail-box">Advances (a): <b>${fmt(adv)}</b></div>
-        <div class="jc-detail-box">Old Credit Cash (oc): <b>${fmt(ocCash)}</b></div>
-        <div class="jc-detail-box">Old Credit UPI (ou): <b>${fmt(ouUpi)}</b></div>
+        <div class="jc-detail-box">Total Billing (T): <b>${fmt(T)}</b></div>
+        <div class="jc-detail-box">Prepaid Green: <b>${fmt(pgTotal)}</b></div>
+        <div class="jc-detail-box">Prepaid Moped: <b>${fmt(pmTotal)}</b></div>
+        <div class="jc-detail-box">Workshop Advance: <b>${fmt(advTotal)}</b></div>
       </div>
       <div class="jc-detail-grid" style="margin-top:10px;">
         <div class="jc-detail-box">Workshop Cash IN: <b>${fmt(cashIn)}</b></div>
         <div class="jc-detail-box">Workshop UPI IN: <b>${fmt(upiIn)}</b></div>
         <div class="jc-detail-box">Credit Issued: <b>${fmt(credit)}</b></div>
+        <div class="jc-detail-box">Old Credit Cash (oc): <b>${fmt(ocCash)}</b></div>
+        <div class="jc-detail-box">Old Credit UPI (ou): <b>${fmt(ouUpi)}</b></div>
       </div>
-      <div id="eodCC" class="crosscheck-line"></div>
-      <h4>Expenses</h4>
+      <div class="${ccCls} crosscheck-line" style="margin-top:10px;">${ccText}</div>
+      <h4 style="margin:14px 0 8px;">Expenses</h4>
       <div class="table-wrapper"><table><thead><tr><th>Category</th><th>Amount</th></tr></thead><tbody>
-        ${Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
+        ${Object.keys(expByCat).length?Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join(''):'<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
       </tbody></table></div>
-      <div class="jc-detail-box" style="display:inline-block;">Cash in Hand = ${fmt(cashIn)} − ${fmt(expCash)} − ${fmt(tpg)} − ${fmt(tpm)} = <b>${fmt(cashInHand)}</b></div>
-    `;
-    const diff = Math.abs((T+adv+ocCash+ouUpi) - (cashIn+upiIn+credit));
-    const cc = document.getElementById('eodCC');
-    cc.className = 'crosscheck-line '+(diff<=1?'cc-ok':diff<=100?'cc-warn':'cc-bad');
-    cc.innerText = `CROSSCHECK: T+a+oc+ou (${fmt(T+adv+ocCash+ouUpi)}) = Cash+UPI+Credit (${fmt(cashIn+upiIn+credit)})  ${diff<=1?'✅':diff<=100?'🟡':'🔴'}`;
+      <div class="jc-detail-box" style="display:inline-block;margin-top:8px;">
+        Cash in Hand = ${fmt(cashIn)} − ${fmt(expCash)} − ${fmt(tpg)} − ${fmt(tpm)} = <b>${fmt(cashInHand)}</b>
+      </div>`;
   } else {
-    // Green / Moped format
-    const wh = activeRole==='green' ? 'Green' : 'Moped';
-    const netUsed = activeRole==='green' ? grnNet : mopNet;
-    const prepaidField = activeRole==='green' ? 'prepaid_green' : 'prepaid_moped';
-    const alreadyCollected = (jobs||[]).reduce((s,j)=>s+(parseFloat(j[prepaidField])||0),0) + (activeRole==='green'?0:0);
-    const {data:pos} = await supabaseClient.from('counter_sales').select('*').eq('status','Closed').gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59').eq('source_role',activeRole);
+    const wh=activeRole==='green'?'Green':'Moped';
+    const netUsed=activeRole==='green'?grnNet:mopNet;
+    const alreadyCollected=activeRole==='green'?pgTotal:pmTotal;
+    const {data:pos}=await supabaseClient.from('counter_sales').select('*').eq('status','Closed').gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59').eq('source_role',activeRole);
     let posCash=0,posUpi=0,posCredit=0;
-    (pos||[]).forEach(p=>{ posCash+=parseFloat(p.cash_amount)||0; posUpi+=parseFloat(p.upi_amount)||0; posCredit+=parseFloat(p.credit_amount)||0; });
-    const transferIn = activeRole==='green'? tpg : tpm;
-    const grossCash = posCash + ocCash + alreadyCollected;
-    const grossUpi = posUpi + ouUpi;
-    const cashInCounter = grossCash - expCash + transferIn;
-    window._systemCIH = cashInCounter;
+    (pos||[]).forEach(p=>{posCash+=parseFloat(p.cash_amount)||0;posUpi+=parseFloat(p.upi_amount)||0;posCredit+=parseFloat(p.credit_amount)||0;});
+    const transferIn=activeRole==='green'?tpg:tpm;
+    const grossCash=posCash+ocCash+alreadyCollected;
+    const grossUpi=posUpi+ouUpi;
+    const cashInCounter=grossCash-expCash+transferIn;
+    window._systemCIH=cashInCounter;
 
-    container.innerHTML = `
-      <h3 style="color:var(--primary);">${wh.toUpperCase()} EOD — ${activeDate}</h3>
+    container.innerHTML=`
+      <h3 style="color:var(--primary);margin-bottom:12px;">${wh.toUpperCase()} EOD — ${activeDate}</h3>
       <div class="jc-detail-grid">
         <div class="jc-detail-box">${wh} items billed in JCs: <b>${fmt(netUsed)}</b></div>
         <div class="jc-detail-box">Already collected (Prepaid+Credit): <b>${fmt(alreadyCollected)}</b></div>
         <div class="jc-detail-box">Still receivable from Workshop: <b>${fmt(Math.max(0,netUsed-alreadyCollected))}</b></div>
       </div>
-      <h4>Counter Sales (POS)</h4>
+      <h4 style="margin:14px 0 8px;">Counter Sales (POS)</h4>
       <div class="jc-detail-grid">
         <div class="jc-detail-box">POS Cash: <b>${fmt(posCash)}</b></div>
         <div class="jc-detail-box">POS UPI: <b>${fmt(posUpi)}</b></div>
@@ -484,234 +594,333 @@ async function loadEodSummary(){
         <div class="jc-detail-box">Gross Counter Cash: <b>${fmt(grossCash)}</b></div>
         <div class="jc-detail-box">Gross Counter UPI: <b>${fmt(grossUpi)}</b></div>
       </div>
-      <h4>Expenses</h4>
+      <h4 style="margin:14px 0 8px;">Expenses</h4>
       <div class="table-wrapper"><table><thead><tr><th>Category</th><th>Amount</th></tr></thead><tbody>
-        ${Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
+        ${Object.keys(expByCat).length?Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join(''):'<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
       </tbody></table></div>
-      <div class="jc-detail-box" style="display:inline-block;">Cash in Counter = ${fmt(grossCash)} − ${fmt(expCash)} + Transfer ${fmt(transferIn)} = <b>${fmt(cashInCounter)}</b></div>
-    `;
+      <div class="jc-detail-box" style="display:inline-block;margin-top:8px;">
+        Cash in Counter = ${fmt(grossCash)} − ${fmt(expCash)} + Transfer ${fmt(transferIn)} = <b>${fmt(cashInCounter)}</b>
+      </div>`;
   }
   loadExistingLogNote();
 }
 
+// ─── LOG NOTE & DENOMINATION GRID ────────────────────────────────────────────
 function buildDenomGrid(){
-  const grid = document.getElementById('denomGrid'); grid.innerHTML='';
+  const grid=document.getElementById('denomGrid'); grid.innerHTML='';
   denomCache.forEach(d=>{
-    const div = document.createElement('div'); div.className='denom-cell';
-    div.innerHTML = `<label>₹${d.value}</label><input type="number" min="0" class="denom-input" data-val="${d.value}" value="0" oninput="recalcLogNote()">`;
+    const div=document.createElement('div'); div.className='denom-cell';
+    div.innerHTML=`<label>₹${d.value}</label><input type="number" min="0" class="denom-input" data-val="${d.value}" value="0" oninput="recalcLogNote()">`;
     grid.appendChild(div);
   });
 }
 
+function setDenomLocked(locked){
+  document.querySelectorAll('.denom-input').forEach(i=>{i.disabled=locked;});
+  const floatEl=document.getElementById('logFloat'); if(floatEl) floatEl.disabled=locked;
+  const saveBtn=document.getElementById('btnSaveLogNote'); if(saveBtn) saveBtn.style.display=locked?'none':'block';
+}
+
 function recalcLogNote(){
   let total=0;
-  document.querySelectorAll('.denom-input').forEach(i=>{ total += (parseFloat(i.value)||0) * parseFloat(i.dataset.val); });
-  const float = parseFloat(document.getElementById('logFloat').value)||0;
-  const systemCIH = window._systemCIH || 0;
-  const expected = systemCIH + float;
-  document.getElementById('logPhysTotal').innerText = fmt(total);
-  document.getElementById('logSystemCIH').innerText = fmt(systemCIH);
-  document.getElementById('logExpected').innerText = fmt(expected);
-  const disc = total - expected;
-  const discEl = document.getElementById('logDiscrepancy');
-  if(Math.abs(disc) < 1){ discEl.className='disc-ok'; discEl.innerText='Nil ✅'; }
-  else { discEl.className='disc-bad'; discEl.innerText = (disc<0? 'SHORT ₹'+Math.abs(Math.round(disc)) : 'EXCESS ₹'+Math.round(disc)); }
-  window._logNotePhysTotal = total; window._logNoteDisc = disc; window._logNoteFloat = float;
+  document.querySelectorAll('.denom-input').forEach(i=>{total+=(parseFloat(i.value)||0)*parseFloat(i.dataset.val);});
+  const float=parseFloat(document.getElementById('logFloat').value)||0;
+  const systemCIH=window._systemCIH||0;
+  const expected=systemCIH+float;
+  document.getElementById('logPhysTotal').innerText=fmt(total);
+  document.getElementById('logSystemCIH').innerText=fmt(systemCIH);
+  document.getElementById('logExpected').innerText=fmt(expected);
+  const disc=total-expected;
+  const discEl=document.getElementById('logDiscrepancy');
+  if(Math.abs(disc)<1){discEl.className='disc-ok';discEl.innerText='Nil ✅';}
+  else{discEl.className='disc-bad';discEl.innerText=(disc<0?'SHORT ₹'+Math.abs(Math.round(disc)):'EXCESS ₹'+Math.round(disc));}
+  window._logNotePhysTotal=total; window._logNoteDisc=disc; window._logNoteFloat=float;
 }
 
 async function loadExistingLogNote(){
-  const {data} = await supabaseClient.from('eod_cash_logs').select('*').eq('entity',activeRole==='admin'?'service':activeRole).eq('log_date',activeDate).maybeSingle();
+  const entity=activeRole==='admin'?'service':activeRole;
+  const {data}=await supabaseClient.from('eod_cash_logs').select('*').eq('entity',entity).eq('log_date',activeDate).maybeSingle();
   if(data){
-    document.getElementById('logFloat').value = data.counter_float||330;
-    const denoms = data.denominations||{};
+    document.getElementById('logFloat').value=data.counter_float||330;
+    const denoms=data.denominations||{};
     setTimeout(()=>{
-      document.querySelectorAll('.denom-input').forEach(i=>{ if(denoms[i.dataset.val]!==undefined) i.value = denoms[i.dataset.val]; });
+      document.querySelectorAll('.denom-input').forEach(i=>{if(denoms[i.dataset.val]!==undefined) i.value=denoms[i.dataset.val];});
       recalcLogNote();
+      // FIX3: Handle finalised state
+      if(data.is_finalised){
+        renderFinalisedState(data);
+      } else {
+        // Log note saved but not finalised — show Finalise button
+        document.getElementById('btnFinaliseEod').style.display='block';
+      }
     },100);
-  } else { setTimeout(recalcLogNote,150); }
+  } else {
+    setTimeout(recalcLogNote,150);
+  }
+}
+
+// FIX3: Render the locked/finalised UI state
+function renderFinalisedState(data){
+  setDenomLocked(true);
+  document.getElementById('btnFinaliseEod').style.display='none';
+  const banner=document.getElementById('eodLockedBanner');
+  banner.style.display='block';
+  const finTime=data.finalised_at?new Date(data.finalised_at).toLocaleString('en-IN'):'';
+  document.getElementById('eodLockedMsg').innerHTML='✅ EOD FINALISED';
+  document.getElementById('eodLockedSub').innerText=`Finalised on ${finTime} by ${(data.finalised_by||'').toUpperCase()}${data.unlocked_at?' | Unlocked at '+new Date(data.unlocked_at).toLocaleString('en-IN')+' by '+(data.unlocked_by||'')+' — '+data.unlock_reason:''}`;
+  // FIX2: Show Full Day Print after finalisation
+  if(activeRole==='service'||activeRole==='admin'){
+    document.getElementById('eodFullDaySection').style.display='block';
+  } else {
+    document.getElementById('eodPrintBasic').style.display='flex';
+  }
+  // FIX4: Admin unlock button
+  if(activeRole==='admin'){
+    document.getElementById('btnAdminUnlock').style.display='block';
+  }
 }
 
 async function saveLogNote(){
   recalcLogNote();
-  const denoms = {};
-  document.querySelectorAll('.denom-input').forEach(i=>{ denoms[i.dataset.val] = parseFloat(i.value)||0; });
-  const entity = activeRole==='admin' ? 'service' : activeRole;
-  const payload = { entity, log_date: activeDate, counter_float: window._logNoteFloat, denominations: denoms,
-    physical_total: window._logNotePhysTotal, system_expected: (window._systemCIH||0)+window._logNoteFloat,
-    discrepancy: window._logNoteDisc, logged_by: activeRole };
-  const {error} = await supabaseClient.from('eod_cash_logs').upsert(payload, {onConflict:'entity,log_date'});
+  const hasValues=Array.from(document.querySelectorAll('.denom-input')).some(i=>(parseFloat(i.value)||0)>0);
+  if(!hasValues){alert('Please enter at least one denomination count before saving.'); return;}
+  const denoms={};
+  document.querySelectorAll('.denom-input').forEach(i=>{denoms[i.dataset.val]=parseFloat(i.value)||0;});
+  const entity=activeRole==='admin'?'service':activeRole;
+  const payload={entity,log_date:activeDate,counter_float:window._logNoteFloat,denominations:denoms,
+    physical_total:window._logNotePhysTotal,system_expected:(window._systemCIH||0)+window._logNoteFloat,
+    discrepancy:window._logNoteDisc,logged_by:activeRole};
+  const {error}=await supabaseClient.from('eod_cash_logs').upsert(payload,{onConflict:'entity,log_date'});
   if(error) return alert('Error saving log note: '+error.message);
-  alert('Log Note saved.');
+  // Show Finalise button after successful save
+  document.getElementById('btnFinaliseEod').style.display='block';
+  alert('Log Note saved. You may now Finalise the EOD when ready.');
 }
 
-// ============ LUBE ISSUED TAB ============
-async function loadLubeIssued(){
-  const tbody = document.getElementById('lubeTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
-  let q = supabaseClient.from('job_card_items').select('*, job_cards!inner(id,status,closed_at)').not('volume_ml','is',null).gt('volume_ml',0)
-    .gte('job_cards.closed_at',activeDate+'T00:00:00').lte('job_cards.closed_at',activeDate+'T23:59:59').eq('job_cards.status','Closed');
-  if(activeRole==='green') q = q.eq('warehouse_type','Green');
-  if(activeRole==='moped') q = q.eq('warehouse_type','Moped');
-  const {data,error} = await q;
-  tbody.innerHTML='';
-  if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`; return; }
-  if(!data || data.length===0){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No lube issued.</td></tr>'; return; }
-  data.forEach(l=>{
-    const vol = (parseFloat(l.qty)||0) * (parseFloat(l.volume_ml)||0);
-    tbody.innerHTML += `<tr><td>${jcRef(l.job_card_id)}</td><td>${l.warehouse_type}</td><td>${l.item_name}</td><td>${l.qty}</td><td>${(vol/1000).toFixed(2)}</td><td>${fmt(l.total_price)}</td></tr>`;
-  });
+// FIX3: Finalise EOD
+async function finaliseEod(){
+  if(!confirm('Finalise the EOD for '+activeDate+'?\n\nThis will LOCK the Log Note Count. It cannot be changed without Admin approval.')) return;
+  const entity=activeRole==='admin'?'service':activeRole;
+  const {data,error}=await supabaseClient.from('eod_cash_logs')
+    .update({is_finalised:true,finalised_at:new Date().toISOString(),finalised_by:activeRole})
+    .eq('entity',entity).eq('log_date',activeDate).select().single();
+  if(error) return alert('Error finalising EOD: '+error.message);
+  renderFinalisedState(data);
 }
 
-// ============ MECHANIC EARNINGS TAB ============
+// FIX4: Admin unlock
+async function adminUnlockEod(){
+  if(activeRole!=='admin') return alert('Admin access required.');
+  const reason=prompt('Enter reason for unlocking EOD for '+activeDate+' (mandatory):');
+  if(!reason||!reason.trim()){alert('Reason is required for audit trail.'); return;}
+  const entity='service'; // Admin always unlocks service entity
+  const {data,error}=await supabaseClient.from('eod_cash_logs')
+    .update({is_finalised:false,unlock_reason:reason.trim(),unlocked_by:'admin',unlocked_at:new Date().toISOString()})
+    .eq('entity',entity).eq('log_date',activeDate).select().single();
+  if(error) return alert('Error unlocking: '+error.message);
+  // Reset UI to editable
+  setDenomLocked(false);
+  document.getElementById('eodLockedBanner').style.display='none';
+  document.getElementById('eodFullDaySection').style.display='none';
+  document.getElementById('btnFinaliseEod').style.display='block';
+  alert('EOD unlocked. Reason recorded: '+reason.trim()+'\nManager can now update the Log Note and re-finalise.');
+}
+
+// ─── FIX1: MECHANIC EARNINGS — use only labour_charges (no service item doubling) ──
 async function loadMechEarnings(){
-  const tbody = document.getElementById('mechTableBody'); tbody.innerHTML='<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
-  const {data:jobs} = await supabaseClient.from('job_cards').select('id,labour_charges,mech_id,co_mech_id,job_card_items(warehouse_type,total_price)')
+  const tbody=document.getElementById('mechTableBody');
+  tbody.innerHTML='<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
+  // FIX1: Only select labour_charges — NOT job_card_items which would cause doubling
+  // labour_charges already equals the sum of all service protocol items (set by billing.html)
+  const {data:jobs}=await supabaseClient.from('job_cards').select('id,labour_charges,mech_id,co_mech_id')
     .eq('status','Closed').gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59');
-  let map = {};
+  let map={};
   (jobs||[]).forEach(j=>{
-    let pkg=0; (j.job_card_items||[]).forEach(it=>{ if(it.warehouse_type==='Service') pkg += parseFloat(it.total_price)||0; });
-    const gross = (parseFloat(j.labour_charges)||0)+pkg;
-    const hasCo = !!j.co_mech_id;
-    const pShare = hasCo? gross/2 : gross; const cShare = hasCo? gross/2 : 0;
-    if(j.mech_id){ const m=mechanicsCache.find(x=>x.id===j.mech_id); if(!map[j.mech_id]) map[j.mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.mech_id].lab+=pShare; }
-    if(hasCo && j.co_mech_id){ const m=mechanicsCache.find(x=>x.id===j.co_mech_id); if(!map[j.co_mech_id]) map[j.co_mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.co_mech_id].lab+=cShare; }
+    const gross=parseFloat(j.labour_charges)||0; // This is authoritative — no double-counting
+    const hasCo=!!j.co_mech_id;
+    const pShare=hasCo?gross/2:gross; const cShare=hasCo?gross/2:0;
+    if(j.mech_id){const m=mechanicsCache.find(x=>x.id===j.mech_id); if(!map[j.mech_id]) map[j.mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.mech_id].lab+=pShare;}
+    if(hasCo&&j.co_mech_id){const m=mechanicsCache.find(x=>x.id===j.co_mech_id); if(!map[j.co_mech_id]) map[j.co_mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.co_mech_id].lab+=cShare;}
   });
   tbody.innerHTML='';
-  let totLab=0, totEarn=0;
-  Object.values(map).forEach(v=>{ const earn=v.lab*(v.rate/100); totLab+=v.lab; totEarn+=earn;
-    tbody.innerHTML += `<tr><td>${v.name}</td><td>${fmt(v.lab)}</td><td>${v.rate}%</td><td>${fmt(earn)}</td></tr>`; });
+  let totLab=0,totEarn=0;
+  Object.values(map).forEach(v=>{const earn=v.lab*(v.rate/100); totLab+=v.lab; totEarn+=earn;
+    tbody.innerHTML+=`<tr><td>${v.name}</td><td>${fmt(v.lab)}</td><td>${v.rate}%</td><td>${fmt(earn)}</td></tr>`;});
   if(Object.keys(map).length===0) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No closed JCs today.</td></tr>';
-  else tbody.innerHTML += `<tr style="font-weight:700;background:#f1f5f9;"><td>TOTAL</td><td>${fmt(totLab)}</td><td>—</td><td>${fmt(totEarn)}</td></tr>`;
+  else tbody.innerHTML+=`<tr style="font-weight:700;background:#f1f5f9;"><td>TOTAL</td><td>${fmt(totLab)}</td><td>—</td><td>${fmt(totEarn)}</td></tr>`;
 }
 
-// ============ POS TABS ============
-async function loadPosTab(wh){
-  const b1 = document.getElementById(wh+'posBody1'); const b2 = document.getElementById(wh+'posBody2');
-  b1.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>'; b2.innerHTML='';
-  const {data:sales} = await supabaseClient.from('counter_sales').select('*').eq('source_role',wh).eq('status','Closed')
-    .gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59');
-  b1.innerHTML='';
-  (sales||[]).forEach(s=>{
-    b1.innerHTML += `<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>${s.customer_name||'Walk-in'}</td><td>${fmt(s.total_amount)}</td><td>${fmt(s.cash_amount)}</td><td>${fmt(s.upi_amount)}</td><td>${fmt(s.credit_amount)}</td></tr>`;
-  });
-  if(!sales || sales.length===0) b1.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No sales today.</td></tr>';
+// ─── LUBE ISSUED TAB ─────────────────────────────────────────────────────────
+async function loadLubeIssued(){
+  const tbody=document.getElementById('lubeTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
+  let q=supabaseClient.from('job_card_items').select('*,job_cards!inner(id,status,closed_at)').not('volume_ml','is',null).gt('volume_ml',0)
+    .gte('job_cards.closed_at',activeDate+'T00:00:00').lte('job_cards.closed_at',activeDate+'T23:59:59').eq('job_cards.status','Closed');
+  if(activeRole==='green') q=q.eq('warehouse_type','Green');
+  if(activeRole==='moped') q=q.eq('warehouse_type','Moped');
+  const {data,error}=await q; tbody.innerHTML='';
+  if(error){tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`;return;}
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No lube issued.</td></tr>';return;}
+  data.forEach(l=>{const vol=(parseFloat(l.qty)||0)*(parseFloat(l.volume_ml)||0);
+    tbody.innerHTML+=`<tr><td>${jcRef(l.job_card_id)}</td><td>${l.warehouse_type}</td><td>${l.item_name}</td><td>${l.qty}</td><td>${(vol/1000).toFixed(2)}</td><td>${fmt(l.total_price)}</td></tr>`;});
+}
 
-  const {data:pays} = await supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').not('sale_id','is',null);
+// ─── POS TABS ─────────────────────────────────────────────────────────────────
+async function loadPosTab(wh){
+  const b1=document.getElementById(wh+'posBody1'); const b2=document.getElementById(wh+'posBody2');
+  b1.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>'; b2.innerHTML='';
+  const {data:sales}=await supabaseClient.from('counter_sales').select('*').eq('source_role',wh).eq('status','Closed').gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59');
+  b1.innerHTML='';
+  (sales||[]).forEach(s=>{b1.innerHTML+=`<tr><td>POS-${s.id.split('-')[0].toUpperCase()}</td><td>${s.customer_name||'Walk-in'}</td><td>${fmt(s.total_amount)}</td><td>${fmt(s.cash_amount)}</td><td>${fmt(s.upi_amount)}</td><td>${fmt(s.credit_amount)}</td></tr>`;});
+  if(!sales||sales.length===0) b1.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No sales today.</td></tr>';
+
+  const {data:pays}=await supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').not('sale_id','is',null);
   b2.innerHTML='';
   for(const p of (pays||[])){
-    if((parseFloat(p.amount_paid)||0) <= 0) continue;
-    const {data:saleRec} = await supabaseClient.from('counter_sales').select('id,source_role,customer_name').eq('id',p.sale_id).maybeSingle();
-    if(!saleRec || saleRec.source_role!==wh) continue;
-    b2.innerHTML += `<tr><td>${new Date(p.created_at).toLocaleDateString('en-IN')}</td><td>POS-${p.sale_id.split('-')[0].toUpperCase()}</td><td>${saleRec.customer_name||''}</td><td>${fmt(p.amount_paid)}</td><td>${(p.payment_mode||'').toLowerCase().includes('upi')?fmt(p.amount_paid):'—'}</td><td>${(p.payment_mode||'').toLowerCase().includes('upi')?'—':fmt(p.amount_paid)}</td></tr>`;
+    if((parseFloat(p.amount_paid)||0)<=0) continue;
+    const {data:saleRec}=await supabaseClient.from('counter_sales').select('id,source_role,customer_name').eq('id',p.sale_id).maybeSingle();
+    if(!saleRec||saleRec.source_role!==wh) continue;
+    const isUpi=(p.payment_mode||'').toLowerCase().includes('upi');
+    b2.innerHTML+=`<tr><td>${new Date(p.created_at).toLocaleDateString('en-IN')}</td><td>POS-${p.sale_id.split('-')[0].toUpperCase()}</td><td>${saleRec.customer_name||''}</td><td>${fmt(p.amount_paid)}</td><td>${isUpi?fmt(p.amount_paid):'—'}</td><td>${isUpi?'—':fmt(p.amount_paid)}</td></tr>`;
   }
   if(b2.innerHTML==='') b2.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No old-bill collections today.</td></tr>';
 }
 
-// ============ CREDIT COLLECTIONS TAB ============
+// ─── CREDIT COLLECTIONS TAB ──────────────────────────────────────────────────
 async function loadCreditCollections(){
-  const tbody = document.getElementById('creditTableBody'); tbody.innerHTML='<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
-  let q = supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').gt('amount_paid',0);
-  const {data,error} = await q;
+  const tbody=document.getElementById('creditTableBody'); tbody.innerHTML='<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
+  const {data,error}=await supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').gt('amount_paid',0);
   tbody.innerHTML='';
-  if(error){ tbody.innerHTML=`<tr><td colspan="5" style="color:red;">${error.message}</td></tr>`; return; }
-  let rows = data||[];
-  if(activeRole==='green' || activeRole==='moped') rows = rows.filter(p=>p.paid_by_role===activeRole);
-  if(rows.length===0){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No collections today.</td></tr>'; return; }
+  if(error){tbody.innerHTML=`<tr><td colspan="5" style="color:red;">${error.message}</td></tr>`;return;}
+  let rows=data||[];
+  if(activeRole==='green'||activeRole==='moped') rows=rows.filter(p=>p.paid_by_role===activeRole);
+  if(rows.length===0){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No collections today.</td></tr>';return;}
   rows.forEach(p=>{
-    const ref = p.sale_id ? 'POS-'+p.sale_id.split('-')[0].toUpperCase() : (p.job_card_id ? jcRef(p.job_card_id) : 'Opening Bal');
-    tbody.innerHTML += `<tr><td>${ref}</td><td>${p.customer_mobile||''}</td><td>${fmt(p.amount_paid)}</td><td>${p.payment_mode||''}</td><td>${p.paid_by_role||''}</td></tr>`;
+    const ref=p.sale_id?'POS-'+p.sale_id.split('-')[0].toUpperCase():(p.job_card_id?jcRef(p.job_card_id):'Opening Bal');
+    tbody.innerHTML+=`<tr><td>${ref}</td><td>${p.customer_mobile||''}</td><td>${fmt(p.amount_paid)}</td><td>${p.payment_mode||''}</td><td>${p.paid_by_role||''}</td></tr>`;
   });
 }
 
-// ============ CROSS ACCOUNTS TAB ============
+// ─── FIX7+FIX8: CROSS ACCOUNTS — Batch query, no timezone loop, Debit/Credit columns ──
 async function initCrossAccounts(){
-  const wrap = document.getElementById('crossStakeholderWrap');
-  const sel = document.getElementById('crossStakeholder');
-  if(activeRole==='service' || activeRole==='admin'){
+  const wrap=document.getElementById('crossStakeholderWrap');
+  const sel=document.getElementById('crossStakeholder');
+  if(activeRole==='service'||activeRole==='admin'){
     wrap.style.display='flex';
-    sel.innerHTML = `<option value="green">Green Warehouse</option><option value="moped">Moped Warehouse</option>`;
+    sel.innerHTML=`<option value="green">Green Warehouse</option><option value="moped">Moped Warehouse</option>`;
   } else { wrap.style.display='none'; }
   if(!document.getElementById('crossStart').value){
-    const end = new Date(); const start = new Date(); start.setDate(start.getDate()-7);
-    document.getElementById('crossEnd').value = end.toISOString().split('T')[0];
-    document.getElementById('crossStart').value = start.toISOString().split('T')[0];
+    const end=new Date(); const start=new Date(); start.setDate(start.getDate()-7);
+    document.getElementById('crossEnd').value=end.toISOString().split('T')[0];
+    document.getElementById('crossStart').value=start.toISOString().split('T')[0];
   }
   loadCrossAccounts();
 }
 
 async function loadCrossAccounts(){
-  const target = (activeRole==='service'||activeRole==='admin') ? document.getElementById('crossStakeholder').value : activeRole;
-  const wh = target==='green' ? 'Green' : 'Moped';
-  const prepaidField = target==='green' ? 'prepaid_green' : 'prepaid_moped';
-  const start = document.getElementById('crossStart').value;
-  const end = document.getElementById('crossEnd').value;
-  const tbody = document.getElementById('crossTableBody'); tbody.innerHTML='<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
+  const target=(activeRole==='service'||activeRole==='admin')?document.getElementById('crossStakeholder').value:activeRole;
+  const wh=target==='green'?'Green':'Moped';
+  const prepaidField=target==='green'?'prepaid_green':'prepaid_moped';
+  const start=document.getElementById('crossStart').value;
+  const end=document.getElementById('crossEnd').value;
+  const tbody=document.getElementById('crossTableBody');
+  tbody.innerHTML='<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
+  document.getElementById('crossOldBalance').innerText='';
 
-  // old balance: cumulative before start date
-  const {data:oldItems} = await supabaseClient.from('job_card_items').select('total_price, job_cards!inner(closed_at,status,'+prepaidField+')').eq('warehouse_type',wh).eq('job_cards.status','Closed').lt('job_cards.closed_at',start+'T00:00:00');
-  const {data:oldExp} = await supabaseClient.from('workshop_expenses').select('amount').ilike('expense_category','%transfer to '+target+'%').lt('created_at',start+'T00:00:00');
-  let oldProductSum=0; (oldItems||[]).forEach(i=>oldProductSum+=parseFloat(i.total_price)||0);
-  let oldTransferSum=0; (oldExp||[]).forEach(e=>oldTransferSum+=parseFloat(e.amount)||0);
-  // simplified old balance (products minus transfers minus prepaid/credit not separately tracked historically — best-effort)
-  let runningBalance = Math.max(0, oldProductSum - oldTransferSum);
-  document.getElementById('crossOldBalance').innerText = `Old Balance (before ${start}): ${fmt(runningBalance)}`;
+  // FIX7: Old balance — cumulative before start date (two queries, parallel)
+  const [oldItemsRes,oldExpRes]=await Promise.all([
+    supabaseClient.from('job_card_items').select('total_price').eq('warehouse_type',wh)
+      .eq('job_cards.status','Closed').lt('job_cards.closed_at',start+'T00:00:00')
+      .select('total_price,job_cards!inner(status,closed_at)').eq('job_cards.status','Closed').lt('job_cards.closed_at',start+'T00:00:00'),
+    supabaseClient.from('workshop_expenses').select('amount').ilike('expense_category','%transfer to '+target+'%').lt('created_at',start+'T00:00:00')
+  ]);
+  let oldProd=0; (oldItemsRes.data||[]).forEach(i=>oldProd+=parseFloat(i.total_price)||0);
+  let oldTrans=0; (oldExpRes.data||[]).forEach(e=>oldTrans+=parseFloat(e.amount)||0);
+  const {data:oldJobs}=await supabaseClient.from('job_cards').select(prepaidField).eq('status','Closed').lt('closed_at',start+'T00:00:00');
+  let oldPrepaid=0; (oldJobs||[]).forEach(j=>oldPrepaid+=parseFloat(j[prepaidField])||0);
+  let runningBalance=oldProd-oldPrepaid-oldTrans;
+  document.getElementById('crossOldBalance').innerText=`Old Balance (before ${start}): ${fmt(runningBalance)}`;
 
-  // day by day
+  // FIX7: Batch query for entire date range — no day-by-day loop (eliminates timezone bug)
+  const [rangeItemsRes,rangeJobsRes,rangeExpRes]=await Promise.all([
+    supabaseClient.from('job_card_items').select('total_price,job_cards!inner(closed_at,status)').eq('warehouse_type',wh)
+      .eq('job_cards.status','Closed').gte('job_cards.closed_at',start+'T00:00:00').lte('job_cards.closed_at',end+'T23:59:59'),
+    supabaseClient.from('job_cards').select('id,'+prepaidField+',closed_at').eq('status','Closed')
+      .gte('closed_at',start+'T00:00:00').lte('closed_at',end+'T23:59:59'),
+    supabaseClient.from('workshop_expenses').select('amount,created_at')
+      .ilike('expense_category','%transfer to '+target+'%').gte('created_at',start+'T00:00:00').lte('created_at',end+'T23:59:59')
+  ]);
+
+  // FIX7: Group by date in JavaScript — no timezone issue possible
+  const byDate={};
+  (rangeItemsRes.data||[]).forEach(item=>{
+    const dt=item.job_cards.closed_at.split('T')[0];
+    if(!byDate[dt]) byDate[dt]={prod:0,prepaid:0,transfer:0};
+    byDate[dt].prod+=parseFloat(item.total_price)||0;
+  });
+  (rangeJobsRes.data||[]).forEach(j=>{
+    const dt=j.closed_at.split('T')[0];
+    if(!byDate[dt]) byDate[dt]={prod:0,prepaid:0,transfer:0};
+    byDate[dt].prepaid+=parseFloat(j[prepaidField])||0;
+  });
+  (rangeExpRes.data||[]).forEach(e=>{
+    const dt=e.created_at.split('T')[0];
+    if(!byDate[dt]) byDate[dt]={prod:0,prepaid:0,transfer:0};
+    byDate[dt].transfer+=parseFloat(e.amount)||0;
+  });
+
   tbody.innerHTML='';
-  let d = new Date(start);
-  const endD = new Date(end);
-  while(d <= endD){
-    const dayStr = d.toISOString().split('T')[0];
-    const {data:dayItems} = await supabaseClient.from('job_card_items').select('total_price, job_cards!inner(closed_at,status)').eq('warehouse_type',wh).eq('job_cards.status','Closed').gte('job_cards.closed_at',dayStr+'T00:00:00').lte('job_cards.closed_at',dayStr+'T23:59:59');
-    const {data:dayJobs} = await supabaseClient.from('job_cards').select('id,'+prepaidField).eq('status','Closed').gte('closed_at',dayStr+'T00:00:00').lte('closed_at',dayStr+'T23:59:59');
-    const {data:dayExp} = await supabaseClient.from('workshop_expenses').select('amount').ilike('expense_category','%transfer to '+target+'%').gte('created_at',dayStr+'T00:00:00').lte('created_at',dayStr+'T23:59:59');
-    let prodSum=0; (dayItems||[]).forEach(i=>prodSum+=parseFloat(i.total_price)||0);
-    let prepaidSum=0; (dayJobs||[]).forEach(j=>prepaidSum+=parseFloat(j[prepaidField])||0);
-    let transferSum=0; (dayExp||[]).forEach(e=>transferSum+=parseFloat(e.amount)||0);
-    const netDue = prodSum - prepaidSum;
-    runningBalance += netDue - transferSum;
-    if(prodSum>0 || prepaidSum>0 || transferSum>0){
-      tbody.innerHTML += `<tr><td>${dayStr}</td><td>${fmt(netDue)}</td><td>${fmt(transferSum)}</td><td><b>${fmt(runningBalance)}</b></td></tr>`;
-    }
-    d.setDate(d.getDate()+1);
+  const sortedDates=Object.keys(byDate).sort();
+  if(sortedDates.length===0){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No activity in this range.</td></tr>';
+    return;
   }
-  if(tbody.innerHTML==='') tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No activity in this range.</td></tr>';
-}
-
-// ============ EXPENSES TAB ============
-async function loadExpenses(){
-  const catSel = document.getElementById('expCategory');
-  catSel.innerHTML = categoryCache.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
-  document.getElementById('expEntityWrap').style.display = (activeRole==='admin') ? 'flex' : 'none';
-
-  const tbody = document.getElementById('expTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
-  let q = supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').order('created_at',{ascending:false});
-  if(activeRole!=='admin') q = q.eq('warehouse_type', activeRole);
-  const {data,error} = await q;
-  tbody.innerHTML='';
-  if(error){ tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`; return; }
-  if(!data || data.length===0){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No expenses today.</td></tr>'; return; }
-  data.forEach(e=>{
-    tbody.innerHTML += `<tr><td>${e.expense_category}</td><td>${fmt(e.amount)}</td><td>${e.payment_mode||'Cash'}</td><td>${e.warehouse_type||''}</td><td>${e.note||''}</td><td>${e.recorded_by||''}</td></tr>`;
+  // FIX8: Debit = products issued, Credit = prepaid collected + transfers received
+  sortedDates.forEach(dt=>{
+    const {prod,prepaid,transfer}=byDate[dt];
+    const debit=prod;
+    const credit=prepaid+transfer;
+    runningBalance+=debit-credit;
+    const balColor=runningBalance>0?'color:#b91c1c;':'color:#166534;';
+    tbody.innerHTML+=`<tr>
+      <td>${dt}</td>
+      <td>${fmt(debit)}</td>
+      <td>${fmt(credit)}</td>
+      <td><b style="${balColor}">${fmt(runningBalance)}</b></td>
+    </tr>`;
   });
 }
 
+// ─── EXPENSES TAB ─────────────────────────────────────────────────────────────
+async function loadExpenses(){
+  const catSel=document.getElementById('expCategory');
+  catSel.innerHTML=categoryCache.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  document.getElementById('expEntityWrap').style.display=(activeRole==='admin')?'flex':'none';
+  const tbody=document.getElementById('expTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
+  let q=supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').order('created_at',{ascending:false});
+  if(activeRole!=='admin') q=q.eq('warehouse_type',activeRole);
+  const {data,error}=await q; tbody.innerHTML='';
+  if(error){tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`;return;}
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No expenses today.</td></tr>';return;}
+  data.forEach(e=>{tbody.innerHTML+=`<tr><td>${e.expense_category}</td><td>${fmt(e.amount)}</td><td>${e.payment_mode||'Cash'}</td><td>${e.warehouse_type||''}</td><td>${e.note||''}</td><td>${e.recorded_by||''}</td></tr>`;});
+}
+
 async function saveExpense(){
-  const cat = document.getElementById('expCategory').value;
-  const amt = parseFloat(document.getElementById('expAmount').value)||0;
-  const mode = document.getElementById('expMode').value;
-  const entity = activeRole==='admin' ? document.getElementById('expEntity').value : activeRole;
-  const note = document.getElementById('expNote').value;
+  const cat=document.getElementById('expCategory').value;
+  const amt=parseFloat(document.getElementById('expAmount').value)||0;
+  const mode=document.getElementById('expMode').value;
+  const entity=activeRole==='admin'?document.getElementById('expEntity').value:activeRole;
+  const note=document.getElementById('expNote').value;
   if(amt<=0) return alert('Enter a valid amount.');
-  const payload = { expense_category: cat, amount: amt, payment_mode: mode, warehouse_type: entity, note: note, recorded_by: activeRole };
-  const {error} = await supabaseClient.from('workshop_expenses').insert(payload);
+  const payload={expense_category:cat,amount:amt,payment_mode:mode,warehouse_type:entity,note:note,recorded_by:activeRole};
+  const {error}=await supabaseClient.from('workshop_expenses').insert(payload);
   if(error) return alert('Error: '+error.message);
   document.getElementById('expAmount').value=''; document.getElementById('expNote').value='';
-  loadExpenses();
-  printExpenseTicket(payload);
+  loadExpenses(); printExpenseTicket(payload);
 }
 
 function printExpenseTicket(p){
-  const w = window.open('','_blank','width=400,height=600');
+  const w=window.open('','_blank','width=400,height=600');
+  if(!w) return alert('Please allow popups for print to work.');
   w.document.write(`<html><head><title>Expense Ticket</title><style>body{font-family:'Courier New',monospace;padding:16px;font-size:13px;}.t{text-align:center;font-weight:bold;font-size:16px;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px;}.r{display:flex;justify-content:space-between;margin:4px 0;}</style></head><body>
   <div class="t">CASH PAYOUT SLIP</div>
   <div class="r"><span>Date:</span><span>${new Date().toLocaleString('en-IN')}</span></div>
@@ -722,90 +931,111 @@ function printExpenseTicket(p){
   <div class="r"><span>Note:</span><span>${p.note||'--'}</span></div>
   <div style="margin-top:30px;display:flex;justify-content:space-between;font-size:11px;"><span>Auth By: ____</span><span>Rcvd By: ____</span></div>
   </body></html>`);
-  w.document.close(); w.focus();
-  setTimeout(()=>{ w.print(); }, 300);
+  w.document.close(); w.focus(); setTimeout(()=>{w.print();},300);
 }
 
-// ============ PRINT FUNCTIONS — APPROACH B (NEW WINDOW) ============
-function openPrintWindow(title, bodyHtml, size){
-  const w = window.open('','_blank','width=900,height=700');
+// ─── PRINT FUNCTIONS — All using new window (Approach B) ─────────────────────
+function openPrintWindow(title,bodyHtml,size){
+  const w=window.open('','_blank','width=900,height=700');
+  if(!w) return alert('Please allow popups for print to work.');
+  const sig=`<div style="display:flex;justify-content:space-between;margin-top:40px;font-size:11px;"><span>Prepared by: ${activeRole.toUpperCase()} | ${new Date().toLocaleString('en-IN')}</span></div>
+  <div style="display:flex;justify-content:space-between;margin-top:20px;font-size:11px;"><span>_______________________<br>Manager Sign</span><span>_______________________<br>Owner/Admin Verify</span></div>`;
   w.document.write(`<html><head><title>${title}</title><style>
-    @page { size:${size||'A4'}; margin:10mm; }
-    body{font-family:'Segoe UI',Arial,sans-serif; padding:14px; color:#000; font-size:12px;}
+    @page{size:${size||'A4'};margin:10mm;}
+    body{font-family:'Segoe UI',Arial,sans-serif;padding:14px;color:#000;font-size:12px;}
     table{width:100%;border-collapse:collapse;margin:8px 0;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:11px;}
-    th{background:#f1f5f9;} h2,h3,h4{color:#000;margin:10px 0 6px;}
+    th{background:#f1f5f9;font-weight:700;} h2,h3,h4{color:#000;margin:10px 0 6px;}
     .cc{padding:8px;border:1px solid #000;font-weight:bold;margin:8px 0;}
-    .sig{display:flex;justify-content:space-between;margin-top:40px;font-size:11px;}
-  </style></head><body>${bodyHtml}<div class="sig"><span>Prepared by: ${activeRole.toUpperCase()} | ${new Date().toLocaleString('en-IN')}</span></div>
-  <div class="sig"><span>_______________________<br>Manager Sign</span><span>_______________________<br>Owner/Admin Verify</span></div>
-  </body></html>`);
-  w.document.close(); w.focus();
-  setTimeout(()=>{ w.print(); }, 400);
+    .open-note{background:#fff7ed;border:1px solid #fed7aa;padding:8px;border-radius:4px;font-size:11px;color:#9a3412;margin:8px 0;}
+  </style></head><body>${bodyHtml}${sig}</body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>{w.print();},400);
 }
 
+// FIX9: printJcDetails uses buildPrintSummaryTable (real HTML table)
 function printJcDetails(){
-  const summaryHtml = document.getElementById('jcSummaryGrid').outerHTML;
-  const ccHtml = document.getElementById('jcCrosscheck').outerHTML;
-  let rows = '';
+  const summaryTable=buildPrintSummaryTable(jcCache);
+  const closed=jcCache.filter(j=>j.status==='Closed');
+  const open=jcCache.filter(j=>j.status!=='Closed');
+  let cT=0,cCash=0,cUpi=0,cCr=0,cPg=0,cPm=0,cAdv=0;
+  closed.forEach(j=>{cT+=(parseFloat(j.green_total)||0)+(parseFloat(j.moped_total)||0)+(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);cCash+=parseFloat(j.cash_amount)||0;cUpi+=parseFloat(j.upi_amount)||0;cCr+=parseFloat(j.credit_amount)||0;cPg+=parseFloat(j.prepaid_green)||0;cPm+=parseFloat(j.prepaid_moped)||0;cAdv+=parseFloat(j.advance_service)||0;});
+  const diff=Math.abs(cT-(cCash+cUpi+cCr+cPg+cPm+cAdv));
+  const ccLine=`<div class="cc" style="background:${diff<=1?'#dcfce7':diff<=100?'#fef9c3':'#fee2e2'};">CROSSCHECK (Closed JCs): Billing ${fmt(cT)} = Collections ${fmt(cCash+cUpi+cCr+cPg+cPm+cAdv)}  ${diff<=1?'✅ BALANCED':diff<=100?'🟡 MINOR DIFF':'🔴 CHECK REQUIRED'}  (Diff: ${fmt(diff)})</div>`;
+  const openNote=open.length>0?`<div class="open-note">⚠️ ${open.length} OPEN JC(s) with advance collected — not included in crosscheck</div>`:'';
+  let rows='';
   jcCache.forEach(j=>{
-    const grn=parseFloat(j.green_total)||0, mop=parseFloat(j.moped_total)||0, lab=(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);
-    rows += `<tr><td>${jcRef(j.id)}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>Cash ${fmt(j.cash_amount)} UPI ${fmt(j.upi_amount)} Cr ${fmt(j.credit_amount)}</td></tr>`;
+    const isOpen=j.status!=='Closed';
+    const grn=parseFloat(j.green_total)||0,mop=parseFloat(j.moped_total)||0,lab=(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);
+    const payCell=isOpen?`Adv ${fmt(j.advance_service)} — OPEN`:`Cash ${fmt(j.cash_amount)} UPI ${fmt(j.upi_amount)} Cr ${fmt(j.credit_amount)}`;
+    rows+=`<tr style="${isOpen?'background:#fffbeb;':''}"><td>${jcRef(j.id)}${isOpen?' [OPEN]':''}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>${payCell}</td></tr>`;
   });
-  openPrintWindow('JC Details '+activeDate, `<h2>MY CARE — JC DAILY REGISTER — ${activeDate}</h2>${summaryHtml}${ccHtml}
-    <table><thead><tr><th>JC No</th><th>Vehicle</th><th>Mechanic</th><th>Net Grn</th><th>Net Mop</th><th>Net Lab+Lathe</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>`, 'A4 landscape');
+  openPrintWindow('JC Details '+activeDate,`<h2>MY CARE — JC DAILY REGISTER — ${activeDate}</h2>${summaryTable}${ccLine}${openNote}
+    <table><thead><tr><th>JC No</th><th>Vehicle</th><th>Mechanic</th><th>Net Grn</th><th>Net Mop</th><th>Net Lab+Lathe</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>`,'A4 landscape');
 }
 
+// FIX9: printEodOnly — use properly structured content
 function printEodOnly(){
-  const content = document.getElementById('eodContent').innerHTML;
-  const logHtml = `<h4>LOG NOTE COUNT</h4><div>Float: ₹${document.getElementById('logFloat').value} | Physical Total: ${document.getElementById('logPhysTotal').innerText} | Discrepancy: ${document.getElementById('logDiscrepancy').innerText}</div>`;
-  openPrintWindow('EOD Summary '+activeDate, `<h2>EOD REPORT — ${activeDate}</h2>${content}${logHtml}`, 'A5');
+  const content=document.getElementById('eodContent').innerHTML;
+  const logLine=`<h4 style="margin-top:14px;">LOG NOTE COUNT</h4><table><tbody>
+    <tr><td>Counter Float</td><td>₹${document.getElementById('logFloat').value}</td></tr>
+    <tr><td>Physical Total</td><td>${document.getElementById('logPhysTotal').innerText}</td></tr>
+    <tr><td>System Expected</td><td>${document.getElementById('logExpected').innerText}</td></tr>
+    <tr><td>Discrepancy</td><td>${document.getElementById('logDiscrepancy').innerText}</td></tr>
+  </tbody></table>`;
+  openPrintWindow('EOD Summary '+activeDate,`<h2>EOD REPORT — ${activeDate}</h2>${content}${logLine}`,'A5');
 }
 
-function printLube(){ openPrintWindow('Lube Issued '+activeDate, `<h2>LUBE ISSUED — ${activeDate}</h2><table>${document.querySelector('#tab-lube table').outerHTML}</table>`, 'A5'); }
-function printMech(){ openPrintWindow('Mechanic Earnings '+activeDate, `<h2>MECHANIC EARNINGS — ${activeDate}</h2>${document.querySelector('#tab-mech table').outerHTML}`, 'A5'); }
-function printPos(wh){ openPrintWindow(wh+' POS '+activeDate, `<h2>${wh.toUpperCase()} POS — ${activeDate}</h2><h4>Sales</h4>${document.querySelector('#tab-'+wh+'pos table:nth-of-type(1)').outerHTML}<h4>Collections</h4>${document.querySelector('#tab-'+wh+'pos table:nth-of-type(2)').outerHTML}`, 'A5'); }
-function printCredit(){ openPrintWindow('Credit Collections '+activeDate, `<h2>CREDIT COLLECTIONS — ${activeDate}</h2>${document.querySelector('#tab-credit table').outerHTML}`, 'A5'); }
-function printCross(){ openPrintWindow('Cross Accounts', `<h2>CROSS ACCOUNTS — ${document.getElementById('crossStart').value} to ${document.getElementById('crossEnd').value}</h2>${document.getElementById('crossOldBalance').outerHTML}${document.querySelector('#tab-cross table').outerHTML}`, 'A4'); }
+function printLube(){
+  const t=document.querySelector('#tab-lube table');
+  openPrintWindow('Lube Issued '+activeDate,`<h2>LUBE ISSUED — ${activeDate}</h2>${t?t.outerHTML:'<p>No data</p>'}`,'A5');
+}
+function printMech(){
+  const t=document.querySelector('#tab-mech table');
+  openPrintWindow('Mechanic Earnings '+activeDate,`<h2>MECHANIC EARNINGS — ${activeDate}</h2>${t?t.outerHTML:'<p>No data</p>'}`,'A5');
+}
+function printPos(wh){
+  const t1=document.querySelector('#tab-'+wh+'pos table:first-of-type');
+  const t2=document.querySelector('#tab-'+wh+'pos table:last-of-type');
+  openPrintWindow(wh+' POS '+activeDate,`<h2>${wh.toUpperCase()} POS — ${activeDate}</h2><h4>Sales</h4>${t1?t1.outerHTML:'<p>No data</p>'}<h4>Collections</h4>${t2?t2.outerHTML:'<p>No data</p>'}`,'A5');
+}
+function printCredit(){
+  const t=document.querySelector('#tab-credit table');
+  openPrintWindow('Credit Collections '+activeDate,`<h2>CREDIT COLLECTIONS — ${activeDate}</h2>${t?t.outerHTML:'<p>No data</p>'}`,'A5');
+}
+function printCross(){
+  const start=document.getElementById('crossStart').value, end=document.getElementById('crossEnd').value;
+  const ob=document.getElementById('crossOldBalance').innerText;
+  const t=document.querySelector('#tab-cross table');
+  openPrintWindow('Cross Accounts',`<h2>CROSS ACCOUNTS — ${start} to ${end}</h2><p><b>${ob}</b></p>${t?t.outerHTML:'<p>No data</p>'}`,'A4');
+}
 
-async function printServiceCombined(){
+// FIX2+FIX3: Full Day Print — only after Finalise EOD, reads saved log note
+async function triggerFullDayPrint(){
+  // Ensure mechanic earnings are loaded
+  await loadMechEarnings();
+  // Page 1: JC List
   printJcDetails();
+  // Page 2: EOD + Log Note + Mechanic Earnings (500ms after first window opens)
   setTimeout(()=>{
-    const eodContent = document.getElementById('eodContent').innerHTML;
-    const mechTable = document.querySelector('#tab-mech table') ? document.querySelector('#tab-mech table').outerHTML : '';
-    const logHtml = `<h4>LOG NOTE COUNT</h4><div>Float: ₹${document.getElementById('logFloat').value} | Physical Total: ${document.getElementById('logPhysTotal').innerText} | Discrepancy: ${document.getElementById('logDiscrepancy').innerText}</div>`;
-    openPrintWindow('EOD+Mechanic '+activeDate, `<h2>EOD REPORT — ${activeDate}</h2>${eodContent}${logHtml}<h3>MECHANIC EARNINGS</h3>${mechTable}`, 'A4');
-  }, 900);
-}
-async function printEntityCombined(){
-  const eodContent = document.getElementById('eodContent').innerHTML;
-  const expTable = document.querySelector('#tab-expenses table').outerHTML;
-  const lubeTable = document.querySelector('#tab-lube table').outerHTML;
-  const logHtml = `<h4>LOG NOTE COUNT</h4><div>Float: ₹${document.getElementById('logFloat').value} | Physical Total: ${document.getElementById('logPhysTotal').innerText} | Discrepancy: ${document.getElementById('logDiscrepancy').innerText}</div>`;
-  openPrintWindow('EOD Combined '+activeDate, `<h2>${activeRole.toUpperCase()} EOD — ${activeDate}</h2>${eodContent}${logHtml}<h3>LUBE ISSUED</h3>${lubeTable}<h3>EXPENSES</h3>${expTable}`, 'A4');
-}
-
-function buildCombinedPrintButtons(){
-  const wrap = document.getElementById('combinedPrintBtns'); wrap.innerHTML='';
-  if(activeRole==='service' || activeRole==='admin'){
-    const b = document.createElement('button'); b.className='btn-action btn-primary'; b.innerText='🖨️ FULL DAY PRINT (JC+EOD+Mechanic)';
-    b.onclick = async ()=>{ await loadEodSummary(); await loadMechEarnings(); printServiceCombined(); };
-    wrap.appendChild(b);
-  }
-  if(activeRole==='green' || activeRole==='moped'){
-    const b = document.createElement('button'); b.className='btn-action btn-primary'; b.innerText='🖨️ FULL DAY PRINT (EOD+Expenses+Lube)';
-    b.onclick = async ()=>{ await loadEodSummary(); await loadExpenses(); await loadLubeIssued(); printEntityCombined(); };
-    wrap.appendChild(b);
-  }
+    const eodContent=document.getElementById('eodContent').innerHTML;
+    const mechTable=document.querySelector('#tab-mech table');
+    const logLine=`<h4 style="margin-top:14px;">LOG NOTE COUNT</h4><table><tbody>
+      <tr><td>Counter Float</td><td>₹${document.getElementById('logFloat').value}</td></tr>
+      <tr><td>Physical Total</td><td>${document.getElementById('logPhysTotal').innerText}</td></tr>
+      <tr><td>System Expected</td><td>${document.getElementById('logExpected').innerText}</td></tr>
+      <tr><td>Discrepancy</td><td>${document.getElementById('logDiscrepancy').innerText}</td></tr>
+    </tbody></table>`;
+    openPrintWindow('EOD+Mechanic '+activeDate,
+      `<h2>EOD REPORT — ${activeDate}</h2>${eodContent}${logLine}<h3 style="margin-top:16px;">MECHANIC EARNINGS</h3>${mechTable?mechTable.outerHTML:'<p>No mechanic data</p>'}`,'A4');
+  },500);
 }
 
-// ============ INIT ============
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 async function init(){
-  document.getElementById('mainDate').value = activeDate;
+  document.getElementById('mainDate').value=activeDate;
   buildTabBar();
-  buildCombinedPrintButtons();
   await prefetchStaticData();
-  const firstTab = TABS.find(t=>t.roles.includes(activeRole));
-  switchTab(firstTab ? firstTab.id : 'jc-details');
+  const firstTab=TABS.find(t=>t.roles.includes(activeRole));
+  switchTab(firstTab?firstTab.id:'jc-details');
 }
 init();
 </script>
