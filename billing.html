@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Floor Billing Console - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- html2canvas loaded lazily on first JPG export — not on page load -->
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad; --warning: #f59e0b;}
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); margin: 0; padding-bottom: 40px; color: var(--text); }
@@ -185,7 +185,8 @@
         <a href="index.html" class="nav-anchor">🏠 HOME</a>
     </div>
     <div style="display:flex; gap:12px; align-items:center;">
-        <button id="btnMechPrintTop" onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🖨️ PRINT MECHANIC TICKET</button>
+        <button onclick="openIntakePrintModal()" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📋 INTAKE TICKET</button>
+        <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🔧 MECHANIC TICKET</button>
         <span id="roleTag" class="badge-role">GUEST</span>
         <a href="login.html" class="nav-anchor" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE')" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">🚪 LOGOUT</a>
     </div>
@@ -223,7 +224,6 @@
             <div id="openJcActionsBar" style="display:none; margin-top:6px; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
                 <span id="expectedDeliveryDisplay" style="font-size:0.7rem; color:#64748b;"></span>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-                    <button onclick="openIntakePrintModal()" style="background:var(--primary); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;">📋 INTAKE / MECHANIC TICKET</button>
                     <button id="btnMarkReady" onclick="markReadyForDelivery()" style="background:var(--success); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;">✓ MARK READY</button>
                 </div>
             </div>
@@ -744,7 +744,7 @@
     </div>
 
 </div><!-- end intake-print-container -->
-    <div class="a5-page">
+    <div class="a5-page" id="mechanic-print-ticket" style="display:none;">
         <!-- Header -->
         <div style="text-align:center; margin-bottom:4px;">
             <img src="logo-main.jpg" onerror="this.style.display='none'" style="height:30px; filter:grayscale(100%); margin-bottom:2px;">
@@ -914,14 +914,15 @@
 
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin' || sessionRole === 'service') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; }
 
-        const { data: staffList } = await supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
+        /* PERF: Run mechanics + job card + catalog all in parallel — Round 1 */
+        const mechPromise = supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
+        const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
+        const catalogPromise = prefetchCentralCatalog();
+        const [mechRes, jobRes] = await Promise.all([mechPromise, jobPromise, catalogPromise]);
+        const staffList = mechRes.data;
         let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By</option>';
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt;
-
-        const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
-        const catalogPromise = prefetchCentralCatalog();
-        const [jobRes] = await Promise.all([jobPromise, catalogPromise]);
         const job = jobRes.data;
 
         if(job) {
@@ -1120,21 +1121,34 @@
         setTimeout(() => window.print(), 200);
     }
 
+    /* PERF: Lazy-load html2canvas only when a JPG export is actually requested */
+    function loadHtml2Canvas() {
+        return new Promise((resolve) => {
+            if (window.html2canvas) { resolve(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            document.head.appendChild(s);
+        });
+    }
+
     function exportCollectionReceiptJpg() {
         const target = document.getElementById('collectionReceiptTarget');
         target.classList.remove('a5-mode');
         const origBorder = target.style.border;
         target.style.border = 'none';
-        html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
-            target.style.border = origBorder;
-            canvas.toBlob(blob => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Collection_Receipt_JC_${targetJobId?.split('-')[0]?.toUpperCase()}.jpg`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }, 'image/jpeg', 0.95);
+        loadHtml2Canvas().then(() => {
+            html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(canvas => {
+                target.style.border = origBorder;
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Collection_Receipt_JC_${targetJobId?.split('-')[0]?.toUpperCase()}.jpg`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }, 'image/jpeg', 0.95);
+            });
         });
     }
 
@@ -1546,7 +1560,13 @@
     async function cancelJobCard() { const reason = prompt("Please provide a reason for cancelling this job card:"); if(!reason || reason.trim() === '') return alert("Cancellation requires a valid reason."); if(confirm("Are you absolutely sure you want to CANCEL this Job Card?")) { await supabaseClient.from('job_cards').update({ status: 'Cancelled', cancellation_reason: reason.trim() }).eq('id', targetJobId); alert("Job Card Cancelled."); window.location.href = 'index.html'; } }
 
     async function fetchCustomerContext(job) {
-        const { data: custData } = await supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single();
+        /* PERF: Run customer + AMC subscription queries in parallel — Round 2 */
+        const [custRes, subsRes] = await Promise.all([
+            supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single(),
+            supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString())
+        ]);
+        const custData = custRes.data;
+        const subs = subsRes.data;
         if (custData) {
             activeCustomerProfile = custData;
             activeCustomerName = custData.name;
@@ -1575,7 +1595,7 @@
             document.getElementById('vPointsUsed').placeholder = 'Not enrolled in Loyalty';
             document.getElementById('pointsRedemptionBlock').style.display = 'none';
         }
-        const { data: subs } = await supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString());
+        /* subs already fetched in parallel above — use directly */
         if (subs && subs.length > 0) document.getElementById('receiptPromoHindi').style.display = 'none';
         else document.getElementById('receiptPromoHindi').style.display = 'block';
     }
@@ -1595,7 +1615,7 @@
 
     function flagNewItemForReview() { const inp = document.getElementById('nPart'); const raw = inp.value.trim().toUpperCase(); inp.value = raw; document.getElementById('autolist-n').style.display='none'; window._pendingItemUnverified = true; }
     function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) { document.getElementById('nPart').value = name; document.getElementById('nBrand').value = brand; document.getElementById('nRate').value = defRate || mrpVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal; const typeSelect = document.getElementById('nType'); if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube'; else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol'; else typeSelect.value = 'Spare'; toggleLubeUI(); document.getElementById('autolist-n').style.display = 'none'; window._pid = pid; window._pmac = mac; window._pmrp = mrpVal; window._pendingItemUnverified = false; if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus(); }
-    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('*'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('*'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', source: 'service' }); }); } }
+    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', source: 'service' }); }); } }
 
     async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified' }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus(); } else { alert("Database Error: " + error.message); } }
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
@@ -1797,7 +1817,7 @@
 
     function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : ''; const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + summaryHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; document.getElementById('btnLandscapePrint').style.display = 'block'; }
 
-    function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }
+    function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; loadHtml2Canvas().then(() => { html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }); }
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
     function executePrint(mode) { document.body.className = ''; const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none'; if (isMulti) { document.body.classList.add('print-multi'); if (mode === 'landscape') document.body.classList.add('print-landscape'); } else { document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') container.classList.add('a5-mode'); else container.classList.remove('a5-mode'); } document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.onafterprint = function() { document.body.className = ''; window.onafterprint = null; }; window.print(); }, 400); }
 
