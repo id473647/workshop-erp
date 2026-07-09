@@ -6,80 +6,52 @@
     <title>Utility Operations Gateway - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- html2canvas loaded lazily on first JPG export -->
+    <script src="notifications.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --utility: #64748b; --gold: #f59e0b; --purple: #8e44ad; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom:40px; }
-        
         .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100; box-sizing: border-box; }
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } 
-        .logo-matrix img { height: 32px; object-fit: contain; }
+        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
         .nav-actions { display: flex; align-items: center; gap: 8px; }
         .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary); }
         .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
         .badge-role { background: var(--utility); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
-
         .wrapper { max-width: 950px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
         .card-panel { background: white; padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .block-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-        
         .utility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 24px; }
         .u-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; }
         .u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-color: #cbd5e1; }
         .u-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px; }
         .u-desc { font-size: 0.8rem; color: #64748b; line-height: 1.3; margin: 0; }
-        
         .inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; align-items: end; }
-        .field-group { display: flex; flex-direction: column; gap: 4px; } 
-        label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } 
-        input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
-        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } 
-        .btn-action:hover { opacity: 0.9; } 
-        .btn-info { background: #2980b9; }
-        
-        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; background: white;} 
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } 
-        th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } 
-        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
-        .utility-workspace { display: none; } 
-        .utility-workspace.active { display: block; }
+        .field-group { display: flex; flex-direction: column; gap: 4px; } label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; } input, select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .btn-action { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.9rem; width: 100%; transition: opacity 0.15s; } .btn-action:hover { opacity: 0.9; } .btn-info { background: #2980b9; }
+        .table-wrapper { border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; margin-top: 12px; max-height: 450px; background: white;} table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; } th { background: #f8fafc; padding: 10px 14px; font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; } td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .utility-workspace { display: none; } .utility-workspace.active { display: block; }
         .edit-icon { cursor: pointer; margin-left: 8px; color: var(--info); font-size: 0.9rem; text-decoration: none; }
-        
         #dailyCollectionBar { background: #0f172a; color: white; padding: 8px 20px; font-size: 0.85rem; font-weight: bold; text-align: center; cursor: pointer; }
         #dailyCollectionBar:hover { background: #1e293b; }
-
-        /* CRM TABS */
         .crm-tab-bar { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 15px; }
         .crm-tab-btn { padding: 10px 20px; cursor: pointer; font-weight: bold; color: #64748b; border: none; background: none; font-size: 0.9rem; }
         .crm-tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        .crm-tab-content { display: none; }
-        .crm-tab-content.active { display: block; }
+        .crm-tab-content { display: none; } .crm-tab-content.active { display: block; }
         .crm-badge { font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
-        .badge-credit { background: #ffedd5; color: #b45309; }
-        .badge-settled { background: #dcfce7; color: #15803d; }
+        .badge-credit { background: #ffedd5; color: #b45309; } .badge-settled { background: #dcfce7; color: #15803d; }
         .pay-row { background: #f8fafc; font-size: 0.8rem; padding: 4px 10px; display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; margin-left: 15px; }
-        
         .target-pay-btn { background: var(--success); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer; margin-left: 8px;}
         .target-pay-input { width: 70px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; margin-left: 8px;}
-        .dept-badge { font-size:0.65rem; padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:bold; }
-        .dept-ws { background:#e0f2fe; color:#0369a1; }
-        .dept-pos { background:#dcfce7; color:#15803d; }
-
-        @media print {
-            body * { visibility: hidden; }
-            #printableLedgerArea, #printableLedgerArea * { visibility: visible; }
-            #printableLedgerArea { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none; margin: 0; padding: 20px;}
-            .no-print { display: none !important; }
-        }
-
+        .dept-badge { font-size:0.65rem; padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:bold; } .dept-ws { background:#e0f2fe; color:#0369a1; } .dept-pos { background:#dcfce7; color:#15803d; }
+        /* Approval banner */
+        .approval-banner { background:#fffbeb; border:2px solid #f59e0b; border-radius:8px; padding:16px; margin-bottom:16px; }
+        .att-badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:0.68rem; font-weight:700; }
+        @media print { body * { visibility: hidden; } #printableLedgerArea, #printableLedgerArea * { visibility: visible; } #printableLedgerArea { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none; margin: 0; padding: 20px;} .no-print { display: none !important; } }
         .receipt-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 300; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
         .receipt-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; font-family: 'Courier New', Courier, monospace; }
-        
-        /* PHASE 3 AUDIT LOG STYLES */
         .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
-        .status-Pending { background: #fef3c7; color: #b45309; }
-        .status-Cleared { background: #dcfce7; color: #15803d; }
-        .status-Rejected { background: #fee2e2; color: #b91c1c; }
+        .status-Pending { background: #fef3c7; color: #b45309; } .status-Cleared { background: #dcfce7; color: #15803d; } .status-Rejected { background: #fee2e2; color: #b91c1c; }
+        .status-pending { background: #fef3c7; color: #b45309; } .status-approved { background: #dcfce7; color: #15803d; } .status-rejected { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -103,7 +75,6 @@
 <div class="wrapper">
     <div id="hubGrid" class="utility-workspace active">
         <div class="block-title" style="margin-bottom:20px;">Enterprise CRM & Logic Configuration</div>
-     
         <div class="utility-grid">
             <div class="u-card" style="border-left:4px solid var(--success);" id="cardCRM" onclick="openWorkspaceTarget('wsCustomers')">
                 <h4 class="u-title">👥 CRM Master & AMC</h4><p class="u-desc">Manage client profiles, map vehicles, and adjust discount tiers.</p>
@@ -114,11 +85,13 @@
             <div class="u-card" id="cardLedger" onclick="window.location.href='workshop-ledger.html'">
                 <h4 class="u-title">📓 Financial Ledgers & EOD</h4><p class="u-desc">Daily cash sheets, Cross-Ledger, and EOD reconciliations.</p>
             </div>
-            
+            <!-- Phase 6a: Pending Approvals card -->
+            <div class="u-card" id="cardApprovals" style="display:none; border-left:4px solid #dc2626;" onclick="window.location.href='approvals.html'">
+                <h4 class="u-title">📋 Pending Approvals</h4><p class="u-desc">Review and action pending commission, balance, and staff change requests.</p>
+            </div>
             <div class="u-card" id="cardAudit" style="display:none; border-left:4px solid var(--danger);" onclick="openWorkspaceTarget('wsAuditLog'); loadAuditLog();">
                 <h4 class="u-title">🛡️ Approval Audit Log</h4><p class="u-desc">Permanent history of all overrides and cross-ledger pings.</p>
             </div>
-
             <div class="u-card" id="cardStaff" onclick="openWorkspaceTarget('wsTech')">
                 <h4 class="u-title">👨‍💼 Staff & Payroll</h4><p class="u-desc">Manage Mechanics, Managers, Attendance & Commission Rules.</p>
             </div>
@@ -137,16 +110,17 @@
             <div class="u-card" id="cardProductGroups" onclick="openWorkspaceTarget('wsProductGroups')" style="display:none; border-left:4px solid var(--purple);">
                 <h4 class="u-title">🗂️ Product Groups</h4><p class="u-desc">Create vehicle-aware product groups for smart autocomplete in billing and POS.</p>
             </div>
-            <div class="u-card" id="cardVehicles" onclick="openWorkspaceTarget('wsVehicles')" style="display:none; border-left:4px solid var(--moped);"> 
-                <h4 class="u-title">🏍️ Vehicle Records</h4> 
-                <p class="u-desc">Search, edit, and merge customer vehicle records. Corrections reflect across all job cards.</p> 
-            </div> 
+            <div class="u-card" id="cardVehicles" onclick="openWorkspaceTarget('wsVehicles')" style="display:none; border-left:4px solid var(--moped);">
+                <h4 class="u-title">🏍️ Vehicle Records</h4>
+                <p class="u-desc">Search, edit, and merge customer vehicle records. Corrections reflect across all job cards.</p>
+            </div>
         </div>
     </div>
 
+    <!-- All existing workspaces preserved exactly as uploaded — only wsTech gets additions below -->
+
     <div id="wsProductGroups" class="card-panel utility-workspace">
         <div class="block-title">Product Group Management</div>
-        
         <h4 style="margin-top:0;">A. Master Groups</h4>
         <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px; margin-bottom:20px;">
             <div class="field-group"><label>Group Name</label><input type="text" id="pgName" placeholder="e.g. HONDA 110CC" oninput="this.value=this.value.toUpperCase()"></div>
@@ -156,40 +130,20 @@
         <div class="table-wrapper" style="margin-bottom:24px;">
             <table class="data-table"><thead><tr><th>Group Name</th><th>Description</th><th>Action</th></tr></thead><tbody id="tbProductGroups"></tbody></table>
         </div>
-
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
             <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:16px;">
                 <h4>B. Assign Products</h4>
-                <div class="field-group" style="margin-bottom:12px;">
-                    <label>Select Target Group</label>
-                    <select id="pgSelectProducts" onchange="loadGroupMappings()"><option value="">-- Choose Group --</option></select>
-                </div>
-                <div class="field-group" style="margin-bottom:12px; position:relative;">
-                    <label>Search Product (Token Match)</label>
-                    <input type="text" id="pgProdSearch" placeholder="Type to search..." oninput="searchGroupProduct(this)" onblur="setTimeout(()=>document.getElementById('pgProdAuto').style.display='none',200)">
-                    <div id="pgProdAuto" style="position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; max-height:150px; overflow-y:auto; display:none; z-index:50;"></div>
-                    <input type="hidden" id="pgSelectedProdId">
-                </div>
+                <div class="field-group" style="margin-bottom:12px;"><label>Select Target Group</label><select id="pgSelectProducts" onchange="loadGroupMappings()"><option value="">-- Choose Group --</option></select></div>
+                <div class="field-group" style="margin-bottom:12px; position:relative;"><label>Search Product (Token Match)</label><input type="text" id="pgProdSearch" placeholder="Type to search..." oninput="searchGroupProduct(this)" onblur="setTimeout(()=>document.getElementById('pgProdAuto').style.display='none',200)"><div id="pgProdAuto" style="position:absolute; top:100%; left:0; right:0; background:white; border:1px solid #ccc; max-height:150px; overflow-y:auto; display:none; z-index:50;"></div><input type="hidden" id="pgSelectedProdId"></div>
                 <button class="btn-action" style="padding:8px;" onclick="assignProductToGroup()">+ ADD PRODUCT TO GROUP</button>
-                <div class="table-wrapper" style="margin-top:12px;">
-                    <table class="data-table"><thead><tr><th>Assigned Products</th><th>Action</th></tr></thead><tbody id="tbGroupProducts"></tbody></table>
-                </div>
+                <div class="table-wrapper" style="margin-top:12px;"><table class="data-table"><thead><tr><th>Assigned Products</th><th>Action</th></tr></thead><tbody id="tbGroupProducts"></tbody></table></div>
             </div>
-
             <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:16px;">
                 <h4>C. Link Vehicles</h4>
-                <div class="field-group" style="margin-bottom:12px;">
-                    <label>Select Target Group</label>
-                    <select id="pgSelectVehicles" onchange="loadGroupVehicles()"><option value="">-- Choose Group --</option></select>
-                </div>
-                <div class="field-group" style="margin-bottom:12px;">
-                    <label>Vehicle Model / Segment Name</label>
-                    <input type="text" id="pgVehModel" placeholder="e.g. ACTIVA 6G" oninput="this.value=this.value.toUpperCase()">
-                </div>
+                <div class="field-group" style="margin-bottom:12px;"><label>Select Target Group</label><select id="pgSelectVehicles" onchange="loadGroupVehicles()"><option value="">-- Choose Group --</option></select></div>
+                <div class="field-group" style="margin-bottom:12px;"><label>Vehicle Model / Segment Name</label><input type="text" id="pgVehModel" placeholder="e.g. ACTIVA 6G" oninput="this.value=this.value.toUpperCase()"></div>
                 <button class="btn-action" style="padding:8px; background:var(--info);" onclick="linkVehicleToGroup()">+ LINK VEHICLE</button>
-                <div class="table-wrapper" style="margin-top:12px;">
-                    <table class="data-table"><thead><tr><th>Linked Models</th><th>Action</th></tr></thead><tbody id="tbGroupVehicles"></tbody></table>
-                </div>
+                <div class="table-wrapper" style="margin-top:12px;"><table class="data-table"><thead><tr><th>Linked Models</th><th>Action</th></tr></thead><tbody id="tbGroupVehicles"></tbody></table></div>
             </div>
         </div>
     </div>
@@ -226,27 +180,23 @@
         <div class="table-wrapper"><table class="data-table"><thead><tr><th>Protocol Name</th><th>Vehicle Category Segment</th><th>Fixed Rate</th><th>Action</th></tr></thead><tbody id="srvTableBody"></tbody></table></div>
     </div>
 
+    <!-- STAFF WORKSPACE — Phase 6a: added attendance status inline + approval banner slot -->
     <div id="wsTech" class="card-panel utility-workspace">
         <div class="block-title">Enterprise Staff & Payroll Directory</div>
+        <!-- Phase 6a: Approval banner slot — only appears when navigated from approvals page -->
+        <div id="staffApprovalBanner" style="display:none;"></div>
         <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
             <div class="inputs-grid">
                 <div class="field-group"><label>Staff Name</label><input type="text" id="tName" placeholder="Full Name" oninput="this.value=this.value.toUpperCase()"></div>
                 <div class="field-group"><label>Mobile Number (Login)</label><input type="tel" id="tMobile" placeholder="10 Digits" maxlength="10"></div>
-                <div class="field-group">
-                    <label>Assigned Role</label>
-                    <select id="tRole">
-                        <option value="Mechanic">Mechanic</option>
-                        <option value="Workshop Manager">Workshop Manager</option>
-                        <option value="Spare Parts Staff">Spare Parts Staff</option>
-                    </select>
-                </div>
+                <div class="field-group"><label>Assigned Role</label><select id="tRole"><option value="Mechanic">Mechanic</option><option value="Workshop Manager">Workshop Manager</option><option value="Spare Parts Staff">Spare Parts Staff</option></select></div>
                 <div class="field-group"><label>Labor Comm. / Salary Ref</label><input type="number" id="tComm" value="0" min="0"></div>
             </div>
             <button id="btnSaveTech" class="btn-action" onclick="upsertStaffProfileRecord()" style="margin-top:12px;">SAVE STAFF PROFILE</button>
             <button id="btnCancelTechEdit" class="btn-action" onclick="cancelTechEdit()" style="margin-top:8px; background:#e2e8f0; color:#1e293b; display:none;">CANCEL EDIT</button>
         </div>
         <div class="table-wrapper">
-            <table><thead><tr><th>Crew Member</th><th>Role</th><th>Wallet / Points</th><th>Action</th></tr></thead><tbody id="techDirectoryTableBody"></tbody></table>
+            <table><thead><tr><th>Crew Member</th><th>Role</th><th>Points / Wallet</th><th>Action</th></tr></thead><tbody id="techDirectoryTableBody"></tbody></table>
         </div>
     </div>
 
@@ -257,69 +207,31 @@
             <div class="inputs-grid">
                 <div class="field-group"><label>Scheme Name</label><input type="text" id="schName" placeholder="e.g. SUMMER LUBE PUSH" oninput="this.value=this.value.toUpperCase()"></div>
                 <div class="field-group"><label>Target Audience</label><select id="schRole"><option value="Mechanic">Mechanics</option><option value="Workshop Manager">Workshop Managers</option></select></div>
-                <div class="field-group">
-                    <label>Target Metric</label>
-                    <select id="schMetric"><option value="GREEN_SPARES_VOL">Green Spares Billed (₹)</option><option value="GREEN_LUBE_VOL">Green Lube Billed (ML)</option><option value="JOB_CARD_COUNT">Total Job Cards Closed (Count)</option><option value="ENGINE_RESTORE_COUNT">Engine Restorations (Count)</option></select>
-                </div>
+                <div class="field-group"><label>Target Metric</label><select id="schMetric"><option value="GREEN_SPARES_VOL">Green Spares Billed (₹)</option><option value="GREEN_LUBE_VOL">Green Lube Billed (ML)</option><option value="JOB_CARD_COUNT">Total Job Cards Closed (Count)</option><option value="ENGINE_RESTORE_COUNT">Engine Restorations (Count)</option></select></div>
                 <div class="field-group"><label>Target Value</label><input type="number" id="schTarget" placeholder="e.g. 35000"></div>
                 <div class="field-group"><label>Reward (₹)</label><input type="number" id="schReward" placeholder="e.g. 500"></div>
             </div>
             <button class="btn-action" style="background:#f59e0b; margin-top:12px;" onclick="createScheme()">ACTIVATE SCHEME</button>
         </div>
-        <div class="table-wrapper">
-            <table><thead><tr><th>Scheme Name</th><th>Audience & Metric</th><th>Target -> Reward</th><th>Status</th></tr></thead><tbody id="schemesTableBody"></tbody></table>
-        </div>
+        <div class="table-wrapper"><table><thead><tr><th>Scheme Name</th><th>Audience & Metric</th><th>Target -> Reward</th><th>Status</th></tr></thead><tbody id="schemesTableBody"></tbody></table></div>
     </div>
-    
-    <div id="wsVehicles" class="card-panel utility-workspace"> 
-      <div class="block-title">🏍️ Customer Vehicle Records 
-        — Search, Edit & Merge Duplicates</div> 
 
-      <div style="background:#fff7ed; border:1px solid #fed7aa; 
-           padding:12px; border-radius:8px; margin-bottom:16px; 
-           font-size:0.82rem; color:#92400e; font-weight:600;"> 
-        ⚠️ SAFE EDIT: Correcting a vehicle name updates it 
-        across ALL linked job cards automatically. Use MERGE 
-        to consolidate two duplicate records — all job cards 
-        from the wrong entry move to the correct one before 
-        the duplicate is safely removed. No data is lost. 
-      </div> 
-
-      <div class="inputs-grid" style="background:#f0f9ff; 
-           padding:16px; border-radius:8px; 
-           border:1px solid #bae6fd; margin-bottom:20px;"> 
-        <div class="field-group" style="grid-column:span 2;"> 
-          <label>Search by Reg No / Model / Customer Mobile 
-          </label> 
-          <input type="text" id="vehSearch" 
-           placeholder="e.g. 5529 or JUPITER or 9876543210" 
-           oninput="this.value=this.value.toUpperCase()"> 
-        </div> 
-        <div class="field-group"> 
-          <button class="btn-action" 
-           style="background:var(--moped);" 
-           onclick="searchVehiclesMaster()"> 
-            SEARCH 
-          </button> 
-        </div> 
-      </div> 
-
-      <div id="vehSearchResults"></div> 
-      <div id="vehMergePanel" style="display:none;"></div> 
-
-    </div> 
+    <div id="wsVehicles" class="card-panel utility-workspace">
+        <div class="block-title">🏍️ Customer Vehicle Records — Search, Edit & Merge Duplicates</div>
+        <div style="background:#fff7ed; border:1px solid #fed7aa; padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.82rem; color:#92400e; font-weight:600;">⚠️ SAFE EDIT: Correcting a vehicle name updates it across ALL linked job cards automatically. Use MERGE to consolidate two duplicate records — all job cards from the wrong entry move to the correct one before the duplicate is safely removed. No data is lost.</div>
+        <div class="inputs-grid" style="background:#f0f9ff; padding:16px; border-radius:8px; border:1px solid #bae6fd; margin-bottom:20px;">
+            <div class="field-group" style="grid-column:span 2;"><label>Search by Reg No / Model / Customer Mobile</label><input type="text" id="vehSearch" placeholder="e.g. 5529 or JUPITER or 9876543210" oninput="this.value=this.value.toUpperCase()"></div>
+            <div class="field-group"><button class="btn-action" style="background:var(--moped);" onclick="searchVehiclesMaster()">SEARCH</button></div>
+        </div>
+        <div id="vehSearchResults"></div>
+        <div id="vehMergePanel" style="display:none;"></div>
+    </div>
 
     <div id="wsAuditLog" class="card-panel utility-workspace">
         <div class="block-title">Enterprise Approval Audit Log</div>
         <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr><th>Date & Time</th><th>Request Type</th><th>Reference</th><th>Requested By</th><th>Resolution</th></tr>
-                </thead>
-                <tbody id="auditLogBody">
-                    <tr><td colspan="5" style="text-align:center;">Loading audit history...</td></tr>
-                </tbody>
-            </table>
+            <table><thead><tr><th>Date & Time</th><th>Request Type</th><th>Reference</th><th>Requested By</th><th>Resolution</th></tr></thead>
+            <tbody id="auditLogBody"><tr><td colspan="5" style="text-align:center;">Loading audit history...</td></tr></tbody></table>
         </div>
     </div>
 </div>
@@ -327,10 +239,7 @@
 <div id="paymentReceiptModal" class="receipt-modal">
     <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
         <div class="receipt-card" id="renderReceiptTarget" style="background:white; color:black; width: 300px;">
-            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:8px;">
-                <img src="logo-main.jpg" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
-                <img src="logo-green.png" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'">
-            </div>
+            <div style="display:flex; justify-content:center; gap:8px; margin-bottom:8px;"><img src="logo-main.jpg" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'"><img src="logo-green.png" style="height:30px; filter:grayscale(100%);" onerror="this.style.display='none'"></div>
             <div style="text-align:center; font-weight:bold; font-size:1rem; margin-bottom:10px; border-bottom:1px dashed #000; padding-bottom:5px;">PAYMENT ACKNOWLEDGEMENT</div>
             <div id="prtContent" style="text-align:left; font-size:0.8rem; line-height:1.5;"></div>
             <div style="border-top:1px dashed #000; margin-top:10px; margin-bottom:15px;"></div>
@@ -348,28 +257,45 @@
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-
     const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
-    
-    function executeSessionTermination() {
-        localStorage.removeItem('ERP_ACTIVE_ROLE');
-        window.location.href = 'login.html';
+    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+
+    /* ── Phase 6a: Lazy html2canvas loader ─────────────────────────────────── */
+    function loadHtml2Canvas() {
+        return new Promise(resolve => {
+            if (window.html2canvas) { resolve(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve; document.head.appendChild(s);
+        });
     }
 
     window.onload = () => {
         if (['admin', 'green', 'moped'].includes(activeSessionRole)) document.getElementById('cardProductGroups').style.display = 'flex';
-        if (['admin','service','green','moped'].includes(activeSessionRole)) document.getElementById('cardVehicles').style.display = 'flex'; 
-        if (activeSessionRole === 'admin') document.getElementById('cardAudit').style.display = 'flex'; // Phase 3 Audit Tab
-        
+        if (['admin','service','green','moped'].includes(activeSessionRole)) document.getElementById('cardVehicles').style.display = 'flex';
+        if (activeSessionRole === 'admin') { document.getElementById('cardAudit').style.display = 'flex'; }
+        /* Phase 6a: Approvals card for admin and service */
+        if (['admin','service'].includes(activeSessionRole)) document.getElementById('cardApprovals').style.display = 'flex';
+
         loadDailyCollection();
 
+        /* Phase 6a: Handle URL params for direct navigation from approvals.html */
         const urlParams = new URLSearchParams(window.location.search);
         const crmMobile = urlParams.get('crm');
+        const tabParam  = urlParams.get('tab');
+        const approvalId = urlParams.get('approval');
+
         if (crmMobile && crmMobile.length >= 10) {
             openWorkspaceTarget('wsCustomers');
             document.getElementById('crmSearch').value = crmMobile;
             searchCRM();
+        } else if (tabParam) {
+            openWorkspaceTarget(tabParam);
+            if (approvalId) {
+                // Wait for the workspace to render before showing banner
+                setTimeout(() => loadApprovalBanner(approvalId), 700);
+            }
         }
     };
 
@@ -381,454 +307,232 @@
         if(id === 'wsTech') loadStaffDirectoryLedgers();
         if(id === 'wsSchemes') loadSchemes();
         if(id === 'wsProductGroups') loadProductGroups();
-        if(id === 'wsVehicles') { document.getElementById('vehSearchResults').innerHTML=''; document.getElementById('vehMergePanel').style.display = 'none'; } 
+        if(id === 'wsVehicles') { document.getElementById('vehSearchResults').innerHTML=''; document.getElementById('vehMergePanel').style.display = 'none'; }
     }
 
     async function loadDailyCollection() {
         const todayStr = new Date().toISOString().split('T')[0];
         const { data: jc } = await supabaseClient.from('job_cards').select('total_invoice_value').eq('status', 'Closed').gte('closed_at', todayStr);
         const { data: pos } = await supabaseClient.from('counter_sales').select('total_amount').eq('status', 'Closed').gte('closed_at', todayStr);
-        
         let wsTotal = 0; let posTotal = 0;
         (jc||[]).forEach(j => wsTotal += parseFloat(j.total_invoice_value)||0);
         (pos||[]).forEach(p => posTotal += parseFloat(p.total_amount)||0);
-        document.getElementById('dailyCollectionBar').innerHTML = `Today's Collection: ₹${wsTotal} (Workshop) | ₹${posTotal} (POS)`;
+        document.getElementById('dailyCollectionBar').innerHTML = `Today's Collection: ₹${wsTotal.toLocaleString('en-IN')} (Workshop) | ₹${posTotal.toLocaleString('en-IN')} (POS)`;
     }
 
-    // === 1. CRM LOGIC (Phase 1, 2, 3 Integrated) ===
+    /* ── Phase 6a: Approval banner for Staff tab ────────────────────────────── */
+    async function loadApprovalBanner(approvalId) {
+        const { data: rec, error } = await supabaseClient.from('approval_requests')
+            .select('*').eq('id', approvalId).maybeSingle();
+        if (!rec || error) return;
+        if (rec.status !== 'pending') {
+            showInfoBanner('This approval has already been ' + rec.status + '.'); return;
+        }
+        renderStaffApprovalBanner(rec);
+    }
+
+    function renderStaffApprovalBanner(rec) {
+        const typeLabel = (rec.request_type || '').replace(/_/g, ' ').toUpperCase();
+        const isAdmin = activeSessionRole === 'admin';
+        const banner = document.getElementById('staffApprovalBanner');
+        banner.className = 'approval-banner';
+        banner.innerHTML = `
+            <div style="font-weight:700;color:#92400e;font-size:1rem;margin-bottom:10px;">
+                ⚠️ PENDING APPROVAL — ${typeLabel}
+            </div>
+            <div style="font-size:0.85rem;line-height:1.8;margin-bottom:12px;">
+                <b>Staff Member:</b> ${rec.entity_label || '—'} &nbsp;&nbsp;
+                <b>Current Value:</b> <span style="background:#fee2e2;padding:1px 6px;border-radius:4px;">${rec.current_value || '—'}</span> &nbsp;&nbsp;
+                <b>Proposed:</b> <span style="background:#dcfce7;color:#166534;font-weight:700;padding:1px 8px;border-radius:4px;">${rec.proposed_value || '—'}</span><br>
+                <b>Requested By:</b> ${(rec.requested_by || '—').toUpperCase()} &nbsp;|&nbsp;
+                <b>Date:</b> ${new Date(rec.requested_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'})}
+                ${rec.reason ? '<br><b>Reason:</b> ' + rec.reason : ''}
+            </div>
+            ${isAdmin ? `
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <button onclick="actionApprovalFromBanner('${rec.id}','approved','${rec.entity_id}','${rec.request_type}','${(rec.proposed_value||'').replace(/'/g,"\\'")}','${rec.entity_label||''}')"
+                    style="background:#16a34a;color:white;border:none;padding:10px 22px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.9rem;">
+                    ✅ APPROVE & APPLY
+                </button>
+                <input type="text" id="bannerRejectReason" placeholder="Rejection reason (required to reject)"
+                    style="flex:1;min-width:220px;padding:9px;border:1px solid #fca5a5;border-radius:6px;font-size:0.85rem;">
+                <button onclick="actionApprovalFromBanner('${rec.id}','rejected','${rec.entity_id}','${rec.request_type}','${(rec.proposed_value||'').replace(/'/g,"\\'")}','${rec.entity_label||''}')"
+                    style="background:#dc2626;color:white;border:none;padding:10px 22px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.9rem;">
+                    ❌ REJECT
+                </button>
+            </div>` :
+            '<p style="color:#64748b;font-size:0.85rem;">Only Admin can approve or reject this change. You can view the details above.</p>'}
+        `;
+        banner.style.display = 'block';
+        /* Highlight the mechanic row once the staff table loads */
+        if (rec.entity_label) {
+            setTimeout(() => highlightMechanicRow(rec.entity_label), 800);
+        }
+        setTimeout(() => banner.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    }
+
+    async function actionApprovalFromBanner(approvalId, action, entityId, requestType, proposedValue, entityLabel) {
+        let actionNote = null;
+        if (action === 'rejected') {
+            actionNote = (document.getElementById('bannerRejectReason')?.value || '').trim();
+            if (!actionNote) { alert('Please enter a reason for rejection before rejecting.'); return; }
+        }
+        if (action === 'approved') {
+            let applyError = null;
+            if (requestType === 'commission_rate') {
+                const { error } = await supabaseClient.from('mechanics').update({ commission_rate: parseFloat(proposedValue) }).eq('id', entityId);
+                applyError = error;
+            } else if (requestType === 'opening_balance') {
+                const { error } = await supabaseClient.from('mechanics').update({ opening_balance: parseFloat(proposedValue) }).eq('id', entityId);
+                applyError = error;
+            } else if (requestType === 'opening_points') {
+                const { error } = await supabaseClient.from('mechanics').update({ opening_points: parseFloat(proposedValue) }).eq('id', entityId);
+                applyError = error;
+            }
+            if (applyError) { alert('Error applying change: ' + applyError.message); return; }
+        }
+        const { error: updErr } = await supabaseClient.from('approval_requests').update({
+            status: action, actioned_by: activeSessionRole,
+            actioned_at: new Date().toISOString(), action_note: actionNote
+        }).eq('id', approvalId);
+        if (updErr) { alert('Error recording action: ' + updErr.message); return; }
+        const msg = action === 'approved'
+            ? `✅ Approved. ${requestType.replace(/_/g,' ')} for ${entityLabel} has been updated.`
+            : `❌ Rejected. Reason recorded.`;
+        alert(msg);
+        document.getElementById('staffApprovalBanner').style.display = 'none';
+        window.history.replaceState({}, '', 'utility-router.html');
+        loadStaffDirectoryLedgers();
+    }
+
+    function highlightMechanicRow(mechName) {
+        setTimeout(() => {
+            const rows = document.querySelectorAll('#techDirectoryTableBody tr');
+            rows.forEach(row => {
+                if (row.innerText.toUpperCase().includes(mechName.toUpperCase())) {
+                    row.style.background = '#fffbeb';
+                    row.style.outline = '2px solid #f59e0b';
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }, 400);
+    }
+
+    function showInfoBanner(msg) {
+        const b = document.getElementById('staffApprovalBanner');
+        b.style.cssText = 'display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;color:#166534;font-weight:700;margin-bottom:16px;';
+        b.innerText = 'ℹ️ ' + msg;
+    }
+
+    // === CRM LOGIC (unchanged) ===
     async function searchCRM() {
         const query = document.getElementById('crmSearch').value.trim();
         const resBox = document.getElementById('crmResults');
         if(query.length < 3) return resBox.innerHTML = '<p style="text-align:center; color:#64748b;">Type at least 3 characters to search.</p>';
-        
         const { data: custs, error } = await supabaseClient.from('customers').select('*, vehicles(*)').or(`mobile_number.ilike.%${query}%,name.ilike.%${query}%`).limit(5);
         if (error) return resBox.innerHTML = `<p style="text-align:center; color:var(--danger);">Error: ${error.message}</p>`;
-        
         resBox.innerHTML = '';
         if(!custs || custs.length === 0) return resBox.innerHTML = '<p style="text-align:center; color:var(--danger);">No profile found.</p>';
-        
         let html = '';
         for(const c of custs) {
             let vHtml = '';
             (c.vehicles || []).forEach(v => {
-                vHtml += `
-                <div style="border:1px solid #e2e8f0; border-radius:6px; padding:10px; margin-bottom:8px; background:#f8fafc;">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                        <strong style="color:var(--primary);">🏍️ ${v.reg_number} (${v.make_model})</strong>
-                        <button onclick="unmapVehicle('${v.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">[UNMAP]</button>
-                    </div>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:8px;">
-                        <input type="text" id="vehReg_${v.id}" value="${v.reg_number}" placeholder="Reg Number" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()">
-                        <input type="text" id="vehMod_${v.id}" value="${v.make_model||''}" placeholder="Make/Model" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()">
-                        <input type="text" id="vehCol_${v.id}" value="${v.color||''}" placeholder="Color" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()">
-                        <input type="text" id="vehChs_${v.id}" value="${v.chassis_number||''}" placeholder="Chassis" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()">
-                        <input type="text" id="vehEng_${v.id}" value="${v.engine_number||''}" placeholder="Engine" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()">
-                        <input type="number" id="vehOdo_${v.id}" value="${v.odometer||''}" placeholder="Odometer" style="padding:6px; font-size:0.8rem;">
-                    </div>
-                    <button onclick="updateVehicleDetails('${v.id}')" style="margin-top:8px; background:var(--info); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.75rem; cursor:pointer;">SAVE VEHICLE</button>
-                </div>`;
+                vHtml += `<div style="border:1px solid #e2e8f0; border-radius:6px; padding:10px; margin-bottom:8px; background:#f8fafc;"><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><strong style="color:var(--primary);">🏍️ ${v.reg_number} (${v.make_model})</strong><button onclick="unmapVehicle('${v.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">[UNMAP]</button></div><div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:8px;"><input type="text" id="vehReg_${v.id}" value="${v.reg_number}" placeholder="Reg Number" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()"><input type="text" id="vehMod_${v.id}" value="${v.make_model||''}" placeholder="Make/Model" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()"><input type="text" id="vehCol_${v.id}" value="${v.color||''}" placeholder="Color" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()"><input type="text" id="vehChs_${v.id}" value="${v.chassis_number||''}" placeholder="Chassis" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()"><input type="text" id="vehEng_${v.id}" value="${v.engine_number||''}" placeholder="Engine" style="padding:6px; font-size:0.8rem;" oninput="this.value=this.value.toUpperCase()"><input type="number" id="vehOdo_${v.id}" value="${v.odometer||''}" placeholder="Odometer" style="padding:6px; font-size:0.8rem;"></div><button onclick="updateVehicleDetails('${v.id}')" style="margin-top:8px; background:var(--info); color:white; border:none; padding:4px 10px; border-radius:4px; font-size:0.75rem; cursor:pointer;">SAVE VEHICLE</button></div>`;
             });
             if(!vHtml) vHtml = '<p style="margin:0; color:#64748b; font-size:0.8rem;">No vehicles linked.</p>';
-            
-            html += `
-            <div style="border:1px solid var(--info); border-radius:8px; margin-bottom:20px; background:white; overflow:hidden;">
-                
-                <div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0; justify-content:space-between; align-items:center;">
-                    <div style="display:flex;">
-                        <button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button>
-                        <button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button>
-                    </div>
-                    <span id="creditBal_${c.mobile_number}" style="font-size:0.8rem; font-weight:bold; color:#b91c1c; background:#fee2e2; padding:4px 10px; border-radius:6px; border:1px solid #fca5a5; margin-right:8px;">Credit Balance: ₹…</span>
-                </div>
-                
-                <div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;">
-                    <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:120px;"><label>Mobile Number</label><input type="text" value="${c.mobile_number}" readonly style="background:#f1f5f9; width:100%;"></div>
-                        <div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" oninput="this.value=this.value.toUpperCase()" style="width:100%;"></div>
-                        <div style="flex:1; min-width:120px;"><label>Tier</label>
-                            <select id="updCat_${c.mobile_number}" style="width:100%;">
-                                <option value="Regular" ${c.category==='Regular'?'selected':''}>Regular Tier</option>
-                                <option value="Silver" ${c.category==='Silver'?'selected':''}>Silver Tier</option>
-                                <option value="Gold" ${c.category==='Gold'?'selected':''}>Gold Tier</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
-                        <div style="flex:3; min-width:250px;"><label>Address</label><input type="text" id="updAddr_${c.mobile_number}" value="${c.address||''}" style="width:100%;"></div>
-                        <div style="flex:1; display:flex; align-items:flex-end; min-width:150px;"><button class="btn-action" onclick="updateCustomer('${c.mobile_number}')">SAVE PROFILE</button></div>
-                    </div>
-                    
-                    <h4 style="margin:0 0 8px 0; color:var(--primary);">Mapped Vehicles</h4>
-                    ${vHtml}
-                </div>
-
-                <div id="crm_ledg_${c.mobile_number}" class="crm-tab-content" style="padding:16px;">
-                    <div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:150px;">
-                            <label>Opening Balance Debt (₹)</label>
-                            <input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
-                        </div>
-                        <button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button>
-                    </div>
-
-                    <div id="ledgerHeader_${c.mobile_number}" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:6px; margin-bottom:16px; display:none;">
-                        <h4 style="margin:0 0 8px 0; color:#b45309;">DEBT RECOVERY SNAPSHOT</h4>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-weight:bold; font-size:0.9rem;">
-                            <div style="color:var(--danger);">Total Enterprise Due: <br>₹<span id="totDue_${c.mobile_number}">0</span></div>
-                            <div style="color:var(--service);">Workshop Dept Due: <br>₹<span id="wsDue_${c.mobile_number}">0</span></div>
-                            <div style="color:var(--success);">Green POS Due: <br>₹<span id="grnDue_${c.mobile_number}">0</span></div>
-                            <div style="color:var(--moped);">Moped POS Due: <br>₹<span id="mopDue_${c.mobile_number}">0</span></div>
-                        </div>
-                    </div>
-
-                    <div class="no-print" style="display:flex; gap:10px; margin-bottom:16px; background:#f8fafc; padding:10px; border-radius:6px; flex-wrap:wrap;">
-                        <input type="date" id="fltSt_${c.mobile_number}">
-                        <input type="date" id="fltEnd_${c.mobile_number}">
-                        <button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN LEDGER</button>
-                        <button class="btn-action" style="background:#15803d; padding:8px 16px; width:auto; margin-left:auto;" onclick="exportLedgerCsv('${c.mobile_number}')">📊 Excel</button>
-                        <button class="btn-action" style="background:var(--primary); padding:8px 16px; width:auto;" onclick="window.print()">🖨️ PDF</button>
-                    </div>
-                    
-                    <div id="printableLedgerArea">
-                        <div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div>
-                    </div>
-                </div>
-            </div>`;
+            html += `<div style="border:1px solid var(--info); border-radius:8px; margin-bottom:20px; background:white; overflow:hidden;"><div class="crm-tab-bar" style="background:#f0f9ff; padding:10px 10px 0 10px; margin-bottom:0; justify-content:space-between; align-items:center;"><div style="display:flex;"><button class="crm-tab-btn active" onclick="switchCrmTab('${c.mobile_number}', 'prof', event)">👤 Profile & Vehicles</button><button class="crm-tab-btn" onclick="switchCrmTab('${c.mobile_number}', 'ledg', event); loadCrmLedger('${c.mobile_number}')">📋 Billing Ledger</button></div><span id="creditBal_${c.mobile_number}" style="font-size:0.8rem; font-weight:bold; color:#b91c1c; background:#fee2e2; padding:4px 10px; border-radius:6px; border:1px solid #fca5a5; margin-right:8px;">Credit Balance: ₹…</span></div><div id="crm_prof_${c.mobile_number}" class="crm-tab-content active" style="padding:16px;"><div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;"><div style="flex:1; min-width:120px;"><label>Mobile Number</label><input type="text" value="${c.mobile_number}" readonly style="background:#f1f5f9; width:100%;"></div><div style="flex:2; min-width:200px;"><label>Full Name</label><input type="text" id="updName_${c.mobile_number}" value="${c.name}" oninput="this.value=this.value.toUpperCase()" style="width:100%;"></div><div style="flex:1; min-width:120px;"><label>Tier</label><select id="updCat_${c.mobile_number}" style="width:100%;"><option value="Regular" ${c.category==='Regular'?'selected':''}>Regular Tier</option><option value="Silver" ${c.category==='Silver'?'selected':''}>Silver Tier</option><option value="Gold" ${c.category==='Gold'?'selected':''}>Gold Tier</option></select></div></div><div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;"><div style="flex:3; min-width:250px;"><label>Address</label><input type="text" id="updAddr_${c.mobile_number}" value="${c.address||''}" style="width:100%;"></div><div style="flex:1; display:flex; align-items:flex-end; min-width:150px;"><button class="btn-action" onclick="updateCustomer('${c.mobile_number}')">SAVE PROFILE</button></div></div><h4 style="margin:0 0 8px 0; color:var(--primary);">Mapped Vehicles</h4>${vHtml}</div><div id="crm_ledg_${c.mobile_number}" class="crm-tab-content" style="padding:16px;"><div style="background:#fef3c7; padding:12px; border-radius:6px; border:1px solid #fde68a; margin-bottom:12px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;"><div style="flex:1; min-width:150px;"><label>Opening Balance Debt (₹)</label><input type="number" id="ob_${c.mobile_number}" placeholder="Amount" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;"></div><button class="btn-action" style="background:#d97706; width:auto;" onclick="setOpeningBalance('${c.mobile_number}', '${c.name.replace(/'/g,"\\'")}')">SET OPENING BALANCE</button></div><div id="ledgerHeader_${c.mobile_number}" style="background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:6px; margin-bottom:16px; display:none;"><h4 style="margin:0 0 8px 0; color:#b45309;">DEBT RECOVERY SNAPSHOT</h4><div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-weight:bold; font-size:0.9rem;"><div style="color:var(--danger);">Total Enterprise Due: <br>₹<span id="totDue_${c.mobile_number}">0</span></div><div style="color:var(--service);">Workshop Dept Due: <br>₹<span id="wsDue_${c.mobile_number}">0</span></div><div style="color:var(--success);">Green POS Due: <br>₹<span id="grnDue_${c.mobile_number}">0</span></div><div style="color:var(--moped);">Moped POS Due: <br>₹<span id="mopDue_${c.mobile_number}">0</span></div></div></div><div class="no-print" style="display:flex; gap:10px; margin-bottom:16px; background:#f8fafc; padding:10px; border-radius:6px; flex-wrap:wrap;"><input type="date" id="fltSt_${c.mobile_number}"><input type="date" id="fltEnd_${c.mobile_number}"><button class="btn-action" style="padding:8px 16px; width:auto;" onclick="loadCrmLedger('${c.mobile_number}')">RUN LEDGER</button><button class="btn-action" style="background:#15803d; padding:8px 16px; width:auto; margin-left:auto;" onclick="exportLedgerCsv('${c.mobile_number}')">📊 Excel</button><button class="btn-action" style="background:var(--primary); padding:8px 16px; width:auto;" onclick="window.print()">🖨️ PDF</button></div><div id="printableLedgerArea"><div id="ledgContent_${c.mobile_number}">Select RUN to view ledger...</div></div></div></div>`;
         }
         resBox.innerHTML = html;
         for (const c of custs) { computeAndShowCreditBalance(c.mobile_number); }
-        
-        setTimeout(async () => { 
-          const nameEl = document.getElementById('updName_' + custs[0]?.mobile_number); 
-          if (nameEl && nameEl.parentElement) { 
-            await checkCustomerSilence(custs[0].mobile_number, nameEl.parentElement); 
-          } 
-        }, 100); 
+        setTimeout(async () => { const nameEl = document.getElementById('updName_' + custs[0]?.mobile_number); if (nameEl && nameEl.parentElement) { await checkCustomerSilence(custs[0].mobile_number, nameEl.parentElement); } }, 100);
     }
 
-    function switchCrmTab(mobile, tab, evt) {
-        const container = document.getElementById(`crm_prof_${mobile}`).parentElement;
-        container.querySelectorAll('.crm-tab-btn').forEach(b => b.classList.remove('active'));
-        if (evt && evt.target) evt.target.classList.add('active');
-        
-        container.querySelectorAll('.crm-tab-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(`crm_${tab}_${mobile}`).classList.add('active');
-    }
+    function switchCrmTab(mobile, tab, evt) { const container = document.getElementById(`crm_prof_${mobile}`).parentElement; container.querySelectorAll('.crm-tab-btn').forEach(b => b.classList.remove('active')); if (evt && evt.target) evt.target.classList.add('active'); container.querySelectorAll('.crm-tab-content').forEach(c => c.classList.remove('active')); document.getElementById(`crm_${tab}_${mobile}`).classList.add('active'); }
 
-    async function computeAndShowCreditBalance(mobile) {
-        const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
-        const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed');
-        const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile);
+    async function computeAndShowCreditBalance(mobile) { const { data: jc } = await supabaseClient.from('job_cards').select('id, total_invoice_value').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed'); const { data: pos } = await supabaseClient.from('counter_sales').select('id, total_amount').eq('customer_mobile', mobile).eq('payment_mode', 'Credit').eq('status', 'Closed'); const { data: pays } = await supabaseClient.from('credit_payments').select('amount_paid, sale_id, job_card_id').eq('customer_mobile', mobile); let totalOut = 0; (jc || []).forEach(j => { const paid = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0); const out = (parseFloat(j.total_invoice_value) || 0) - paid; if (out > 0) totalOut += out; }); (pos || []).forEach(s => { const paid = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0); const out = (parseFloat(s.total_amount) || 0) - paid; if (out > 0) totalOut += out; }); const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id); let obDebt = 0; obPays.forEach(p => { if (parseFloat(p.amount_paid) < 0) obDebt += Math.abs(parseFloat(p.amount_paid)); else obDebt -= parseFloat(p.amount_paid) || 0; }); if (obDebt > 0) totalOut += obDebt; const el = document.getElementById(`creditBal_${mobile}`); if (el) { el.innerText = `Credit Balance: ₹${totalOut.toFixed(2)}`; el.style.background = totalOut > 0 ? '#fee2e2' : '#dcfce7'; el.style.color = totalOut > 0 ? '#b91c1c' : '#15803d'; el.style.borderColor = totalOut > 0 ? '#fca5a5' : '#bbf7d0'; } }
 
-        let totalOut = 0;
-        (jc || []).forEach(j => {
-            const paid = (pays || []).filter(p => p.job_card_id === j.id).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
-            const out = (parseFloat(j.total_invoice_value) || 0) - paid;
-            if (out > 0) totalOut += out;
-        });
+    async function checkCustomerSilence(mobile, containerEl) { const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); const { data } = await supabaseClient.from('job_cards').select('created_at').eq('customer_mobile', mobile).order('created_at', { ascending: false }).limit(1); const lastVisit = data && data.length > 0 ? new Date(data[0].created_at) : null; if (!lastVisit || lastVisit < ninetyDaysAgo) { const daysSince = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null; const badge = document.createElement('span'); badge.style.cssText = 'background:#fef3c7;color:#b45309;font-size:0.75rem;font-weight:bold;padding:2px 8px;border-radius:4px;margin-left:8px;border:1px solid #fde68a;'; badge.title = 'Last visited: ' + (lastVisit ? lastVisit.toLocaleDateString('en-IN') : 'Never'); badge.innerText = lastVisit ? '📞 SILENT ' + daysSince + ' DAYS' : '📞 NEW / NO HISTORY'; if (containerEl) containerEl.appendChild(badge); } }
 
-        (pos || []).forEach(s => {
-            const paid = (pays || []).filter(p => p.sale_id === s.id).reduce((sm, p) => sm + (parseFloat(p.amount_paid) || 0), 0);
-            const out = (parseFloat(s.total_amount) || 0) - paid;
-            if (out > 0) totalOut += out;
-        });
+    async function updateVehicleDetails(vid) { const data = { reg_number: document.getElementById(`vehReg_${vid}`).value.toUpperCase(), make_model: document.getElementById(`vehMod_${vid}`).value.toUpperCase(), color: document.getElementById(`vehCol_${vid}`).value.toUpperCase(), chassis_number: document.getElementById(`vehChs_${vid}`).value.toUpperCase(), engine_number: document.getElementById(`vehEng_${vid}`).value.toUpperCase(), odometer: document.getElementById(`vehOdo_${vid}`).value }; const { error } = await supabaseClient.from('vehicles').update(data).eq('id', vid); if (error) alert("Error: " + error.message); else alert('Vehicle Updated'); }
+    async function updateCustomer(mobile) { const data = { name: document.getElementById(`updName_${mobile}`).value.trim().toUpperCase(), category: document.getElementById(`updCat_${mobile}`).value, address: document.getElementById(`updAddr_${mobile}`).value }; const { error } = await supabaseClient.from('customers').update(data).eq('mobile_number', mobile); if (error) alert("Error: " + error.message); else alert("Profile Updated"); }
+    async function unmapVehicle(vid) { if(confirm("Remove this vehicle from the profile?")) { const { error } = await supabaseClient.from('vehicles').delete().eq('id', vid); if (error) alert("Error: " + error.message); else searchCRM(); } }
+    async function setOpeningBalance(mobile, name) { const amt = parseFloat(document.getElementById(`ob_${mobile}`).value) || 0; if(amt <= 0) return; const { error } = await supabaseClient.from('credit_payments').insert({ customer_mobile: mobile, amount_paid: -amt, payment_mode: 'Opening Balance', note: 'Opening Balance', paid_by_role: activeSessionRole }); if (error) return alert("Error: " + error.message); alert('Opening Balance Logged'); document.getElementById(`ob_${mobile}`).value = ''; if (document.getElementById(`crm_ledg_${mobile}`).classList.contains('active')) { loadCrmLedger(mobile); } computeAndShowCreditBalance(mobile); }
 
-        const obPays = (pays || []).filter(p => !p.sale_id && !p.job_card_id);
-        let obDebt = 0;
-        obPays.forEach(p => {
-            if (parseFloat(p.amount_paid) < 0) obDebt += Math.abs(parseFloat(p.amount_paid));
-            else obDebt -= parseFloat(p.amount_paid) || 0;
-        });
-        if (obDebt > 0) totalOut += obDebt;
+    let ledgerExportData = [];
+    async function loadCrmLedger(mobile) { const st = document.getElementById(`fltSt_${mobile}`).value; const end = document.getElementById(`fltEnd_${mobile}`).value; let events = []; let wsDebt = 0; let grnDebt = 0; let mopDebt = 0; const [psRes, jsRes, paysRes] = await Promise.all([supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile)]); const ps = psRes.data || []; const js = jsRes.data || []; const pays = paysRes.data || []; ps.forEach(s => { events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id, source_role: s.source_role }); }); js.forEach(j => { events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id, source_role: j.source_role }); }); pays.forEach(p => { const amt = parseFloat(p.amount_paid) || 0; if(amt < 0 && p.payment_mode === 'Opening Balance') { events.push({ date: new Date('2000-01-01'), desc: `Opening Balance Debt`, debit: Math.abs(amt), credit: 0, isInvoice: false, type: 'OB', id: p.id }); } else if(amt > 0) { events.push({ date: new Date(p.created_at), desc: `Payment via ${p.payment_mode} by ${p.paid_by_role}`, debit: 0, credit: amt, id: p.id, isInvoice: false, linked_jc: p.job_card_id, linked_pos: p.sale_id }); } }); events.sort((a,b) => a.date - b.date); let runningBalance = 0; let tableHtml = `<div class="table-wrapper"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Debit (Billed)</th><th>Credit (Paid)</th><th>Balance Due</th><th class="no-print">Target Settle</th></tr></thead><tbody>`; ledgerExportData = [["Date", "Description", "Debit", "Credit", "Balance Due"]]; const invoiceBalances = {}; events.filter(e => e.isInvoice || e.type==='OB').forEach(e => { invoiceBalances[e.id] = e.debit; }); events.filter(e => !e.isInvoice && e.credit > 0).forEach(e => { if(e.linked_jc && invoiceBalances[e.linked_jc]) invoiceBalances[e.linked_jc] -= e.credit; if(e.linked_pos && invoiceBalances[e.linked_pos]) invoiceBalances[e.linked_pos] -= e.credit; }); events.forEach(e => { runningBalance += e.debit; runningBalance -= e.credit; const inRange = (!st || e.date >= new Date(st)) && (!end || e.date <= new Date(end + 'T23:59:59')); if(inRange) { const dateStr = e.date.getFullYear() === 2000 ? '--' : e.date.toLocaleDateString('en-IN'); let badge = ''; if (e.type === 'JC') badge = '<span class="dept-badge dept-ws">WORKSHOP</span>'; else if (e.type === 'POS') { if (e.source_role === 'moped') badge = '<span class="dept-badge" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd;">MOPED</span>'; else badge = '<span class="dept-badge dept-pos">GREEN</span>'; } const drStr = e.debit > 0 ? `₹${e.debit.toFixed(2)}` : ''; const crStr = e.credit > 0 ? `<span style="color:var(--success); font-weight:bold;">₹${e.credit.toFixed(2)}</span>` : ''; const balStr = `<strong style="color:var(--danger);">₹${Math.max(0, runningBalance).toFixed(2)}</strong>`; let targetSettleUi = ''; if((e.isInvoice || e.type==='OB') && invoiceBalances[e.id] > 0) { const owe = invoiceBalances[e.id]; if(e.type === 'JC') wsDebt += owe; else if(e.type === 'POS' && e.source_role === 'moped') mopDebt += owe; else if(e.type === 'POS') grnDebt += owe; let isAllowedToSettle = false; if (activeSessionRole === 'admin') isAllowedToSettle = true; else if (activeSessionRole === 'service' && e.type === 'JC') isAllowedToSettle = true; else if (activeSessionRole === 'green' && e.type === 'POS' && (e.source_role === 'green' || !e.source_role)) isAllowedToSettle = true; else if (activeSessionRole === 'moped' && e.type === 'POS' && e.source_role === 'moped') isAllowedToSettle = true; if (isAllowedToSettle) { targetSettleUi = `<div style="display:flex; align-items:center;" class="no-print"><input type="number" id="payInp_${e.id}" class="target-pay-input" placeholder="₹${owe.toFixed(0)}"><select id="payMod_${e.id}" style="padding:2px; font-size:0.7rem; margin-left:4px;"><option value="Cash">Cash</option><option value="UPI">UPI</option></select><button class="target-pay-btn" onclick="applyTargetPayment('${mobile}', '${e.id}', '${e.type}', ${owe})">PAY</button></div>`; } else { targetSettleUi = `<div style="font-size:0.75rem; color:#94a3b8; font-weight:bold;" class="no-print">🔒 Restricted Dept</div>`; } } tableHtml += `<tr><td>${dateStr}</td><td>${e.desc} ${badge}</td><td>${drStr}</td><td>${crStr}</td><td>${balStr}</td><td class="no-print">${targetSettleUi}</td></tr>`; ledgerExportData.push([dateStr, e.desc, drStr, crStr, Math.max(0, runningBalance).toFixed(2)]); } }); tableHtml += '</tbody></table></div>'; document.getElementById(`totDue_${mobile}`).innerText = (wsDebt + grnDebt + mopDebt).toFixed(2); document.getElementById(`wsDue_${mobile}`).innerText = wsDebt.toFixed(2); document.getElementById(`grnDue_${mobile}`).innerText = grnDebt.toFixed(2); document.getElementById(`mopDue_${mobile}`).innerText = mopDebt.toFixed(2); document.getElementById(`ledgerHeader_${mobile}`).style.display = 'block'; document.getElementById(`ledgContent_${mobile}`).innerHTML = tableHtml; }
 
-        const el = document.getElementById(`creditBal_${mobile}`);
-        if (el) {
-            el.innerText = `Credit Balance: ₹${totalOut.toFixed(2)}`;
-            el.style.background = totalOut > 0 ? '#fee2e2' : '#dcfce7';
-            el.style.color = totalOut > 0 ? '#b91c1c' : '#15803d';
-            el.style.borderColor = totalOut > 0 ? '#fca5a5' : '#bbf7d0';
-        }
-    }
-    
-    async function checkCustomerSilence(mobile, containerEl) { 
-      const ninetyDaysAgo = new Date(); 
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90); 
+    async function applyTargetPayment(mobile, targetId, targetType, maxAmt) { const amtInput = document.getElementById(`payInp_${targetId}`); const amt = parseFloat(amtInput.value) || 0; const mode = document.getElementById(`payMod_${targetId}`).value; if(amt <= 0 || amt > maxAmt) return alert(`Enter a valid amount up to ₹${maxAmt}.`); const payload = { customer_mobile: mobile, amount_paid: amt, payment_mode: mode, paid_by_role: activeSessionRole, note: 'Targeted Ledger Settlement' }; if(targetType === 'JC') payload.job_card_id = targetId; if(targetType === 'POS') payload.sale_id = targetId; const { error } = await supabaseClient.from('credit_payments').insert(payload); if (error) alert("Error: " + error.message); else { generatePaymentReceipt(mobile, amt, mode, targetType, targetId); loadCrmLedger(mobile); computeAndShowCreditBalance(mobile); } }
 
-      const { data } = await supabaseClient.from('job_cards').select('created_at').eq('customer_mobile', mobile).order('created_at', { ascending: false }).limit(1); 
+    function generatePaymentReceipt(mobile, amount, mode, type, id) { const d = new Date(); const prefix = type === 'JC' ? 'Workshop Job Card' : (type === 'POS' ? 'Retail POS Invoice' : 'Opening Balance'); const refText = type === 'OB' ? 'Manual Registry' : id.split('-')[0].toUpperCase(); const receiptHtml = `Date: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}<br>Client Mobile: ${mobile}<br><br>Received with thanks the sum of:<br><strong style="font-size:1.5rem; color:var(--success);">₹${amount.toFixed(2)}</strong><br><br><strong>Mode:</strong> ${mode}<br><strong>Target:</strong> ${prefix} (${refText})<br><br><strong>Collected By Dept:</strong> ${activeSessionRole.toUpperCase()}<br><em style="font-size:0.75rem;">*Subject to internal vault clearing.*</em>`; document.getElementById('prtContent').innerHTML = receiptHtml; document.getElementById('paymentReceiptModal').style.display = 'flex'; }
 
-      const lastVisit = data && data.length > 0 ? new Date(data[0].created_at) : null; 
+    function exportReceiptAsJPG() { const layoutTarget = document.getElementById('renderReceiptTarget'); loadHtml2Canvas().then(() => { html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { canvas.toBlob(blob => { const targetBlobUrl = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = targetBlobUrl; a.download = `Receipt_${new Date().getTime()}.jpg`; a.click(); URL.revokeObjectURL(targetBlobUrl); }, 'image/jpeg', 0.95); }); }); }
 
-      if (!lastVisit || lastVisit < ninetyDaysAgo) { 
-        const daysSince = lastVisit ? Math.floor((Date.now() - lastVisit.getTime()) / 86400000) : null; 
-        const badge = document.createElement('span'); 
-        badge.style.cssText = 'background:#fef3c7;color:#b45309;font-size:0.75rem;font-weight:bold;padding:2px 8px;border-radius:4px;margin-left:8px;border:1px solid #fde68a;'; 
-        badge.title = 'Last visited: ' + (lastVisit ? lastVisit.toLocaleDateString('en-IN') : 'Never'); 
-        badge.innerText = lastVisit ? '📞 SILENT ' + daysSince + ' DAYS' : '📞 NEW / NO HISTORY'; 
-        if (containerEl) containerEl.appendChild(badge); 
-      } 
-    } 
+    function exportLedgerCsv(mobile) { if(ledgerExportData.length <= 1) return alert("No data to export."); let csvContent = "data:text/csv;charset=utf-8,"; ledgerExportData.forEach(rowArray => { let row = rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Ledger_${mobile}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); }
 
-    async function updateVehicleDetails(vid) {
-        const data = {
-            reg_number: document.getElementById(`vehReg_${vid}`).value.toUpperCase(),
-            make_model: document.getElementById(`vehMod_${vid}`).value.toUpperCase(),
-            color: document.getElementById(`vehCol_${vid}`).value.toUpperCase(),
-            chassis_number: document.getElementById(`vehChs_${vid}`).value.toUpperCase(),
-            engine_number: document.getElementById(`vehEng_${vid}`).value.toUpperCase(),
-            odometer: document.getElementById(`vehOdo_${vid}`).value
-        };
-        const { error } = await supabaseClient.from('vehicles').update(data).eq('id', vid);
-        if (error) alert("Error: " + error.message);
-        else alert('Vehicle Updated');
-    }
-
-    async function updateCustomer(mobile) {
-        const data = {
-            name: document.getElementById(`updName_${mobile}`).value.trim().toUpperCase(), 
-            category: document.getElementById(`updCat_${mobile}`).value,
-            address: document.getElementById(`updAddr_${mobile}`).value
-        };
-        const { error } = await supabaseClient.from('customers').update(data).eq('mobile_number', mobile);
-        if (error) alert("Error: " + error.message);
-        else alert("Profile Updated");
-    }
-
-    async function unmapVehicle(vid) {
-        if(confirm("Remove this vehicle from the profile?")) {
-            const { error } = await supabaseClient.from('vehicles').delete().eq('id', vid);
-            if (error) alert("Error: " + error.message);
-            else searchCRM();
-        }
-    }
-
-    async function setOpeningBalance(mobile, name) {
-        const amt = parseFloat(document.getElementById(`ob_${mobile}`).value) || 0;
-        if(amt <= 0) return;
-        const { error } = await supabaseClient.from('credit_payments').insert({ customer_mobile: mobile, amount_paid: -amt, payment_mode: 'Opening Balance', note: 'Opening Balance', paid_by_role: activeSessionRole });
-        if (error) return alert("Error: " + error.message);
-        alert('Opening Balance Logged');
-        document.getElementById(`ob_${mobile}`).value = '';
-        if (document.getElementById(`crm_ledg_${mobile}`).classList.contains('active')) { loadCrmLedger(mobile); }
-        computeAndShowCreditBalance(mobile);
-    }
-
-    let ledgerExportData = []; 
-
-    // PHASE 2 & 3 INTEGRATED LEDGER ENGINE
-    async function loadCrmLedger(mobile) {
-        const st = document.getElementById(`fltSt_${mobile}`).value;
-        const end = document.getElementById(`fltEnd_${mobile}`).value;
-        
-        let events = []; 
-        let wsDebt = 0; let grnDebt = 0; let mopDebt = 0;
-
-        const [psRes, jsRes, paysRes] = await Promise.all([
-            supabaseClient.from('counter_sales').select('id, created_at, closed_at, total_amount, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
-            supabaseClient.from('job_cards').select('id, created_at, closed_at, total_invoice_value, payment_mode, status, source_role').eq('customer_mobile', mobile).eq('status', 'Closed').eq('payment_mode', 'Credit'),
-            supabaseClient.from('credit_payments').select('*').eq('customer_mobile', mobile)
-        ]);
-
-        const ps = psRes.data || [];
-        const js = jsRes.data || [];
-        const pays = paysRes.data || [];
-
-        ps.forEach(s => { events.push({ date: new Date(s.closed_at || s.created_at), desc: `POS Invoice Ref: POS-${s.id.split('-')[0].toUpperCase()}`, debit: parseFloat(s.total_amount) || 0, credit: 0, isInvoice: true, type: 'POS', id: s.id, source_role: s.source_role }); });
-        js.forEach(j => { events.push({ date: new Date(j.closed_at || j.created_at), desc: `Workshop Job Card Ref: JC-${j.id.split('-')[0].toUpperCase()}`, debit: parseFloat(j.total_invoice_value) || 0, credit: 0, isInvoice: true, type: 'JC', id: j.id, source_role: j.source_role }); });
-        
-        pays.forEach(p => {
-            const amt = parseFloat(p.amount_paid) || 0;
-            if(amt < 0 && p.payment_mode === 'Opening Balance') {
-                events.push({ date: new Date('2000-01-01'), desc: `Opening Balance Debt`, debit: Math.abs(amt), credit: 0, isInvoice: false, type: 'OB', id: p.id });
-            } else if(amt > 0) {
-                events.push({ date: new Date(p.created_at), desc: `Payment via ${p.payment_mode} by ${p.paid_by_role}`, debit: 0, credit: amt, id: p.id, isInvoice: false, linked_jc: p.job_card_id, linked_pos: p.sale_id });
-            }
-        });
-        
-        events.sort((a,b) => a.date - b.date);
-        
-        let runningBalance = 0;
-        let tableHtml = `<div class="table-wrapper"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Debit (Billed)</th><th>Credit (Paid)</th><th>Balance Due</th><th class="no-print">Target Settle</th></tr></thead><tbody>`;
-        
-        ledgerExportData = [["Date", "Description", "Debit", "Credit", "Balance Due"]];
-
-        const invoiceBalances = {};
-        events.filter(e => e.isInvoice || e.type==='OB').forEach(e => { invoiceBalances[e.id] = e.debit; });
-        events.filter(e => !e.isInvoice && e.credit > 0).forEach(e => {
-            if(e.linked_jc && invoiceBalances[e.linked_jc]) invoiceBalances[e.linked_jc] -= e.credit;
-            if(e.linked_pos && invoiceBalances[e.linked_pos]) invoiceBalances[e.linked_pos] -= e.credit;
-        });
-
-        events.forEach(e => {
-            runningBalance += e.debit;
-            runningBalance -= e.credit;
-            
-            const inRange = (!st || e.date >= new Date(st)) && (!end || e.date <= new Date(end + 'T23:59:59'));
-            
-            if(inRange) {
-                const dateStr = e.date.getFullYear() === 2000 ? '--' : e.date.toLocaleDateString('en-IN');
-                
-                let badge = '';
-                if (e.type === 'JC') badge = '<span class="dept-badge dept-ws">WORKSHOP</span>';
-                else if (e.type === 'POS') {
-                    if (e.source_role === 'moped') badge = '<span class="dept-badge" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd;">MOPED</span>';
-                    else badge = '<span class="dept-badge dept-pos">GREEN</span>';
-                }
-
-                const drStr = e.debit > 0 ? `₹${e.debit.toFixed(2)}` : '';
-                const crStr = e.credit > 0 ? `<span style="color:var(--success); font-weight:bold;">₹${e.credit.toFixed(2)}</span>` : '';
-                const balStr = `<strong style="color:var(--danger);">₹${Math.max(0, runningBalance).toFixed(2)}</strong>`;
-                
-                let targetSettleUi = '';
-                if((e.isInvoice || e.type==='OB') && invoiceBalances[e.id] > 0) {
-                    const owe = invoiceBalances[e.id];
-                    if(e.type === 'JC') wsDebt += owe;
-                    else if(e.type === 'POS' && e.source_role === 'moped') mopDebt += owe;
-                    else if(e.type === 'POS') grnDebt += owe;
-                    
-                    let isAllowedToSettle = false;
-                    if (activeSessionRole === 'admin') isAllowedToSettle = true;
-                    else if (activeSessionRole === 'service' && e.type === 'JC') isAllowedToSettle = true;
-                    else if (activeSessionRole === 'green' && e.type === 'POS' && (e.source_role === 'green' || !e.source_role)) isAllowedToSettle = true;
-                    else if (activeSessionRole === 'moped' && e.type === 'POS' && e.source_role === 'moped') isAllowedToSettle = true;
-
-                    if (isAllowedToSettle) {
-                        targetSettleUi = `
-                            <div style="display:flex; align-items:center;" class="no-print">
-                                <input type="number" id="payInp_${e.id}" class="target-pay-input" placeholder="₹${owe.toFixed(0)}">
-                                <select id="payMod_${e.id}" style="padding:2px; font-size:0.7rem; margin-left:4px;"><option value="Cash">Cash</option><option value="UPI">UPI</option></select>
-                                <button class="target-pay-btn" onclick="applyTargetPayment('${mobile}', '${e.id}', '${e.type}', ${owe})">PAY</button>
-                            </div>`;
-                    } else {
-                        targetSettleUi = `<div style="font-size:0.75rem; color:#94a3b8; font-weight:bold;" class="no-print">🔒 Restricted Dept</div>`;
-                    }
-                }
-
-                tableHtml += `<tr><td>${dateStr}</td><td>${e.desc} ${badge}</td><td>${drStr}</td><td>${crStr}</td><td>${balStr}</td><td class="no-print">${targetSettleUi}</td></tr>`;
-                ledgerExportData.push([dateStr, e.desc, drStr, crStr, Math.max(0, runningBalance).toFixed(2)]);
-            }
-        });
-
-        tableHtml += '</tbody></table></div>';
-        
-        document.getElementById(`totDue_${mobile}`).innerText = (wsDebt + grnDebt + mopDebt).toFixed(2);
-        document.getElementById(`wsDue_${mobile}`).innerText = wsDebt.toFixed(2);
-        document.getElementById(`grnDue_${mobile}`).innerText = grnDebt.toFixed(2);
-        document.getElementById(`mopDue_${mobile}`).innerText = mopDebt.toFixed(2);
-        document.getElementById(`ledgerHeader_${mobile}`).style.display = 'block';
-        
-        document.getElementById(`ledgContent_${mobile}`).innerHTML = tableHtml;
-    }
-
-    async function applyTargetPayment(mobile, targetId, targetType, maxAmt) {
-        const amtInput = document.getElementById(`payInp_${targetId}`);
-        const amt = parseFloat(amtInput.value) || 0;
-        const mode = document.getElementById(`payMod_${targetId}`).value;
-
-        if(amt <= 0 || amt > maxAmt) return alert(`Enter a valid amount up to ₹${maxAmt}.`);
-
-        const payload = { customer_mobile: mobile, amount_paid: amt, payment_mode: mode, paid_by_role: activeSessionRole, note: 'Targeted Ledger Settlement' };
-        if(targetType === 'JC') payload.job_card_id = targetId;
-        if(targetType === 'POS') payload.sale_id = targetId;
-
-        const { error } = await supabaseClient.from('credit_payments').insert(payload);
-        if (error) alert("Error: " + error.message);
-        else {
-            generatePaymentReceipt(mobile, amt, mode, targetType, targetId);
-            loadCrmLedger(mobile);
-            computeAndShowCreditBalance(mobile);
-        }
-    }
-
-    function generatePaymentReceipt(mobile, amount, mode, type, id) {
-        const d = new Date();
-        const prefix = type === 'JC' ? 'Workshop Job Card' : (type === 'POS' ? 'Retail POS Invoice' : 'Opening Balance');
-        const refText = type === 'OB' ? 'Manual Registry' : id.split('-')[0].toUpperCase();
-        
-        const receiptHtml = `
-            Date: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}<br>
-            Client Mobile: ${mobile}<br><br>
-            Received with thanks the sum of:<br>
-            <strong style="font-size:1.5rem; color:var(--success);">₹${amount.toFixed(2)}</strong><br><br>
-            <strong>Mode:</strong> ${mode}<br>
-            <strong>Target:</strong> ${prefix} (${refText})<br><br>
-            <strong>Collected By Dept:</strong> ${activeSessionRole.toUpperCase()}<br>
-            <em style="font-size:0.75rem;">*Subject to internal vault clearing.*</em>
-        `;
-        document.getElementById('prtContent').innerHTML = receiptHtml;
-        document.getElementById('paymentReceiptModal').style.display = 'flex';
-    }
-
-    function exportReceiptAsJPG() {
-        const layoutTarget = document.getElementById('renderReceiptTarget');
-        html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
-            canvas.toBlob(blob => {
-                const targetBlobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = targetBlobUrl; a.download = `Receipt_${new Date().getTime()}.jpg`; a.click(); 
-                URL.revokeObjectURL(targetBlobUrl);
-            }, 'image/jpeg', 0.95);
-        });
-    }
-
-    function exportLedgerCsv(mobile) {
-        if(ledgerExportData.length <= 1) return alert("No data to export.");
-        let csvContent = "data:text/csv;charset=utf-8,";
-        ledgerExportData.forEach(rowArray => {
-            let row = rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",");
-            csvContent += row + "\r\n";
-        });
-        const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", `Ledger_${mobile}.csv`); document.body.appendChild(link);
-        link.click(); document.body.removeChild(link);
-    }
-
-    // === PHASE 3: AUDIT LOG FETCHER ===
+    // === AUDIT LOG (updated to handle both old and new column styles) ===
     async function loadAuditLog() {
-        const { data: logs, error } = await supabaseClient.from('approval_requests')
-            .select('*').order('created_at', { ascending: false }).limit(50);
-            
-        const tbody = document.getElementById('auditLogBody');
-        tbody.innerHTML = '';
-        
-        if (error) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Failed to load audit history: ${error.message}</td></tr>`;
-            return;
-        }
-
-        if(!logs || logs.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b;">No audit records found.</td></tr>`;
-            return;
-        }
-
+        const { data: logs, error } = await supabaseClient.from('approval_requests').select('*').order('requested_at', { ascending: false }).limit(50);
+        const tbody = document.getElementById('auditLogBody'); tbody.innerHTML = '';
+        if (error) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Failed to load: ${error.message}</td></tr>`; return; }
+        if(!logs || logs.length === 0) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b;">No records found.</td></tr>`; return; }
         (logs||[]).forEach(log => {
-            const dateStr = new Date(log.created_at).toLocaleString('en-IN');
-            
-            let refStr = '--';
-            if (log.payload?.jc_id) refStr = `JC-${log.payload.jc_id.split('-')[0].toUpperCase()}`;
-            else if (log.payload?.sale_id) refStr = `POS-${log.payload.sale_id.split('-')[0].toUpperCase()}`;
-            
-            const reqBy = (log.requested_by_role || 'SYSTEM').toUpperCase();
-            
-            let resDetails = '';
-            if (log.status === 'Cleared' && log.request_type === 'Discount Override') {
-                const dist = log.payload?.distribution || {};
-                resDetails = `<div style="font-size:0.7rem; color:#64748b; margin-top:4px;">G:₹${dist.green||0} | M:₹${dist.moped||0} | L:₹${dist.labour||0} | T:₹${dist.lathe||0}</div>`;
-            }
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td style="font-weight:bold;">${log.request_type}</td>
-                    <td><span style="font-family:monospace; color:var(--info);">${refStr}</span></td>
-                    <td>${reqBy}</td>
-                    <td><span class="status-tag status-${log.status}">${log.status}</span>${resDetails}</td>
-                </tr>
-            `;
+            const dateStr = new Date(log.requested_at || log.created_at).toLocaleString('en-IN');
+            const reqBy = (log.requested_by || log.requested_by_role || 'SYSTEM').toUpperCase();
+            const status = log.status || 'Pending';
+            const statusClass = status === 'approved' || status === 'Cleared' ? 'status-Cleared' : status === 'rejected' || status === 'Rejected' ? 'status-Rejected' : 'status-Pending';
+            const entityRef = log.entity_label || log.entity_id || (log.payload?.jc_id ? 'JC-'+log.payload.jc_id.split('-')[0].toUpperCase() : '—');
+            tbody.innerHTML += `<tr><td>${dateStr}</td><td style="font-weight:bold;">${log.request_type}</td><td><span style="font-family:monospace; color:var(--info);">${entityRef}</span></td><td>${reqBy}</td><td><span class="status-tag ${statusClass}">${status}</span></td></tr>`;
         });
     }
 
-    // === PRODUCT GROUP, BRAND, SERVICE, STAFF, SCHEMES, VEHICLE LOGIC (PRESERVED) ===
+    // === STAFF DIRECTORY — Phase 6a: Shows today's attendance status inline ===
+    async function loadStaffDirectoryLedgers() {
+        const today = new Date().toISOString().split('T')[0];
+        /* Parallel fetch: staff list + today's attendance */
+        const [staffRes, attRes] = await Promise.all([
+            supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name'),
+            supabaseClient.from('mechanic_attendance').select('mech_id, status, approved_status, check_in_time').eq('date', today)
+        ]);
+        const list = staffRes.data || [];
+        /* Build lookup map: mech_id → attendance */
+        const attMap = {};
+        (attRes.data || []).forEach(a => { attMap[a.mech_id] = a; });
+
+        const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = '';
+        list.forEach(t => {
+            const att = attMap[t.id];
+            let attBadge = '<span style="font-size:0.68rem;color:#94a3b8;">Not marked</span>';
+            if (att) {
+                const finalStatus = att.approved_status || att.status || 'Marked';
+                const isPending = !att.approved_status;
+                let bg='#e2e8f0',col='#475569';
+                if(finalStatus==='Present'||finalStatus==='On Time'){bg='#dcfce7';col='#166534';}
+                else if(finalStatus==='Late'){bg='#fef9c3';col='#854d0e';}
+                else if(finalStatus==='Half Day'){bg='#fff7ed';col='#9a3412';}
+                else if(finalStatus==='Absent'){bg='#fee2e2';col='#991b1b';}
+                attBadge = `<span class="att-badge" style="background:${bg};color:${col};">${finalStatus}${isPending?' ⏳':''}</span>`;
+            }
+            const pts = parseFloat(t.earned_points) || 0;
+            const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.78rem;">Pay ₹${Math.floor(pts)}</button>` : '';
+            const safeName = t.name.replace(/'/g, "\\'");
+            tbody.innerHTML += `<tr id="mechrow_${t.id}"><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="font-size:0.7rem;">Today: ${attBadge}</small></td><td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem;">${t.staff_role}</span> <span style="font-size:0.7rem;color:#64748b;">${t.commission_rate}%</span></td><td>${pts.toFixed(0)} Pts</td><td>${cashBtn} <button onclick="deactivateStaff('${t.id}')" style="margin-left:8px; border:none; background:none; color:var(--danger); cursor:pointer; font-size:0.78rem;">[DROP]</button></td></tr>`;
+        });
+    }
+
+    let activeEditMechId = null;
+    function editStaff(id, name, mobile, role, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tRole').value = role || 'Mechanic'; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
+    function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tRole').value = 'Mechanic'; document.getElementById('tComm').value = '0'; document.getElementById('btnSaveTech').innerText = "SAVE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
+    async function upsertStaffProfileRecord() { const nameStr = document.getElementById('tName').value.trim().toUpperCase(); const mobStr = document.getElementById('tMobile').value.trim(); const roleStr = document.getElementById('tRole').value; const commVal = parseFloat(document.getElementById('tComm').value) || 0; if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); const payload = { mobile_number: Number(mobStr), name: nameStr, staff_role: roleStr, commission_rate: commVal, is_active: true }; let error = null; if (activeEditMechId) { const result = await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); error = result.error; } else { const result = await supabaseClient.from('mechanics').insert(payload); error = result.error; } if (error) alert("Error: " + error.message); else { cancelTechEdit(); loadStaffDirectoryLedgers(); } }
+    async function deactivateStaff(id) { if(confirm("Drop this staff member from active roster?")) { const { error } = await supabaseClient.from('mechanics').update({ is_active: false }).eq('id', id); if (error) alert("Error: " + error.message); else loadStaffDirectoryLedgers(); } }
+    async function cashOutStaff(id, currentPts) { if(confirm(`Convert ${Math.floor(currentPts)} points to cash payout?`)) { const { error: updErr } = await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', id); if (updErr) return alert("Error: " + updErr.message); const { error: insErr } = await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Points Cashout', stakeholder_id: id, amount: Math.floor(currentPts), note: 'Automated conversion' }); if (insErr) return alert("Error logging expense: " + insErr.message); loadStaffDirectoryLedgers(); } }
+
+    async function createScheme() { const sName = document.getElementById('schName').value.trim().toUpperCase(); const sRole = document.getElementById('schRole').value; const sMetric = document.getElementById('schMetric').value; const sTarget = parseFloat(document.getElementById('schTarget').value); const sReward = parseFloat(document.getElementById('schReward').value); if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters."); const { error } = await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward }); if (error) alert("Error: " + error.message); else { alert("Scheme activated!"); loadSchemes(); } }
+    async function loadSchemes() { const { data: schemes, error } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false }); if (error) return console.error(error); const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = ''; schemes?.forEach(s => { const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`; tbody.innerHTML += `<tr><td><strong>${s.scheme_name}</strong></td><td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td><td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td><td>${statusHtml}</td></tr>`; }); }
+    async function toggleScheme(id, makeActive) { const { error } = await supabaseClient.from('active_schemes').update({ is_active: makeActive }).eq('id', id); if (error) alert("Error: " + error.message); else loadSchemes(); }
+
+    // Product group logic (unchanged)
     let catalogCache = [];
-    async function fetchCatalogForPG() { if(catalogCache.length === 0) { const { data } = await supabaseClient.from('product_master').select('*'); catalogCache = data || []; } }
+    async function fetchCatalogForPG() { if(catalogCache.length === 0) { const { data } = await supabaseClient.from('product_master').select('id,item_name,brand'); catalogCache = data || []; } }
     async function searchGroupProduct(inp) { await fetchCatalogForPG(); const q = inp.value.toLowerCase().trim(); const auto = document.getElementById('pgProdAuto'); if(q.length < 2) { auto.style.display = 'none'; return; } const tokens = q.split(' ').filter(t=>t); const res = catalogCache.filter(p => { const str = (p.item_name + ' ' + (p.brand||'')).toLowerCase(); return tokens.every(t => str.includes(t)); }).slice(0,10); auto.innerHTML = ''; res.forEach(p => { const d = document.createElement('div'); d.style.padding = '8px 12px'; d.style.cursor = 'pointer'; d.style.borderBottom = '1px solid #eee'; d.innerHTML = `<strong>${p.item_name}</strong> <span style="font-size:0.75rem; color:#666;">${p.brand||''}</span>`; d.onmousedown = () => { document.getElementById('pgProdSearch').value = p.item_name; document.getElementById('pgSelectedProdId').value = p.id; auto.style.display = 'none'; }; auto.appendChild(d); }); auto.style.display = res.length > 0 ? 'block' : 'none'; }
     async function createProductGroup() { const name = document.getElementById('pgName').value.trim(); const desc = document.getElementById('pgDesc').value.trim(); if(!name) return; const { error } = await supabaseClient.from('product_groups').insert({ group_name: name, description: desc }); if (error) return alert("Error: " + error.message); document.getElementById('pgName').value = ''; document.getElementById('pgDesc').value = ''; loadProductGroups(); }
     async function loadProductGroups() { const { data, error } = await supabaseClient.from('product_groups').select('*').order('group_name'); if (error) return console.error(error); let selP = '<option value="">-- Choose Group --</option>'; let selV = '<option value="">-- Choose Group --</option>'; let trs = ''; (data||[]).forEach(g => { selP += `<option value="${g.id}">${g.group_name}</option>`; selV += `<option value="${g.id}">${g.group_name}</option>`; trs += `<tr><td><strong>${g.group_name}</strong></td><td>${g.description||''}</td><td><button onclick="deleteProductGroup('${g.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); document.getElementById('tbProductGroups').innerHTML = trs; document.getElementById('pgSelectProducts').innerHTML = selP; document.getElementById('pgSelectVehicles').innerHTML = selV; }
@@ -845,141 +549,14 @@
     async function loadServices() { const { data: s, error } = await supabaseClient.from('service_packages').select('*').order('vehicle_category'); if (error) return console.error(error); const tb = document.getElementById('srvTableBody'); tb.innerHTML = ''; (s||[]).forEach(item => { tb.innerHTML += `<tr><td><strong>${item.package_name}</strong></td><td>${item.vehicle_category}</td><td>₹${item.base_rate}</td><td><button onclick="deleteSrv('${item.id}')" style="color:var(--danger); background:none; border:none; cursor:pointer;">[DEL]</button></td></tr>`; }); }
     async function saveServiceProtocol() { const name = document.getElementById('srvName').value; const cat = document.getElementById('srvCat').value; const rate = document.getElementById('srvRate').value; if(!name) return; const { error } = await supabaseClient.from('service_packages').insert({ package_name: name, vehicle_category: cat, base_rate: rate }); if (error) alert("Error: " + error.message); else loadServices(); }
     async function deleteSrv(id) { const { error } = await supabaseClient.from('service_packages').delete().eq('id', id); if (error) alert("Error: " + error.message); else loadServices(); }
-    let activeEditMechId = null;
-    function editStaff(id, name, mobile, role, comm) { activeEditMechId = id; document.getElementById('tName').value = name; document.getElementById('tMobile').value = mobile || ''; document.getElementById('tRole').value = role || 'Mechanic'; document.getElementById('tComm').value = comm; document.getElementById('btnSaveTech').innerText = "UPDATE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "inline-block"; }
-    function cancelTechEdit() { activeEditMechId = null; document.getElementById('tName').value = ''; document.getElementById('tMobile').value = ''; document.getElementById('tRole').value = 'Mechanic'; document.getElementById('tComm').value = '0'; document.getElementById('btnSaveTech').innerText = "SAVE STAFF PROFILE"; document.getElementById('btnCancelTechEdit').style.display = "none"; }
-    async function upsertStaffProfileRecord() { const nameStr = document.getElementById('tName').value.trim().toUpperCase(); const mobStr = document.getElementById('tMobile').value.trim(); const roleStr = document.getElementById('tRole').value; const commVal = parseFloat(document.getElementById('tComm').value) || 0; if(!nameStr || mobStr.length !== 10) return alert("Valid name and 10-digit mobile required."); const payload = { mobile_number: Number(mobStr), name: nameStr, staff_role: roleStr, commission_rate: commVal, is_active: true }; let error = null; if (activeEditMechId) { const result = await supabaseClient.from('mechanics').update(payload).eq('id', activeEditMechId); error = result.error; } else { const result = await supabaseClient.from('mechanics').insert(payload); error = result.error; } if (error) alert("Error: " + error.message); else { cancelTechEdit(); loadStaffDirectoryLedgers(); } }
-    async function loadStaffDirectoryLedgers() { const { data: list, error } = await supabaseClient.from('mechanics').select('*').eq('is_active', true).order('staff_role').order('name'); if (error) return console.error(error); const tbody = document.getElementById('techDirectoryTableBody'); tbody.innerHTML = ''; list?.forEach(t => { const pts = parseFloat(t.earned_points) || 0; const cashBtn = pts > 0 ? `<button onclick="cashOutStaff('${t.id}', ${pts})" style="background:var(--success); color:white; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">Pay ₹${Math.floor(pts)}</button>` : ''; const safeName = t.name.replace(/'/g, "\\'"); tbody.innerHTML += `<tr><td><strong>${t.name}</strong> <span class="edit-icon" onclick="editStaff('${t.id}', '${safeName}', '${t.mobile_number}', '${t.staff_role}', ${t.commission_rate})">✏️</span><br><small style="color:var(--info); cursor:pointer; text-decoration:underline;" onclick="markAttendance('${t.id}')">Log Attendance</small></td><td><span style="background:#e2e8f0; color:#475569; padding:2px 8px; border-radius:12px; font-size:0.75rem;">${t.staff_role}</span></td><td>${pts.toFixed(0)} Pts</td><td>${cashBtn} <button onclick="deactivateStaff('${t.id}')" style="margin-left:8px; border:none; background:none; color:var(--danger); cursor:pointer;">[DROP]</button></td></tr>`; }); }
-    async function markAttendance(mechId) { const d = prompt("Enter Date (YYYY-MM-DD) for Attendance:", new Date().toISOString().split('T')[0]); if(!d) return; const { error } = await supabaseClient.from('mechanic_attendance').insert({ mechanic_id: mechId, attendance_date: d, status: 'Present' }); if (error) alert("Error: " + error.message); else alert("Marked Present for " + d); }
-    async function deactivateStaff(id) { if(confirm("Drop this staff member from active roster?")) { const { error } = await supabaseClient.from('mechanics').update({ is_active: false }).eq('id', id); if (error) alert("Error: " + error.message); else loadStaffDirectoryLedgers(); } }
-    async function cashOutStaff(id, currentPts) { if(confirm(`Convert ${currentPts} points to cash payout?`)) { const { error: updErr } = await supabaseClient.from('mechanics').update({ earned_points: 0 }).eq('id', id); if (updErr) return alert("Error: " + updErr.message); const { error: insErr } = await supabaseClient.from('workshop_expenses').insert({ expense_category: 'Points Cashout', stakeholder_id: id, amount: Math.floor(currentPts), note: 'Automated conversion' }); if (insErr) return alert("Error logging expense: " + insErr.message); loadStaffDirectoryLedgers(); } }
-    async function createScheme() { const sName = document.getElementById('schName').value.trim().toUpperCase(); const sRole = document.getElementById('schRole').value; const sMetric = document.getElementById('schMetric').value; const sTarget = parseFloat(document.getElementById('schTarget').value); const sReward = parseFloat(document.getElementById('schReward').value); if(!sName || !sTarget || !sReward) return alert("Fill all scheme parameters."); const { error } = await supabaseClient.from('active_schemes').insert({ scheme_name: sName, target_role: sRole, metric_type: sMetric, target_value: sTarget, reward_amount: sReward }); if (error) alert("Error: " + error.message); else { alert("Scheme activated!"); loadSchemes(); } }
-    async function loadSchemes() { const { data: schemes, error } = await supabaseClient.from('active_schemes').select('*').order('created_at', { ascending: false }); if (error) return console.error(error); const tbody = document.getElementById('schemesTableBody'); tbody.innerHTML = ''; schemes?.forEach(s => { const statusHtml = s.is_active ? `<span style="color:var(--success); font-weight:bold;">ACTIVE</span> <button onclick="toggleScheme('${s.id}', false)" style="margin-left:8px; font-size:0.7rem;">Deactivate</button>` : `<span style="color:var(--danger); font-weight:bold;">PAUSED</span> <button onclick="toggleScheme('${s.id}', true)" style="margin-left:8px; font-size:0.7rem;">Activate</button>`; tbody.innerHTML += `<tr><td><strong>${s.scheme_name}</strong></td><td><span style="font-size:0.75rem; color:#64748b;">${s.target_role}</span><br><strong>${s.metric_type}</strong></td><td>Hit <strong>${s.target_value}</strong><br>Get <strong style="color:var(--gold);">₹${s.reward_amount}</strong></td><td>${statusHtml}</td></tr>`; }); }
-    async function toggleScheme(id, makeActive) { const { error } = await supabaseClient.from('active_schemes').update({ is_active: makeActive }).eq('id', id); if (error) alert("Error: " + error.message); else loadSchemes(); }
 
-    /* ── VEHICLE SEARCH (customer vehicles table) ──── */
-    async function searchVehiclesMaster() { 
-      const q = document.getElementById('vehSearch').value.trim();
-      const box = document.getElementById('vehSearchResults');
-      document.getElementById('vehMergePanel').style.display = 'none';
-
-      if (q.length < 2) { box.innerHTML = '<p style="color:#64748b;padding:8px;">Type at least 2 characters.</p>'; return; }
-      box.innerHTML = '<p style="color:#64748b;padding:8px;">Searching...</p>';
-
-      const { data, error } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,color,customer_mobile,customers(name)').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%,customer_mobile.ilike.%' + q + '%').limit(40);
-
-      if (error) { box.innerHTML = '<p style="color:var(--danger);">Error: ' + error.message + '</p>'; return; }
-      if (!data || data.length === 0) { box.innerHTML = '<p style="color:var(--danger);">No vehicles found.</p>'; return; }
-
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Reg No</th><th>Make / Model</th><th>Color</th><th>Customer</th><th>Mobile</th><th style="min-width:160px;">Actions</th></tr></thead><tbody>';
-
-      data.forEach(v => {
-        const cn = (v.customers?.name || '--').replace(/'/g, "\\'");
-        const rid = v.id;
-        html += `<tr id="vrow_${rid}">
-          <td><input type="text" id="vreg_${rid}" value="${v.reg_number||''}" oninput="this.value=this.value.toUpperCase()" style="width:85px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td>
-          <td><input type="text" id="vmod_${rid}" value="${v.make_model||''}" oninput="this.value=this.value.toUpperCase()" style="width:110px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td>
-          <td><input type="text" id="vcol_${rid}" value="${v.color||''}" oninput="this.value=this.value.toUpperCase()" style="width:70px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;"></td>
-          <td style="font-size:0.8rem;">${cn}</td>
-          <td style="font-size:0.8rem;">${v.customer_mobile||'--'}</td>
-          <td style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button onclick="saveVehicleEdit('${rid}')" style="background:var(--success);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">SAVE</button>
-            <button onclick="openMergePanel('${rid}', document.getElementById('vreg_${rid}').value, document.getElementById('vmod_${rid}').value)" style="background:var(--purple);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">MERGE</button>
-          </td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-      box.innerHTML = html;
-    } 
-
-    async function saveVehicleEdit(vid) { 
-      const reg = document.getElementById('vreg_' + vid).value.trim().toUpperCase();
-      const mod = document.getElementById('vmod_' + vid).value.trim().toUpperCase();
-      const col = document.getElementById('vcol_' + vid).value.trim().toUpperCase();
-      if (!reg || !mod) { alert('Reg No and Model cannot be empty.'); return; }
-      const { error } = await supabaseClient.from('vehicles').update({ reg_number: reg, make_model: mod, color: col }).eq('id', vid);
-      if (error) { alert('Error: ' + error.message); } else {
-        const row = document.getElementById('vrow_' + vid);
-        if (row) { row.style.background = '#f0fdf4'; setTimeout(() => { row.style.background = ''; }, 1800); }
-      }
-    } 
-
-    function openMergePanel(srcId, srcReg, srcMod) { 
-      const panel = document.getElementById('vehMergePanel');
-      panel.style.display = 'block';
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      panel.innerHTML = `
-        <div style="background:#fef3c7;border:1px solid #fde68a;padding:16px;border-radius:8px;margin-top:16px;">
-          <h4 style="margin:0 0 8px 0;color:#b45309;">🔀 MERGE DUPLICATE VEHICLE</h4>
-          <p style="font-size:0.85rem;color:#92400e;margin:0 0 12px 0;"><strong>DUPLICATE (will be removed):</strong> ${srcReg} — ${srcMod}<br>All job cards from this entry will move to the correct vehicle selected below.</p>
-          <div class="inputs-grid" style="margin-bottom:12px;">
-            <div class="field-group" style="flex:2;position:relative;">
-              <label>Search for CORRECT vehicle (merge target)</label>
-              <input type="text" id="mergeTargetSearch" placeholder="Type reg no or model..." oninput="this.value=this.value.toUpperCase(); searchMergeTarget(this)" autocomplete="off">
-              <div id="mergeTargetDrop" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:50;display:none;box-shadow:0 4px 6px rgba(0,0,0,0.08);"></div>
-              <input type="hidden" id="mergeTargetId">
-              <div id="mergeTargetLabel" style="font-size:0.8rem;color:var(--success);font-weight:bold;margin-top:4px;display:none;"></div>
-            </div>
-          </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button onclick="executeMerge('${srcId}', '${srcReg}', '${srcMod}')" style="background:var(--danger);color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">✅ CONFIRM MERGE & REMOVE DUPLICATE</button>
-            <button onclick="document.getElementById('vehMergePanel').style.display='none'" style="background:#e2e8f0;color:var(--primary);border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">CANCEL</button>
-          </div>
-        </div>`;
-    } 
-
+    // Vehicle search (unchanged)
+    async function searchVehiclesMaster() { const q = document.getElementById('vehSearch').value.trim(); const box = document.getElementById('vehSearchResults'); document.getElementById('vehMergePanel').style.display = 'none'; if (q.length < 2) { box.innerHTML = '<p style="color:#64748b;padding:8px;">Type at least 2 characters.</p>'; return; } box.innerHTML = '<p style="color:#64748b;padding:8px;">Searching...</p>'; const { data, error } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,color,customer_mobile,customers(name)').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%,customer_mobile.ilike.%' + q + '%').limit(40); if (error) { box.innerHTML = '<p style="color:var(--danger);">Error: ' + error.message + '</p>'; return; } if (!data || data.length === 0) { box.innerHTML = '<p style="color:var(--danger);">No vehicles found.</p>'; return; } let html = '<div class="table-wrapper"><table><thead><tr><th>Reg No</th><th>Make / Model</th><th>Color</th><th>Customer</th><th>Mobile</th><th style="min-width:160px;">Actions</th></tr></thead><tbody>'; data.forEach(v => { const cn = (v.customers?.name || '--').replace(/'/g, "\\'"); const rid = v.id; html += `<tr id="vrow_${rid}"><td><input type="text" id="vreg_${rid}" value="${v.reg_number||''}" oninput="this.value=this.value.toUpperCase()" style="width:85px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td><td><input type="text" id="vmod_${rid}" value="${v.make_model||''}" oninput="this.value=this.value.toUpperCase()" style="width:110px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;font-weight:bold;"></td><td><input type="text" id="vcol_${rid}" value="${v.color||''}" oninput="this.value=this.value.toUpperCase()" style="width:70px;padding:5px;font-size:0.8rem;border:1px solid var(--border);border-radius:4px;"></td><td style="font-size:0.8rem;">${cn}</td><td style="font-size:0.8rem;">${v.customer_mobile||'--'}</td><td style="display:flex;gap:5px;flex-wrap:wrap;"><button onclick="saveVehicleEdit('${rid}')" style="background:var(--success);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">SAVE</button><button onclick="openMergePanel('${rid}', document.getElementById('vreg_${rid}').value, document.getElementById('vmod_${rid}').value)" style="background:var(--purple);color:white;border:none;padding:4px 8px;border-radius:4px;font-size:0.75rem;font-weight:bold;cursor:pointer;">MERGE</button></td></tr>`; }); html += '</tbody></table></div>'; box.innerHTML = html; }
+    async function saveVehicleEdit(vid) { const reg = document.getElementById('vreg_' + vid).value.trim().toUpperCase(); const mod = document.getElementById('vmod_' + vid).value.trim().toUpperCase(); const col = document.getElementById('vcol_' + vid).value.trim().toUpperCase(); if (!reg || !mod) { alert('Reg No and Model cannot be empty.'); return; } const { error } = await supabaseClient.from('vehicles').update({ reg_number: reg, make_model: mod, color: col }).eq('id', vid); if (error) { alert('Error: ' + error.message); } else { const row = document.getElementById('vrow_' + vid); if (row) { row.style.background = '#f0fdf4'; setTimeout(() => { row.style.background = ''; }, 1800); } } }
+    function openMergePanel(srcId, srcReg, srcMod) { const panel = document.getElementById('vehMergePanel'); panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); panel.innerHTML = `<div style="background:#fef3c7;border:1px solid #fde68a;padding:16px;border-radius:8px;margin-top:16px;"><h4 style="margin:0 0 8px 0;color:#b45309;">🔀 MERGE DUPLICATE VEHICLE</h4><p style="font-size:0.85rem;color:#92400e;margin:0 0 12px 0;"><strong>DUPLICATE (will be removed):</strong> ${srcReg} — ${srcMod}<br>All job cards from this entry will move to the correct vehicle selected below.</p><div class="inputs-grid" style="margin-bottom:12px;"><div class="field-group" style="flex:2;position:relative;"><label>Search for CORRECT vehicle (merge target)</label><input type="text" id="mergeTargetSearch" placeholder="Type reg no or model..." oninput="this.value=this.value.toUpperCase(); searchMergeTarget(this)" autocomplete="off"><div id="mergeTargetDrop" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:0 0 6px 6px;max-height:160px;overflow-y:auto;z-index:50;display:none;box-shadow:0 4px 6px rgba(0,0,0,0.08);"></div><input type="hidden" id="mergeTargetId"><div id="mergeTargetLabel" style="font-size:0.8rem;color:var(--success);font-weight:bold;margin-top:4px;display:none;"></div></div></div><div style="display:flex;gap:10px;flex-wrap:wrap;"><button onclick="executeMerge('${srcId}', '${srcReg}', '${srcMod}')" style="background:var(--danger);color:white;border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">✅ CONFIRM MERGE & REMOVE DUPLICATE</button><button onclick="document.getElementById('vehMergePanel').style.display='none'" style="background:#e2e8f0;color:var(--primary);border:none;padding:10px 20px;border-radius:6px;font-weight:bold;cursor:pointer;">CANCEL</button></div></div>`; }
     let _mergeTimer = null;
-    async function searchMergeTarget(inp) { 
-      clearTimeout(_mergeTimer);
-      const q = inp.value.trim();
-      const drop = document.getElementById('mergeTargetDrop');
-      if (q.length < 2) { drop.style.display='none'; return; }
-      _mergeTimer = setTimeout(async () => {
-        const { data } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,customer_mobile').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%').limit(15);
-        drop.innerHTML = '';
-        (data||[]).forEach(v => {
-          const d = document.createElement('div');
-          d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:0.82rem;border-bottom:1px solid #f1f5f9;';
-          d.innerHTML = '<strong>' + v.reg_number + '</strong> — ' + (v.make_model||'') + ' <span style="color:#64748b;font-size:0.75rem;">' + (v.customer_mobile||'') + '</span>';
-          d.onmousedown = () => {
-            document.getElementById('mergeTargetId').value = v.id;
-            document.getElementById('mergeTargetSearch').value = v.reg_number + ' — ' + (v.make_model||'');
-            const lbl = document.getElementById('mergeTargetLabel');
-            lbl.style.display = 'block'; lbl.innerText = '✅ Target: ' + v.reg_number + ' — ' + (v.make_model||'');
-            drop.style.display = 'none';
-          };
-          drop.appendChild(d);
-        });
-        drop.style.display = (data && data.length) ? 'block' : 'none';
-      }, 250);
-    } 
-
-    async function executeMerge(srcId, srcReg, srcMod) { 
-      const tgtId = document.getElementById('mergeTargetId').value.trim();
-      const tgtLabel = document.getElementById('mergeTargetSearch').value.trim();
-
-      if (!tgtId) { alert('Please select the correct target vehicle first.'); return; }
-      if (tgtId === srcId) { alert('Source and target cannot be the same vehicle.'); return; }
-
-      const confirmed = confirm('MERGE CONFIRMATION\n\nDUPLICATE (will be removed):\n' + srcReg + ' — ' + srcMod + '\n\nCORRECT TARGET (all job cards move here):\n' + tgtLabel + '\n\nThis cannot be undone. Proceed?');
-      if (!confirmed) return;
-
-      const { data: jcList, error: jcErr } = await supabaseClient.from('job_cards').select('id').eq('vehicle_id', srcId);
-      if (jcErr) { alert('Error reading job cards: ' + jcErr.message); return; }
-
-      if (jcList && jcList.length > 0) {
-        const { error: upErr } = await supabaseClient.from('job_cards').update({ vehicle_id: tgtId }).eq('vehicle_id', srcId);
-        if (upErr) { alert('Error re-linking job cards: ' + upErr.message); return; }
-      }
-
-      const { error: delErr } = await supabaseClient.from('vehicles').delete().eq('id', srcId);
-      if (delErr) { alert('Job cards moved but could not remove duplicate: ' + delErr.message); return; }
-
-      const moved = jcList ? jcList.length : 0;
-      alert('✅ Merge complete.\n' + moved + ' job card(s) re-linked to correct vehicle.\nDuplicate record removed.');
-      document.getElementById('vehMergePanel').style.display = 'none';
-      searchVehiclesMaster(); 
-    } 
+    async function searchMergeTarget(inp) { clearTimeout(_mergeTimer); const q = inp.value.trim(); const drop = document.getElementById('mergeTargetDrop'); if (q.length < 2) { drop.style.display='none'; return; } _mergeTimer = setTimeout(async () => { const { data } = await supabaseClient.from('vehicles').select('id,reg_number,make_model,customer_mobile').or('reg_number.ilike.%' + q + '%,make_model.ilike.%' + q + '%').limit(15); drop.innerHTML = ''; (data||[]).forEach(v => { const d = document.createElement('div'); d.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:0.82rem;border-bottom:1px solid #f1f5f9;'; d.innerHTML = '<strong>' + v.reg_number + '</strong> — ' + (v.make_model||'') + ' <span style="color:#64748b;font-size:0.75rem;">' + (v.customer_mobile||'') + '</span>'; d.onmousedown = () => { document.getElementById('mergeTargetId').value = v.id; document.getElementById('mergeTargetSearch').value = v.reg_number + ' — ' + (v.make_model||''); const lbl = document.getElementById('mergeTargetLabel'); lbl.style.display = 'block'; lbl.innerText = '✅ Target: ' + v.reg_number + ' — ' + (v.make_model||''); drop.style.display = 'none'; }; drop.appendChild(d); }); drop.style.display = (data && data.length) ? 'block' : 'none'; }, 250); }
+    async function executeMerge(srcId, srcReg, srcMod) { const tgtId = document.getElementById('mergeTargetId').value.trim(); const tgtLabel = document.getElementById('mergeTargetSearch').value.trim(); if (!tgtId) { alert('Please select the correct target vehicle first.'); return; } if (tgtId === srcId) { alert('Source and target cannot be the same vehicle.'); return; } const confirmed = confirm('MERGE CONFIRMATION\n\nDUPLICATE (will be removed):\n' + srcReg + ' — ' + srcMod + '\n\nCORRECT TARGET (all job cards move here):\n' + tgtLabel + '\n\nThis cannot be undone. Proceed?'); if (!confirmed) return; const { data: jcList, error: jcErr } = await supabaseClient.from('job_cards').select('id').eq('vehicle_id', srcId); if (jcErr) { alert('Error reading job cards: ' + jcErr.message); return; } if (jcList && jcList.length > 0) { const { error: upErr } = await supabaseClient.from('job_cards').update({ vehicle_id: tgtId }).eq('vehicle_id', srcId); if (upErr) { alert('Error re-linking job cards: ' + upErr.message); return; } } const { error: delErr } = await supabaseClient.from('vehicles').delete().eq('id', srcId); if (delErr) { alert('Job cards moved but could not remove duplicate: ' + delErr.message); return; } const moved = jcList ? jcList.length : 0; alert('✅ Merge complete.\n' + moved + ' job card(s) re-linked to correct vehicle.\nDuplicate record removed.'); document.getElementById('vehMergePanel').style.display = 'none'; searchVehiclesMaster(); }
 </script>
 </body>
 </html>
