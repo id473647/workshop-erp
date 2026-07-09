@@ -1,294 +1,566 @@
-=== PROMPT 1 — FILE: product-master-console.html ===
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Catalog Console — My Care ERP</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <style>
-        :root {
-            --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
-            --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad;
-        }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--light); color: var(--text); margin: 0; padding: 0; }
-        .wrapper { max-width: 1000px; margin: 0 auto; padding: 20px; }
-        .nav-bar { position: sticky; top: 0; background: var(--primary); color: white; padding: 10px 20px; display: flex; justify-content: space-between; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .nav-links a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; cursor: pointer; }
-        .tabs { display: flex; gap: 5px; margin-top: 20px; border-bottom: 2px solid var(--border); overflow-x: auto; }
-        .tab { padding: 10px 15px; background: #e2e8f0; border-radius: 5px 5px 0 0; cursor: pointer; font-weight: bold; color: var(--primary); border: none; white-space: nowrap; }
-        .tab.active { background: var(--purple); color: white; }
-        .tab-content { display: none; background: white; padding: 20px; border: 1px solid var(--border); border-top: none; }
-        .tab-content.active { display: block; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px; }
-        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
-        th { background: var(--primary); color: white; }
-        .form-control { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
-        .btn { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 0.8rem; }
-        .btn-success { background: var(--success); }
-        .btn-primary { background: var(--primary); }
-        .btn-danger { background: var(--danger); }
-        .btn-info { background: var(--info); }
-        .btn-purple { background: var(--purple); }
-        .badge { background: var(--danger); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px; }
-        #scanner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
-        #scanner-video { width: 100%; max-width: 500px; border: 2px solid var(--success); }
-        .locked-banner { display: none; text-align: center; padding: 50px; background: #fee2e2; color: #991b1b; font-size: 1.2rem; font-weight: bold; margin-top: 50px; border-radius: 8px; }
-        @media print { body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; } }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product & Catalog Master — My Care ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="notifications.js"></script>
+<style>
+:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--purple:#8e44ad;--gold:#f59e0b;}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:0;padding:0;color:var(--text);padding-bottom:60px;}
+.sticky-nav{max-width:950px;margin:0 auto;background:white;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.02);position:sticky;top:0;z-index:100;}
+.logo-matrix{display:flex;align-items:center;gap:8px;}.logo-matrix img{height:32px;object-fit:contain;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.btn-header{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:.8rem;font-weight:700;text-decoration:none;cursor:pointer;background:#f1f5f9;color:var(--primary);}
+.btn-logout{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.badge-role{background:#0f172a;color:white;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;text-transform:uppercase;margin-left:8px;}
+.wrapper{max-width:950px;margin:0 auto;padding:20px;}
+/* Tabs */
+.tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;flex-wrap:nowrap;}
+.tab-btn{padding:9px 14px;border:none;background:none;font-weight:700;color:#64748b;border-bottom:3px solid transparent;cursor:pointer;font-size:.82rem;white-space:nowrap;border-radius:6px 6px 0 0;}
+.tab-btn.active{color:var(--purple);border-bottom-color:var(--purple);background:#faf5ff;}
+.tab-panel{display:none;}.tab-panel.active{display:block;}
+/* Cards */
+.card-panel{background:white;padding:20px;border-radius:10px;border:1px solid var(--border);margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.02);}
+.block-title{font-size:1rem;font-weight:700;color:var(--primary);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:14px;}
+/* Forms */
+.inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;align-items:end;background:#f8fafc;padding:14px;border-radius:8px;border:1px solid var(--border);}
+.field-group{display:flex;flex-direction:column;gap:4px;}
+.field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
+input,select{padding:9px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;width:100%;}
+.btn-action{background:var(--success);color:white;border:none;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.85rem;}
+.btn-action.info{background:var(--info);}
+.btn-action.danger{background:var(--danger);}
+.btn-action.purple{background:var(--purple);}
+.btn-action.warn{background:var(--gold);color:#1c1917;}
+/* Tables */
+.table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;margin-top:12px;max-height:480px;}
+table{width:100%;border-collapse:collapse;font-size:.82rem;}
+th{background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;position:sticky;top:0;z-index:2;}
+td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+/* Unverified queue */
+.unverified-card{border:1px solid var(--border);padding:14px;margin-bottom:12px;background:#fffbeb;border-radius:8px;border-left:4px solid var(--gold);}
+.unv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
+.unv-grid input,.unv-grid select{font-size:.82rem;padding:7px;}
+/* Badge */
+.count-badge{background:var(--danger);color:white;padding:1px 7px;border-radius:10px;font-size:.7rem;margin-left:6px;}
+/* Search bar */
+.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.search-bar input,.search-bar select{flex:1;min-width:120px;}
+/* Scanner */
+#scannerOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:400;}
+#scannerVideo{width:100%;max-width:500px;border:2px solid var(--success);}
+/* Print */
+#printArea{display:none;}
+@media print{body *{visibility:hidden;}#printArea,#printArea *{visibility:visible;}#printArea{position:absolute;left:0;top:0;width:100%;display:flex;flex-wrap:wrap;gap:10px;}}
+</style>
 </head>
 <body>
-    <div class="nav-bar">
-        <div class="nav-links">
-            <a onclick="window.history.back()">← BACK</a>
-            <a href="index.html">🏠 HOME</a>
-        </div>
-        <div><span style="background:var(--purple); padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold;">ADMIN CONSOLE</span></div>
+
+<nav class="sticky-nav">
+  <div class="logo-matrix">
+    <img src="logo-main.jpg" onerror="this.style.display='none'">
+    <img src="logo-green.png" onerror="this.style.display='none'">
+  </div>
+  <div class="nav-actions">
+    <button class="btn-header" onclick="history.back()">← BACK</button>
+    <a href="utility-router.html" class="btn-header">🗂️ HUB</a>
+    <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
+    <span id="roleDisplay" class="badge-role">ADMIN</span>
+  </div>
+</nav>
+
+<div class="wrapper">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('tUnverified',event)">
+      ⏳ Unverified Queue <span class="count-badge" id="unvCount">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('tCatalog',event)">📦 Full Catalog</button>
+    <button class="tab-btn" onclick="switchTab('tFamilies',event)">🗂️ Families</button>
+    <button class="tab-btn" onclick="switchTab('tGroups',event)">🔗 Product Groups</button>
+    <button class="tab-btn" onclick="switchTab('tBrands',event)">💰 Brand Discounts</button>
+  </div>
+
+  <!-- ── TAB 1: UNVERIFIED QUEUE ──────────────────────────────────────────── -->
+  <div id="tUnverified" class="tab-panel active">
+    <div class="card-panel">
+      <div class="block-title">⏳ Unverified Product Queue</div>
+      <p style="font-size:.85rem;color:#64748b;margin-top:0;">Products created on-the-fly during billing. Review, complete all fields, then approve to go live.</p>
+      <div id="unverifiedList"><p style="text-align:center;color:#94a3b8;">Loading...</p></div>
     </div>
+  </div>
 
-    <div class="locked-banner" id="lockedBanner">ACCESS DENIED. ADMIN ROLE REQUIRED.</div>
-
-    <div class="wrapper" id="mainWrapper" style="display:none;">
-        <h2 style="color:var(--purple);">Product Catalog Manager</h2>
-        
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('tab-unverified')">1. Unverified Queue <span id="unvCount" class="badge">0</span></button>
-            <button class="tab" onclick="switchTab('tab-catalog')">2. Full Catalog</button>
-            <button class="tab" onclick="switchTab('tab-families')">3. Families</button>
-            <button class="tab" onclick="switchTab('tab-groups')">4. Groups</button>
-            <button class="tab" onclick="switchTab('tab-variants')">5. Fiber Variants</button>
-        </div>
-
-        <div id="tab-unverified" class="tab-content active">
-            <p>Products created during billing. Review, complete fields, and approve.</p>
-            <div id="unverifiedList"></div>
-        </div>
-
-        <div id="tab-catalog" class="tab-content">
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input type="text" id="catSearch" class="form-control" placeholder="Search item or brand..." onkeyup="loadCatalog()">
-                <select id="catScope" class="form-control" onchange="loadCatalog()"><option value="">All Scopes</option><option value="universal">Universal</option><option value="generic">Generic</option><option value="specific">Specific</option></select>
-                <button class="btn btn-info" onclick="bulkPrintLabels()">🏷️ Print Selected Labels</button>
-            </div>
-            <table id="catTable">
-                <thead><tr><th><input type="checkbox" id="catCheckAll" onchange="toggleAllChecks()"></th><th>Item Name</th><th>Brand</th><th>Scope</th><th>Track</th><th>MRP</th><th>Sell</th><th>Action</th></tr></thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        <div id="tab-families" class="tab-content">
-            <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:15px; background:var(--light); padding:10px; border:1px solid var(--border);">
-                <div><label>Family Name</label><input type="text" id="famName" class="form-control" style="text-transform:uppercase;"></div>
-                <div><label>Has Fiber Variants?</label><select id="famFiber" class="form-control"><option value="false">No</option><option value="true">Yes</option></select></div>
-                <button class="btn btn-success" onclick="createFamily()">+ Add Family</button>
-            </div>
-            <table id="famTable"><thead><tr><th>Family Name</th><th>Is Fiber?</th><th>Created At</th><th>Action</th></tr></thead><tbody></tbody></table>
-        </div>
-
-        <div id="tab-groups" class="tab-content">
-            <div style="background:var(--light); padding:10px; border:1px solid var(--border); margin-bottom:15px;">
-                <h4>Create Group (Cross-Vehicle Compatibility)</h4>
-                <div style="display:flex; gap:10px; align-items:flex-end;">
-                    <div style="flex:1;"><label>Group Name (e.g. VISOR SHINE PLATFORM)</label><input type="text" id="grpName" class="form-control"></div>
-                    <div style="flex:1;"><label>Base Product ID</label><input type="text" id="grpProdId" class="form-control" placeholder="UUID of product_master"></div>
-                    <button class="btn btn-success" onclick="createGroup()">Save Group</button>
-                </div>
-            </div>
-            <div id="groupsList"></div>
-        </div>
-
-        <div id="tab-variants" class="tab-content">
-            <p>Manage color/sticker variants for Fiber items.</p>
-            <div id="variantsList"></div>
-        </div>
+  <!-- ── TAB 2: FULL CATALOG ─────────────────────────────────────────────── -->
+  <div id="tCatalog" class="tab-panel">
+    <div class="card-panel">
+      <div class="block-title">📦 Live Product Catalog</div>
+      <div class="search-bar">
+        <input type="text" id="catSearch" placeholder="Search by item name or brand..." oninput="loadCatalog()">
+        <select id="catScope" onchange="loadCatalog()">
+          <option value="">All Scopes</option>
+          <option value="universal">Universal</option>
+          <option value="generic">Generic</option>
+          <option value="specific">Specific</option>
+        </select>
+        <button class="btn-action warn" onclick="bulkPrintLabels()">🏷️ Print Selected Labels</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="catTable">
+          <thead><tr>
+            <th><input type="checkbox" id="catCheckAll" onchange="toggleAllChecks()"></th>
+            <th>Item Name</th><th>Brand</th><th>Scope</th>
+            <th>Track Stock</th><th>MRP</th><th>Sell Price</th><th>Action</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
+  </div>
 
-    <div id="scanner-overlay"><video id="scanner-video"></video><button class="btn btn-danger" style="margin-top:20px;" onclick="closeScanner()">Cancel</button></div>
-    <div id="print-area" style="display:none;"></div>
+  <!-- ── TAB 3: FAMILIES ─────────────────────────────────────────────────── -->
+  <div id="tFamilies" class="tab-panel">
+    <div class="card-panel">
+      <div class="block-title">🗂️ Product Families</div>
+      <div class="inputs-grid">
+        <div class="field-group"><label>Family Name</label>
+          <input type="text" id="famName" placeholder="e.g. ENGINE OIL" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field-group"><label>Has Fiber Variants?</label>
+          <select id="famFiber"><option value="false">No</option><option value="true">Yes</option></select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn-action" onclick="createFamily()">+ ADD FAMILY</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table id="famTable">
+          <thead><tr><th>Family Name</th><th>Fiber Variants?</th><th>Created</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-    <script>
-        const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-        let codeReader;
+  <!-- ── TAB 4: PRODUCT GROUPS ───────────────────────────────────────────── -->
+  <div id="tGroups" class="tab-panel">
+    <div class="card-panel">
+      <div class="block-title">🔗 Cross-Vehicle Product Groups</div>
+      <p style="font-size:.85rem;color:#64748b;margin-top:0;">Group a base product with compatible vehicle models for smart autocomplete in billing.</p>
+      <div class="inputs-grid">
+        <div class="field-group" style="grid-column:span 2;"><label>Group Name</label>
+          <input type="text" id="grpName" placeholder="e.g. VISOR SHINE PLATFORM" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field-group" style="grid-column:span 2;"><label>Base Product — Search by Name</label>
+          <div style="position:relative;">
+            <input type="text" id="grpProdSearch" placeholder="Type product name to search..." oninput="searchGrpProduct(this)" onblur="setTimeout(()=>document.getElementById('grpProdDrop').style.display='none',200)">
+            <div id="grpProdDrop" style="position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);max-height:160px;overflow-y:auto;z-index:50;display:none;border-radius:0 0 6px 6px;box-shadow:0 4px 6px rgba(0,0,0,.06);"></div>
+            <input type="hidden" id="grpProdId">
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn-action purple" onclick="createGroup()">CREATE GROUP</button>
+        </div>
+      </div>
+      <div id="groupsList"></div>
+    </div>
+  </div>
 
-        if (localStorage.getItem('ERP_ACTIVE_ROLE') !== 'admin') {
-            document.getElementById('lockedBanner').style.display = 'block';
-        } else {
-            document.getElementById('mainWrapper').style.display = 'block';
-            initPage();
-        }
+  <!-- ── TAB 5: BRAND DISCOUNTS ──────────────────────────────────────────── -->
+  <div id="tBrands" class="tab-panel">
+    <div class="card-panel">
+      <div class="block-title">💰 Brand Discount Tier Rules</div>
+      <div class="inputs-grid" style="background:#fefce8;border:1px solid #fef08a;">
+        <div class="field-group"><label>Brand Name</label>
+          <input type="text" id="brandName" placeholder="e.g. MOTUL" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field-group"><label>Regular Discount %</label><input type="number" id="brandReg" value="0"></div>
+        <div class="field-group"><label>Silver Discount %</label><input type="number" id="brandSilv" value="5"></div>
+        <div class="field-group"><label>Gold Discount %</label><input type="number" id="brandGold" value="10"></div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn-action" style="background:var(--primary);" onclick="saveBrandRule()">SAVE RULE</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Brand</th><th>Regular %</th><th>Silver %</th><th>Gold %</th><th>Action</th></tr></thead>
+          <tbody id="brandTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
-            if(tabId==='tab-unverified') loadUnverified();
-            if(tabId==='tab-catalog') loadCatalog();
-            if(tabId==='tab-families') loadFamilies();
-            if(tabId==='tab-groups') loadGroups();
-        }
+</div><!-- end wrapper -->
 
-        async function initPage() { loadUnverified(); }
+<!-- Scanner overlay -->
+<div id="scannerOverlay">
+  <video id="scannerVideo"></video>
+  <button class="btn-action danger" style="margin-top:20px;width:auto;" onclick="closeScanner()">Cancel</button>
+</div>
 
-        // --- TAB 1: Unverified ---
-        async function loadUnverified() {
-            const { data } = await supabaseClient.from('product_master').select('*').eq('catalog_status', 'unverified');
-            document.getElementById('unvCount').innerText = data ? data.length : 0;
-            const container = document.getElementById('unverifiedList');
-            container.innerHTML = '';
-            (data||[]).forEach(p => {
-                container.innerHTML += `<div style="border:1px solid var(--border); padding:10px; margin-bottom:10px; background:#f8fafc;">
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <input type="text" id="u-name-${p.id}" value="${p.item_name}" class="form-control" style="flex:2">
-                        <input type="text" id="u-brand-${p.id}" value="${p.brand||''}" class="form-control" placeholder="Brand" style="text-transform:uppercase; flex:1">
-                        <select id="u-scope-${p.id}" class="form-control"><option value="generic">Generic</option><option value="universal">Universal</option><option value="specific">Specific</option></select>
-                        <select id="u-track-${p.id}" class="form-control"><option value="true">Track Stock</option><option value="false">Bin Item (No Stock)</option></select>
-                    </div>
-                    <div style="display:flex; gap:10px; margin-bottom:10px;">
-                        <input type="number" id="u-mrp-${p.id}" value="${p.mrp||0}" class="form-control" placeholder="MRP" style="color:var(--mrp); font-weight:bold;">
-                        <input type="number" id="u-cost-${p.id}" value="${p.cost_price||0}" class="form-control" placeholder="Cost">
-                        <input type="number" id="u-ret-${p.id}" value="${p.retail_price||p.default_price||0}" class="form-control" placeholder="Sell">
-                        <input type="text" id="u-bar-${p.id}" value="${p.barcode_id||''}" class="form-control" placeholder="Barcode">
-                        <button class="btn btn-info" onclick="scanBarcode('u-bar-${p.id}')">📷</button>
-                    </div>
-                    <button class="btn btn-success" onclick="approveProduct('${p.id}')">✓ Approve & Go Live</button>
-                    <button class="btn btn-danger" onclick="deleteProduct('${p.id}')">✗ Delete</button>
-                </div>`;
-            });
-        }
+<!-- Print area (hidden, print-only) -->
+<div id="printArea"></div>
 
-        async function approveProduct(id) {
-            const payload = {
-                item_name: document.getElementById(`u-name-${id}`).value,
-                brand: document.getElementById(`u-brand-${id}`).value.toUpperCase(),
-                scope: document.getElementById(`u-scope-${id}`).value,
-                track_stock: document.getElementById(`u-track-${id}`).value === 'true',
-                mrp: parseFloat(document.getElementById(`u-mrp-${id}`).value)||0,
-                cost_price: parseFloat(document.getElementById(`u-cost-${id}`).value)||0,
-                retail_price: parseFloat(document.getElementById(`u-ret-${id}`).value)||0,
-                barcode_id: document.getElementById(`u-bar-${id}`).value,
-                catalog_status: 'live'
-            };
-            await supabaseClient.from('product_master').update(payload).eq('id', id);
-            loadUnverified();
-        }
+<script>
+const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const sessionRole=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase();
+document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
+function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
-        // --- TAB 2: Catalog ---
-        async function loadCatalog() {
-            let q = supabaseClient.from('product_master').select('*').eq('catalog_status', 'live').order('item_name').limit(100);
-            const search = document.getElementById('catSearch').value.toLowerCase();
-            const scope = document.getElementById('catScope').value;
-            if(search) q = q.ilike('item_name', `%${search}%`);
-            if(scope) q = q.eq('scope', scope);
-            
-            const { data } = await q;
-            const tbody = document.querySelector('#catTable tbody');
-            tbody.innerHTML = '';
-            (data||[]).forEach(p => {
-                tbody.innerHTML += `<tr>
-                    <td><input type="checkbox" class="cat-check" value="${p.id}" data-name="${p.item_name}" data-mrp="${p.mrp||0}" data-ret="${p.retail_price||0}" data-bar="${p.barcode_id||''}"></td>
-                    <td>${p.item_name}</td><td>${p.brand||'STD'}</td><td>${p.scope}</td>
-                    <td>${p.track_stock?'Yes':'No'}</td><td style="color:var(--mrp);">${p.mrp||0}</td><td>${p.retail_price||0}</td>
-                    <td><button class="btn btn-danger" onclick="deleteProduct('${p.id}', true)">Delete</button></td>
-                </tr>`;
-            });
-        }
+// Access guard — admin only
+if(sessionRole!=='admin'){
+  document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:var(--danger);font-weight:700;font-size:1.2rem;">ACCESS DENIED. Admin login required.</div>';
+}
 
-        function toggleAllChecks() {
-            const v = document.getElementById('catCheckAll').checked;
-            document.querySelectorAll('.cat-check').forEach(c => c.checked = v);
-        }
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tabId,evt){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  if(evt?.target) evt.target.classList.add('active');
+  if(tabId==='tUnverified') loadUnverified();
+  if(tabId==='tCatalog') loadCatalog();
+  if(tabId==='tFamilies') loadFamilies();
+  if(tabId==='tGroups') loadGroups();
+  if(tabId==='tBrands') loadBrands();
+}
 
-        async function deleteProduct(id, reloadCat=false) {
-            if(!confirm('Delete this product?')) return;
-            await supabaseClient.from('product_master').delete().eq('id', id);
-            reloadCat ? loadCatalog() : loadUnverified();
-        }
+// ── TAB 1: UNVERIFIED QUEUE ────────────────────────────────────────────────
+async function loadUnverified(){
+  const{data}=await sb.from('product_master').select('*').eq('catalog_status','unverified').order('created_at',{ascending:false});
+  document.getElementById('unvCount').innerText=data?data.length:0;
+  const container=document.getElementById('unverifiedList');
+  if(!data||data.length===0){container.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No products pending approval. ✅</p>';return;}
+  container.innerHTML='';
+  data.forEach(p=>{
+    container.innerHTML+=`
+    <div class="unverified-card">
+      <div style="font-size:.78rem;color:#92400e;font-weight:700;margin-bottom:8px;">
+        📦 Created during billing — ${new Date(p.created_at).toLocaleDateString('en-IN')}
+      </div>
+      <div class="unv-grid">
+        <div class="field-group" style="grid-column:span 2;"><label>Item Name</label>
+          <input type="text" id="u-name-${p.id}" value="${p.item_name||''}" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field-group"><label>Brand</label>
+          <input type="text" id="u-brand-${p.id}" value="${p.brand||''}" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="field-group"><label>Scope</label>
+          <select id="u-scope-${p.id}">
+            <option value="generic" ${p.scope==='generic'?'selected':''}>Generic</option>
+            <option value="universal" ${p.scope==='universal'?'selected':''}>Universal</option>
+            <option value="specific" ${p.scope==='specific'?'selected':''}>Specific</option>
+          </select>
+        </div>
+        <div class="field-group"><label>Stock Tracking</label>
+          <select id="u-track-${p.id}">
+            <option value="true" ${p.track_stock?'selected':''}>Track Stock</option>
+            <option value="false" ${!p.track_stock?'selected':''}>Bin / No Track</option>
+          </select>
+        </div>
+      </div>
+      <div class="unv-grid">
+        <div class="field-group"><label>MRP (₹)</label>
+          <input type="number" id="u-mrp-${p.id}" value="${p.mrp||0}">
+        </div>
+        <div class="field-group"><label>Cost Price (₹)</label>
+          <input type="number" id="u-cost-${p.id}" value="${p.cost_price||0}">
+        </div>
+        <div class="field-group"><label>Sell Price (₹)</label>
+          <input type="number" id="u-ret-${p.id}" value="${p.retail_price||p.default_price||0}">
+        </div>
+        <div class="field-group"><label>Barcode</label>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="u-bar-${p.id}" value="${p.barcode_id||''}" style="flex:1;">
+            <button class="btn-action info" style="padding:6px 10px;font-size:.78rem;" onclick="scanBarcode('u-bar-${p.id}')">📷</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-action" onclick="approveProduct('${p.id}')">✅ APPROVE & GO LIVE</button>
+        <button class="btn-action danger" onclick="deleteProduct('${p.id}',false)">🗑️ DELETE</button>
+      </div>
+    </div>`;
+  });
+}
 
-        // --- TAB 3: Families ---
-        async function loadFamilies() {
-            const { data } = await supabaseClient.from('product_families').select('*');
-            const tbody = document.querySelector('#famTable tbody');
-            tbody.innerHTML = '';
-            (data||[]).forEach(f => {
-                tbody.innerHTML += `<tr><td>${f.family_name}</td><td>${f.is_fiber?'Yes':'No'}</td><td>${new Date(f.created_at).toLocaleDateString()}</td>
-                    <td><button class="btn btn-danger" onclick="deleteFamily('${f.id}')">Delete</button></td></tr>`;
-            });
-        }
-        async function createFamily() {
-            const name = document.getElementById('famName').value.trim().toUpperCase();
-            const fiber = document.getElementById('famFiber').value === 'true';
-            if(!name) return;
-            await supabaseClient.from('product_families').insert({family_name: name, is_fiber: fiber});
-            document.getElementById('famName').value = '';
-            loadFamilies();
-        }
-        async function deleteFamily(id) { await supabaseClient.from('product_families').delete().eq('id',id); loadFamilies(); }
+async function approveProduct(id){
+  const payload={
+    item_name:document.getElementById(`u-name-${id}`).value.trim().toUpperCase(),
+    brand:document.getElementById(`u-brand-${id}`).value.trim().toUpperCase(),
+    scope:document.getElementById(`u-scope-${id}`).value,
+    track_stock:document.getElementById(`u-track-${id}`).value==='true',
+    mrp:parseFloat(document.getElementById(`u-mrp-${id}`).value)||0,
+    cost_price:parseFloat(document.getElementById(`u-cost-${id}`).value)||0,
+    retail_price:parseFloat(document.getElementById(`u-ret-${id}`).value)||0,
+    barcode_id:document.getElementById(`u-bar-${id}`).value.trim(),
+    catalog_status:'live'
+  };
+  if(!payload.item_name){alert('Item name is required.');return;}
+  const{error}=await sb.from('product_master').update(payload).eq('id',id);
+  if(error) alert('Error: '+error.message);
+  else loadUnverified();
+}
 
-        // --- TAB 4: Groups ---
-        async function loadGroups() {
-            const { data } = await supabaseClient.from('product_groups').select('*, product_group_vehicles(vehicle_model)');
-            const c = document.getElementById('groupsList');
-            c.innerHTML = '';
-            (data||[]).forEach(g => {
-                const vehs = g.product_group_vehicles.map(v=>v.vehicle_model).join(', ');
-                c.innerHTML += `<div style="border:1px solid var(--border); padding:10px; margin-bottom:10px;">
-                    <strong>${g.group_name}</strong> <span style="font-size:0.8rem; color:var(--info);">[Product ID: ${g.product_master_id}]</span><br>
-                    <span style="font-size:0.85rem;">Vehicles: ${vehs || 'None'}</span>
-                    <div style="margin-top:5px;"><button class="btn btn-danger" onclick="deleteGroup('${g.id}')">Delete Group</button></div>
-                </div>`;
-            });
-        }
-        async function createGroup() {
-            const name = document.getElementById('grpName').value;
-            const pid = document.getElementById('grpProdId').value;
-            if(!name || !pid) return;
-            await supabaseClient.from('product_groups').insert({group_name: name, product_master_id: pid});
-            document.getElementById('grpName').value=''; document.getElementById('grpProdId').value='';
-            loadGroups();
-        }
-        async function deleteGroup(id) { await supabaseClient.from('product_groups').delete().eq('id',id); loadGroups(); }
+async function deleteProduct(id,isCatalog){
+  if(!confirm('Delete this product permanently?')) return;
+  await sb.from('product_master').delete().eq('id',id);
+  isCatalog?loadCatalog():loadUnverified();
+}
 
-        // --- Utils & Scanners ---
-        async function scanBarcode(targetId) {
-            if(!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
-            document.getElementById('scanner-overlay').style.display = 'flex';
-            try {
-                const result = await codeReader.decodeFromInputVideoDevice(undefined, 'scanner-video');
-                document.getElementById(targetId).value = result.text;
-                closeScanner();
-            } catch(e) { console.error(e); }
-        }
-        function closeScanner() { if(codeReader) codeReader.reset(); document.getElementById('scanner-overlay').style.display = 'none'; }
+// ── TAB 2: FULL CATALOG ────────────────────────────────────────────────────
+async function loadCatalog(){
+  let q=sb.from('product_master').select('id,item_name,brand,scope,track_stock,mrp,retail_price,barcode_id').eq('catalog_status','live').order('item_name').limit(150);
+  const search=document.getElementById('catSearch').value.trim();
+  const scope=document.getElementById('catScope').value;
+  if(search) q=q.ilike('item_name',`%${search}%`);
+  if(scope) q=q.eq('scope',scope);
+  const{data}=await q;
+  const tbody=document.querySelector('#catTable tbody'); tbody.innerHTML='';
+  (data||[]).forEach(p=>{
+    tbody.innerHTML+=`<tr>
+      <td><input type="checkbox" class="cat-check" value="${p.id}" data-name="${p.item_name}" data-mrp="${p.mrp||0}" data-ret="${p.retail_price||0}" data-bar="${p.barcode_id||''}"></td>
+      <td><strong>${p.item_name}</strong></td>
+      <td>${p.brand||'—'}</td>
+      <td><span style="font-size:.72rem;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-weight:700;">${p.scope}</span></td>
+      <td>${p.track_stock?'✅ Yes':'—'}</td>
+      <td style="color:#b45309;font-weight:700;">₹${p.mrp||0}</td>
+      <td>₹${p.retail_price||0}</td>
+      <td><button class="btn-action danger" style="padding:4px 8px;font-size:.75rem;" onclick="deleteProduct('${p.id}',true)">DEL</button></td>
+    </tr>`;
+  });
+  if(!data||data.length===0) tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px;">No products found.</td></tr>';
+}
 
-        function bulkPrintLabels() {
-            const printTarget = document.getElementById('print-area');
-            printTarget.innerHTML = '';
-            let count = 0;
-            document.querySelectorAll('.cat-check:checked').forEach(c => {
-                count++;
-                const svgId = `lbl-cat-${c.value}`;
-                printTarget.innerHTML += `<div style="width:62mm; height:38mm; border:1px solid #000; padding:2mm; box-sizing:border-box; font-family:Arial; page-break-inside:avoid;">
-                    <div style="font-size:7pt; font-weight:bold; text-align:center;">My Care Service Center</div>
-                    <div style="font-size:6pt; margin:2px 0;">${c.dataset.name.substring(0,30)}</div>
-                    <div style="font-size:6pt; color:#7c3aed;">MRP: ₹${c.dataset.mrp} | Sell: ₹${c.dataset.ret}</div>
-                    <div style="text-align:center;"><svg id="${svgId}"></svg></div>
-                </div>`;
-            });
-            if(count===0) return alert('Select items to print');
-            
-            setTimeout(() => {
-                document.querySelectorAll('.cat-check:checked').forEach(c => {
-                    const bar = c.dataset.bar || '000000';
-                    JsBarcode(`#lbl-cat-${c.value}`, bar==='000000'?'TEST':bar, {format:'CODE128', width:1.2, height:25, displayValue:true, fontSize:8, margin:0});
-                });
-                window.print();
-            }, 500);
-        }
-    </script>
+function toggleAllChecks(){
+  const v=document.getElementById('catCheckAll').checked;
+  document.querySelectorAll('.cat-check').forEach(c=>c.checked=v);
+}
+
+function bulkPrintLabels(){
+  const printTarget=document.getElementById('printArea');
+  printTarget.innerHTML='';
+  let count=0;
+  document.querySelectorAll('.cat-check:checked').forEach(c=>{
+    count++;
+    const svgId=`lbl-${c.value}`;
+    printTarget.innerHTML+=`<div style="width:62mm;height:38mm;border:1px solid #000;padding:2mm;box-sizing:border-box;font-family:Arial;page-break-inside:avoid;">
+      <div style="font-size:7pt;font-weight:bold;text-align:center;">My Care Service Center</div>
+      <div style="font-size:6pt;margin:2px 0;">${(c.dataset.name||'').substring(0,30)}</div>
+      <div style="font-size:6pt;color:#7c3aed;">MRP: ₹${c.dataset.mrp} | Sell: ₹${c.dataset.ret}</div>
+      <div style="text-align:center;"><svg id="${svgId}"></svg></div>
+    </div>`;
+  });
+  if(count===0){alert('Select at least one product to print labels.');return;}
+  setTimeout(()=>{
+    document.querySelectorAll('.cat-check:checked').forEach(c=>{
+      const bar=c.dataset.bar||'000000';
+      try{JsBarcode(`#lbl-${c.value}`,bar==='000000'?'TEST':bar,{format:'CODE128',width:1.2,height:25,displayValue:true,fontSize:8,margin:0});}
+      catch(e){console.warn('Barcode error:',e);}
+    });
+    window.print();
+  },400);
+}
+
+// ── TAB 3: FAMILIES ────────────────────────────────────────────────────────
+async function loadFamilies(){
+  const{data}=await sb.from('product_families').select('*').order('family_name');
+  const tbody=document.querySelector('#famTable tbody'); tbody.innerHTML='';
+  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:16px;">No families yet.</td></tr>';return;}
+  data.forEach(f=>{
+    tbody.innerHTML+=`<tr>
+      <td><strong>${f.family_name}</strong></td>
+      <td>${f.is_fiber?'✅ Yes':'—'}</td>
+      <td>${new Date(f.created_at).toLocaleDateString('en-IN')}</td>
+      <td><button class="btn-action danger" style="padding:4px 8px;font-size:.75rem;" onclick="deleteFamily('${f.id}')">DEL</button></td>
+    </tr>`;
+  });
+}
+
+async function createFamily(){
+  const name=document.getElementById('famName').value.trim().toUpperCase();
+  const fiber=document.getElementById('famFiber').value==='true';
+  if(!name){alert('Enter a family name.');return;}
+  const{error}=await sb.from('product_families').insert({family_name:name,is_fiber:fiber});
+  if(error){alert('Error: '+error.message);return;}
+  document.getElementById('famName').value='';
+  loadFamilies();
+}
+
+async function deleteFamily(id){
+  if(!confirm('Delete this family?')) return;
+  await sb.from('product_families').delete().eq('id',id);
+  loadFamilies();
+}
+
+// ── TAB 4: PRODUCT GROUPS (uses actual schema: product_master_id) ──────────
+let catalogCache=[];
+async function fetchCatalogCache(){
+  if(catalogCache.length) return;
+  const{data}=await sb.from('product_master').select('id,item_name,brand').eq('catalog_status','live').order('item_name').limit(500);
+  catalogCache=data||[];
+}
+
+async function searchGrpProduct(inp){
+  await fetchCatalogCache();
+  const q=inp.value.toLowerCase().trim();
+  const drop=document.getElementById('grpProdDrop');
+  if(q.length<2){drop.style.display='none';return;}
+  const tokens=q.split(' ').filter(Boolean);
+  const res=catalogCache.filter(p=>{
+    const s=(p.item_name+' '+(p.brand||'')).toLowerCase();
+    return tokens.every(t=>s.includes(t));
+  }).slice(0,10);
+  drop.innerHTML='';
+  res.forEach(p=>{
+    const d=document.createElement('div');
+    d.style.cssText='padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f1f5f9;';
+    d.innerHTML=`<strong>${p.item_name}</strong> <span style="font-size:.75rem;color:#666;">${p.brand||''}</span>`;
+    d.onmousedown=()=>{
+      document.getElementById('grpProdSearch').value=p.item_name+(p.brand?' ('+p.brand+')':'');
+      document.getElementById('grpProdId').value=p.id;
+      drop.style.display='none';
+    };
+    drop.appendChild(d);
+  });
+  drop.style.display=res.length?'block':'none';
+}
+
+async function loadGroups(){
+  await fetchCatalogCache();
+  const{data}=await sb.from('product_groups').select('*, product_group_vehicles(id,vehicle_model)').order('group_name');
+  const container=document.getElementById('groupsList'); container.innerHTML='';
+  if(!data||data.length===0){container.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No groups yet.</p>';return;}
+  data.forEach(g=>{
+    const prod=catalogCache.find(p=>p.id===g.product_master_id);
+    const prodLabel=prod?`${prod.item_name}${prod.brand?' ('+prod.brand+')':''}`:'Unknown Product';
+    const vehs=(g.product_group_vehicles||[]).map(v=>v.vehicle_model).join(', ')||'None';
+    container.innerHTML+=`
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:white;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <strong>${g.group_name}</strong>
+          <div style="font-size:.8rem;color:#64748b;margin-top:2px;">Base Product: <span style="color:var(--info);">${prodLabel}</span></div>
+          <div style="font-size:.8rem;color:#64748b;">Linked Vehicles: ${vehs}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;">
+          <button class="btn-action info" style="padding:4px 10px;font-size:.75rem;" onclick="toggleAddVehicle('vehForm_${g.id}')">+ Vehicle</button>
+          <button class="btn-action danger" style="padding:4px 10px;font-size:.75rem;" onclick="deleteGroup('${g.id}')">DEL GROUP</button>
+        </div>
+      </div>
+      <div id="vehForm_${g.id}" style="display:none;margin-top:8px;display:none;">
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="vehInp_${g.id}" placeholder="e.g. ACTIVA 6G" oninput="this.value=this.value.toUpperCase()" style="flex:1;">
+          <button class="btn-action" style="padding:6px 12px;font-size:.8rem;" onclick="addVehicleToGroup('${g.id}')">LINK</button>
+        </div>
+        ${(g.product_group_vehicles||[]).map(v=>`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.8rem;border-bottom:1px solid #f1f5f9;">
+          <span>${v.vehicle_model}</span>
+          <button onclick="removeVehicle('${v.id}','${g.id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-weight:700;">[UNLINK]</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+}
+
+function toggleAddVehicle(id){
+  const el=document.getElementById(id);
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function createGroup(){
+  const name=document.getElementById('grpName').value.trim().toUpperCase();
+  const pid=document.getElementById('grpProdId').value.trim();
+  if(!name){alert('Enter a group name.');return;}
+  if(!pid){alert('Select a base product by searching above.');return;}
+  const{error}=await sb.from('product_groups').insert({group_name:name,product_master_id:pid});
+  if(error){alert('Error: '+error.message);return;}
+  document.getElementById('grpName').value='';
+  document.getElementById('grpProdSearch').value='';
+  document.getElementById('grpProdId').value='';
+  loadGroups();
+}
+
+async function deleteGroup(id){
+  if(!confirm('Delete this group and all its vehicle links?')) return;
+  await sb.from('product_group_vehicles').delete().eq('group_id',id);
+  await sb.from('product_groups').delete().eq('id',id);
+  loadGroups();
+}
+
+async function addVehicleToGroup(groupId){
+  const inp=document.getElementById(`vehInp_${groupId}`);
+  const model=inp.value.trim();
+  if(!model) return;
+  const{error}=await sb.from('product_group_vehicles').insert({group_id:groupId,vehicle_model:model});
+  if(error){alert('Error: '+error.message);return;}
+  inp.value='';
+  loadGroups();
+}
+
+async function removeVehicle(vehicleRowId,groupId){
+  await sb.from('product_group_vehicles').delete().eq('id',vehicleRowId);
+  loadGroups();
+}
+
+// ── TAB 5: BRAND DISCOUNTS ─────────────────────────────────────────────────
+async function loadBrands(){
+  const{data}=await sb.from('brand_master').select('*').order('brand_name');
+  const tb=document.getElementById('brandTableBody'); tb.innerHTML='';
+  if(!data||data.length===0){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:16px;">No brand rules yet.</td></tr>';return;}
+  data.forEach(b=>{
+    tb.innerHTML+=`<tr>
+      <td><strong>${b.brand_name}</strong></td>
+      <td>${b.disc_regular}%</td>
+      <td>${b.disc_silver}%</td>
+      <td>${b.disc_gold}%</td>
+      <td><button class="btn-action danger" style="padding:4px 8px;font-size:.75rem;" onclick="deleteBrand('${b.id}')">DEL</button></td>
+    </tr>`;
+  });
+}
+
+async function saveBrandRule(){
+  const name=document.getElementById('brandName').value.trim();
+  if(!name){alert('Enter a brand name.');return;}
+  const{error}=await sb.from('brand_master').insert({
+    brand_name:name,
+    disc_regular:parseFloat(document.getElementById('brandReg').value)||0,
+    disc_silver:parseFloat(document.getElementById('brandSilv').value)||0,
+    disc_gold:parseFloat(document.getElementById('brandGold').value)||0
+  });
+  if(error){alert('Error: '+error.message);return;}
+  document.getElementById('brandName').value='';
+  loadBrands();
+}
+
+async function deleteBrand(id){
+  const{error}=await sb.from('brand_master').delete().eq('id',id);
+  if(error)alert('Error: '+error.message);else loadBrands();
+}
+
+// ── BARCODE SCANNER ────────────────────────────────────────────────────────
+let codeReader=null;
+async function scanBarcode(targetId){
+  if(!codeReader) codeReader=new ZXing.BrowserMultiFormatReader();
+  document.getElementById('scannerOverlay').style.display='flex';
+  try{
+    const result=await codeReader.decodeFromInputVideoDevice(undefined,'scannerVideo');
+    document.getElementById(targetId).value=result.text;
+    closeScanner();
+  }catch(e){console.error('Scanner error:',e);}
+}
+function closeScanner(){
+  if(codeReader) codeReader.reset();
+  document.getElementById('scannerOverlay').style.display='none';
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+if(sessionRole==='admin') loadUnverified();
+</script>
 </body>
 </html>
