@@ -1,219 +1,787 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mechanic Portal - My Care ERP</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <style>
-        :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --gold: #f59e0b; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; color: var(--text); padding-bottom:40px;}
-        
-        .sticky-nav { max-width: 950px; margin: 0 auto; background: white; padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100;}
-        .logo-matrix { display: flex; align-items: center; gap: 8px; } .logo-matrix img { height: 32px; object-fit: contain; }
-        .nav-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-header { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; background:#f1f5f9; color:var(--primary);}
-        .btn-logout { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
-        .badge-role { background: var(--info); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-left: 8px; }
-        
-        .container { max-width: 600px; margin: 20px auto; padding: 0 20px; box-sizing: border-box; }
-        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border); }
-        input[type="tel"], input[type="date"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 12px; }
-        .btn { width: 100%; background: var(--info); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; display: flex; justify-content: center; gap: 8px; }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-        .stat-box { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
-        .stat-val { font-size: 1.5rem; font-weight: bold; color: var(--primary); margin-top: 4px; }
-        .stat-title { font-size: 0.7rem; color: #64748b; text-transform: uppercase; font-weight: bold; }
-        .points-card { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-        
-        .lockout-banner { display: none; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-        
-        .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
-        .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-weight: bold; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; }
-        .tab-btn.active { color: var(--info); border-bottom-color: var(--info); }
-        .tab-content { display: none; } .tab-content.active { display: block; }
-        .list-item { border-bottom: 1px solid var(--border); padding: 12px 0; } .list-item:last-child { border-bottom: none; }
-        .pill { font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 12px; background: #e2e8f0; color: #475569; }
-        .pill.open { background: #fef3c7; color: #b45309; } .pill.closed { background: #dcfce7; color: #15803d; }
-        .stars { color: var(--gold); font-size: 1.1rem; letter-spacing: 2px; }
-        #viewLogin { display: block; } #viewDashboard { display: none; }
-        .filter-strip { display: flex; gap: 8px; margin-bottom: 16px; } .filter-strip input { margin-bottom: 0; padding: 8px; font-size: 0.85rem; }
-        #pdfRenderTarget { display: none; padding: 30px; font-family: 'Helvetica', sans-serif; color: #000; background: #fff; width: 800px; }
-        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.85rem; } .pdf-table th, .pdf-table td { border: 1px solid #ccc; padding: 8px; text-align: left; } .pdf-table th { background: #f1f5f9; font-weight: bold; }
-        .credit-text { color: #15803d; font-weight: bold; } .debit-text { color: #b91c1c; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Technician Portal — My Care ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- html2pdf loaded lazily only when PDF statement is generated -->
+<style>
+:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#ef4444;--gold:#f59e0b;}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:0;padding:0;color:var(--text);padding-bottom:60px;}
+/* Mechanic notification bar */
+#mechNotifBar{display:none;background:#1d4ed8;color:white;padding:9px 20px;font-size:0.82rem;font-weight:700;text-align:center;width:100%;}
+.sticky-nav{max-width:600px;margin:0 auto;background:white;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.02);position:sticky;top:0;z-index:100;}
+.logo-matrix{display:flex;align-items:center;gap:8px;}.logo-matrix img{height:32px;object-fit:contain;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.btn-header{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:.8rem;font-weight:700;text-decoration:none;cursor:pointer;background:#f1f5f9;color:var(--primary);}
+.btn-logout{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.badge-role{background:var(--info);color:white;padding:4px 10px;border-radius:4px;font-size:.75rem;font-weight:700;text-transform:uppercase;margin-left:8px;}
+.container{max-width:500px;margin:24px auto;padding:0 16px;}
+.card{background:white;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.04);border:1px solid var(--border);}
+/* Views */
+.view{display:none;}.view.active{display:block;}
+/* Login screens */
+.login-logo{text-align:center;margin-bottom:20px;}
+.login-logo img{height:48px;object-fit:contain;margin:0 8px;}
+h2.screen-title{text-align:center;color:var(--primary);margin:0 0 6px;font-size:1.3rem;}
+.screen-sub{text-align:center;color:#64748b;font-size:.88rem;margin-bottom:20px;}
+input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-radius:8px;font-size:1.1rem;text-align:center;letter-spacing:2px;margin-bottom:14px;}
+.btn-full{width:100%;background:var(--info);color:white;border:none;padding:14px;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;margin-bottom:10px;transition:opacity .15s;}
+.btn-full:hover{opacity:.9;}
+.btn-full.success{background:var(--success);}
+.btn-full.dark{background:var(--primary);}
+.btn-full.bio{background:white;color:var(--primary);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-full:disabled{opacity:.4;cursor:not-allowed;}
+/* PIN boxes */
+.pin-row{display:flex;gap:12px;justify-content:center;margin:20px 0;}
+.pin-box{width:54px;height:64px;border:2px solid var(--border);border-radius:10px;font-size:1.8rem;text-align:center;font-weight:700;transition:border-color .15s;background:white;}
+.pin-box:focus{border-color:var(--info);outline:none;box-shadow:0 0 0 3px rgba(41,128,185,.15);}
+.pin-box.filled{border-color:var(--success);background:#f0fdf4;}
+.pin-box.error{border-color:var(--danger);background:#fef2f2;animation:shake .3s;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+.attempt-warn{color:var(--danger);font-size:.82rem;text-align:center;font-weight:700;margin-bottom:8px;}
+.lockout-msg{background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;text-align:center;font-weight:700;margin-bottom:12px;}
+.divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:#94a3b8;font-size:.8rem;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+/* Dashboard */
+.points-card{background:linear-gradient(135deg,#f59e0b,#d97706);color:white;text-align:center;padding:20px;border-radius:12px;margin-bottom:16px;}
+.points-big{font-size:3rem;font-weight:700;margin:4px 0;}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.stat-box{background:white;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+.stat-val{font-size:1.4rem;font-weight:700;color:var(--primary);margin-top:4px;}
+.stat-title{font-size:.68rem;color:#64748b;text-transform:uppercase;font-weight:700;}
+.lockout-banner{display:none;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:14px;border-radius:8px;font-weight:700;text-align:center;margin-bottom:16px;}
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:16px;overflow-x:auto;}
+.tab-btn{flex:1;padding:10px 8px;background:none;border:none;font-weight:700;color:#64748b;border-bottom:3px solid transparent;cursor:pointer;font-size:.82rem;white-space:nowrap;}
+.tab-btn.active{color:var(--info);border-bottom-color:var(--info);}
+.tab-content{display:none;}.tab-content.active{display:block;}
+/* Job list */
+.list-item{border-bottom:1px solid var(--border);padding:12px 0;}.list-item:last-child{border-bottom:none;}
+.pill{font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:12px;background:#e2e8f0;color:#475569;}
+.pill.open{background:#fef3c7;color:#b45309;}.pill.closed{background:#dcfce7;color:#15803d;}
+.stars{color:var(--gold);font-size:1.1rem;letter-spacing:2px;}
+/* Ledger */
+.filter-strip{display:flex;gap:8px;margin-bottom:12px;}
+.filter-strip input{flex:1;padding:9px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;}
+/* My Profile */
+.photo-ring{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--border);display:block;margin:0 auto 12px;}
+.photo-placeholder{width:90px;height:90px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 12px;}
+.field-group{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
+.field-group input,.field-group select{padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.9rem;}
+.field-group input:read-only{background:#f8fafc;color:#64748b;}
+.id-proof-upload{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;position:relative;overflow:hidden;}
+.id-proof-upload input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.id-proof-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:8px;display:none;}
+#pdfRenderTarget{display:none;padding:30px;font-family:'Helvetica',sans-serif;color:#000;background:#fff;width:800px;}
+.pdf-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:.85rem;}
+.pdf-table th,.pdf-table td{border:1px solid #ccc;padding:8px;text-align:left;}
+.pdf-table th{background:#f1f5f9;font-weight:700;}
+.credit-text{color:#15803d;font-weight:700;}.debit-text{color:#b91c1c;font-weight:700;}
+</style>
 </head>
 <body>
 
+<div id="mechNotifBar">🔵 &nbsp;Loading attendance status...</div>
+
 <nav class="sticky-nav">
-    <div class="logo-matrix">
-        <img src="logo-main.jpg" onerror="this.style.display='none'">
-        <img src="logo-green.png" onerror="this.style.display='none'">
-    </div>
-    <div class="nav-actions">
-        <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
-        <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
-        <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
-        <span id="roleDisplay" class="badge-role">MECHANIC</span>
-    </div>
+  <div class="logo-matrix">
+    <img src="logo-main.jpg" onerror="this.style.display='none'">
+    <img src="logo-green.png" onerror="this.style.display='none'">
+  </div>
+  <div class="nav-actions">
+    <button class="btn-header" onclick="history.back()">← BACK</button>
+    <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
+    <span id="roleDisplay" class="badge-role">MECHANIC</span>
+  </div>
 </nav>
 
 <div class="container">
-    <div id="viewLogin" class="card">
-        <h2 style="margin-top:0; color:var(--primary); text-align:center;">Technician Login</h2>
-        <p style="text-align:center; color:#64748b; font-size:0.9rem;">Enter your registered mobile number.</p>
-        <input type="tel" id="loginMobile" placeholder="10 Digits Mobile Number" maxlength="10">
-        <button class="btn" onclick="authenticateMechanic()">LOGIN</button>
+
+  <!-- ── VIEW: Mobile Entry ─────────────────────────────────────────── -->
+  <div id="vMobile" class="view active card">
+    <div class="login-logo">
+      <img src="logo-main.jpg" onerror="this.style.display='none'">
+      <img src="logo-green.png" onerror="this.style.display='none'">
+    </div>
+    <h2 class="screen-title">Technician Login</h2>
+    <p class="screen-sub">Enter your registered mobile number.</p>
+    <input type="tel" id="loginMobile" placeholder="10-digit mobile number" maxlength="10"
+      onkeydown="if(event.key==='Enter') lookupMobile()">
+    <button class="btn-full" onclick="lookupMobile()">NEXT →</button>
+  </div>
+
+  <!-- ── VIEW: PIN Entry ────────────────────────────────────────────── -->
+  <div id="vPinEntry" class="view card">
+    <h2 class="screen-title">Verify Identity</h2>
+    <p class="screen-sub" id="pinGreeting">Welcome, MECHANIC</p>
+    <div id="lockoutDisplay" class="lockout-msg" style="display:none;"></div>
+    <div id="attemptWarn" class="attempt-warn" style="display:none;"></div>
+    <div class="pin-row" id="pinBoxRow">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+    </div>
+    <button class="btn-full success" id="btnPinSubmit" onclick="submitPIN()">VERIFY</button>
+    <div class="divider" id="bioDivider" style="display:none;">or</div>
+    <button class="btn-full bio" id="btnBiometric" style="display:none;" onclick="authenticateWithBiometric()">
+      🔍&nbsp; Use Fingerprint / Face ID
+    </button>
+    <button class="btn-full" style="background:#e2e8f0;color:#475569;margin-top:8px;" onclick="showView('vMobile')">← Change Number</button>
+  </div>
+
+  <!-- ── VIEW: PIN Setup (first login or after reset) ─────────────── -->
+  <div id="vPinSetup" class="view card">
+    <h2 class="screen-title">Set Your PIN</h2>
+    <p class="screen-sub">Choose a 4-digit PIN for secure login.</p>
+    <p style="font-size:.8rem;color:#64748b;text-align:center;margin-bottom:4px;">New PIN</p>
+    <div class="pin-row" id="newPinRow">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+    </div>
+    <p style="font-size:.8rem;color:#64748b;text-align:center;margin-bottom:4px;">Confirm PIN</p>
+    <div class="pin-row" id="confirmPinRow">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-box" maxlength="1" inputmode="numeric" pattern="[0-9]">
+    </div>
+    <p id="setupMismatch" style="display:none;color:var(--danger);text-align:center;font-weight:700;font-size:.85rem;">PINs do not match. Try again.</p>
+    <button class="btn-full success" onclick="savePIN()">SET PIN & CONTINUE</button>
+  </div>
+
+  <!-- ── VIEW: Dashboard ─────────────────────────────────────────────── -->
+  <div id="vDashboard" class="view">
+    <div id="lockoutBanner" class="lockout-banner">⚠️ इस सप्ताह आपका पॉइंट अर्जन बंद है (Lockout Active)। बेहतर सेवा दें।</div>
+
+    <div class="points-card">
+      <div style="font-size:.82rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Earned Reward Points</div>
+      <div class="points-big" id="dispPoints">0</div>
+      <div style="font-size:.78rem;opacity:.9;">Cashable at Workshop Counter</div>
     </div>
 
-    <div id="viewDashboard">
-        <div id="lockoutAlert" class="lockout-banner">
-            ⚠️ इस सप्ताह आपका पॉइंट अर्जन बंद है (Lockout Active)। बेहतर सेवा दें।
-        </div>
-
-        <div class="points-card">
-            <div style="font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Earned Reward Points</div>
-            <div style="font-size:3rem; font-weight:bold; margin:4px 0;" id="dispPoints">0</div>
-            <div style="font-size:0.8rem; opacity:0.9;">Cashable at Workshop Counter</div>
-        </div>
-
-        <div class="stat-grid">
-            <div class="stat-box"><div class="stat-title">Weekly Score (Avg)</div><div class="stat-val" id="dispAvgScore">--</div></div>
-            <div class="stat-box"><div class="stat-title">Your Net Share Earned</div><div class="stat-val" id="dispTotalLabor" style="color:var(--success);">₹0</div></div>
-        </div>
-
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('tabJobs')">Allotted Jobs</button>
-            <button class="tab-btn" onclick="switchTab('tabReviews')">Customer Reviews</button>
-            <button class="tab-btn" onclick="switchTab('tabLedger')">Financial Ledger</button>
-        </div>
-
-        <div id="tabJobs" class="tab-content active card"><div id="jobsList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading jobs...</p></div></div>
-        <div id="tabReviews" class="tab-content card"><div id="reviewsList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading reviews...</p></div></div>
-        <div id="tabLedger" class="tab-content card">
-            <h3 style="margin-top:0; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Generate Statement</h3>
-            <div class="filter-strip"><input type="date" id="ledgStart"><input type="date" id="ledgEnd"></div>
-            <button class="btn" style="background:var(--primary); margin-bottom:16px;" onclick="generateLedgerStatement()">📄 GENERATE PDF LEDGER</button>
-            <h3 style="margin-top:20px; color:var(--primary); font-size:1rem; border-bottom:1px solid var(--border); padding-bottom:8px;">Recent Cash Payouts</h3>
-            <div id="payoutList"><p style="text-align:center; color:#94a3b8; font-size:0.85rem;">Loading payouts...</p></div>
-        </div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-title">Weekly Score (Avg)</div><div class="stat-val" id="dispAvgScore">—</div></div>
+      <div class="stat-box"><div class="stat-title">Net Share Earned</div><div class="stat-val" id="dispTotalLabor" style="color:var(--success);">₹0</div></div>
     </div>
-</div>
 
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tabJobs',event)">Allotted Jobs</button>
+      <button class="tab-btn" onclick="switchTab('tabReviews',event)">Reviews</button>
+      <button class="tab-btn" onclick="switchTab('tabLedger',event)">Financial Ledger</button>
+      <button class="tab-btn" onclick="switchTab('tabProfile',event)">My Profile</button>
+    </div>
+
+    <div id="tabJobs" class="tab-content active card">
+      <div id="jobsList"><p style="text-align:center;color:#94a3b8;font-size:.85rem;">Loading jobs...</p></div>
+    </div>
+
+    <div id="tabReviews" class="tab-content card">
+      <div id="reviewsList"><p style="text-align:center;color:#94a3b8;font-size:.85rem;">Loading reviews...</p></div>
+    </div>
+
+    <div id="tabLedger" class="tab-content card">
+      <h3 style="margin-top:0;color:var(--primary);font-size:1rem;border-bottom:1px solid var(--border);padding-bottom:8px;">Generate Statement</h3>
+      <div class="filter-strip">
+        <input type="date" id="ledgStart">
+        <input type="date" id="ledgEnd">
+      </div>
+      <button class="btn-full dark" onclick="generateLedgerStatement()">📄 GENERATE PDF STATEMENT</button>
+      <h3 style="margin-top:20px;color:var(--primary);font-size:1rem;border-bottom:1px solid var(--border);padding-bottom:8px;">Recent Cash Payouts</h3>
+      <div id="payoutList"><p style="text-align:center;color:#94a3b8;font-size:.85rem;">Loading payouts...</p></div>
+    </div>
+
+    <div id="tabProfile" class="tab-content card">
+      <h3 style="margin-top:0;color:var(--primary);font-size:1rem;">My Profile</h3>
+
+      <!-- Profile photo -->
+      <div style="text-align:center;margin-bottom:16px;">
+        <img id="profilePhotoDisplay" src="" alt="" class="photo-ring" style="display:none;">
+        <div id="profilePhotoPlaceholder" class="photo-placeholder">👤</div>
+        <label style="display:inline-block;margin-top:8px;cursor:pointer;background:#f1f5f9;padding:6px 14px;border-radius:6px;font-size:.78rem;font-weight:700;color:var(--primary);border:1px solid var(--border);">
+          📷 Update Photo
+          <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="uploadProfilePhoto(this)">
+        </label>
+      </div>
+
+      <!-- Read-only info -->
+      <div class="field-group"><label>Name</label><input type="text" id="pfName" readonly></div>
+      <div class="field-group"><label>Role</label><input type="text" id="pfRole" readonly></div>
+      <div class="field-group"><label>Commission Rate</label><input type="text" id="pfComm" readonly></div>
+
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border);">
+      <p style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:12px;">Personal Details</p>
+
+      <div class="field-group"><label>Residential Address</label>
+        <input type="text" id="pfAddress" placeholder="Your current address" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="field-group"><label>Emergency Contact Name</label>
+        <input type="text" id="pfEcName" placeholder="Name" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="field-group"><label>Relation to You</label>
+        <input type="text" id="pfEcRelation" placeholder="e.g. Father, Brother, Wife" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="field-group"><label>Emergency Mobile</label>
+        <input type="tel" id="pfEcMobile" placeholder="10-digit number" maxlength="10">
+      </div>
+
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border);">
+      <p style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:12px;">ID Proof</p>
+
+      <div class="field-group"><label>ID Type</label>
+        <select id="pfIdType">
+          <option value="">Select Type</option>
+          <option value="AADHAAR">Aadhaar Card</option>
+          <option value="DRIVING_LICENCE">Driving Licence</option>
+          <option value="VOTER_ID">Voter ID</option>
+          <option value="PAN">PAN Card</option>
+        </select>
+      </div>
+      <div class="field-group"><label>ID Number</label>
+        <input type="text" id="pfIdNumber" placeholder="ID number" oninput="this.value=this.value.toUpperCase()">
+      </div>
+
+      <div class="id-proof-upload" id="idProofUploadZone">
+        <input type="file" accept="image/*" capture="environment" onchange="uploadIdProof(this)">
+        <div style="font-size:.85rem;color:#64748b;pointer-events:none;">
+          📷 Tap to capture / upload ID photo
+        </div>
+        <img id="idProofThumb" class="id-proof-thumb">
+      </div>
+      <p id="idUploadStatus" style="font-size:.75rem;text-align:center;margin-top:6px;color:#64748b;"></p>
+
+      <button class="btn-full success" style="margin-top:16px;" onclick="saveProfile()">💾 SAVE MY DETAILS</button>
+
+      <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">
+      <p style="font-size:.78rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Biometric Login</p>
+      <div id="bioRegSection">
+        <p id="bioStatus" style="font-size:.82rem;color:#64748b;margin-bottom:10px;"></p>
+        <button class="btn-full bio" id="btnRegisterBio" onclick="registerBiometric()" style="display:none;">
+          🔍&nbsp; Register Fingerprint / Face ID
+        </button>
+        <button class="btn-full" id="btnRemoveBio" onclick="removeBiometric()" style="display:none;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;">
+          🗑️ Remove Biometric
+        </button>
+      </div>
+    </div>
+
+  </div><!-- end vDashboard -->
+</div><!-- end container -->
+
+<!-- PDF render target (hidden) -->
 <div id="pdfRenderTarget">
-    <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px;">
-        <h2 style="margin:0;">My Care Service Center - Crew Statement</h2>
-        <p style="margin:4px 0; color:#444;" id="pdfMeta">Technician Name | Dates</p>
-    </div>
-    <table class="pdf-table" id="pdfTable"><thead><tr><th>Date</th><th>Ref / Job Card</th><th>Description</th><th>Credit (Earned)</th><th>Debit (Paid)</th></tr></thead><tbody></tbody></table>
-    <div style="text-align:right; font-size:1.2rem; font-weight:bold; margin-top:20px;">Net Outstanding Balance: <span id="pdfNetBal">₹0</span></div>
+  <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px;">
+    <h2 style="margin:0;">My Care Service Center — Crew Statement</h2>
+    <p style="margin:4px 0;color:#444;" id="pdfMeta"></p>
+  </div>
+  <table class="pdf-table" id="pdfTable">
+    <thead><tr><th>Date</th><th>Ref / Job Card</th><th>Description</th><th>Credit (Earned)</th><th>Debit (Paid)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div style="text-align:right;font-size:1.2rem;font-weight:700;margin-top:20px;">
+    Net Outstanding Balance: <span id="pdfNetBal">₹0</span>
+  </div>
 </div>
 
 <script>
-    const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co"; const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    let activeMech = null;
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const SESSION_KEY='MECH_SESSION_V1';
+const ATTEMPT_KEY='MECH_PIN_ATTEMPTS';
+const SESSION_HOURS=8;
+const INACTIVITY_MIN=30;
+const MAX_ATTEMPTS=3;
+const LOCKOUT_MIN=5;
 
-    document.getElementById('roleDisplay').innerText = (localStorage.getItem('ERP_ACTIVE_ROLE') || 'MECHANIC').toUpperCase();
-    function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
+let activeMech=null;
+let tempMech=null; // mechanic found during mobile lookup, before PIN verified
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    document.getElementById('ledgStart').value = new Date(new Date().setDate(1)).toISOString().split('T')[0]; 
-    document.getElementById('ledgEnd').value = todayStr;
+function doLogout(){
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(ATTEMPT_KEY);
+  activeMech=null;
+  showView('vMobile');
+  document.getElementById('loginMobile').value='';
+}
 
-    function switchTab(tabId) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); event.target.classList.add('active'); document.getElementById(tabId).classList.add('active'); }
+// ── SESSION MANAGEMENT ────────────────────────────────────────────────────
+function saveSession(mech){
+  const s={mechId:mech.id,mechName:mech.name,loginTime:Date.now(),lastActivity:Date.now()};
+  localStorage.setItem(SESSION_KEY,JSON.stringify(s));
+}
+function getSession(){
+  try{
+    const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
+    if(!s) return null;
+    const now=Date.now();
+    if(now-s.loginTime>SESSION_HOURS*3600000){localStorage.removeItem(SESSION_KEY);return null;}
+    if(now-s.lastActivity>INACTIVITY_MIN*60000){localStorage.removeItem(SESSION_KEY);return null;}
+    return s;
+  }catch(e){return null;}
+}
+function refreshActivity(){
+  const s=getSession();
+  if(s){s.lastActivity=Date.now();localStorage.setItem(SESSION_KEY,JSON.stringify(s));}
+}
+// Refresh on user interaction
+['click','keypress','touchstart'].forEach(e=>document.addEventListener(e,refreshActivity,{passive:true}));
+// Check session every 5 minutes
+setInterval(()=>{if(activeMech && !getSession()){alert('Session expired. Please login again.');doLogout();}},300000);
 
-    async function authenticateMechanic() {
-        const mobile = document.getElementById('loginMobile').value.trim();
-        if(mobile.length !== 10) return alert("Enter valid 10-digit number.");
-        
-        const { data: mechData } = await supabaseClient.from('mechanics').select('*').eq('mobile_number', mobile).single();
+// ── ATTEMPT LOCKOUT ────────────────────────────────────────────────────────
+function getAttempts(){
+  try{return JSON.parse(localStorage.getItem(ATTEMPT_KEY)||'{"count":0,"lockedUntil":0}');}
+  catch(e){return{count:0,lockedUntil:0};}
+}
+function recordFailedAttempt(){
+  const a=getAttempts();
+  a.count++;
+  if(a.count>=MAX_ATTEMPTS){a.lockedUntil=Date.now()+LOCKOUT_MIN*60000;a.count=0;}
+  localStorage.setItem(ATTEMPT_KEY,JSON.stringify(a));
+  return a;
+}
+function clearAttempts(){localStorage.removeItem(ATTEMPT_KEY);}
+function checkLockout(){
+  const a=getAttempts();
+  if(a.lockedUntil>Date.now()){
+    const remaining=Math.ceil((a.lockedUntil-Date.now())/60000);
+    return`Too many wrong PINs. Wait ${remaining} minute${remaining>1?'s':''}.`;
+  }
+  return null;
+}
 
-        if(mechData) {
-            activeMech = mechData;
-            document.getElementById('viewLogin').style.display = 'none'; document.getElementById('viewDashboard').style.display = 'block';
-            document.getElementById('dispPoints').innerText = Math.floor(mechData.earned_points || 0);
-            document.getElementById('roleDisplay').innerText = `TECH: ${mechData.name.toUpperCase()}`;
-            
-            if (mechData.lockout_active) {
-                document.getElementById('lockoutAlert').style.display = 'block';
-            }
+// ── PIN HASHING (SHA-256) ─────────────────────────────────────────────────
+async function hashPIN(pin){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
-            loadMechanicData();
-        } else { alert("Login Failed: Mobile number not found in Technician Registry."); }
+// ── VIEW MANAGEMENT ────────────────────────────────────────────────────────
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── PIN BOX BEHAVIOUR ─────────────────────────────────────────────────────
+function initPinBoxes(rowId,onComplete){
+  const boxes=document.querySelectorAll(`#${rowId} .pin-box`);
+  boxes.forEach((box,i)=>{
+    box.value='';
+    box.classList.remove('filled','error');
+    box.addEventListener('input',()=>{
+      box.value=box.value.replace(/\D/g,'').slice(-1);
+      if(box.value) box.classList.add('filled'); else box.classList.remove('filled');
+      if(box.value && i<boxes.length-1) boxes[i+1].focus();
+      const all=Array.from(boxes).map(b=>b.value).join('');
+      if(all.length===4 && onComplete) onComplete(all);
+    });
+    box.addEventListener('keydown',e=>{
+      if(e.key==='Backspace'&&!box.value&&i>0){boxes[i-1].focus();boxes[i-1].classList.remove('filled');}
+    });
+  });
+  return boxes;
+}
+function getPinFromRow(rowId){
+  return Array.from(document.querySelectorAll(`#${rowId} .pin-box`)).map(b=>b.value).join('');
+}
+function shakePin(rowId){
+  document.querySelectorAll(`#${rowId} .pin-box`).forEach(b=>{b.classList.add('error');setTimeout(()=>b.classList.remove('error'),400);});
+}
+
+// ── STEP 1: MOBILE LOOKUP ─────────────────────────────────────────────────
+async function lookupMobile(){
+  const mobile=document.getElementById('loginMobile').value.trim();
+  if(mobile.length!==10||isNaN(mobile)){alert('Enter a valid 10-digit mobile number.');return;}
+  const{data,error}=await sb.from('mechanics').select('*').eq('mobile_number',mobile).single();
+  if(!data||error){alert('Mobile number not found in Technician Registry.');return;}
+  tempMech=data;
+
+  if(!data.pin_set||!data.pin_hash){
+    // First login or PIN was reset
+    showView('vPinSetup');
+    setTimeout(()=>{
+      initPinBoxes('newPinRow');
+      initPinBoxes('confirmPinRow');
+      document.querySelector('#newPinRow .pin-box').focus();
+    },100);
+  } else {
+    // PIN exists — show PIN entry
+    document.getElementById('pinGreeting').innerText=`Welcome, ${data.name.toUpperCase()}`;
+    showView('vPinEntry');
+    const lockMsg=checkLockout();
+    if(lockMsg){
+      document.getElementById('lockoutDisplay').style.display='block';
+      document.getElementById('lockoutDisplay').innerText=lockMsg;
+      document.getElementById('btnPinSubmit').disabled=true;
+    } else {
+      document.getElementById('lockoutDisplay').style.display='none';
+      document.getElementById('btnPinSubmit').disabled=false;
+      // Check biometric option
+      if(data.webauthn_credential_id && window.PublicKeyCredential){
+        document.getElementById('bioDivider').style.display='flex';
+        document.getElementById('btnBiometric').style.display='flex';
+      }
+      setTimeout(()=>{
+        initPinBoxes('pinBoxRow');
+        document.querySelector('#pinBoxRow .pin-box').focus();
+      },100);
     }
+  }
+}
 
-    async function loadMechanicData() {
-        const { data: jobs } = await supabaseClient.from('job_cards').select('*, vehicles(reg_number), job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at', { ascending: false });
-        let totalNetShare = 0; const jList = document.getElementById('jobsList'); jList.innerHTML = ''; const rList = document.getElementById('reviewsList'); rList.innerHTML = '';
-
-        const startOfWeek = new Date(); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-        let weekReviewTotal = 0; let weekReviewCount = 0;
-
-        if(jobs && jobs.length > 0) {
-            jobs.forEach(job => {
-                let pkgLabor = 0; if(job.job_card_items) { job.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
-                const grossLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor;
-                let allocatedLabor = grossLabor; let splitTag = "";
-                if (job.mech_id && job.co_mech_id) { allocatedLabor = grossLabor / 2; splitTag = " <span style='color:var(--info); font-size:0.7rem;'>(50% Co-Mech Split)</span>"; }
-                const commRate = parseFloat(activeMech.commission_rate) || 0; const myNetShare = allocatedLabor * (commRate / 100);
-                if(job.status === 'Closed') totalNetShare += myNetShare;
-                
-                const statClass = job.status === 'Open' ? 'open' : 'closed';
-                jList.innerHTML += `<div class="list-item"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number || 'N/A'}</strong><span class="pill ${statClass}">${job.status}</span></div><div style="font-size:0.85rem; color:#64748b; margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString()}</div><div style="font-size:0.85rem; color:#475569; margin-bottom:2px;">Job Gross Labor: ₹${grossLabor}${splitTag}</div><div style="font-size:0.85rem; font-weight:bold; color:var(--success);">Your Share Earned (${commRate}%): ₹${myNetShare.toFixed(2)}</div></div>`;
-                
-                if(job.is_reviewed && job.mech_id === activeMech.id) {
-                    const stars = '★'.repeat(job.review_rating) + '☆'.repeat(5 - job.review_rating);
-                    rList.innerHTML += `<div class="list-item"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:0.8rem; color:#475569; font-style:italic;">"${job.review_mech_feedback || 'No feedback'}"</div></div>`;
-                    
-                    // Analytics for weekly score
-                    if (new Date(job.closed_at) >= startOfWeek) {
-                        weekReviewTotal += job.review_rating;
-                        weekReviewCount++;
-                    }
-                }
-            });
-        } else { jList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No allotted jobs found.</p>'; }
-        if(rList.innerHTML === '') rList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No reviews submitted yet.</p>';
-        
-        document.getElementById('dispTotalLabor').innerText = `₹${Math.floor(totalNetShare)}`;
-        if (weekReviewCount > 0) {
-            document.getElementById('dispAvgScore').innerText = `${(weekReviewTotal / weekReviewCount).toFixed(1)} / 5`;
-        }
-
-        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', activeMech.id).order('created_at', { ascending: false }).limit(10);
-        const pList = document.getElementById('payoutList'); pList.innerHTML = '';
-        if(payouts && payouts.length > 0) {
-            payouts.forEach(p => { pList.innerHTML += `<div class="list-item" style="display:flex; justify-content:space-between;"><div><strong>${new Date(p.created_at).toLocaleDateString()}</strong><br><span style="font-size:0.8rem; color:#64748b;">${p.note || 'Cash Out'}</span></div><strong style="color:var(--danger);">-₹${p.amount}</strong></div>`; });
-        } else { pList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.85rem;">No payout history.</p>'; }
+// ── STEP 2A: PIN SUBMIT ───────────────────────────────────────────────────
+async function submitPIN(){
+  const lockMsg=checkLockout();
+  if(lockMsg){document.getElementById('lockoutDisplay').innerText=lockMsg;document.getElementById('lockoutDisplay').style.display='block';return;}
+  const pin=getPinFromRow('pinBoxRow');
+  if(pin.length!==4){alert('Enter all 4 digits.');return;}
+  const hashed=await hashPIN(pin);
+  if(hashed===tempMech.pin_hash){
+    clearAttempts();
+    activeMech=tempMech;
+    saveSession(activeMech);
+    proceedToDashboard();
+    offerBiometricIfNew();
+  } else {
+    const state=recordFailedAttempt();
+    shakePin('pinBoxRow');
+    document.querySelectorAll('#pinBoxRow .pin-box').forEach(b=>{b.value='';b.classList.remove('filled');});
+    document.querySelector('#pinBoxRow .pin-box').focus();
+    const warn=document.getElementById('attemptWarn');
+    if(state.lockedUntil>Date.now()){
+      warn.style.display='block';
+      warn.innerText=`Account locked for ${LOCKOUT_MIN} minutes due to too many wrong PINs.`;
+      document.getElementById('btnPinSubmit').disabled=true;
+    } else {
+      warn.style.display='block';
+      const remaining=MAX_ATTEMPTS-state.count;
+      warn.innerText=`Wrong PIN. ${remaining} attempt${remaining!==1?'s':''} remaining.`;
     }
+  }
+}
 
-    async function generateLedgerStatement() {
-        const start = document.getElementById('ledgStart').value; const end = document.getElementById('ledgEnd').value;
-        if (!start || !end) return alert("Select Date Range");
-        const { data: jobs } = await supabaseClient.from('job_cards').select('id, closed_at, labour_charges, mech_id, co_mech_id, job_card_items(warehouse_type, total_price)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).eq('status', 'Closed').gte('closed_at', start).lte('closed_at', end + 'T23:59:59');
-        const { data: payouts } = await supabaseClient.from('workshop_expenses').select('*').eq('stakeholder_id', activeMech.id).gte('created_at', start).lte('created_at', end + 'T23:59:59');
-        
-        let totalCredit = 0; let totalDebit = 0; const tbody = document.getElementById('pdfTable').querySelector('tbody'); tbody.innerHTML = '';
-        
-        (jobs || []).forEach(job => {
-            let pkgLabor = 0; if(job.job_card_items) { job.job_card_items.forEach(item => { if(item.warehouse_type === 'Service') pkgLabor += parseFloat(item.total_price) || 0; }); }
-            let grossLabor = (parseFloat(job.labour_charges) || 0) + pkgLabor; let splitText = "";
-            if (job.mech_id && job.co_mech_id) { grossLabor = grossLabor / 2; splitText = " (50% Split)"; }
-            const commRate = parseFloat(activeMech.commission_rate) || 0; const myShare = grossLabor * (commRate / 100); totalCredit += myShare;
-            tbody.innerHTML += `<tr><td>${new Date(job.closed_at).toLocaleDateString()}</td><td>JC-${job.id.split('-')[0].toUpperCase()}</td><td>Labor Commission${splitText}</td><td class="credit-text">+₹${myShare.toFixed(2)}</td><td>--</td></tr>`;
-        });
-        (payouts || []).forEach(p => {
-            totalDebit += parseFloat(p.amount) || 0;
-            tbody.innerHTML += `<tr><td>${new Date(p.created_at).toLocaleDateString()}</td><td>PAYOUT</td><td>${p.note || 'Cash Issued'}</td><td>--</td><td class="debit-text">-₹${p.amount}</td></tr>`;
-        });
+// ── STEP 2B: PIN SETUP (first login / after reset) ────────────────────────
+async function savePIN(){
+  const newPin=getPinFromRow('newPinRow');
+  const confirmPin=getPinFromRow('confirmPinRow');
+  if(newPin.length!==4||confirmPin.length!==4){alert('Fill all 4 digits in both rows.');return;}
+  if(newPin!==confirmPin){
+    document.getElementById('setupMismatch').style.display='block';
+    shakePin('confirmPinRow');
+    document.querySelectorAll('#confirmPinRow .pin-box').forEach(b=>{b.value='';b.classList.remove('filled');});
+    document.querySelector('#confirmPinRow .pin-box').focus();
+    return;
+  }
+  document.getElementById('setupMismatch').style.display='none';
+  const hashed=await hashPIN(newPin);
+  const{error}=await sb.from('mechanics').update({pin_hash:hashed,pin_set:true}).eq('id',tempMech.id);
+  if(error){alert('Error saving PIN: '+error.message);return;}
+  tempMech.pin_hash=hashed;tempMech.pin_set=true;
+  activeMech=tempMech;
+  saveSession(activeMech);
+  proceedToDashboard();
+  offerBiometricIfNew();
+}
 
-        document.getElementById('pdfMeta').innerText = `Technician: ${activeMech.name} | Period: ${start} to ${end}`;
-        document.getElementById('pdfNetBal').innerText = `₹${Math.floor(totalCredit - totalDebit)}`;
-        const element = document.getElementById('pdfRenderTarget'); element.style.display = 'block';
-        html2pdf().set({ margin: 0.5, filename: `Ledger_${activeMech.name.replace(/\s/g, '_')}.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(element).save().then(() => { element.style.display = 'none'; });
+// ── WEBAUTHN ──────────────────────────────────────────────────────────────
+async function offerBiometricIfNew(){
+  if(!window.PublicKeyCredential) return;
+  if(activeMech.webauthn_credential_id) return; // already registered
+  if(sessionStorage.getItem('BIO_OFFERED')) return; // already offered this session
+  sessionStorage.setItem('BIO_OFFERED','1');
+  setTimeout(()=>{
+    if(confirm('Would you like to set up fingerprint or face ID for faster future logins?')){
+      registerBiometric();
     }
+  },800);
+}
+
+async function registerBiometric(){
+  if(!window.PublicKeyCredential){alert('Biometric authentication is not supported on this device.');return;}
+  try{
+    const challenge=new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    const cred=await navigator.credentials.create({publicKey:{
+      challenge,
+      rp:{name:'My Care ERP',id:window.location.hostname},
+      user:{id:new TextEncoder().encode(activeMech.id),name:activeMech.mobile_number,displayName:activeMech.name},
+      pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},
+      timeout:60000
+    }});
+    if(!cred){alert('Biometric registration cancelled.');return;}
+    const credId=btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+    const{error}=await sb.from('mechanics').update({webauthn_credential_id:credId}).eq('id',activeMech.id);
+    if(!error){
+      activeMech.webauthn_credential_id=credId;
+      alert('Fingerprint / Face ID registered successfully!');
+      updateBioStatus();
+    }
+  }catch(e){alert('Biometric setup failed: '+e.message);}
+}
+
+async function authenticateWithBiometric(){
+  if(!tempMech||!tempMech.webauthn_credential_id){return;}
+  try{
+    const challenge=new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    const rawId=Uint8Array.from(atob(tempMech.webauthn_credential_id),c=>c.charCodeAt(0));
+    const assertion=await navigator.credentials.get({publicKey:{
+      challenge,
+      allowCredentials:[{type:'public-key',id:rawId}],
+      userVerification:'required',
+      timeout:60000
+    }});
+    if(assertion){
+      clearAttempts();
+      activeMech=tempMech;
+      saveSession(activeMech);
+      proceedToDashboard();
+    }
+  }catch(e){alert('Biometric verification failed. Please use your PIN.');}
+}
+
+async function removeBiometric(){
+  if(!confirm('Remove fingerprint / face ID? You will use PIN only.')) return;
+  const{error}=await sb.from('mechanics').update({webauthn_credential_id:null}).eq('id',activeMech.id);
+  if(!error){activeMech.webauthn_credential_id=null;updateBioStatus();alert('Biometric removed.');}
+}
+
+function updateBioStatus(){
+  const supported=!!window.PublicKeyCredential;
+  const regBtn=document.getElementById('btnRegisterBio');
+  const remBtn=document.getElementById('btnRemoveBio');
+  const statusEl=document.getElementById('bioStatus');
+  if(!supported){statusEl.innerText='Biometric login is not supported on this device.';return;}
+  if(activeMech&&activeMech.webauthn_credential_id){
+    statusEl.innerText='✅ Fingerprint / Face ID is registered on this device.';
+    regBtn.style.display='none';remBtn.style.display='block';
+  } else {
+    statusEl.innerText='Fingerprint / Face ID is not set up yet.';
+    regBtn.style.display='block';remBtn.style.display='none';
+  }
+}
+
+// ── DASHBOARD INIT ────────────────────────────────────────────────────────
+async function proceedToDashboard(){
+  showView('vDashboard');
+  document.getElementById('roleDisplay').innerText=`TECH: ${activeMech.name.split(' ')[0]}`;
+  document.getElementById('dispPoints').innerText=Math.floor(activeMech.earned_points||0);
+  if(activeMech.lockout_active) document.getElementById('lockoutBanner').style.display='block';
+  // Set ledger date defaults
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('ledgEnd').value=today;
+  document.getElementById('ledgStart').value=new Date(new Date().setDate(1)).toISOString().split('T')[0];
+  // Load data
+  await Promise.all([loadMechanicData(),loadPayouts()]);
+  loadProfileData();
+  checkAttendanceNotification();
+}
+
+// ── ATTENDANCE NOTIFICATION ────────────────────────────────────────────────
+async function checkAttendanceNotification(){
+  const today=new Date().toISOString().split('T')[0];
+  const bar=document.getElementById('mechNotifBar');
+  const{data}=await sb.from('mechanic_attendance').select('id,approved_status').eq('mech_id',activeMech.id).eq('date',today).maybeSingle();
+  if(!data){
+    bar.innerText='🔵  Your attendance for today has not been marked yet. Please inform your manager.';
+    bar.style.display='block';
+  } else if(data&&!data.approved_status){
+    bar.innerText='🔵  Your attendance for today is pending manager approval.';
+    bar.style.display='block';
+  } else {
+    bar.style.display='none';
+  }
+}
+
+// ── MECHANIC DATA (FIX1: labour_charges only — no pkgLabor doubling) ───────
+async function loadMechanicData(){
+  const{data:jobs}=await sb.from('job_cards').select('id,created_at,closed_at,status,labour_charges,mech_id,co_mech_id,is_reviewed,review_rating,review_mech_feedback,vehicles(reg_number)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at',{ascending:false});
+  let totalNetShare=0;
+  const jList=document.getElementById('jobsList'); jList.innerHTML='';
+  const rList=document.getElementById('reviewsList'); rList.innerHTML='';
+  const startOfWeek=new Date(); startOfWeek.setDate(startOfWeek.getDate()-startOfWeek.getDay());
+  let weekTotal=0,weekCount=0;
+  (jobs||[]).forEach(job=>{
+    // FIX1: Only labour_charges — no job_card_items doubling
+    const gross=parseFloat(job.labour_charges)||0;
+    const hasCo=job.mech_id&&job.co_mech_id;
+    const allocated=hasCo?gross/2:gross;
+    const commRate=parseFloat(activeMech.commission_rate)||0;
+    const myShare=allocated*(commRate/100);
+    if(job.status==='Closed') totalNetShare+=myShare;
+    const splitTag=hasCo?` <span style="color:var(--info);font-size:.7rem;">(50% Co-Mech)</span>`:'';
+    const statClass=job.status==='Open'?'open':'closed';
+    jList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong><span class="pill ${statClass}">${job.status}</span></div><div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div><div style="font-size:.82rem;color:#475569;">Labour: ₹${gross}${splitTag}</div><div style="font-size:.82rem;font-weight:700;color:var(--success);">Your Share (${commRate}%): ₹${myShare.toFixed(2)}</div></div>`;
+    if(job.is_reviewed&&job.mech_id===activeMech.id){
+      const stars='★'.repeat(job.review_rating||0)+'☆'.repeat(5-(job.review_rating||0));
+      rList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:.8rem;color:#475569;font-style:italic;">"${job.review_mech_feedback||'No feedback'}"</div></div>`;
+      if(new Date(job.closed_at)>=startOfWeek){weekTotal+=job.review_rating||0;weekCount++;}
+    }
+  });
+  if(!jList.innerHTML) jList.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;">No allotted jobs found.</p>';
+  if(!rList.innerHTML) rList.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;">No reviews yet.</p>';
+  document.getElementById('dispTotalLabor').innerText=`₹${Math.floor(totalNetShare)}`;
+  if(weekCount>0) document.getElementById('dispAvgScore').innerText=`${(weekTotal/weekCount).toFixed(1)} / 5`;
+}
+
+async function loadPayouts(){
+  const{data}=await sb.from('workshop_expenses').select('*').eq('stakeholder_id',activeMech.id).order('created_at',{ascending:false}).limit(10);
+  const el=document.getElementById('payoutList'); el.innerHTML='';
+  if(data&&data.length>0){
+    data.forEach(p=>{el.innerHTML+=`<div class="list-item" style="display:flex;justify-content:space-between;"><div><strong>${new Date(p.created_at).toLocaleDateString('en-IN')}</strong><br><span style="font-size:.78rem;color:#64748b;">${p.note||'Cash Out'}</span></div><strong style="color:var(--danger);">-₹${p.amount}</strong></div>`;});
+  } else { el.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;">No payout history.</p>'; }
+}
+
+// ── MY PROFILE ─────────────────────────────────────────────────────────────
+async function loadProfileData(){
+  const{data}=await sb.from('mechanics').select('name,staff_role,commission_rate,address,emergency_contact_name,emergency_contact_relation,emergency_contact_mobile,id_proof_type,id_proof_number,id_proof_photo_url,profile_photo_url,webauthn_credential_id').eq('id',activeMech.id).single();
+  if(!data) return;
+  Object.assign(activeMech,data);
+  document.getElementById('pfName').value=data.name||'';
+  document.getElementById('pfRole').value=data.staff_role||'';
+  document.getElementById('pfComm').value=(data.commission_rate||0)+'%';
+  document.getElementById('pfAddress').value=data.address||'';
+  document.getElementById('pfEcName').value=data.emergency_contact_name||'';
+  document.getElementById('pfEcRelation').value=data.emergency_contact_relation||'';
+  document.getElementById('pfEcMobile').value=data.emergency_contact_mobile||'';
+  document.getElementById('pfIdType').value=data.id_proof_type||'';
+  document.getElementById('pfIdNumber').value=data.id_proof_number||'';
+  // Load profile photo
+  if(data.profile_photo_url){
+    const{data:url}=await sb.storage.from('staff-documents').createSignedUrl(data.profile_photo_url,3600);
+    if(url?.signedUrl){
+      const img=document.getElementById('profilePhotoDisplay');
+      img.src=url.signedUrl; img.style.display='block';
+      document.getElementById('profilePhotoPlaceholder').style.display='none';
+    }
+  }
+  // Load ID proof thumb
+  if(data.id_proof_photo_url){
+    const{data:url}=await sb.storage.from('staff-documents').createSignedUrl(data.id_proof_photo_url,3600);
+    if(url?.signedUrl){
+      const thumb=document.getElementById('idProofThumb');
+      thumb.src=url.signedUrl; thumb.style.display='block';
+      document.getElementById('idUploadStatus').innerText='ID proof on file. Click to update.';
+    }
+  }
+  updateBioStatus();
+}
+
+async function saveProfile(){
+  const payload={
+    address:document.getElementById('pfAddress').value.trim().toUpperCase(),
+    emergency_contact_name:document.getElementById('pfEcName').value.trim().toUpperCase(),
+    emergency_contact_relation:document.getElementById('pfEcRelation').value.trim().toUpperCase(),
+    emergency_contact_mobile:document.getElementById('pfEcMobile').value.trim(),
+    id_proof_type:document.getElementById('pfIdType').value,
+    id_proof_number:document.getElementById('pfIdNumber').value.trim().toUpperCase()
+  };
+  const{error}=await sb.from('mechanics').update(payload).eq('id',activeMech.id);
+  if(error) alert('Error saving: '+error.message);
+  else alert('Profile saved successfully. ✅');
+}
+
+async function uploadProfilePhoto(input){
+  const file=input.files[0]; if(!file) return;
+  const path=`profile-photos/${activeMech.id}.jpg`;
+  const{error}=await sb.storage.from('staff-documents').upload(path,file,{upsert:true,contentType:file.type});
+  if(error){alert('Photo upload error: '+error.message);return;}
+  await sb.from('mechanics').update({profile_photo_url:path}).eq('id',activeMech.id);
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=document.getElementById('profilePhotoDisplay');
+    img.src=e.target.result; img.style.display='block';
+    document.getElementById('profilePhotoPlaceholder').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadIdProof(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('idUploadStatus').innerText='Uploading...';
+  const path=`id-proofs/${activeMech.id}.jpg`;
+  const{error}=await sb.storage.from('staff-documents').upload(path,file,{upsert:true,contentType:file.type});
+  if(error){document.getElementById('idUploadStatus').innerText='Upload failed.';return;}
+  await sb.from('mechanics').update({id_proof_photo_url:path}).eq('id',activeMech.id);
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const thumb=document.getElementById('idProofThumb');
+    thumb.src=e.target.result; thumb.style.display='block';
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('idUploadStatus').innerText='ID proof uploaded. ✅';
+}
+
+// ── LEDGER PDF (FIX1: no pkgLabor doubling) ────────────────────────────────
+function loadHtml2Pdf(){
+  return new Promise(resolve=>{
+    if(window.html2pdf){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload=resolve; document.head.appendChild(s);
+  });
+}
+
+async function generateLedgerStatement(){
+  const start=document.getElementById('ledgStart').value;
+  const end=document.getElementById('ledgEnd').value;
+  if(!start||!end){alert('Select a date range.');return;}
+  const[{data:jobs},{data:payouts}]=await Promise.all([
+    sb.from('job_cards').select('id,closed_at,labour_charges,mech_id,co_mech_id').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).eq('status','Closed').gte('closed_at',start).lte('closed_at',end+'T23:59:59'),
+    sb.from('workshop_expenses').select('*').eq('stakeholder_id',activeMech.id).gte('created_at',start).lte('created_at',end+'T23:59:59')
+  ]);
+  let totalCredit=0,totalDebit=0;
+  const tbody=document.getElementById('pdfTable').querySelector('tbody'); tbody.innerHTML='';
+  (jobs||[]).forEach(job=>{
+    // FIX1: Only labour_charges — no doubling
+    let gross=parseFloat(job.labour_charges)||0;
+    const hasCo=job.mech_id&&job.co_mech_id;
+    const split=hasCo?' (50% Split)':'';
+    if(hasCo) gross=gross/2;
+    const rate=parseFloat(activeMech.commission_rate)||0;
+    const share=gross*(rate/100);
+    totalCredit+=share;
+    tbody.innerHTML+=`<tr><td>${new Date(job.closed_at).toLocaleDateString('en-IN')}</td><td>JC-${job.id.split('-')[0].toUpperCase()}</td><td>Labour Commission${split}</td><td class="credit-text">+₹${share.toFixed(2)}</td><td>--</td></tr>`;
+  });
+  (payouts||[]).forEach(p=>{
+    totalDebit+=parseFloat(p.amount)||0;
+    tbody.innerHTML+=`<tr><td>${new Date(p.created_at).toLocaleDateString('en-IN')}</td><td>PAYOUT</td><td>${p.note||'Cash Issued'}</td><td>--</td><td class="debit-text">-₹${p.amount}</td></tr>`;
+  });
+  document.getElementById('pdfMeta').innerText=`Technician: ${activeMech.name} | Period: ${start} to ${end}`;
+  document.getElementById('pdfNetBal').innerText=`₹${Math.floor(totalCredit-totalDebit)}`;
+  const el=document.getElementById('pdfRenderTarget'); el.style.display='block';
+  await loadHtml2Pdf();
+  html2pdf().set({margin:.5,filename:`Statement_${activeMech.name.replace(/\s/g,'_')}.pdf`,html2canvas:{scale:2},jsPDF:{unit:'in',format:'letter',orientation:'portrait'}}).from(el).save().then(()=>{el.style.display='none';});
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(tabId,evt){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  if(evt?.target) evt.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ── INIT: Check for existing valid session ─────────────────────────────────
+window.onload=async()=>{
+  const session=getSession();
+  if(session){
+    const{data}=await sb.from('mechanics').select('*').eq('id',session.mechId).single();
+    if(data){activeMech=data;proceedToDashboard();return;}
+  }
+  showView('vMobile');
+  document.getElementById('loginMobile').focus();
+};
 </script>
 </body>
 </html>
