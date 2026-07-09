@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pending Approvals — My Care ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="notifications.js"></script>
+<style>
+:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warning:#f59e0b;}
+*{box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:0;padding:0;color:var(--text);padding-bottom:60px;}
+.sticky-nav{max-width:950px;margin:0 auto;background:white;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.02);position:sticky;top:0;z-index:100;}
+.logo-matrix{display:flex;align-items:center;gap:8px;}.logo-matrix img{height:32px;object-fit:contain;}
+.nav-actions{display:flex;align-items:center;gap:8px;}
+.btn-header{padding:5px 12px;border-radius:6px;border:1px solid var(--border);font-size:.8rem;font-weight:700;text-decoration:none;cursor:pointer;background:#f1f5f9;color:var(--primary);}
+.btn-logout{background:#fee2e2;color:#b91c1c;border-color:#fca5a5;}
+.badge-role{background:#0f172a;color:white;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;text-transform:uppercase;margin-left:8px;}
+.wrapper{max-width:950px;margin:0 auto;padding:20px;}
+.card-panel{background:white;padding:20px;border-radius:10px;border:1px solid var(--border);margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.02);}
+.section-title{font-size:.95rem;font-weight:700;color:var(--primary);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+table{width:100%;border-collapse:collapse;font-size:.83rem;}
+th{background:#f8fafc;padding:10px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;margin-bottom:20px;}
+.tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase;}
+.tag-pending{background:#fef3c7;color:#b45309;}
+.tag-approved{background:#dcfce7;color:#166534;}
+.tag-rejected{background:#fee2e2;color:#991b1b;}
+.btn-view{background:var(--info);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;}
+.btn-view:hover{opacity:.9;}
+.empty-row td{text-align:center;color:#94a3b8;padding:24px;}
+.type-label{font-weight:700;color:var(--primary);}
+.change-pill{display:inline-block;background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:.78rem;margin:1px;}
+.change-arrow{color:var(--success);font-weight:700;}
+</style>
+</head>
+<body>
+
+<nav class="sticky-nav">
+  <div class="logo-matrix">
+    <img src="logo-main.jpg" onerror="this.style.display='none'">
+    <img src="logo-green.png" onerror="this.style.display='none'">
+  </div>
+  <div class="nav-actions">
+    <button class="btn-header" onclick="history.back()">← BACK</button>
+    <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
+    <span id="roleDisplay" class="badge-role">GUEST</span>
+  </div>
+</nav>
+
+<div class="wrapper">
+
+  <!-- PENDING SECTION -->
+  <div class="card-panel" id="pendingPanel">
+    <div class="section-title">
+      ⏳ Pending — Action Required
+      <span id="pendingCount" style="background:#fee2e2;color:#b91c1c;padding:2px 10px;border-radius:10px;font-size:.78rem;">0</span>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Staff / Entity</th>
+            <th>Change</th>
+            <th>Requested By</th>
+            <th>Date</th>
+            <th>Reason</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="pendingBody">
+          <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HISTORY SECTION -->
+  <div class="card-panel">
+    <div class="section-title">📋 History — Last 30 Days</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Staff / Entity</th>
+            <th>Change</th>
+            <th>Requested By</th>
+            <th>Actioned By</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const role=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase();
+document.getElementById('roleDisplay').innerText=role.toUpperCase();
+function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
+
+// Map request_type to the page that handles it
+function getViewUrl(rec){
+  const t=rec.request_type;
+  if(['commission_rate','opening_balance','opening_points','late_fine','attendance_exemption'].includes(t)){
+    return `utility-router.html?tab=wsTech&approval=${rec.id}`;
+  }
+  if(t==='jc_reopen' && rec.entity_id){
+    return `billing.html?id=${rec.entity_id}&approval=${rec.id}`;
+  }
+  if(t==='customer_credit' || t==='customer_discount'){
+    return `utility-router.html?tab=wsCustomers&approval=${rec.id}`;
+  }
+  return `utility-router.html?approval=${rec.id}`;
+}
+
+function typeLabel(t){
+  const map={
+    commission_rate:'Commission Rate',
+    opening_balance:'Opening Balance',
+    opening_points:'Opening Points',
+    jc_reopen:'JC Reopen',
+    late_fine:'Late Fine',
+    attendance_exemption:'Attendance Exemption',
+    customer_credit:'Customer Credit Limit',
+    customer_discount:'Customer Discount',
+    pin_reset:'PIN Reset'
+  };
+  return map[t]||(t||'').replace(/_/g,' ');
+}
+
+function changePill(cur,prop){
+  if(!cur && !prop) return '—';
+  if(cur && prop) return `<span class="change-pill">${cur}</span> <span class="change-arrow">→</span> <span class="change-pill" style="background:#dcfce7;color:#166534;">${prop}</span>`;
+  if(prop) return `<span class="change-pill" style="background:#dcfce7;color:#166534;">${prop}</span>`;
+  return `<span class="change-pill">${cur}</span>`;
+}
+
+function fmtDate(d){
+  if(!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+async function loadApprovals(){
+  // Role filter: admin sees all financial; service sees their own proposals + attendance
+  let pendingQ = sb.from('approval_requests').select('*').eq('status','pending').order('requested_at',{ascending:false});
+  let historyQ = sb.from('approval_requests').select('*').neq('status','pending').order('actioned_at',{ascending:false}).limit(50);
+
+  if(role==='service'){
+    // Service sees items they raised (staff proposals + attendance)
+    pendingQ = pendingQ.eq('requested_by','service');
+    historyQ = historyQ.eq('requested_by','service');
+  }
+
+  const [pendRes, histRes] = await Promise.all([pendingQ, historyQ]);
+  const pending = pendRes.data||[];
+  const history = histRes.data||[];
+
+  // Filter history to last 30 days
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+  const recentHistory = history.filter(h=>new Date(h.actioned_at||h.requested_at)>=cutoff);
+
+  // Render pending
+  document.getElementById('pendingCount').innerText = pending.length;
+  const pBody = document.getElementById('pendingBody');
+  if(pending.length===0){
+    pBody.innerHTML='<tr class="empty-row"><td colspan="7">No pending approvals. ✅</td></tr>';
+  } else {
+    pBody.innerHTML = pending.map(r=>`
+      <tr>
+        <td><span class="type-label">${typeLabel(r.request_type)}</span></td>
+        <td>${r.entity_label||r.entity_type||'—'}</td>
+        <td>${changePill(r.current_value,r.proposed_value)}</td>
+        <td>${(r.requested_by||'—').toUpperCase()}</td>
+        <td>${fmtDate(r.requested_at)}</td>
+        <td style="font-size:.78rem;color:#64748b;max-width:150px;">${r.reason||'—'}</td>
+        <td><button class="btn-view" onclick="window.location.href='${getViewUrl(r)}'">VIEW →</button></td>
+      </tr>`).join('');
+  }
+
+  // Render history
+  const hBody = document.getElementById('historyBody');
+  if(recentHistory.length===0){
+    hBody.innerHTML='<tr class="empty-row"><td colspan="7">No history in last 30 days.</td></tr>';
+  } else {
+    hBody.innerHTML = recentHistory.map(r=>`
+      <tr>
+        <td><span class="type-label">${typeLabel(r.request_type)}</span></td>
+        <td>${r.entity_label||r.entity_type||'—'}</td>
+        <td>${changePill(r.current_value,r.proposed_value)}</td>
+        <td>${(r.requested_by||'—').toUpperCase()}</td>
+        <td>${(r.actioned_by||'—').toUpperCase()}</td>
+        <td>${fmtDate(r.actioned_at||r.requested_at)}</td>
+        <td><span class="tag tag-${r.status==='approved'?'approved':r.status==='rejected'?'rejected':'pending'}">${r.status||'pending'}</span>
+          ${r.action_note?`<br><span style="font-size:.72rem;color:#64748b;">${r.action_note}</span>`:''}</td>
+      </tr>`).join('');
+  }
+}
+
+loadApprovals();
+</script>
+</body>
+</html>
