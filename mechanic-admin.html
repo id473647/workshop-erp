@@ -22,17 +22,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:
 .inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;align-items:end;}
 .field-group{display:flex;flex-direction:column;gap:4px;}
 .field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
-input,select{padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;}
+input,select,textarea{padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;}
 input:read-only{background:#f8fafc;color:#64748b;}
 .btn-action{background:var(--success);color:white;border:none;padding:10px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.85rem;transition:opacity .15s;}
 .btn-action:hover{opacity:.9;}
 .btn-info{background:var(--info);}.btn-warn{background:var(--warning);color:#000;}.btn-danger{background:var(--danger);}.btn-purple{background:var(--purple);}
+/* Page tabs */
+.page-tab-bar{display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:18px;}
+.page-tab{padding:9px 18px;border:none;background:none;font-weight:700;color:#64748b;border-bottom:3px solid transparent;cursor:pointer;font-size:.85rem;border-radius:6px 6px 0 0;}
+.page-tab.active{color:var(--primary);border-bottom-color:var(--info);background:#f0f9ff;}
+.page-panel{display:none;}.page-panel.active{display:block;}
+/* Tables */
 .table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;margin-top:12px;}
-table{width:100%;border-collapse:collapse;font-size:.83rem;}
+table{width:100%;border-collapse:collapse;font-size:.82rem;}
 th{background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;}
-td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
-/* Attendance badge */
-.att-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.68rem;font-weight:700;}
+td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 /* Profile panel */
 .profile-panel{background:#f8fafc;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;}
 .profile-panel-inner{padding:20px;}
@@ -43,18 +47,18 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 .profile-photo-placeholder{width:80px;height:80px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:1.8rem;border:2px solid var(--border);}
 .detail-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.83rem;}
 .detail-label{color:#64748b;font-weight:700;}
-.detail-val{color:var(--text);}
 .propose-row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
-.propose-row input{flex:1;min-width:100px;padding:7px;font-size:.82rem;}
-.propose-row textarea{flex:2;min-width:150px;padding:7px;font-size:.82rem;border:1px solid var(--border);border-radius:6px;resize:none;}
-.status-badge{display:inline-block;padding:3px 8px;border-radius:12px;font-size:.7rem;font-weight:700;}
-.badge-active{background:#dcfce7;color:#166534;}.badge-locked{background:#fee2e2;color:#991b1b;}.badge-inactive{background:#e2e8f0;color:#475569;}
-@media print{
-  .no-print{display:none!important;}
-  .print-only{display:block!important;}
-  body{background:white;}
-  .sticky-nav,.btn-action,.btn-header{display:none!important;}
-}
+.propose-row input,.propose-row select,.propose-row textarea{flex:1;min-width:100px;padding:7px;font-size:.82rem;}
+/* Attendance register */
+.att-form-row{background:#f8fafc;padding:12px 14px;border-radius:6px;}
+.date-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.date-nav input{padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;}
+.att-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:700;}
+.loc-ok{color:#166534;}.loc-warn{color:#854d0e;}
+.summary-bar{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-top:12px;font-size:.83rem;}
+/* Settings panel */
+.settings-panel{background:#fff7ed;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:14px;}
+@media print{.no-print{display:none!important;}body{background:white;}.sticky-nav,.btn-action,.btn-header{display:none!important;}}
 </style>
 </head>
 <body>
@@ -75,7 +79,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 
 <div class="wrapper">
 
-  <!-- ADD / EDIT STAFF FORM -->
+  <!-- ADD / EDIT STAFF FORM (always visible) -->
   <div class="card-panel no-print">
     <div class="block-title">Staff & Payroll Management</div>
     <div class="inputs-grid">
@@ -86,6 +90,8 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
           <option value="Mechanic">Mechanic</option>
           <option value="Workshop Manager">Workshop Manager</option>
           <option value="Spare Parts Staff">Spare Parts Staff</option>
+          <option value="Front Office">Front Office</option>
+          <option value="Receptionist">Receptionist</option>
         </select>
       </div>
       <div class="field-group"><label>Commission / Salary Ref</label><input type="number" id="tComm" value="0" min="0"></div>
@@ -96,25 +102,65 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     </div>
   </div>
 
-  <!-- STAFF ROSTER TABLE -->
-  <div class="card-panel">
-    <div class="block-title" style="display:flex;justify-content:space-between;">
-      <span>Staff Roster</span>
-      <span style="font-size:.78rem;font-weight:400;color:#64748b;">Today: <span id="todayLabel"></span></span>
+  <!-- PAGE TABS -->
+  <div class="page-tab-bar no-print">
+    <button id="tab-roster" class="page-tab active" onclick="switchPageTab('roster')">👥 Staff Roster</button>
+    <button id="tab-attendance" class="page-tab" onclick="switchPageTab('attendance')">📅 Attendance Register</button>
+  </div>
+
+  <!-- ── PANEL: STAFF ROSTER ──────────────────────────────────────────── -->
+  <div id="panel-roster" class="page-panel active">
+    <div class="card-panel">
+      <div class="block-title" style="display:flex;justify-content:space-between;">
+        <span>Staff Roster</span>
+        <span style="font-size:.78rem;font-weight:400;color:#64748b;">Today: <span id="todayLabel"></span></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Crew Member</th><th>Role</th><th>Today's Attendance</th><th>Points / Wallet</th><th>Actions</th></tr></thead>
+          <tbody id="staffBody"></tbody>
+        </table>
+      </div>
     </div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Crew Member</th>
-            <th>Role</th>
-            <th>Today's Attendance</th>
-            <th>Points / Wallet</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="staffBody"></tbody>
-      </table>
+  </div>
+
+  <!-- ── PANEL: ATTENDANCE REGISTER ──────────────────────────────────── -->
+  <div id="panel-attendance" class="page-panel">
+
+    <!-- Workshop Settings (admin only) -->
+    <div id="wsSettingsPanel" class="settings-panel" style="display:none;">
+      <div style="font-weight:700;color:#92400e;margin-bottom:10px;font-size:.9rem;">⚙️ Workshop Attendance Settings (Admin Only)</div>
+      <div class="inputs-grid" style="background:transparent;padding:0;border:none;">
+        <div class="field-group"><label>Workshop Latitude</label><input type="number" id="wsLat" step="0.000001" placeholder="21.898431"></div>
+        <div class="field-group"><label>Workshop Longitude</label><input type="number" id="wsLng" step="0.000001" placeholder="77.902407"></div>
+        <div class="field-group"><label>Attendance Radius (metres)</label><input type="number" id="wsRadius" placeholder="200"></div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="btn-action btn-warn" onclick="saveWorkshopSettings()">SAVE SETTINGS</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-panel">
+      <div class="block-title">📅 Daily Attendance Register</div>
+
+      <!-- Date navigation -->
+      <div class="date-nav">
+        <button class="btn-action btn-info" style="padding:7px 12px;" onclick="changeDate(-1)">← Prev</button>
+        <input type="date" id="attDate" onchange="loadAttendanceRegister(this.value)">
+        <button class="btn-action btn-info" style="padding:7px 12px;" onclick="changeDate(1)">Next →</button>
+        <button class="btn-action" style="padding:7px 12px;background:#0f172a;" onclick="goToday()">Today</button>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr>
+            <th>Mechanic</th><th>Shift</th><th>Check-in</th><th>Check-out</th>
+            <th>Duration</th><th>Status</th><th>Location</th><th class="no-print">Actions</th>
+          </tr></thead>
+          <tbody id="attRegBody"><tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px;">Select a date to load attendance.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="summary-bar no-print" id="attSummary"></div>
     </div>
   </div>
 
@@ -129,13 +175,22 @@ document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
 document.getElementById('todayLabel').innerText=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
-// ── PIN HASHING ──────────────────────────────────────────────────────────────
+// ── PAGE TAB SWITCHING ────────────────────────────────────────────────────
+function switchPageTab(tab){
+  document.querySelectorAll('.page-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.page-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+  if(tab==='attendance') initAttendanceTab();
+}
+
+// ── PIN HASHING ───────────────────────────────────────────────────────────
 async function hashPIN(pin){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pin));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// ── STAFF SAVE / EDIT ────────────────────────────────────────────────────────
+// ── STAFF SAVE / EDIT ─────────────────────────────────────────────────────
 let activeEditId=null;
 function cancelEdit(){
   activeEditId=null;
@@ -170,8 +225,7 @@ async function saveStaff(){
     const{error}=await sb.from('mechanics').insert(payload);
     if(error) return alert('Error: '+error.message);
   }
-  cancelEdit();
-  loadStaff();
+  cancelEdit(); loadStaff();
 }
 async function deactivateStaff(id,name){
   if(!confirm(`Remove ${name} from active roster?`)) return;
@@ -179,7 +233,7 @@ async function deactivateStaff(id,name){
   if(!error) loadStaff();
 }
 
-// ── STAFF LOAD ───────────────────────────────────────────────────────────────
+// ── STAFF LOAD (with today attendance inline) ──────────────────────────────
 async function loadStaff(){
   const today=new Date().toISOString().split('T')[0];
   const[staffRes,attRes]=await Promise.all([
@@ -197,22 +251,20 @@ async function loadStaff(){
       const final=att.approved_status||att.status||'Marked';
       const pending=!att.approved_status;
       let bg='#e2e8f0',col='#475569';
-      if(final==='Present'||final==='On Time'){bg='#dcfce7';col='#166534';}
+      if(final==='On Time'||final==='Present'){bg='#dcfce7';col='#166534';}
       else if(final==='Late'){bg='#fef9c3';col='#854d0e';}
       else if(final==='Half Day'){bg='#fff7ed';col='#9a3412';}
       else if(final==='Absent'){bg='#fee2e2';col='#991b1b';}
-      attBadge=`<span class="att-badge" style="background:${bg};color:${col};">${final}${pending?' ⏳':''}</span>`;
+      else if(final==='On Leave'||final==='Medical Leave'){bg='#e0f2fe';col='#0369a1';}
+      attBadge=`<span style="background:${bg};color:${col};padding:2px 7px;border-radius:10px;font-size:.68rem;font-weight:700;">${final}${pending?' ⏳':''}</span>`;
     }
     const pts=parseFloat(m.earned_points)||0;
-    const statusBadge=m.lockout_active?'<span class="status-badge badge-locked">LOCKED</span>':'<span class="status-badge badge-active">ACTIVE</span>';
-    const cashBtn=pts>0&&(sessionRole==='admin'||sessionRole==='service')?`<button class="btn-action btn-warn" style="padding:4px 8px;font-size:.75rem;" onclick="cashOutPoints('${m.id}','${m.name.replace(/'/g,"\\'")}',${pts})">Pay ₹${Math.floor(pts)}</button>`:'';
+    const statusBadge=m.lockout_active?'<span style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-size:.68rem;font-weight:700;">LOCKED</span>':'';
+    const cashBtn=pts>0?`<button class="btn-action btn-warn" style="padding:4px 8px;font-size:.75rem;" onclick="cashOutPoints('${m.id}','${m.name.replace(/'/g,"\\'")}',${pts})">Pay ₹${Math.floor(pts)}</button>`:'';
     const liftBtn=m.lockout_active&&sessionRole==='admin'?`<button class="btn-action btn-info" style="padding:4px 8px;font-size:.75rem;" onclick="liftLockout('${m.id}')">Lift Lock</button>`:'';
     tbody.innerHTML+=`
       <tr id="row_${m.id}">
-        <td>
-          <strong>${m.name}</strong> ${statusBadge}
-          <br><small style="color:#64748b;">${m.mobile_number||''} · ${m.commission_rate||0}% comm.</small>
-        </td>
+        <td><strong>${m.name}</strong> ${statusBadge}<br><small style="color:#64748b;">${m.mobile_number||''} · ${m.commission_rate||0}% · ${m.staff_role}</small></td>
         <td><span style="background:#e2e8f0;color:#475569;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">${m.staff_role}</span></td>
         <td>${attBadge}</td>
         <td>${Math.floor(pts)} Pts</td>
@@ -235,7 +287,7 @@ async function loadStaff(){
   });
 }
 
-// ── PROFILE PANEL ────────────────────────────────────────────────────────────
+// ── PROFILE PANEL ─────────────────────────────────────────────────────────
 let openProfileId=null;
 async function toggleProfile(mechId){
   const panel=document.getElementById(`profilePanel_${mechId}`);
@@ -243,28 +295,26 @@ async function toggleProfile(mechId){
     const prev=document.getElementById(`profilePanel_${openProfileId}`);
     if(prev) prev.style.display='none';
   }
-  if(panel.style.display==='none'||panel.style.display===''){
-    panel.style.display='table-row';
-    openProfileId=mechId;
+  if(panel.style.display==='none'||!panel.style.display){
+    panel.style.display='table-row'; openProfileId=mechId;
     await renderProfilePanel(mechId);
-  } else {
-    panel.style.display='none';
-    openProfileId=null;
-  }
+  } else { panel.style.display='none'; openProfileId=null; }
 }
 
 async function renderProfilePanel(mechId){
   const content=document.getElementById(`profileContent_${mechId}`);
-  const{data:m}=await sb.from('mechanics').select('*').eq('id',mechId).single();
-  if(!m){content.innerHTML='<p style="color:red;">Failed to load profile.</p>';return;}
+  const[mechRes,shiftRes]=await Promise.all([
+    sb.from('mechanics').select('*').eq('id',mechId).single(),
+    sb.from('mechanic_shifts').select('*').eq('mechanic_id',mechId).maybeSingle()
+  ]);
+  const m=mechRes.data; const shift=shiftRes.data;
+  if(!m){content.innerHTML='<p style="color:red;">Failed to load.</p>';return;}
 
-  // Load photo signed URLs
-  let profilePhotoHtml=`<div class="profile-photo-placeholder">👤</div>`;
-  let idProofHtml='<span style="color:#94a3b8;font-size:.82rem;">No ID photo uploaded</span>';
-
+  let photoHtml=`<div class="profile-photo-placeholder">👤</div>`;
+  let idProofHtml='<span style="color:#94a3b8;font-size:.82rem;">No ID photo on file</span>';
   if(m.profile_photo_url){
     const{data:u}=await sb.storage.from('staff-documents').createSignedUrl(m.profile_photo_url,3600);
-    if(u?.signedUrl) profilePhotoHtml=`<img src="${u.signedUrl}" class="profile-photo" alt="${m.name}">`;
+    if(u?.signedUrl) photoHtml=`<img src="${u.signedUrl}" class="profile-photo" alt="${m.name}">`;
   }
   if(m.id_proof_photo_url){
     const{data:u}=await sb.storage.from('staff-documents').createSignedUrl(m.id_proof_photo_url,3600);
@@ -273,47 +323,75 @@ async function renderProfilePanel(mechId){
       if(sessionRole==='admin') idProofHtml+=`&nbsp;<button class="btn-action" style="background:#e2e8f0;color:#1e293b;padding:4px 12px;font-size:.75rem;" onclick="printIdProof('${mechId}','${m.name}','${m.id_proof_type||''}','${m.id_proof_number||''}','${u.signedUrl}')">🖨️ PRINT ID</button>`;
     }
   }
-
-  const isAdmin=sessionRole==='admin';
-  const canManage=isAdmin||sessionRole==='service';
+  const canManage=sessionRole==='admin'||sessionRole==='service';
+  const shiftStart=shift?.shift_start?.substring(0,5)||'09:00';
+  const shiftEnd=shift?.shift_end?.substring(0,5)||'18:00';
+  const threshold=shift?.late_threshold_minutes||15;
 
   content.innerHTML=`
     <!-- HEADER -->
     <div class="prof-section" style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
       <div style="flex:0 0 auto;">
-        ${profilePhotoHtml}
-        ${canManage?`<label style="display:block;text-align:center;margin-top:6px;cursor:pointer;font-size:.72rem;color:var(--info);font-weight:700;">
-          📷 Upload Photo
-          <input type="file" accept="image/*" style="display:none;" onchange="uploadStaffPhoto('${mechId}',this)">
-        </label>`:''}
+        ${photoHtml}
+        ${canManage?`<label style="display:block;text-align:center;margin-top:6px;cursor:pointer;font-size:.72rem;color:var(--info);font-weight:700;">📷 Upload Photo<input type="file" accept="image/*" style="display:none;" onchange="uploadStaffPhoto('${mechId}',this)"></label>`:''}
       </div>
       <div style="flex:1;">
         <div style="font-size:1.1rem;font-weight:700;color:var(--primary);">${m.name}</div>
         <div style="font-size:.85rem;color:#64748b;">${m.staff_role} · ${m.mobile_number}</div>
-        <div style="font-size:.85rem;margin-top:4px;">Commission: <strong>${m.commission_rate||0}%</strong></div>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn-action no-print" style="padding:6px 14px;font-size:.78rem;background:#e2e8f0;color:#1e293b;" onclick="printStaffProfile('${mechId}')">🖨️ PRINT PROFILE</button>
-        </div>
+        <div style="font-size:.85rem;margin-top:2px;">Commission: <strong>${m.commission_rate||0}%</strong></div>
+        <button class="btn-action no-print" style="margin-top:8px;padding:6px 14px;font-size:.78rem;background:#e2e8f0;color:#1e293b;" onclick="printStaffProfile('${mechId}')">🖨️ PRINT PROFILE</button>
       </div>
     </div>
 
-    <!-- PERSONAL DETAILS (filled by mechanic) -->
+    <!-- PERSONAL DETAILS -->
     <div class="prof-section">
       <div class="prof-section-title">Personal Details (filled by mechanic)</div>
       <div class="detail-row"><span class="detail-label">Address</span><span class="detail-val">${m.address||'—'}</span></div>
       <div class="detail-row"><span class="detail-label">Emergency Contact</span><span class="detail-val">${m.emergency_contact_name||'—'} (${m.emergency_contact_relation||'—'})</span></div>
       <div class="detail-row"><span class="detail-label">Emergency Mobile</span><span class="detail-val">${m.emergency_contact_mobile||'—'}</span></div>
-      <div class="detail-row"><span class="detail-label">ID Type</span><span class="detail-val">${m.id_proof_type||'—'}</span></div>
-      <div class="detail-row"><span class="detail-label">ID Number</span><span class="detail-val">${m.id_proof_number||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">ID Type / Number</span><span class="detail-val">${m.id_proof_type||'—'} / ${m.id_proof_number||'—'}</span></div>
       <div style="margin-top:8px;">${idProofHtml}</div>
     </div>
+
+    <!-- SHIFT TIMINGS -->
+    ${canManage?`
+    <div class="prof-section">
+      <div class="prof-section-title">Shift Timings</div>
+      <div class="propose-row">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:100px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">SHIFT START</label><input type="time" id="sStart_${mechId}" value="${shiftStart}"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:100px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">SHIFT END</label><input type="time" id="sEnd_${mechId}" value="${shiftEnd}"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:80px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">LATE AFTER (MIN)</label><input type="number" id="sThreshold_${mechId}" value="${threshold}" style="width:100%;"></div>
+        <button class="btn-action btn-info" onclick="saveShiftTimings('${mechId}')" style="align-self:flex-end;">SAVE TIMINGS</button>
+      </div>
+    </div>`:''}
+
+    <!-- EXEMPTIONS / LEAVE -->
+    ${canManage?`
+    <div class="prof-section">
+      <div class="prof-section-title">Attendance Exemptions / Leave</div>
+      <div id="exemptList_${mechId}" style="margin-bottom:10px;font-size:.82rem;color:#94a3b8;">Loading...</div>
+      <div class="propose-row">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">FROM DATE</label><input type="date" id="exFrom_${mechId}"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">TO DATE</label><input type="date" id="exTo_${mechId}"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">TYPE</label>
+          <select id="exType_${mechId}">
+            <option value="time_relaxation">Time Relaxation</option>
+            <option value="approved_leave">Approved Leave</option>
+            <option value="medical_leave">Medical Leave</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">MODIFIED START</label><input type="time" id="exModStart_${mechId}" placeholder="09:30"></div>
+        <textarea id="exReason_${mechId}" placeholder="Reason (required)" rows="1" style="flex:2;min-width:150px;"></textarea>
+        <button class="btn-action btn-info" onclick="logExemption('${mechId}','${m.name.replace(/'/g,"\\'")}')">LOG</button>
+      </div>
+    </div>`:''}
 
     <!-- FINANCIAL TERMS -->
     ${canManage?`
     <div class="prof-section">
       <div class="prof-section-title">Financial Terms (requires Admin approval)</div>
       <div style="margin-bottom:10px;">
-        <div class="detail-row"><span class="detail-label">Commission Rate</span><span class="detail-val">${m.commission_rate||0}%</span></div>
+        <div class="detail-row"><span class="detail-label">Commission Rate</span><span>${m.commission_rate||0}%</span></div>
         <div class="propose-row">
           <input type="number" id="propComm_${mechId}" placeholder="New %" min="0" max="100" style="width:80px;">
           <textarea id="propCommReason_${mechId}" placeholder="Reason for change (required)" rows="1"></textarea>
@@ -321,20 +399,12 @@ async function renderProfilePanel(mechId){
         </div>
       </div>
       <div style="margin-bottom:10px;">
-        <div class="detail-row"><span class="detail-label">Opening Balance</span><span class="detail-val">₹${m.opening_balance||0} (as of ${m.opening_balance_date||'not set'})</span></div>
+        <div class="detail-row"><span class="detail-label">Opening Balance</span><span>₹${m.opening_balance||0} (as of ${m.opening_balance_date||'not set'})</span></div>
         <div class="propose-row">
           <input type="number" id="propBal_${mechId}" placeholder="Amount ₹">
           <input type="date" id="propBalDate_${mechId}">
           <textarea id="propBalReason_${mechId}" placeholder="Reason (required)" rows="1"></textarea>
           <button class="btn-action btn-warn" onclick="proposeOpeningBalance('${mechId}','${m.name.replace(/'/g,"\\'")}')">PROPOSE</button>
-        </div>
-      </div>
-      <div>
-        <div class="detail-row"><span class="detail-label">Opening Points</span><span class="detail-val">${m.opening_points||0} pts</span></div>
-        <div class="propose-row">
-          <input type="number" id="propPts_${mechId}" placeholder="Points">
-          <textarea id="propPtsReason_${mechId}" placeholder="Reason (required)" rows="1"></textarea>
-          <button class="btn-action btn-warn" onclick="proposeChange('${mechId}','${m.name.replace(/'/g,"\\'")}','opening_points','${m.opening_points||0} pts','propPts_${mechId}','propPtsReason_${mechId}',' pts')">PROPOSE</button>
         </div>
       </div>
     </div>`:''}
@@ -343,10 +413,7 @@ async function renderProfilePanel(mechId){
     ${canManage?`
     <div class="prof-section">
       <div class="prof-section-title">PIN Management</div>
-      <div class="detail-row">
-        <span class="detail-label">PIN Status</span>
-        <span class="detail-val">${m.pin_set?'✅ PIN Set':'⚠️ PIN Not Set (will be prompted on first login)'}</span>
-      </div>
+      <div class="detail-row"><span class="detail-label">PIN Status</span><span>${m.pin_set?'✅ PIN Set':'⚠️ Not Set — prompted on first login'}</span></div>
       <div class="propose-row" style="margin-top:10px;">
         <input type="number" id="tempPin_${mechId}" placeholder="4-digit temp PIN" maxlength="4" style="width:130px;">
         <button class="btn-action btn-purple" onclick="resetPIN('${mechId}','${m.name.replace(/'/g,"\\'")}')">RESET PIN</button>
@@ -354,46 +421,78 @@ async function renderProfilePanel(mechId){
       </div>
     </div>`:''}
   `;
+  loadExemptions(mechId);
 }
 
-// ── PROPOSALS ─────────────────────────────────────────────────────────────────
-async function proposeChange(mechId,mechName,type,currentVal,inputId,reasonId,suffix=''){
-  const el=document.getElementById(inputId);
-  const reasonEl=document.getElementById(reasonId);
-  const val=(el?.value||'').trim();
-  const reason=(reasonEl?.value||'').trim();
-  if(!val){alert('Enter a value to propose.');return;}
-  if(!reason){alert('Reason is required for this proposal.');return;}
-  const{error}=await sb.from('approval_requests').insert({
-    request_type:type,entity_id:mechId,entity_type:'mechanic',entity_label:mechName,
-    requested_by:sessionRole,current_value:String(currentVal),
-    proposed_value:val+suffix,reason,status:'pending'
+// ── SHIFT TIMINGS ─────────────────────────────────────────────────────────
+async function saveShiftTimings(mechId){
+  const start=document.getElementById(`sStart_${mechId}`).value;
+  const end=document.getElementById(`sEnd_${mechId}`).value;
+  const threshold=parseInt(document.getElementById(`sThreshold_${mechId}`).value)||15;
+  const payload={mechanic_id:mechId,shift_start:start+':00',shift_end:end+':00',late_threshold_minutes:threshold,updated_by:sessionRole,updated_at:new Date().toISOString()};
+  const{error}=await sb.from('mechanic_shifts').upsert(payload,{onConflict:'mechanic_id'});
+  if(error) alert('Error: '+error.message);
+  else alert(`Shift timings saved: ${start} – ${end} | Late after ${threshold} min`);
+}
+
+// ── EXEMPTIONS ────────────────────────────────────────────────────────────
+async function logExemption(mechId,mechName){
+  const from=document.getElementById(`exFrom_${mechId}`).value;
+  const to=document.getElementById(`exTo_${mechId}`).value;
+  const type=document.getElementById(`exType_${mechId}`).value;
+  const modStart=document.getElementById(`exModStart_${mechId}`).value;
+  const reason=document.getElementById(`exReason_${mechId}`).value.trim();
+  if(!from||!to||!reason){alert('From date, To date, and Reason are all required.');return;}
+  if(new Date(to)<new Date(from)){alert('To date must be on or after From date.');return;}
+  const{error}=await sb.from('attendance_exemptions').insert({
+    mechanic_id:mechId,exemption_from:from,exemption_to:to,exemption_type:type,
+    modified_start:type==='time_relaxation'&&modStart?modStart+':00':null,
+    reason,logged_by:sessionRole
   });
   if(error){alert('Error: '+error.message);return;}
-  if(el) el.value='';
-  if(reasonEl) reasonEl.value='';
-  alert(`Proposal submitted. ${mechName}'s ${type.replace('_',' ')} change from ${currentVal} to ${val+suffix} is pending Admin approval.`);
+  ['exFrom_','exTo_','exModStart_','exReason_'].forEach(id=>{const el=document.getElementById(id+mechId);if(el)el.value='';});
+  alert(`Exemption logged for ${mechName}: ${from} → ${to}`);
+  loadExemptions(mechId);
 }
 
+async function loadExemptions(mechId){
+  const el=document.getElementById(`exemptList_${mechId}`); if(!el) return;
+  const today=new Date().toISOString().split('T')[0];
+  const{data}=await sb.from('attendance_exemptions').select('*').eq('mechanic_id',mechId).gte('exemption_to',today).order('exemption_from');
+  if(!data||data.length===0){el.innerHTML='<span style="color:#94a3b8;">No active or upcoming exemptions.</span>';return;}
+  el.innerHTML=data.map(e=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;font-size:.82rem;">
+      <span><strong>${e.exemption_from}</strong> → <strong>${e.exemption_to}</strong> &nbsp;|&nbsp; ${e.exemption_type.replace(/_/g,' ')} &nbsp;|&nbsp; ${e.reason}</span>
+      <button onclick="deleteExemption('${e.id}','${mechId}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-weight:700;">[DEL]</button>
+    </div>`).join('');
+}
+
+async function deleteExemption(exemptId,mechId){
+  if(!confirm('Remove this exemption?')) return;
+  const{error}=await sb.from('attendance_exemptions').delete().eq('id',exemptId);
+  if(!error) loadExemptions(mechId);
+}
+
+// ── PROPOSALS & PIN (unchanged from Phase 6b) ─────────────────────────────
+async function proposeChange(mechId,mechName,type,currentVal,inputId,reasonId,suffix=''){
+  const val=(document.getElementById(inputId)?.value||'').trim();
+  const reason=(document.getElementById(reasonId)?.value||'').trim();
+  if(!val){alert('Enter a value to propose.');return;}
+  if(!reason){alert('Reason is required.');return;}
+  const{error}=await sb.from('approval_requests').insert({request_type:type,entity_id:mechId,entity_type:'mechanic',entity_label:mechName,requested_by:sessionRole,current_value:String(currentVal),proposed_value:val+suffix,reason,status:'pending'});
+  if(error){alert('Error: '+error.message);return;}
+  document.getElementById(inputId).value='';document.getElementById(reasonId).value='';
+  alert(`Proposal submitted — pending Admin approval.`);
+}
 async function proposeOpeningBalance(mechId,mechName){
   const amt=document.getElementById(`propBal_${mechId}`).value.trim();
   const date=document.getElementById(`propBalDate_${mechId}`).value;
   const reason=document.getElementById(`propBalReason_${mechId}`).value.trim();
-  if(!amt||!date){alert('Enter both amount and effective date.');return;}
-  if(!reason){alert('Reason is required.');return;}
-  const{error}=await sb.from('approval_requests').insert({
-    request_type:'opening_balance',entity_id:mechId,entity_type:'mechanic',entity_label:mechName,
-    requested_by:sessionRole,current_value:'0',
-    proposed_value:`₹${amt} from ${date}`,reason,status:'pending'
-  });
+  if(!amt||!date||!reason){alert('Amount, date, and reason are all required.');return;}
+  const{error}=await sb.from('approval_requests').insert({request_type:'opening_balance',entity_id:mechId,entity_type:'mechanic',entity_label:mechName,requested_by:sessionRole,current_value:'0',proposed_value:`₹${amt} from ${date}`,reason,status:'pending'});
   if(error){alert('Error: '+error.message);return;}
-  document.getElementById(`propBal_${mechId}`).value='';
-  document.getElementById(`propBalDate_${mechId}`).value='';
-  document.getElementById(`propBalReason_${mechId}`).value='';
-  alert(`Opening balance proposal submitted. Pending Admin approval.`);
+  alert('Opening balance proposal submitted — pending Admin approval.');
 }
-
-// ── PIN RESET ─────────────────────────────────────────────────────────────────
 async function resetPIN(mechId,mechName){
   const inp=document.getElementById(`tempPin_${mechId}`);
   const tempPin=(inp?.value||'').trim();
@@ -402,103 +501,299 @@ async function resetPIN(mechId,mechName){
   const{error}=await sb.from('mechanics').update({pin_hash:hashed,pin_set:false}).eq('id',mechId);
   if(error){alert('Error: '+error.message);return;}
   if(inp) inp.value='';
-  alert(`Temporary PIN set for ${mechName}.\nTell them to login with PIN: ${tempPin}\nThey will be asked to set a new PIN on login.`);
+  alert(`Temp PIN set for ${mechName}. Tell them the PIN: ${tempPin}\nThey will be forced to set a new PIN on login.`);
 }
-
 async function clearBiometric(mechId,mechName){
-  if(!confirm(`Remove biometric for ${mechName}? They will use PIN only.`)) return;
+  if(!confirm(`Remove biometric for ${mechName}?`)) return;
   const{error}=await sb.from('mechanics').update({webauthn_credential_id:null}).eq('id',mechId);
   if(!error){alert('Biometric removed.');renderProfilePanel(mechId);}
 }
-
-// ── CASH OUT POINTS ───────────────────────────────────────────────────────────
 async function cashOutPoints(mechId,mechName,pts){
-  if(!confirm(`Convert ${Math.floor(pts)} points to cash payout for ${mechName}?`)) return;
+  if(!confirm(`Convert ${Math.floor(pts)} points to cash for ${mechName}?`)) return;
   const[{error:e1},{error:e2}]=await Promise.all([
     sb.from('mechanics').update({earned_points:0}).eq('id',mechId),
     sb.from('workshop_expenses').insert({expense_category:'Points Cashout',stakeholder_id:mechId,amount:Math.floor(pts),note:`Points Cashout — ${mechName}`,recorded_by:sessionRole})
   ]);
-  if(e1||e2){alert('Error during cashout: '+(e1?.message||e2?.message));return;}
+  if(e1||e2){alert('Error: '+(e1?.message||e2?.message));return;}
   loadStaff();
 }
-
 async function liftLockout(mechId){
-  if(!confirm('Lift lockout for this mechanic?')) return;
+  if(!confirm('Lift lockout?')) return;
   const{error}=await sb.from('mechanics').update({lockout_active:false}).eq('id',mechId);
   if(!error) loadStaff();
 }
-
-// ── PHOTO UPLOAD (by service/admin on behalf of mechanic) ────────────────────
 async function uploadStaffPhoto(mechId,input){
   const file=input.files[0]; if(!file) return;
-  const path=`profile-photos/${mechId}.jpg`;
-  const{error}=await sb.storage.from('staff-documents').upload(path,file,{upsert:true,contentType:file.type});
+  const{error}=await sb.storage.from('staff-documents').upload(`profile-photos/${mechId}.jpg`,file,{upsert:true,contentType:file.type});
   if(error){alert('Upload error: '+error.message);return;}
-  await sb.from('mechanics').update({profile_photo_url:path}).eq('id',mechId);
-  alert('Profile photo updated.');
-  renderProfilePanel(mechId);
+  await sb.from('mechanics').update({profile_photo_url:`profile-photos/${mechId}.jpg`}).eq('id',mechId);
+  alert('Photo updated.');renderProfilePanel(mechId);
 }
-
-// ── PRINT STAFF PROFILE ───────────────────────────────────────────────────────
 async function printStaffProfile(mechId){
   const{data:m}=await sb.from('mechanics').select('*').eq('id',mechId).single();
   if(!m) return;
-  let photoHtml='';
-  if(m.profile_photo_url){
-    const{data:u}=await sb.storage.from('staff-documents').createSignedUrl(m.profile_photo_url,600);
-    if(u?.signedUrl) photoHtml=`<img src="${u.signedUrl}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #ccc;float:right;">`;
-  }
   const win=window.open('','_blank','width=600,height=700');
-  win.document.write(`<html><head><title>Staff Profile — ${m.name}</title>
-  <style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;font-size:12px;color:#000;}
-  h2{margin:0 0 4px;font-size:16px;}
-  .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;}
-  .lbl{font-weight:700;color:#64748b;}
-  .sig{display:flex;justify-content:space-between;margin-top:40px;font-size:11px;}
-  </style></head><body>
-  <div style="border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;overflow:hidden;">
-    ${photoHtml}
-    <h2>${m.name}</h2>
-    <div style="font-size:11px;color:#64748b;">${m.staff_role} · My Care Service Center</div>
-  </div>
+  win.document.write(`<html><head><title>Staff Profile — ${m.name}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;font-size:12px;}.row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;}.lbl{font-weight:700;color:#64748b;}.sig{display:flex;justify-content:space-between;margin-top:40px;font-size:11px;}</style></head><body>
+  <h2 style="margin:0 0 4px;">${m.name}</h2><div style="font-size:11px;color:#64748b;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;">${m.staff_role} · My Care Service Center</div>
   <div class="row"><span class="lbl">Mobile</span><span>${m.mobile_number}</span></div>
-  <div class="row"><span class="lbl">Commission Rate</span><span>${m.commission_rate||0}%</span></div>
-  <div class="row"><span class="lbl">Status</span><span>${m.is_active?'Active':'Inactive'}${m.lockout_active?' | LOCKED OUT':''}</span></div>
+  <div class="row"><span class="lbl">Commission</span><span>${m.commission_rate||0}%</span></div>
   <div class="row"><span class="lbl">Address</span><span>${m.address||'—'}</span></div>
-  <div class="row"><span class="lbl">Emergency Contact</span><span>${m.emergency_contact_name||'—'} (${m.emergency_contact_relation||'—'})</span></div>
-  <div class="row"><span class="lbl">Emergency Mobile</span><span>${m.emergency_contact_mobile||'—'}</span></div>
-  <div class="row"><span class="lbl">ID Type</span><span>${m.id_proof_type||'—'}</span></div>
-  <div class="row"><span class="lbl">ID Number</span><span>${m.id_proof_number||'—'}</span></div>
-  <div class="row"><span class="lbl">Opening Balance</span><span>₹${m.opening_balance||0} (from ${m.opening_balance_date||'not set'})</span></div>
-  <div class="sig">
-    <span>Printed by: ${(localStorage.getItem('ERP_ACTIVE_ROLE')||'').toUpperCase()} · ${new Date().toLocaleString('en-IN')}</span>
-  </div>
-  <div class="sig"><span>________________<br>Manager Signature</span><span>________________<br>Admin Verify</span></div>
+  <div class="row"><span class="lbl">Emergency Contact</span><span>${m.emergency_contact_name||'—'} (${m.emergency_contact_relation||'—'}) ${m.emergency_contact_mobile||''}</span></div>
+  <div class="row"><span class="lbl">ID</span><span>${m.id_proof_type||'—'} / ${m.id_proof_number||'—'}</span></div>
+  <div class="sig"><span>Printed: ${new Date().toLocaleString('en-IN')}</span></div>
+  <div class="sig"><span>________________<br>Manager</span><span>________________<br>Admin</span></div>
   </body></html>`);
   win.document.close();win.focus();setTimeout(()=>win.print(),400);
 }
-
 async function printIdProof(mechId,name,idType,idNumber,signedUrl){
   const win=window.open('','_blank','width=600,height=700');
-  win.document.write(`<html><head><title>ID Proof — ${name}</title>
-  <style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;font-size:13px;color:#000;text-align:center;}
-  .warn{background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:6px;font-size:11px;color:#9a3412;margin-bottom:16px;}
-  img{max-width:100%;border:1px solid #ccc;border-radius:8px;margin-top:16px;}
-  </style></head><body>
-  <h3 style="margin-bottom:4px;">GOVERNMENT ID PROOF — CONFIDENTIAL</h3>
-  <div class="warn">⚠️ This document is confidential. Authorised access only.</div>
-  <div><strong>Employee Name:</strong> ${name}</div>
-  <div style="margin:8px 0;"><strong>ID Type:</strong> ${idType||'—'}</div>
-  <div><strong>ID Number:</strong> <span style="font-size:16px;font-weight:700;font-family:monospace;">${idNumber||'—'}</span></div>
+  win.document.write(`<html><head><title>ID Proof — ${name}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;text-align:center;}.warn{background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:6px;font-size:11px;color:#9a3412;margin-bottom:16px;}img{max-width:100%;border:1px solid #ccc;border-radius:8px;margin-top:16px;}</style></head><body>
+  <h3>GOVERNMENT ID PROOF — CONFIDENTIAL</h3><div class="warn">⚠️ Authorised access only.</div>
+  <div><strong>${name}</strong> | ${idType||'—'} | <span style="font-size:16px;font-weight:700;font-family:monospace;">${idNumber||'—'}</span></div>
   <img src="${signedUrl}" alt="ID Proof">
-  <div style="margin-top:20px;font-size:11px;color:#64748b;">Printed by Admin · ${new Date().toLocaleString('en-IN')}</div>
+  <div style="margin-top:20px;font-size:11px;color:#64748b;">Admin · ${new Date().toLocaleString('en-IN')}</div>
   </body></html>`);
   win.document.close();win.focus();setTimeout(()=>win.print(),400);
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+// ── ATTENDANCE REGISTER ───────────────────────────────────────────────────
+let attDate=new Date().toISOString().split('T')[0];
+const STATUS_COLORS={'On Time':['#dcfce7','#166534'],'Present':['#dcfce7','#166534'],'Late':['#fef9c3','#854d0e'],'Half Day':['#fff7ed','#9a3412'],'Absent':['#fee2e2','#991b1b'],'On Leave':['#e0f2fe','#0369a1'],'Medical Leave':['#f3e8ff','#7e22ce']};
+
+function initAttendanceTab(){
+  document.getElementById('attDate').value=attDate;
+  if(sessionRole==='admin') document.getElementById('wsSettingsPanel').style.display='block';
+  loadWorkshopSettings();
+  loadAttendanceRegister(attDate);
+}
+
+function changeDate(delta){
+  const d=new Date(attDate); d.setDate(d.getDate()+delta);
+  attDate=d.toISOString().split('T')[0];
+  document.getElementById('attDate').value=attDate;
+  loadAttendanceRegister(attDate);
+}
+function goToday(){
+  attDate=new Date().toISOString().split('T')[0];
+  document.getElementById('attDate').value=attDate;
+  loadAttendanceRegister(attDate);
+}
+
+async function loadAttendanceRegister(date){
+  if(!date){date=attDate;} else {attDate=date;}
+  const tbody=document.getElementById('attRegBody');
+  tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px;">Loading...</td></tr>';
+
+  const[staffRes,attRes,shiftsRes]=await Promise.all([
+    sb.from('mechanics').select('id,name,staff_role').eq('is_active',true).order('name'),
+    sb.from('mechanic_attendance').select('*').eq('date',date),
+    sb.from('mechanic_shifts').select('mechanic_id,shift_start,shift_end,late_threshold_minutes')
+  ]);
+  const staff=staffRes.data||[];
+  const attMap={};
+  (attRes.data||[]).forEach(a=>attMap[a.mech_id]=a);
+  const shiftMap={};
+  (shiftsRes.data||[]).forEach(s=>shiftMap[s.mechanic_id]=s);
+
+  tbody.innerHTML='';
+  let counts={present:0,late:0,absent:0,leave:0,unmarked:0};
+
+  staff.forEach(m=>{
+    const att=attMap[m.id];
+    const shift=shiftMap[m.id];
+    const shiftLabel=shift?`${shift.shift_start.substring(0,5)}–${shift.shift_end.substring(0,5)}`:'09:00–18:00';
+
+    let statusBadge='<span style="color:#94a3b8;font-size:.75rem;">Not Marked</span>';
+    let checkInDisplay='—',checkOutDisplay='—',duration='—',locBadge='—';
+
+    if(att){
+      const finalStatus=att.approved_status||att.auto_status||'Marked';
+      const[bg,col]=STATUS_COLORS[finalStatus]||['#f1f5f9','#475569'];
+      const pending=!att.approved_status;
+      statusBadge=`<span class="att-badge" style="background:${bg};color:${col};">${finalStatus}${pending?' ⏳':''}</span>`;
+      if(att.check_in_time) checkInDisplay=new Date(att.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      if(att.check_out_time){
+        checkOutDisplay=new Date(att.check_out_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+        const diff=new Date(att.check_out_time)-new Date(att.check_in_time);
+        duration=`${Math.floor(diff/3600000)}h ${Math.floor((diff%3600000)/60000)}m`;
+      }
+      if(att.check_in_distance_metres!==null&&att.check_in_distance_metres!==undefined){
+        locBadge=att.check_in_distance_metres<=200?`<span class="loc-ok">📍 In</span>`:`<span class="loc-warn">⚠️ ${att.check_in_distance_metres}m</span>`;
+      }
+      if(['On Time','Present'].includes(finalStatus)){counts.present++;}
+      else if(finalStatus==='Late'){counts.present++;counts.late++;}
+      else if(['On Leave','Medical Leave'].includes(finalStatus)) counts.leave++;
+      else if(finalStatus==='Absent') counts.absent++;
+    } else { counts.unmarked++; }
+
+    const actionBtns=buildActionBtns(m.id,att,shift);
+
+    tbody.innerHTML+=`
+      <tr>
+        <td><strong>${m.name}</strong><br><span style="font-size:.7rem;color:#64748b;">${m.staff_role}</span></td>
+        <td style="font-size:.75rem;">${shiftLabel}</td>
+        <td>${checkInDisplay}</td><td>${checkOutDisplay}</td>
+        <td style="font-size:.78rem;">${duration}</td>
+        <td>${statusBadge}</td><td>${locBadge}</td>
+        <td class="no-print">${actionBtns}</td>
+      </tr>
+      <tr id="inForm_${m.id}" style="display:none;"><td colspan="8"><div class="att-form-row">${buildMarkInForm(m.id,m.name,date,shift)}</div></td></tr>
+      ${att?`<tr id="outForm_${att.id}" style="display:none;"><td colspan="8"><div class="att-form-row">${buildMarkOutForm(att.id,att.check_in_time)}</div></td></tr>
+      <tr id="ovrForm_${att.id}" style="display:none;"><td colspan="8"><div class="att-form-row">${buildOverrideForm(att.id,att.approved_status||att.auto_status||'')}</div></td></tr>`:''}`;
+  });
+
+  const sumEl=document.getElementById('attSummary');
+  if(staff.length>0) sumEl.innerHTML=`<strong>${counts.present}</strong> Present &nbsp;|&nbsp; <strong style="color:#854d0e;">${counts.late}</strong> Late &nbsp;|&nbsp; <strong style="color:#991b1b;">${counts.absent}</strong> Absent &nbsp;|&nbsp; <strong style="color:#0369a1;">${counts.leave}</strong> On Leave &nbsp;|&nbsp; <strong style="color:#b45309;">${counts.unmarked}</strong> Not Marked`;
+  else sumEl.innerHTML='No active staff found.';
+}
+
+function buildActionBtns(mechId,att,shift){
+  let btns='';
+  if(!att){
+    btns+=`<button class="btn-action" style="padding:3px 8px;font-size:.72rem;" onclick="toggleAttForm('inForm_${mechId}')">MARK IN</button>`;
+  } else {
+    if(!att.check_out_time&&att.check_in_time){
+      btns+=`<button class="btn-action btn-warn" style="padding:3px 8px;font-size:.72rem;" onclick="toggleAttForm('outForm_${att.id}')">OUT</button> `;
+    }
+    btns+=`<button class="btn-action btn-info" style="padding:3px 8px;font-size:.72rem;" onclick="toggleAttForm('ovrForm_${att.id}')">OVERRIDE</button>`;
+  }
+  return btns;
+}
+
+function buildMarkInForm(mechId,mechName,date,shift){
+  const now=new Date().toTimeString().substring(0,5);
+  const info=shift?`Shift: ${shift.shift_start.substring(0,5)} | Late after ${shift.late_threshold_minutes||15}min`:'Default 09:00 | Late after 15min';
+  return `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+    <div><div style="font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:4px;">MARK ATTENDANCE — ${mechName}</div>
+    <div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;">${info}</div></div>
+    <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">CHECK-IN TIME</label><input type="time" id="inTime_${mechId}" value="${now}" style="padding:7px;border:1px solid var(--border);border-radius:6px;"></div>
+    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:150px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">NOTE</label><input type="text" id="inNote_${mechId}" placeholder="Optional" style="padding:7px;border:1px solid var(--border);border-radius:6px;"></div>
+    <button class="btn-action" onclick="saveMarkIn('${mechId}','${date}','${shift?.shift_start||'09:00:00'}',${shift?.late_threshold_minutes||15})" style="padding:7px 14px;">SAVE</button>
+    <button onclick="toggleAttForm('inForm_${mechId}')" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:1.1rem;">✕</button>
+  </div>`;
+}
+
+function buildMarkOutForm(attId,checkInTime){
+  const now=new Date().toTimeString().substring(0,5);
+  return `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">CHECK-OUT TIME</label><input type="time" id="outTime_${attId}" value="${now}" style="padding:7px;border:1px solid var(--border);border-radius:6px;"></div>
+    <button class="btn-action btn-warn" onclick="saveMarkOut('${attId}','${checkInTime}')" style="padding:7px 14px;">SAVE CHECK-OUT</button>
+    <button onclick="toggleAttForm('outForm_${attId}')" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:1.1rem;">✕</button>
+  </div>`;
+}
+
+function buildOverrideForm(attId,currentStatus){
+  const statuses=['On Time','Late','Half Day','Absent','On Leave','Medical Leave'];
+  const opts=statuses.map(s=>`<option value="${s}" ${s===currentStatus?'selected':''}>${s}</option>`).join('');
+  return `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">NEW STATUS</label><select id="ovrSt_${attId}" style="padding:7px;border:1px solid var(--border);border-radius:6px;">${opts}</select></div>
+    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;"><label style="font-size:.7rem;font-weight:700;color:#64748b;">REASON (REQUIRED)</label><input type="text" id="ovrNote_${attId}" placeholder="Reason for override" style="padding:7px;border:1px solid var(--border);border-radius:6px;"></div>
+    <button class="btn-action btn-info" onclick="saveOverride('${attId}')" style="padding:7px 14px;">SAVE OVERRIDE</button>
+    <button onclick="toggleAttForm('ovrForm_${attId}')" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:1.1rem;">✕</button>
+  </div>`;
+}
+
+function toggleAttForm(id){
+  const allForms=['inForm_','outForm_','ovrForm_'];
+  document.querySelectorAll(allForms.map(p=>`[id^="${p}"]`).join(',')).forEach(el=>{
+    if(el.id!==id) el.style.display='none';
+  });
+  const el=document.getElementById(id);
+  if(el) el.style.display=el.style.display==='none'||!el.style.display?'table-row':'none';
+}
+
+function calcAutoStatusAdmin(checkInDate,shiftStart,threshold){
+  const[sh,sm]=shiftStart.split(':').map(Number);
+  const lateMin=sh*60+sm+(parseInt(threshold)||15);
+  const nowMin=checkInDate.getHours()*60+checkInDate.getMinutes();
+  return nowMin>lateMin?'Late':'On Time';
+}
+
+async function saveMarkIn(mechId,date,shiftStart,threshold){
+  const timeStr=document.getElementById(`inTime_${mechId}`).value;
+  const note=document.getElementById(`inNote_${mechId}`).value;
+  if(!timeStr){alert('Enter a check-in time.');return;}
+  const checkInISO=`${date}T${timeStr}:00`;
+  const checkInDate=new Date(checkInISO);
+
+  // Check exemptions for this date
+  const{data:exemption}=await sb.from('attendance_exemptions').select('*').eq('mechanic_id',mechId).lte('exemption_from',date).gte('exemption_to',date).maybeSingle();
+  let autoStatus='On Time';
+  if(exemption){
+    if(exemption.exemption_type==='approved_leave') autoStatus='On Leave';
+    else if(exemption.exemption_type==='medical_leave') autoStatus='Medical Leave';
+    else if(exemption.exemption_type==='time_relaxation'&&exemption.modified_start){
+      const[mh,mm]=exemption.modified_start.split(':').map(Number);
+      const lateMin=mh*60+mm+(parseInt(threshold)||15);
+      const nowMin=checkInDate.getHours()*60+checkInDate.getMinutes();
+      autoStatus=nowMin>lateMin?'Late':'On Time';
+    }
+  } else {
+    autoStatus=calcAutoStatusAdmin(checkInDate,shiftStart,threshold);
+  }
+
+  const{error}=await sb.from('mechanic_attendance').insert({
+    mech_id:mechId,date,check_in_time:checkInISO,auto_status:autoStatus,
+    approved_status:autoStatus,approved_by:sessionRole,approved_at:new Date().toISOString(),
+    service_note:note||null,logged_by_role:sessionRole,marked_by_service:true
+  });
+  if(error){alert('Error: '+error.message);return;}
+  loadAttendanceRegister(attDate);
+}
+
+async function saveMarkOut(attId,checkInTime){
+  const timeStr=document.getElementById(`outTime_${attId}`).value;
+  if(!timeStr){alert('Enter a check-out time.');return;}
+  const checkOutISO=`${attDate}T${timeStr}:00`;
+  const diff=new Date(checkOutISO)-new Date(checkInTime);
+  const hours=diff/3600000;
+  const updates={check_out_time:checkOutISO};
+  if(hours<4){
+    updates.auto_status='Half Day';updates.approved_status='Half Day';
+    updates.approved_by=sessionRole;updates.approved_at=new Date().toISOString();
+  }
+  const{error}=await sb.from('mechanic_attendance').update(updates).eq('id',attId);
+  if(error){alert('Error: '+error.message);return;}
+  if(hours<4) alert('Half Day flagged — duration was under 4 hours.');
+  loadAttendanceRegister(attDate);
+}
+
+async function saveOverride(attId){
+  const status=document.getElementById(`ovrSt_${attId}`).value;
+  const note=document.getElementById(`ovrNote_${attId}`).value.trim();
+  if(!note){alert('Reason is required for any override.');return;}
+  const{error}=await sb.from('mechanic_attendance').update({
+    approved_status:status,approved_by:sessionRole,
+    approved_at:new Date().toISOString(),service_note:note
+  }).eq('id',attId);
+  if(error){alert('Error: '+error.message);return;}
+  loadAttendanceRegister(attDate);
+}
+
+// ── WORKSHOP SETTINGS ─────────────────────────────────────────────────────
+async function loadWorkshopSettings(){
+  const{data}=await sb.from('workshop_settings').select('setting_key,setting_value');
+  const map={};
+  (data||[]).forEach(s=>map[s.setting_key]=s.setting_value);
+  if(document.getElementById('wsLat')) document.getElementById('wsLat').value=map['workshop_lat']||'21.898431';
+  if(document.getElementById('wsLng')) document.getElementById('wsLng').value=map['workshop_lng']||'77.902407';
+  if(document.getElementById('wsRadius')) document.getElementById('wsRadius').value=map['attendance_radius_metres']||'200';
+}
+async function saveWorkshopSettings(){
+  const lat=document.getElementById('wsLat').value.trim();
+  const lng=document.getElementById('wsLng').value.trim();
+  const radius=document.getElementById('wsRadius').value.trim();
+  if(!lat||!lng||!radius){alert('All three fields are required.');return;}
+  const now=new Date().toISOString();
+  for(const[key,val] of [['workshop_lat',lat],['workshop_lng',lng],['attendance_radius_metres',radius]]){
+    await sb.from('workshop_settings').upsert({setting_key:key,setting_value:val,updated_by:sessionRole,updated_at:now},{onConflict:'setting_key'});
+  }
+  alert(`Settings saved. Attendance radius: ${radius}m from workshop.`);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────
 if(!['admin','service'].includes(sessionRole)){
-  document.body.innerHTML='<div style="text-align:center;padding:60px;color:#e74c3c;font-weight:700;font-size:1.2rem;">Access Denied. Admin or Service login required.</div>';
+  document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:#e74c3c;font-weight:700;font-size:1.2rem;">Access Denied. Admin or Service login required.</div>';
 } else {
   loadStaff();
 }
