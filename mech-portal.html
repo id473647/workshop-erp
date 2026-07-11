@@ -73,6 +73,10 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
 .field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
 .field-group input,.field-group select{padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.9rem;}
 .field-group input:read-only{background:#f8fafc;color:#64748b;}
+.att-card{background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;text-align:center;}
+.att-status-pill{display:inline-block;padding:8px 20px;border-radius:20px;font-weight:700;font-size:.95rem;margin-bottom:10px;}
+.loc-badge{font-size:.75rem;padding:3px 10px;border-radius:10px;font-weight:700;}
+.loc-ok{background:#dcfce7;color:#166534;}.loc-warn{background:#fef9c3;color:#854d0e;}.loc-na{background:#f1f5f9;color:#64748b;}
 .id-proof-upload{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;position:relative;overflow:hidden;}
 .id-proof-upload input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
 .id-proof-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:6px;margin-top:8px;display:none;}
@@ -94,7 +98,7 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
   </div>
   <div class="nav-actions">
     <button class="btn-header" onclick="history.back()">← BACK</button>
-    <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button class="btn-header" onclick="activeMech?showView('vDashboard'):showView('vMobile')">🏠 HOME</button>
     <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">MECHANIC</span>
   </div>
@@ -161,6 +165,13 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
   <div id="vDashboard" class="view">
     <div id="lockoutBanner" class="lockout-banner">⚠️ इस सप्ताह आपका पॉइंट अर्जन बंद है (Lockout Active)। बेहतर सेवा दें।</div>
 
+    <!-- Phase 6c: Attendance card — most prominent position -->
+    <div class="att-card" id="attendanceCard">
+      <div id="attStatusContent">
+        <div style="color:#94a3b8;font-size:.85rem;">Checking attendance status...</div>
+      </div>
+    </div>
+
     <div class="points-card">
       <div style="font-size:.82rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Earned Reward Points</div>
       <div class="points-big" id="dispPoints">0</div>
@@ -177,6 +188,7 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
       <button class="tab-btn" onclick="switchTab('tabReviews',event)">Reviews</button>
       <button class="tab-btn" onclick="switchTab('tabLedger',event)">Financial Ledger</button>
       <button class="tab-btn" onclick="switchTab('tabProfile',event)">My Profile</button>
+      <button class="tab-btn" onclick="switchTab('tabEarnings',event)">💰 My Earnings</button>
     </div>
 
     <div id="tabJobs" class="tab-content active card">
@@ -272,6 +284,20 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
       </div>
     </div>
 
+    <!-- ── TAB: MY EARNINGS ──────────────────────────────────────────────── -->
+    <div id="tabEarnings" class="tab-content card">
+      <!-- Month navigation -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <button onclick="changeEarningsMonth(-1)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;color:var(--primary);">← Prev</button>
+        <span id="earningsMonthLabel" style="font-weight:700;font-size:.95rem;color:var(--primary);"></span>
+        <button onclick="changeEarningsMonth(1)" style="background:#f1f5f9;border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer;color:var(--primary);">Next →</button>
+      </div>
+      <!-- Content rendered by loadMyEarnings() -->
+      <div id="earningsContent">
+        <p style="text-align:center;color:#94a3b8;font-size:.85rem;">Loading earnings...</p>
+      </div>
+    </div>
+
   </div><!-- end vDashboard -->
 </div><!-- end container -->
 
@@ -301,6 +327,10 @@ const SESSION_HOURS=8;
 const INACTIVITY_MIN=30;
 const MAX_ATTEMPTS=3;
 const LOCKOUT_MIN=5;
+// ── WORKSHOP LOCATION ─────────────────────────────────────────────────────
+const WORKSHOP_LAT=21.898431;
+const WORKSHOP_LNG=77.902407;
+const WORKSHOP_RADIUS=200; // metres — within this = In Premises
 
 let activeMech=null;
 let tempMech=null; // mechanic found during mobile lookup, before PIN verified
@@ -584,23 +614,242 @@ async function proceedToDashboard(){
   // Load data
   await Promise.all([loadMechanicData(),loadPayouts()]);
   loadProfileData();
-  checkAttendanceNotification();
+  renderAttendanceStatus(); // Phase 6c: full attendance card
+  checkAttendanceNotification(); // Phase 6c: top notification bar
 }
 
-// ── ATTENDANCE NOTIFICATION ────────────────────────────────────────────────
+// ── ATTENDANCE NOTIFICATION BAR ────────────────────────────────────────────
 async function checkAttendanceNotification(){
   const today=new Date().toISOString().split('T')[0];
   const bar=document.getElementById('mechNotifBar');
-  const{data}=await sb.from('mechanic_attendance').select('id,approved_status').eq('mech_id',activeMech.id).eq('date',today).maybeSingle();
+  const{data}=await sb.from('mechanic_attendance').select('id,auto_status,approved_status').eq('mech_id',activeMech.id).eq('date',today).maybeSingle();
   if(!data){
-    bar.innerText='🔵  Your attendance for today has not been marked yet. Please inform your manager.';
+    bar.innerHTML='🔵 &nbsp;You have not marked attendance today. Use the button above.';
     bar.style.display='block';
-  } else if(data&&!data.approved_status){
-    bar.innerText='🔵  Your attendance for today is pending manager approval.';
+  } else if(!data.approved_status){
+    bar.innerHTML='🔵 &nbsp;Your attendance is pending manager approval.';
     bar.style.display='block';
   } else {
     bar.style.display='none';
   }
+}
+
+// ── PHASE 6C: HAVERSINE DISTANCE ─────────────────────────────────────────
+function calcDistance(lat1,lon1,lat2,lon2){
+  const R=6371000;
+  const φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180;
+  const Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+
+// ── PHASE 6C: 5 AM DAILY RESET ───────────────────────────────────────────
+function check5AMReset(){
+  const session=getSession();
+  if(!session||!activeMech) return;
+  const now=new Date();
+  const today5AM=new Date(); today5AM.setHours(5,0,0,0);
+  const loginTime=new Date(session.loginTime);
+  if(loginTime<today5AM && now>=today5AM){
+    doLogout();
+    setTimeout(()=>{
+      const msg=document.createElement('div');
+      msg.style.cssText='background:#dbeafe;border:1px solid #93c5fd;padding:12px;border-radius:8px;margin-bottom:12px;text-align:center;font-size:.88rem;color:#1e40af;font-weight:700;';
+      msg.innerHTML='🌅 Good morning! Please log in to mark attendance for today.';
+      const v=document.getElementById('vMobile');
+      v.insertBefore(msg,v.firstChild);
+      setTimeout(()=>msg.remove(),8000);
+    },150);
+  }
+}
+// Run on visibility change and every minute
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)check5AMReset();});
+setInterval(check5AMReset,60000);
+
+// ── PHASE 6C: RENDER ATTENDANCE STATUS CARD ──────────────────────────────
+async function renderAttendanceStatus(){
+  const today=new Date().toISOString().split('T')[0];
+  const el=document.getElementById('attStatusContent');
+  if(!el||!activeMech) return;
+
+  const{data:att}=await sb.from('mechanic_attendance')
+    .select('*').eq('mech_id',activeMech.id).eq('date',today).maybeSingle();
+
+  const dateLabel=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+
+  if(!att){
+    el.innerHTML=`
+      <div style="font-size:.8rem;color:#64748b;margin-bottom:10px;">📅 ${dateLabel}</div>
+      <div style="font-weight:700;color:#b45309;margin-bottom:12px;font-size:.95rem;">Attendance not marked yet.</div>
+      <div id="locStatusMsg" style="font-size:.75rem;color:#64748b;margin-bottom:10px;"></div>
+      <button class="btn-full success" onclick="markCheckIn()" id="btnCheckIn" style="max-width:280px;margin:0 auto;display:flex;justify-content:center;gap:8px;">
+        📍 MARK ATTENDANCE
+      </button>`;
+    return;
+  }
+
+  const checkInDisplay=att.check_in_time?new Date(att.check_in_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'—';
+  const checkOutDisplay=att.check_out_time?new Date(att.check_out_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):null;
+  const finalStatus=att.approved_status||att.auto_status||'Marked';
+
+  // Colour coding
+  const statusColors={
+    'On Time':['#dcfce7','#166534'],
+    'Present':['#dcfce7','#166534'],
+    'Late':['#fef9c3','#854d0e'],
+    'Half Day':['#fff7ed','#9a3412'],
+    'Absent':['#fee2e2','#991b1b'],
+    'On Leave':['#e0f2fe','#0369a1'],
+    'Medical Leave':['#f3e8ff','#7e22ce'],
+  };
+  const[bg,col]=statusColors[finalStatus]||['#f1f5f9','#475569'];
+
+  // Location badge
+  let locHtml='';
+  if(att.check_in_distance_metres!==null && att.check_in_distance_metres!==undefined){
+    if(att.check_in_distance_metres<=WORKSHOP_RADIUS){
+      locHtml=`<span class="loc-badge loc-ok">📍 In Premises</span>`;
+    } else {
+      locHtml=`<span class="loc-badge loc-warn">⚠️ ${att.check_in_distance_metres}m from workshop</span>`;
+    }
+  } else {
+    locHtml=`<span class="loc-badge loc-na">📍 Location unavailable</span>`;
+  }
+
+  const markedBy=att.marked_by_service?'<div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">Marked by manager</div>':'';
+  const pendingBadge=!att.approved_status?'<div style="font-size:.75rem;color:#b45309;margin-top:6px;">⏳ Pending manager approval</div>':'';
+  const checkoutBtn=(!checkOutDisplay && att.check_in_time)?`<button class="btn-full" onclick="markCheckOut()" style="max-width:200px;margin:10px auto 0;background:#f1f5f9;color:#1e293b;font-size:.82rem;padding:9px;">MARK CHECK OUT</button>`:'';
+  const durationHtml=checkOutDisplay?`<div style="font-size:.78rem;color:#64748b;margin-top:4px;">Duration: ${calcDuration(att.check_in_time,att.check_out_time)}</div>`:'';
+
+  el.innerHTML=`
+    <div style="font-size:.8rem;color:#64748b;margin-bottom:8px;">📅 ${dateLabel}</div>
+    <div class="att-status-pill" style="background:${bg};color:${col};">
+      ${finalStatus==='On Time'||finalStatus==='Present'?'✅':finalStatus==='Late'?'⚠️':finalStatus==='On Leave'||finalStatus==='Medical Leave'?'🏥':'ℹ️'}
+      &nbsp;${finalStatus}
+    </div>
+    <div style="font-size:.82rem;color:#475569;margin-bottom:6px;">
+      Check-in: <strong>${checkInDisplay}</strong>
+      ${checkOutDisplay?` &nbsp;|&nbsp; Check-out: <strong>${checkOutDisplay}</strong>`:''}
+    </div>
+    ${durationHtml}
+    <div style="margin-top:6px;">${locHtml}</div>
+    ${markedBy}${pendingBadge}${checkoutBtn}`;
+}
+
+function calcDuration(inTime,outTime){
+  if(!inTime||!outTime) return '—';
+  const diff=new Date(outTime)-new Date(inTime);
+  const h=Math.floor(diff/3600000);
+  const m=Math.floor((diff%3600000)/60000);
+  return `${h}h ${m}m`;
+}
+
+// ── PHASE 6C: MARK CHECK-IN ──────────────────────────────────────────────
+async function markCheckIn(){
+  const btn=document.getElementById('btnCheckIn');
+  if(btn) btn.disabled=true;
+  const locMsg=document.getElementById('locStatusMsg');
+  if(locMsg) locMsg.innerText='Getting your location...';
+
+  // Get location silently (5 second timeout)
+  let lat=null,lng=null,dist=null;
+  try{
+    const pos=await new Promise((res,rej)=>
+      navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000,enableHighAccuracy:true})
+    );
+    lat=parseFloat(pos.coords.latitude.toFixed(6));
+    lng=parseFloat(pos.coords.longitude.toFixed(6));
+    dist=calcDistance(lat,lng,WORKSHOP_LAT,WORKSHOP_LNG);
+    if(locMsg) locMsg.innerText=dist<=WORKSHOP_RADIUS?'📍 Location: In Premises':'⚠️ Location: '+dist+'m from workshop';
+  }catch(e){
+    if(locMsg) locMsg.innerText='📍 Location unavailable — proceeding without it.';
+  }
+
+  const now=new Date();
+  const today=now.toISOString().split('T')[0];
+
+  // Get shift timing for this mechanic
+  const[shiftRes,exemptRes]=await Promise.all([
+    sb.from('mechanic_shifts').select('*').eq('mechanic_id',activeMech.id).maybeSingle(),
+    sb.from('attendance_exemptions').select('*').eq('mechanic_id',activeMech.id)
+      .lte('exemption_from',today).gte('exemption_to',today).maybeSingle()
+  ]);
+
+  // Calculate auto status
+  const autoStatus=calcAutoStatus(now,shiftRes.data,exemptRes.data);
+
+  let insertError = null;
+  try {
+    const{error}=await sb.from('mechanic_attendance').insert({
+      mech_id:activeMech.id,
+      date:today,
+      check_in_time:now.toISOString(),
+      auto_status:autoStatus,
+      logged_by_role:'mechanic',
+      marked_by_service:false,
+      check_in_lat:lat,
+      check_in_lng:lng,
+      check_in_distance_metres:dist
+    });
+    insertError = error;
+  } catch(netErr) {
+    insertError = { message: 'Network error — please check your connection and try again.' };
+  }
+
+  if(insertError){
+    alert('Could not mark attendance: '+insertError.message);
+    if(btn) btn.disabled=false;
+    if(locMsg) locMsg.innerText='';
+    return;
+  }
+  await renderAttendanceStatus();
+  await checkAttendanceNotification();
+}
+
+// ── PHASE 6C: MARK CHECK-OUT ─────────────────────────────────────────────
+async function markCheckOut(){
+  const today=new Date().toISOString().split('T')[0];
+  const now=new Date();
+  const{data:att}=await sb.from('mechanic_attendance')
+    .select('id,check_in_time').eq('mech_id',activeMech.id).eq('date',today).maybeSingle();
+  if(!att){alert('No check-in found for today.');return;}
+
+  // Auto half-day detection: less than 4 hours
+  const duration=att.check_in_time?(now-new Date(att.check_in_time))/3600000:0;
+  const isHalfDay=duration>0&&duration<4;
+
+  const{error}=await sb.from('mechanic_attendance').update({
+    check_out_time:now.toISOString(),
+    ...(isHalfDay&&{auto_status:'Half Day'})
+  }).eq('id',att.id);
+
+  if(error){alert('Error: '+error.message);return;}
+  if(isHalfDay) alert('Check-out recorded. Duration under 4 hours — marked as Half Day for manager review.');
+  else alert('Check-out recorded. Duration: '+calcDuration(att.check_in_time,now.toISOString()));
+  renderAttendanceStatus();
+}
+
+// ── PHASE 6C: AUTO STATUS CALCULATION ────────────────────────────────────
+function calcAutoStatus(nowDate,shift,exemption){
+  // Exemption overrides shift timing
+  if(exemption){
+    if(exemption.exemption_type==='approved_leave') return 'On Leave';
+    if(exemption.exemption_type==='medical_leave') return 'Medical Leave';
+    if(exemption.exemption_type==='time_relaxation'&&exemption.modified_start){
+      const[mh,mm]=exemption.modified_start.split(':').map(Number);
+      const threshold=(shift?.late_threshold_minutes)||15;
+      const lateMin=mh*60+mm+threshold;
+      const nowMin=nowDate.getHours()*60+nowDate.getMinutes();
+      return nowMin>lateMin?'Late':'On Time';
+    }
+  }
+  // Normal shift comparison
+  const startStr=shift?.shift_start||'09:00:00';
+  const threshold=shift?.late_threshold_minutes||15;
+  const[sh,sm]=startStr.split(':').map(Number);
+  const lateMin=sh*60+sm+threshold;
+  const nowMin=nowDate.getHours()*60+nowDate.getMinutes();
+  return nowMin>lateMin?'Late':'On Time';
 }
 
 // ── MECHANIC DATA (FIX1: labour_charges only — no pkgLabor doubling) ───────
@@ -770,10 +1019,142 @@ function switchTab(tabId,evt){
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   if(evt?.target) evt.target.classList.add('active');
   document.getElementById(tabId).classList.add('active');
+  if(tabId==='tabEarnings') loadMyEarnings();
+}
+
+// ── MY EARNINGS TAB ───────────────────────────────────────────────────────
+let earningsYear=new Date().getFullYear();
+let earningsMonth=new Date().getMonth(); // 0-indexed
+
+function changeEarningsMonth(delta){
+  earningsMonth+=delta;
+  if(earningsMonth<0){earningsMonth=11;earningsYear--;}
+  if(earningsMonth>11){earningsMonth=0;earningsYear++;}
+  loadMyEarnings();
+}
+
+async function loadMyEarnings(){
+  if(!activeMech) return;
+  const startDate=new Date(earningsYear,earningsMonth,1).toISOString().split('T')[0];
+  const endDate=new Date(earningsYear,earningsMonth+1,0).toISOString().split('T')[0];
+  const monthLabel=new Date(earningsYear,earningsMonth,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('earningsMonthLabel').innerText=monthLabel;
+  const content=document.getElementById('earningsContent');
+  content.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;padding:16px;">Loading...</p>';
+
+  // Parallel fetch: job cards + payouts for this period
+  const[jcRes,payRes]=await Promise.all([
+    sb.from('job_cards')
+      .select('id,closed_at,labour_charges,mech_id,co_mech_id')
+      .or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`)
+      .eq('status','Closed')
+      .gte('closed_at',startDate)
+      .lte('closed_at',endDate+'T23:59:59'),
+    sb.from('mechanic_payouts')
+      .select('earning_date,amount,payout_date')
+      .eq('mechanic_id',activeMech.id)
+      .gte('earning_date',startDate)
+      .lte('earning_date',endDate)
+      .order('payout_date',{ascending:false})
+  ]);
+
+  // Group earnings by date (FIX: labour_charges only, no pkgLabor)
+  const earnByDate={};
+  (jcRes.data||[]).forEach(jc=>{
+    const date=jc.closed_at.split('T')[0];
+    const labour=parseFloat(jc.labour_charges)||0;
+    const hasCo=jc.mech_id&&jc.co_mech_id&&jc.mech_id!==jc.co_mech_id;
+    const allocated=hasCo?labour/2:labour;
+    const rate=parseFloat(activeMech.commission_rate)||0;
+    earnByDate[date]=(earnByDate[date]||0)+allocated*rate/100;
+  });
+
+  // Group payouts by earning_date — keep latest payout_date per earning_date for display
+  const paidByDate={};
+  const lastPaidDateByEarning={};
+  (payRes.data||[]).forEach(p=>{
+    paidByDate[p.earning_date]=(paidByDate[p.earning_date]||0)+parseFloat(p.amount);
+    // Since ordered desc, first hit per earning_date = latest payout_date
+    if(!lastPaidDateByEarning[p.earning_date]) lastPaidDateByEarning[p.earning_date]=p.payout_date;
+  });
+
+  // Union of all dates that have either earnings or payouts
+  const allDates=[...new Set([...Object.keys(earnByDate),...Object.keys(paidByDate)])].sort();
+
+  if(allDates.length===0){
+    content.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;padding:20px;">No earnings recorded for '+monthLabel+'.</p>';
+    return;
+  }
+
+  let totalEarned=0,totalPaid=0;
+  let rows='';
+
+  allDates.forEach(date=>{
+    const earned=earnByDate[date]||0;
+    const paid=paidByDate[date]||0;
+    const outstanding=Math.max(0,earned-paid);
+    totalEarned+=earned; totalPaid+=paid;
+
+    // Status display
+    let statusHtml;
+    if(outstanding<=0&&paid>0){
+      const paidOn=lastPaidDateByEarning[date]?new Date(lastPaidDateByEarning[date]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'';
+      statusHtml=`<span style="color:#166534;font-weight:700;">✅ Paid${paidOn?' '+paidOn:''}</span>`;
+    } else if(paid>0&&outstanding>0){
+      statusHtml=`<span style="color:#854d0e;font-weight:700;">🟡 Partial — ₹${outstanding.toFixed(0)} due</span>`;
+    } else {
+      statusHtml=`<span style="color:#991b1b;font-weight:700;">⏳ Pending</span>`;
+    }
+
+    const dayLabel=new Date(date+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'});
+    rows+=`<tr>
+      <td style="font-size:.82rem;">${dayLabel}</td>
+      <td style="font-weight:700;color:var(--primary);">₹${earned.toFixed(0)}</td>
+      <td style="color:var(--success);">₹${paid.toFixed(0)}</td>
+      <td style="color:var(--danger);font-weight:700;">${outstanding>0?'₹'+outstanding.toFixed(0):'—'}</td>
+      <td style="font-size:.78rem;">${statusHtml}</td>
+    </tr>`;
+  });
+
+  const totalOutstanding=Math.max(0,totalEarned-totalPaid);
+
+  content.innerHTML=`
+    <!-- Summary cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:.68rem;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:4px;">Total Earned</div>
+        <div style="font-size:1.15rem;font-weight:700;color:var(--primary);">₹${totalEarned.toFixed(0)}</div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:.68rem;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:4px;">Total Paid</div>
+        <div style="font-size:1.15rem;font-weight:700;color:var(--success);">₹${totalPaid.toFixed(0)}</div>
+      </div>
+      <div style="background:${totalOutstanding>0?'#fef2f2':'#f0fdf4'};border:1px solid ${totalOutstanding>0?'#fca5a5':'#bbf7d0'};border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:.68rem;font-weight:700;color:${totalOutstanding>0?'#991b1b':'#166534'};text-transform:uppercase;margin-bottom:4px;">Outstanding</div>
+        <div style="font-size:1.15rem;font-weight:700;color:${totalOutstanding>0?'var(--danger)':'var(--success)'};">${totalOutstanding>0?'₹'+totalOutstanding.toFixed(0):'All Clear ✅'}</div>
+      </div>
+    </div>
+    <!-- Day-wise table -->
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+        <thead><tr>
+          <th style="background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;">Date</th>
+          <th style="background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;">Earned</th>
+          <th style="background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;">Paid</th>
+          <th style="background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;">Outstanding</th>
+          <th style="background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;">Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p style="font-size:.72rem;color:#94a3b8;margin-top:10px;text-align:center;">
+      Earnings based on closed job cards. Contact manager for any discrepancy.
+    </p>`;
 }
 
 // ── INIT: Check for existing valid session ─────────────────────────────────
 window.onload=async()=>{
+  check5AMReset(); // Phase 6c: force reset if past 5 AM
   const session=getSession();
   if(session){
     const{data}=await sb.from('mechanics').select('*').eq('id',session.mechId).single();
