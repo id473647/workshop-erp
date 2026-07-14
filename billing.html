@@ -6,6 +6,8 @@
     <title>Floor Billing Console - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="notifications.js"></script>
+    <link rel="stylesheet" href="dark-mode.css">
+    <script src="dark-mode.js"></script>
     <!-- html2canvas loaded lazily on first JPG export — not on page load -->
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #ef4444; --purple: #8e44ad; --warning: #f59e0b;}
@@ -188,6 +190,7 @@
     <div style="display:flex; gap:12px; align-items:center;">
         <button onclick="openIntakePrintModal()" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📋 INTAKE TICKET</button>
         <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🔧 MECHANIC TICKET</button>
+        <button id="themeToggle" onclick="toggleTheme()" title="Toggle Dark / Light Mode" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 10px; cursor:pointer; font-size:1rem; line-height:1;">🌙</button>
         <span id="roleTag" class="badge-role">GUEST</span>
         <a href="login.html" class="nav-anchor" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE')" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">🚪 LOGOUT</a>
     </div>
@@ -832,7 +835,7 @@
     const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
 
-    let lineItemsLocalMemory = []; let globalCatalogCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
+    let lineItemsLocalMemory = []; let globalCatalogCache = []; let mechanicsCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
     window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false; let activeCustomerProfile = { category: 'Regular' };
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
@@ -916,11 +919,12 @@
         if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin' || sessionRole === 'service') { document.getElementById('inlineAddStrip').style.display = 'flex'; document.getElementById('columnDestroyer').style.display = 'table-cell'; }
 
         /* PERF: Run mechanics + job card + catalog all in parallel — Round 1 */
-        const mechPromise = supabaseClient.from('mechanics').select('id, name, staff_role').eq('is_active', true).order('name');
+        const mechPromise = supabaseClient.from('mechanics').select('id, name, staff_role, commission_rate').eq('is_active', true).order('name');
         const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
         const catalogPromise = prefetchCentralCatalog();
         const [mechRes, jobRes] = await Promise.all([mechPromise, jobPromise, catalogPromise]);
         const staffList = mechRes.data;
+        mechanicsCache = staffList || [];
         let pOpt = '<option value="">-- Unassigned --</option>'; let cOpt = '<option value="">+ Co-Mechanic</option>'; let issuerOpt = '<option value="">+ Issued By</option>';
         staffList?.forEach(s => { if(s.staff_role === 'Mechanic') { pOpt += `<option value="${s.id}">${s.name}</option>`; cOpt += `<option value="${s.id}">${s.name}</option>`; } if(s.staff_role === 'Spare Parts Staff' || s.staff_role === 'Workshop Manager') { issuerOpt += `<option value="${s.id}">${s.name}</option>`; } });
         document.getElementById('primaryMech').innerHTML = pOpt; document.getElementById('coMech').innerHTML = cOpt; document.getElementById('nIssuer').innerHTML = issuerOpt;
@@ -1716,7 +1720,15 @@
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
         if (statusTarget === 'Closed' && !error) {
-            const totalLabour = servicePkgGrossTotal; const hasCo = !!document.getElementById('coMech').value; const primaryShare = hasCo ? totalLabour / 2 : totalLabour; const coShare = hasCo ? totalLabour / 2 : 0; const primaryMechId = document.getElementById('primaryMech').value; const coMechId = document.getElementById('coMech').value; const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const ledgerEntries = []; if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}` }); if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)` }); if (ledgerEntries.length > 0) await supabaseClient.from('staff_ledger').insert(ledgerEntries);
+            const totalLabour = servicePkgGrossTotal; const hasCo = !!document.getElementById('coMech').value; const primaryShare = hasCo ? totalLabour / 2 : totalLabour; const coShare = hasCo ? totalLabour / 2 : 0; const primaryMechId = document.getElementById('primaryMech').value; const coMechId = document.getElementById('coMech').value; const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+            // Rate lookup — mechanicsCache already in memory from page load, zero extra DB call
+            const primaryRate = mechanicsCache.find(m => m.id === primaryMechId)?.commission_rate || 0;
+            const coRate      = mechanicsCache.find(m => m.id === coMechId)?.commission_rate      || 0;
+            const todayDate   = new Date().toISOString().split('T')[0];
+            const ledgerEntries = [];
+            if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, log_date: todayDate, commission_rate_snap: primaryRate, commission_amount: primaryShare * (primaryRate / 100) });
+            if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)`, log_date: todayDate, commission_rate_snap: coRate, commission_amount: coShare * (coRate / 100) });
+            if (ledgerEntries.length > 0) await supabaseClient.from('staff_ledger').insert(ledgerEntries);
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
                  * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
