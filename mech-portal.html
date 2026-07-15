@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Technician Portal — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- html2pdf loaded lazily only when PDF statement is generated -->
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#ef4444;--gold:#f59e0b;}
 *{box-sizing:border-box;}
@@ -99,6 +100,7 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
   <div class="nav-actions">
     <button class="btn-header" onclick="history.back()">← BACK</button>
     <button class="btn-header" onclick="activeMech?showView('vDashboard'):showView('vMobile')">🏠 HOME</button>
+    <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
     <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">MECHANIC</span>
   </div>
@@ -1043,13 +1045,13 @@ async function loadMyEarnings(){
   content.innerHTML='<p style="text-align:center;color:#94a3b8;font-size:.85rem;padding:16px;">Loading...</p>';
 
   // Parallel fetch: job cards + payouts for this period
-  const[jcRes,payRes]=await Promise.all([
-    sb.from('job_cards')
-      .select('id,closed_at,labour_charges,mech_id,co_mech_id')
-      .or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`)
-      .eq('status','Closed')
-      .gte('closed_at',startDate)
-      .lte('closed_at',endDate+'T23:59:59'),
+  const[ledgerRes,payRes]=await Promise.all([
+    sb.from('staff_ledger')
+      .select('log_date,commission_amount')
+      .eq('mechanic_id',activeMech.id)
+      .eq('entry_type','Labour Credit')
+      .gte('log_date',startDate)
+      .lte('log_date',endDate),
     sb.from('mechanic_payouts')
       .select('earning_date,amount,payout_date')
       .eq('mechanic_id',activeMech.id)
@@ -1058,15 +1060,11 @@ async function loadMyEarnings(){
       .order('payout_date',{ascending:false})
   ]);
 
-  // Group earnings by date (FIX: labour_charges only, no pkgLabor)
+  // Read pre-computed commission directly from staff_ledger (Phase 8)
   const earnByDate={};
-  (jcRes.data||[]).forEach(jc=>{
-    const date=jc.closed_at.split('T')[0];
-    const labour=parseFloat(jc.labour_charges)||0;
-    const hasCo=jc.mech_id&&jc.co_mech_id&&jc.mech_id!==jc.co_mech_id;
-    const allocated=hasCo?labour/2:labour;
-    const rate=parseFloat(activeMech.commission_rate)||0;
-    earnByDate[date]=(earnByDate[date]||0)+allocated*rate/100;
+  (ledgerRes.data||[]).forEach(row=>{
+    if(!row.log_date) return;
+    earnByDate[row.log_date]=(earnByDate[row.log_date]||0)+parseFloat(row.commission_amount||0);
   });
 
   // Group payouts by earning_date — keep latest payout_date per earning_date for display
