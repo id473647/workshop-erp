@@ -6,6 +6,8 @@
 <title>Workshop Master Ledger — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warning:#f59e0b;--green:#27ae60;--moped:#3498db;}
 *{box-sizing:border-box;}
@@ -80,6 +82,7 @@ input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6
   <div class="nav-actions">
     <button class="btn-header" onclick="history.back()">← BACK</button>
     <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
     <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">LEDGER</span>
   </div>
@@ -173,11 +176,19 @@ input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6
 
     <!-- ══ MECHANIC EARNINGS TAB ══ -->
     <div id="tab-mech" class="view-panel">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button class="btn-action btn-info" onclick="printMech()">🖨️ PRINT</button></div>
-      <div class="table-wrapper">
-        <table><thead><tr><th>Mechanic</th><th>Today Labour</th><th>Commission %</th><th>Earned Today</th></tr></thead>
-        <tbody id="mechTableBody"></tbody></table>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:.82rem;color:#64748b;">Last 12 days + any unpaid up to 40 days &nbsp;|&nbsp; <strong id="mechUnpaidSummary" style="color:#991b1b;"></strong></span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-action btn-info" style="padding:6px 12px;font-size:.8rem;" onclick="exportMechEarningsExcel()">📊 EXCEL</button>
+          <button class="btn-action btn-info" style="padding:6px 12px;font-size:.8rem;" onclick="printMech()">🖨️ PRINT</button>
+        </div>
       </div>
+      <!-- Cross-tab: Date × Mechanic -->
+      <div id="mechCrossTabContent" class="table-wrapper">
+        <div style="text-align:center;padding:20px;color:#94a3b8;">Loading earnings data...</div>
+      </div>
+      <!-- Legacy hidden table — used by print functions only -->
+      <table style="display:none;"><thead><tr><th>Mechanic</th><th>Today Labour</th><th>Commission %</th><th>Earned Today</th></tr></thead><tbody id="mechTableBody"></tbody></table>
     </div>
 
     <!-- ══ GREEN POS TAB ══ -->
@@ -727,28 +738,165 @@ async function adminUnlockEod(){
   alert('EOD unlocked. Reason recorded: '+reason.trim()+'\nManager can now update the Log Note and re-finalise.');
 }
 
-// ─── FIX1: MECHANIC EARNINGS — use only labour_charges (no service item doubling) ──
+// ─── 6d-C: MECHANIC EARNINGS — Date × Mechanic cross-tab ─────────────────────
+let mechEarningsExportData=[];
 async function loadMechEarnings(){
-  const tbody=document.getElementById('mechTableBody');
-  tbody.innerHTML='<tr><td colspan="4" style="text-align:center;">Loading...</td></tr>';
-  // FIX1: Only select labour_charges — NOT job_card_items which would cause doubling
-  // labour_charges already equals the sum of all service protocol items (set by billing.html)
-  const {data:jobs}=await supabaseClient.from('job_cards').select('id,labour_charges,mech_id,co_mech_id')
-    .eq('status','Closed').gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59');
-  let map={};
-  (jobs||[]).forEach(j=>{
-    const gross=parseFloat(j.labour_charges)||0; // This is authoritative — no double-counting
-    const hasCo=!!j.co_mech_id;
-    const pShare=hasCo?gross/2:gross; const cShare=hasCo?gross/2:0;
-    if(j.mech_id){const m=mechanicsCache.find(x=>x.id===j.mech_id); if(!map[j.mech_id]) map[j.mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.mech_id].lab+=pShare;}
-    if(hasCo&&j.co_mech_id){const m=mechanicsCache.find(x=>x.id===j.co_mech_id); if(!map[j.co_mech_id]) map[j.co_mech_id]={name:m?m.name:'Unknown',lab:0,rate:m?m.commission_rate:10}; map[j.co_mech_id].lab+=cShare;}
+  const container=document.getElementById('mechCrossTabContent');
+  if(!container) return;
+  container.innerHTML='<div style="text-align:center;padding:20px;color:#94a3b8;">Loading...</div>';
+  const mechs=(mechanicsCache||[]).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!mechs.length){container.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">No active mechanics found.</div>';return;}
+
+  // Build commission rate lookup
+  const rates={};
+  mechs.forEach(m=>rates[m.id]=parseFloat(m.commission_rate)||0);
+
+  // Date ranges
+  const today=activeDate;
+  const d40=new Date(today+'T12:00:00'); d40.setDate(d40.getDate()-40);
+  const from40=d40.toISOString().split('T')[0];
+  const d12=new Date(today+'T12:00:00'); d12.setDate(d12.getDate()-12);
+  const from12=d12.toISOString().split('T')[0];
+
+  // Parallel fetch: job cards + payouts for last 40 days
+  // Phase 8: read pre-computed commission from staff_ledger instead of scanning job_cards
+  const[ledgerRes,payRes]=await Promise.all([
+    supabaseClient.from('staff_ledger')
+      .select('mechanic_id,log_date,commission_amount')
+      .eq('entry_type','Labour Credit')
+      .gte('log_date',from40)
+      .lte('log_date',today),
+    supabaseClient.from('mechanic_payouts')
+      .select('mechanic_id,earning_date,amount,payout_date')
+      .gte('earning_date',from40)
+      .lte('earning_date',today)
+      .order('payout_date',{ascending:false})
+  ]);
+
+  // Build earnMap: date → { mechId: commission_amount } — direct from staff_ledger
+  const earnMap={};
+  (ledgerRes.data||[]).forEach(row=>{
+    if(!row.log_date||!row.mechanic_id) return;
+    if(!earnMap[row.log_date]) earnMap[row.log_date]={};
+    earnMap[row.log_date][row.mechanic_id]=(earnMap[row.log_date][row.mechanic_id]||0)+parseFloat(row.commission_amount||0);
   });
-  tbody.innerHTML='';
-  let totLab=0,totEarn=0;
-  Object.values(map).forEach(v=>{const earn=v.lab*(v.rate/100); totLab+=v.lab; totEarn+=earn;
-    tbody.innerHTML+=`<tr><td>${v.name}</td><td>${fmt(v.lab)}</td><td>${v.rate}%</td><td>${fmt(earn)}</td></tr>`;});
-  if(Object.keys(map).length===0) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No closed JCs today.</td></tr>';
-  else tbody.innerHTML+=`<tr style="font-weight:700;background:#f1f5f9;"><td>TOTAL</td><td>${fmt(totLab)}</td><td>—</td><td>${fmt(totEarn)}</td></tr>`;
+
+  // Build payouts: earning_date → { totalPaid, latestPaidDate }
+  const payMap={};
+  (payRes.data||[]).forEach(p=>{
+    if(!payMap[p.earning_date]) payMap[p.earning_date]={totalPaid:0,latestPaidDate:null};
+    payMap[p.earning_date].totalPaid+=parseFloat(p.amount)||0;
+    if(!payMap[p.earning_date].latestPaidDate) payMap[p.earning_date].latestPaidDate=p.payout_date;
+  });
+
+  // Determine dates to show: last 12 days OR any older date with outstanding balance
+  const allDates=[...new Set([...Object.keys(earnMap),...Object.keys(payMap)])].sort().reverse();
+  const datesToShow=allDates.filter(d=>{
+    const earned=Object.values(earnMap[d]||{}).reduce((s,v)=>s+v,0);
+    const paid=payMap[d]?.totalPaid||0;
+    return d>=from12||(earned-paid)>0.01;
+  });
+
+  if(!datesToShow.length){
+    container.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">No earnings in the last 40 days.</div>';
+    document.getElementById('mechUnpaidSummary').innerText='';
+    return;
+  }
+
+  // Build table
+  const thStyle='padding:8px 8px;font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid var(--border);white-space:nowrap;';
+  const mechThs=mechs.map(m=>`<th style="${thStyle}text-align:right;">${m.name.split(' ')[0].substring(0,8)}</th>`).join('');
+  let rows=''; let gEarned=0,gPaid=0; let unpaidDates=0;
+  const colTotals={};mechs.forEach(m=>colTotals[m.id]=0);
+  mechEarningsExportData=[['DATE',...mechs.map(m=>m.name.split(' ')[0]),'TOTAL','PAID','PAID DATE','BALANCE','AGE','STATUS']];
+
+  datesToShow.forEach(date=>{
+    const dayEarns=earnMap[date]||{};
+    const earned=Object.values(dayEarns).reduce((s,v)=>s+v,0);
+    const pi=payMap[date]||{};
+    const paid=pi.totalPaid||0;
+    const balance=Math.max(0,earned-paid);
+    gEarned+=earned; gPaid+=paid;
+    const ageDays=Math.floor((new Date(today+'T12:00:00')-new Date(date+'T12:00:00'))/86400000);
+
+    // Row styling based on payment status
+    let rowBg='',ageBg='#f1f5f9',ageCol='#475569',statusIcon='';
+    if(balance<=0.01&&paid>0.01){statusIcon='✅';rowBg='';}
+    else if(paid>0.01&&balance>0.01){statusIcon='🟡';rowBg='background:#fffbeb;';unpaidDates++;ageBg=ageDays>10?'#fee2e2':'#fef9c3';ageCol=ageDays>10?'#991b1b':'#854d0e';}
+    else{statusIcon='⏳';rowBg='background:#fff7f7;';unpaidDates++;ageBg=ageDays>10?'#fee2e2':'#fef9c3';ageCol=ageDays>10?'#991b1b':'#854d0e';}
+
+    const dateDisplay=new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',weekday:'short'});
+    const paidDateDisplay=pi.latestPaidDate?new Date(pi.latestPaidDate+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'—';
+    const paidDateLabel=paidDateDisplay+(paid>0.01&&balance>0.01?' (Part.)':'');
+
+    const mechCells=mechs.map(m=>{
+      const e=dayEarns[m.id]||0; colTotals[m.id]+=e;
+      return`<td style="text-align:right;padding:6px 8px;font-size:.8rem;${e>0.01?'font-weight:700;color:var(--primary);':'color:#cbd5e1;'}">${e>0.01?Math.round(e):'—'}</td>`;
+    }).join('');
+
+    const payBtn=balance>0.01?`<button onclick="window.open('mechanic-admin.html?paydate=${date}','_blank')" style="background:var(--success);color:white;border:none;padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:700;cursor:pointer;">PAY</button>`:`<span style="font-size:.85rem;">${statusIcon}</span>`;
+
+    rows+=`<tr style="${rowBg}">
+      <td style="padding:6px 10px;font-size:.78rem;font-weight:700;white-space:nowrap;">${dateDisplay}</td>
+      ${mechCells}
+      <td style="text-align:right;padding:6px 8px;font-weight:700;">${earned>0.01?Math.round(earned):'—'}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:700;">${paid>0.01?Math.round(paid):'—'}</td>
+      <td style="padding:6px 8px;font-size:.75rem;white-space:nowrap;">${paidDateLabel}</td>
+      <td style="text-align:right;padding:6px 8px;font-weight:700;color:${balance>0.01?'var(--danger)':'#166534'};">${balance>0.01?Math.round(balance):'✓'}</td>
+      <td style="text-align:center;padding:4px 6px;background:${ageBg};color:${ageCol};font-weight:700;font-size:.72rem;">${balance>0.01?ageDays+'d':''}</td>
+      <td style="text-align:center;padding:4px 8px;">${payBtn}</td>
+    </tr>`;
+
+    mechEarningsExportData.push([date,...mechs.map(m=>Math.round(dayEarns[m.id]||0)),Math.round(earned),Math.round(paid),paidDateLabel,Math.round(balance),balance>0.01?ageDays+'d':'',statusIcon]);
+  });
+
+  // Totals footer row
+  const colTotalCells=mechs.map(m=>`<td style="text-align:right;padding:8px;font-weight:700;">₹${Math.round(colTotals[m.id]).toLocaleString('en-IN')}</td>`).join('');
+  const totalBal=Math.max(0,gEarned-gPaid);
+
+  container.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+    <thead><tr style="background:#f8fafc;">
+      <th style="${thStyle}text-align:left;">DATE</th>
+      ${mechThs}
+      <th style="${thStyle}text-align:right;">TOTAL</th>
+      <th style="${thStyle}text-align:right;color:#166534;">PAID</th>
+      <th style="${thStyle}">PAID DATE</th>
+      <th style="${thStyle}text-align:right;color:#991b1b;">BALANCE</th>
+      <th style="${thStyle}text-align:center;">AGE</th>
+      <th style="${thStyle}text-align:center;">ACTION</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:#f1f5f9;border-top:2px solid var(--border);">
+      <td style="padding:8px 10px;font-weight:700;font-size:.8rem;">TOTAL</td>
+      ${colTotalCells}
+      <td style="text-align:right;padding:8px;font-weight:700;">₹${Math.round(gEarned).toLocaleString('en-IN')}</td>
+      <td style="text-align:right;padding:8px;font-weight:700;color:var(--success);">₹${Math.round(gPaid).toLocaleString('en-IN')}</td>
+      <td style="padding:8px;">—</td>
+      <td style="text-align:right;padding:8px;font-weight:700;color:${totalBal>0?'var(--danger)':'#166534'};">₹${Math.round(totalBal).toLocaleString('en-IN')}</td>
+      <td>—</td><td>—</td>
+    </tr></tfoot>
+  </table>`;
+
+  // Summary line
+  const sumEl=document.getElementById('mechUnpaidSummary');
+  if(sumEl) sumEl.innerHTML=`Outstanding: ₹${Math.round(totalBal).toLocaleString('en-IN')} &nbsp;|&nbsp; Unpaid date-rows: ${unpaidDates}`;
+
+  // Populate legacy hidden table (today only) for print function compatibility
+  const tbody=document.getElementById('mechTableBody');
+  if(tbody){
+    tbody.innerHTML='';
+    const todayE=earnMap[today]||{};let tLab=0,tEarn=0;
+    mechs.forEach(m=>{const e=todayE[m.id]||0;if(e>0){const lab=rates[m.id]>0?e/(rates[m.id]/100):0;tLab+=lab;tEarn+=e;tbody.innerHTML+=`<tr><td>${m.name}</td><td>${fmt(lab)}</td><td>${rates[m.id]||0}%</td><td>${fmt(e)}</td></tr>`;}});
+    if(!tbody.innerHTML) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No closed JCs today.</td></tr>';
+    else tbody.innerHTML+=`<tr style="font-weight:700;background:#f1f5f9;"><td>TOTAL</td><td>${fmt(tLab)}</td><td>—</td><td>${fmt(tEarn)}</td></tr>`;
+  }
+}
+
+function exportMechEarningsExcel(){
+  if(!mechEarningsExportData.length){alert('Load mechanic earnings data first.');return;}
+  let csv='data:text/csv;charset=utf-8,';
+  mechEarningsExportData.forEach(row=>{csv+=row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')+'\r\n';});
+  const a=document.createElement('a');a.setAttribute('href',encodeURI(csv));a.setAttribute('download',`MechanicEarnings_${activeDate}.csv`);document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
 // ─── LUBE ISSUED TAB ─────────────────────────────────────────────────────────
