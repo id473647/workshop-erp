@@ -6,6 +6,8 @@
 <title>Staff & Payroll — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warning:#f59e0b;--purple:#8e44ad;}
 *{box-sizing:border-box;}
@@ -68,6 +70,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <button class="btn-header" onclick="history.back()">← BACK</button>
     <a href="utility-router.html" class="btn-header">🗂️ HUB</a>
     <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
     <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">STAFF</span>
   </div>
@@ -518,16 +521,18 @@ async function loadPayoutEarnings(){
   const date=document.getElementById('payDate').value;if(!date){alert('Select a date.');return;}
   payDateLoaded=date;await loadMechCache();
   const content=document.getElementById('payoutsContent');content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:12px;">Loading...</p>';
-  const[{data:jcs},{data:paid}]=await Promise.all([sb.from('job_cards').select('id,labour_charges,mech_id,co_mech_id').eq('status','Closed').gte('closed_at',`${date}T00:00:00`).lte('closed_at',`${date}T23:59:59`),sb.from('mechanic_payouts').select('mechanic_id,amount').eq('earning_date',date)]);
+  // Phase 8: read pre-computed commission from staff_ledger instead of calculating from job_cards
+  const[{data:ledger},{data:paid}]=await Promise.all([
+    sb.from('staff_ledger').select('mechanic_id,commission_amount').eq('log_date',date).eq('entry_type','Labour Credit'),
+    sb.from('mechanic_payouts').select('mechanic_id,amount').eq('earning_date',date)
+  ]);
   const earnings={};Object.values(mechCache).forEach(m=>{earnings[m.id]={mechanic:m,earned:0};});
-  (jcs||[]).forEach(jc=>{
-    const lab=parseFloat(jc.labour_charges)||0;const hasCo=jc.mech_id&&jc.co_mech_id&&jc.mech_id!==jc.co_mech_id;
-    if(jc.mech_id&&earnings[jc.mech_id]){const alloc=hasCo?lab/2:lab;earnings[jc.mech_id].earned+=alloc*(earnings[jc.mech_id].mechanic.commission_rate||0)/100;}
-    if(jc.co_mech_id&&hasCo&&earnings[jc.co_mech_id])earnings[jc.co_mech_id].earned+=(lab/2)*(earnings[jc.co_mech_id].mechanic.commission_rate||0)/100;
+  (ledger||[]).forEach(row=>{
+    if(earnings[row.mechanic_id]) earnings[row.mechanic_id].earned+=parseFloat(row.commission_amount||0);
   });
   const paidMap={};(paid||[]).forEach(p=>{paidMap[p.mechanic_id]=(paidMap[p.mechanic_id]||0)+parseFloat(p.amount);});
   const rows=Object.values(earnings).filter(e=>e.earned>0).sort((a,b)=>a.mechanic.name.localeCompare(b.mechanic.name));
-  if(!rows.length){content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No closed job cards with labour charges on this date.</p>';document.getElementById('paySourcePanel').style.display='none';return;}
+  if(!rows.length){content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No commission entries in staff ledger for this date.</p>';document.getElementById('paySourcePanel').style.display='none';return;}
   let tHtml=`<div class="table-wrapper"><table><thead><tr><th>☑</th><th>Mechanic</th><th>Rate</th><th>Earned</th><th>Paid</th><th>Outstanding</th><th>Pay Now (₹)</th><th>Status</th></tr></thead><tbody>`;
   rows.forEach(e=>{
     const alreadyPaid=paidMap[e.mechanic.id]||0;const outstanding=Math.max(0,e.earned-alreadyPaid);
@@ -593,7 +598,16 @@ function printIdProof(name,idType,idNumber,signedUrl){const win=window.open('','
 if(!['admin','service'].includes(sessionRole)){
   document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:#e74c3c;font-weight:700;font-size:1.2rem;">Access Denied. Admin or Service login required.</div>';
 }else{
-  loadWsDefaults().then(()=>loadStaff());
+  loadWsDefaults().then(async()=>{
+    await loadStaff();
+    // Handle ?paydate= URL param from workshop-ledger PAY button
+    const paydate=new URLSearchParams(window.location.search).get('paydate');
+    if(paydate){
+      switchPageTab('payouts');
+      document.getElementById('payDate').value=paydate;
+      loadPayoutEarnings();
+    }
+  });
 }
 </script>
 </body>
