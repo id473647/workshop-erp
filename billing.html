@@ -240,6 +240,16 @@
         🎁 FREE SERVICE PACKAGE ELIGIBLE — This customer completed 5 paid services! Waive the service package charge on this visit.
     </div>
 
+    <!-- PHASE 9: Complaint JC banner — shown when billing opens a complaint job card -->
+    <div id="complaintBanner" style="display:none; background:#fef9c3; border:2px solid #f59e0b; border-radius:8px; padding:12px 16px; margin-bottom:14px;">
+      <div id="complaintBannerText" style="font-weight:700; color:#854d0e; font-size:.9rem; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span id="complaintFaultBadge" style="padding:3px 12px; border-radius:10px; font-size:.78rem; font-weight:700;"></span>
+        <button id="btnReclassify" onclick="reclassifyFault()" class="input-lockable" style="background:none; border:1px solid #f59e0b; color:#854d0e; padding:4px 10px; border-radius:6px; font-size:.78rem; font-weight:700; cursor:pointer;">↔ RECLASSIFY FAULT TYPE</button>
+        <span style="font-size:.72rem; color:#92400e;">Service manager can reclassify at any time before complaint is closed.</span>
+      </div>
+    </div>
+
     <!-- PHASE 4c: Parking charge banner — shown when delivery_ready_at > 20 days -->
     <div id="parkingBanner" class="parking-banner">
         <div style="font-weight:700; color:#dc2626; margin-bottom:4px; font-size:0.9rem;">🚗 VEHICLE STORAGE ALERT</div>
@@ -391,7 +401,15 @@
             Still service/admin only — Green/Moped never had access to this block.
         -->
         <div id="settlementActionBlock" style="display:none;">
-            <button class="btn-pay-now" onclick="openPayNowModal()">💵 PAY NOW · ₹<span id="netValuationDisplay">0</span></button>
+            <!-- PHASE 9: Complaint approval request — shown instead of PAY NOW until admin approves -->
+            <button id="btnComplaintApproval" onclick="requestComplaintApproval()" style="display:none; width:100%; background:#f59e0b; color:#000; border:none; padding:18px; border-radius:8px; font-weight:700; font-size:1.1rem; cursor:pointer; margin-bottom:10px; transition:opacity .15s;">
+                📋 REQUEST ADMIN APPROVAL
+            </button>
+            <div id="complaintApprovalWait" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px; text-align:center; font-weight:700; color:#854d0e; margin-bottom:10px;">
+                ⏳ Waiting for Admin to approve complaint resolution…
+            </div>
+            <!-- Normal PAY NOW — hidden for unapproved complaint JCs -->
+            <button id="btnPayNow" class="btn-pay-now" onclick="openPayNowModal()">💵 PAY NOW · ₹<span id="netValuationDisplay">0</span></button>
             <div class="settle-secondary-row">
                 <button class="btn-action btn-cancel" onclick="cancelJobCard()">🚫 CANCEL JOB</button>
                 <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
@@ -836,6 +854,13 @@
     document.getElementById('roleTag').innerText = sessionRole.toUpperCase();
 
     let lineItemsLocalMemory = []; let globalCatalogCache = []; let mechanicsCache = []; let activeJobContext = null; let activeCustomerName = 'Walk-in';
+    /* PHASE 9: Complaint JC state */
+    let isComplaintJc = false;
+    let activeComplaintRecord = null;
+    let complaintCreditLines = [];
+    let complaintCreditTotal = 0;
+    let complaintApproved = false;
+    let complaintApprovalInterval = null;
     let partsGrossTotal = 0; let servicePkgGrossTotal = 0; let activeGlobalDiscountPercent = 0; let customerWalletBalance = 0; let isSplitPayment = false; let splitCashVal = 0; let splitUpiVal = 0;
     window._pid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false; let activeCustomerProfile = { category: 'Regular' };
     let internalGreenNet = 0; let internalMopedNet = 0; let internalLabourNet = 0; let internalLatheNet = 0; let internalLubeNet = 0;
@@ -995,6 +1020,11 @@
                 document.getElementById('lockedStatusWord').innerText = job.status.toUpperCase();
                 if(job.status === 'Cancelled' && job.cancellation_reason) { document.getElementById('lockReasonDisplay').style.display = 'block'; document.getElementById('lockReasonText').innerText = job.cancellation_reason; }
                 lockUserInterface();
+            }
+            /* PHASE 9: Load complaint context if this is a complaint JC */
+            if (job.is_complaint_jc && job.complaint_ref_id) {
+                isComplaintJc = true;
+                await loadComplaintContext(job.complaint_ref_id);
             }
         }
     }
@@ -1607,7 +1637,10 @@
     
     async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true }); lineItemsLocalMemory = items || []; renderDynamicTable(); }
     
-    function renderDynamicTable() { const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; lineItemsLocalMemory.forEach((line, idx) => { let dropAuth = false; if (!isLocked) { if (sessionRole === 'admin') { dropAuth = true; } else if (sessionRole === 'service' && line.warehouse_type === 'Service') { dropAuth = true; } else if (sessionRole === 'green' && line.warehouse_type === 'Green') { dropAuth = true; } else if (sessionRole === 'moped' && line.warehouse_type === 'Moped') { dropAuth = true; } } let evaluatedLineTotal = parseFloat(line.total_price); if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); evaluatedLineTotal = evaluatedLineTotal || 0; const issuerName = line.mechanics?.name || '--'; let displayRole = line.warehouse_type; let cssClass = `ware-${line.warehouse_type.toLowerCase()}`; let displayItemName = line.item_name; if(line.warehouse_type === 'Service') { const isLathe = line.item_name.startsWith('[LATHE]'); const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); const icon = isLathe ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️'); displayRole = isLathe ? icon : `${icon} Service`; if(isLathe) { cssClass = 'ware-lathe'; displayItemName = line.item_name.replace('[LATHE]', '').trim(); } } const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; let qtyDisplay = `<input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}`; if(line.warehouse_type === 'Service') qtyDisplay = `1 Pkg`; tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${displayItemName}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; }); compileDynamicSums(); }
+    function renderDynamicTable() { const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; lineItemsLocalMemory.forEach((line, idx) => { let dropAuth = false; if (!isLocked) { if (sessionRole === 'admin') { dropAuth = true; } else if (sessionRole === 'service' && line.warehouse_type === 'Service') { dropAuth = true; } else if (sessionRole === 'green' && line.warehouse_type === 'Green') { dropAuth = true; } else if (sessionRole === 'moped' && line.warehouse_type === 'Moped') { dropAuth = true; } } let evaluatedLineTotal = parseFloat(line.total_price); if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); evaluatedLineTotal = evaluatedLineTotal || 0; const issuerName = line.mechanics?.name || '--'; let displayRole = line.warehouse_type; let cssClass = `ware-${line.warehouse_type.toLowerCase()}`; let displayItemName = line.item_name; if(line.warehouse_type === 'Service') { const isLathe = line.item_name.startsWith('[LATHE]'); const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); const icon = isLathe ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️'); displayRole = isLathe ? icon : `${icon} Service`; if(isLathe) { cssClass = 'ware-lathe'; displayItemName = line.item_name.replace('[LATHE]', '').trim(); } } const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; let qtyDisplay = `<input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}`; if(line.warehouse_type === 'Service') qtyDisplay = `1 Pkg`; tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${displayItemName}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; });
+    /* PHASE 9: Complaint credit lines — defective items credited back (read-only) */
+    if(complaintCreditLines.length>0){complaintCreditLines.forEach(cl=>{tbody.innerHTML+=`<tr style="background:#fef2f2;"><td><span class="pill-warehouse" style="background:#991b1b;color:white;">CREDIT</span></td><td><strong style="color:#991b1b;">${cl.item_name}</strong></td><td style="font-size:.75rem;color:#94a3b8;">Defective return</td><td>—</td><td style="color:#991b1b;font-weight:700;">−₹${cl.original_price}</td><td></td></tr>`;});}
+    compileDynamicSums(); }
 
     document.getElementById('nPart').addEventListener('keydown', function(e) { let listContainer = document.getElementById("autolist-n"); if (!listContainer || listContainer.style.display === 'none') return; let x = listContainer.getElementsByClassName("autocomplete-item"); if (x.length === 0) return; if (e.key === "ArrowDown") { currentFocus++; addActive(x); } else if (e.key === "ArrowUp") { currentFocus--; addActive(x); } else if (e.key === "Enter" || e.key === "Tab") { if (currentFocus > -1) { e.preventDefault(); x[currentFocus].click(); } } });
     function addActive(x) { if (!x) return false; removeActive(x); if (currentFocus >= x.length) currentFocus = 0; if (currentFocus < 0) currentFocus = (x.length - 1); x[currentFocus].classList.add("autocomplete-active"); }
@@ -1620,7 +1653,7 @@
 
     function flagNewItemForReview() { const inp = document.getElementById('nPart'); const raw = inp.value.trim().toUpperCase(); inp.value = raw; document.getElementById('autolist-n').style.display='none'; window._pendingItemUnverified = true; }
     function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) { document.getElementById('nPart').value = name; document.getElementById('nBrand').value = brand; document.getElementById('nRate').value = defRate || mrpVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal; const typeSelect = document.getElementById('nType'); if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube'; else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol'; else typeSelect.value = 'Spare'; toggleLubeUI(); document.getElementById('autolist-n').style.display = 'none'; window._pid = pid; window._pmac = mac; window._pmrp = mrpVal; window._pendingItemUnverified = false; if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus(); }
-    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, unit_metric: 'Pkg', source: 'service' }); }); } }
+    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate,is_premium_service,premium_label'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, is_premium_service: s.is_premium_service || false, premium_label: s.premium_label || null, unit_metric: 'Pkg', source: 'service' }); }); } }
 
     async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified' }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus(); } else { alert("Database Error: " + error.message); } }
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
@@ -1632,7 +1665,8 @@
         const couponAmtEl = document.getElementById('couponDiscountAmt'); if (couponAmtEl) couponAmtEl.innerText = referralDiscountAmount;
         if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; }
         /* PHASE 3: referralDiscountAmount deducted from net after admin concession — per confirmed sequencing */
-        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - referralDiscountAmount - a_srv - p_grn - p_mop - pUsed) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
+        /* PHASE 9: complaintCreditTotal further reduces net for replaced defective items */
+        document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - referralDiscountAmount - a_srv - p_grn - p_mop - pUsed - complaintCreditTotal) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
 
     async function saveJobState() { if(!activeJobContext || activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') return; const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; const pUsed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0; await supabaseClient.from('job_cards').update({ total_invoice_value: netVal, labour_charges: servicePkgGrossTotal || 0, lathe_welding: internalLatheNet || 0, lubricant_total: internalLubeNet || 0, future_advice: document.getElementById('vFutureAdvice').value.trim(), advance_service: parseFloat(document.getElementById('vAdvanceService').value) || 0, prepaid_green: parseFloat(document.getElementById('vPrepaidGreen').value) || 0, prepaid_moped: parseFloat(document.getElementById('vPrepaidMoped').value) || 0, green_total: internalGreenNet || 0, moped_total: internalMopedNet || 0, points_used: pUsed || 0 }).eq('id', targetJobId); }
 
@@ -1758,11 +1792,15 @@
                     await supabaseClient.from('customers').update({ loyalty_points: Math.max(0, currentPoints) }).eq('mobile_number', activeCustomerProfile.mobile_number);
                 }
                 /*
-                 * PHASE 3: SERVICE COUNT — increment for 5+1 free service tracking.
-                 * Only for enrolled customers. If count reaches 5 within 2 years of enrollment,
-                 * set free_service_eligible = true (banner shown on next JC load).
+                 * PHASE 9: SERVICE COUNT — only for PREMIUM/JUMBO services, never for complaint JCs.
+                 * is_premium_service flag set on service_packages via product-master-console.html.
                  */
-                if (activeCustomerProfile.is_loyalty_member) {
+                const hasPremiumService = !isComplaintJc && lineItemsLocalMemory.some(line => {
+                    if (line.warehouse_type !== 'Service') return false;
+                    const cached = globalCatalogCache.find(c => c.source === 'service' && c.item_name === line.item_name);
+                    return cached?.is_premium_service === true;
+                });
+                if (activeCustomerProfile.is_loyalty_member && hasPremiumService) {
                     const currentCount = parseInt(activeCustomerProfile.service_count) || 0;
                     const newCount = currentCount + 1;
                     const enrollDate = activeCustomerProfile.enrollment_date ? new Date(activeCustomerProfile.enrollment_date) : null;
@@ -1819,6 +1857,27 @@
             }
         }
 
+        /* PHASE 9: Complaint JC close — log defective stock + close complaint record */
+        if (!error && statusTarget === 'Closed' && isComplaintJc && activeComplaintRecord) {
+            const { data: cItems } = await supabaseClient.from('complaint_items').select('*').eq('complaint_id', activeComplaintRecord.id);
+            if (cItems && cItems.length > 0) {
+                const defRows = cItems.map(i => ({
+                    complaint_id         : activeComplaintRecord.id,
+                    original_jc_item_id  : i.original_jc_item_id || null,
+                    item_name            : i.item_name,
+                    brand                : i.brand || null,
+                    qty                  : 1,
+                    original_cost        : parseFloat(i.original_price) || 0,
+                    warehouse_type       : 'green',
+                    status               : 'In_Store',
+                    defect_note          : activeComplaintRecord.complaint_note || null,
+                    logged_by            : sessionRole
+                }));
+                await supabaseClient.from('defective_stock').insert(defRows);
+            }
+            await supabaseClient.from('customer_complaints').update({ status: 'Closed' }).eq('id', activeComplaintRecord.id);
+        }
+
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; else document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
     }
 
@@ -1835,6 +1894,132 @@
     function executePrint(mode) { document.body.className = ''; const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none'; if (isMulti) { document.body.classList.add('print-multi'); if (mode === 'landscape') document.body.classList.add('print-landscape'); } else { document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') container.classList.add('a5-mode'); else container.classList.remove('a5-mode'); } document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.onafterprint = function() { document.body.className = ''; window.onafterprint = null; }; window.print(); }, 400); }
 
     async function dispatchPaymentPing() { const reqAmt = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; if (reqAmt <= 0) return alert("No outstanding balance to request."); const target = document.getElementById('pingTargetDept').value; const statusText = document.getElementById('pingStatusText'); if(!confirm(`Send payment request for ₹${reqAmt} to the ${target.toUpperCase()} counter?`)) return; statusText.innerText = "Dispatching request..."; const payload = { customer_mobile: activeJobContext.customer_mobile, requested_by_role: sessionRole, request_type: 'Cash Collection', payload: { jc_id: targetJobId, amount: reqAmt }, status: 'Pending', target_dept: target }; const { error } = await supabaseClient.from('approval_requests').insert(payload); if (error) statusText.innerText = "Error: " + error.message; else { statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`; document.getElementById('settlementActionBlock').style.display = 'none'; } }
+
+    // ── PHASE 9: COMPLAINT JC FUNCTIONS ─────────────────────────────────────
+
+    async function loadComplaintContext(complaintId) {
+        const { data: complaint } = await supabaseClient.from('customer_complaints')
+            .select('*').eq('id', complaintId).single();
+        if (!complaint) return;
+        activeComplaintRecord = complaint;
+
+        // Show complaint banner
+        const banner = document.getElementById('complaintBanner');
+        if (banner) banner.style.display = 'block';
+        const refShort = 'JC-' + (complaint.reference_jc_id || '').split('-')[0].toUpperCase();
+        const closedApprox = complaint.created_at ? new Date(complaint.created_at).toLocaleDateString('en-IN') : '—';
+        const el = document.getElementById('complaintBannerText');
+        if (el) el.innerHTML = `⚠️ COMPLAINT JC — Reference: <strong>${refShort}</strong> &nbsp;|&nbsp; Logged: ${closedApprox} &nbsp;|&nbsp; Note: ${complaint.complaint_note || '—'}`;
+        updateComplaintBanner();
+
+        // Load complaint items as credit lines
+        const { data: items } = await supabaseClient.from('complaint_items')
+            .select('item_name, original_price').eq('complaint_id', complaintId);
+        complaintCreditLines = (items || []).map(i => ({
+            item_name   : '[CREDIT] ' + i.item_name,
+            original_price: parseFloat(i.original_price) || 0
+        }));
+        complaintCreditTotal = complaintCreditLines.reduce((s, l) => s + l.original_price, 0);
+
+        // Settlement button state
+        if (complaint.status === 'Approved' || complaint.status === 'Closed') {
+            complaintApproved = true;
+            // PAY NOW already visible by default
+        } else {
+            // Hide PAY NOW, show REQUEST APPROVAL
+            const payBtn = document.getElementById('btnPayNow');
+            const appBtn = document.getElementById('btnComplaintApproval');
+            if (payBtn) payBtn.style.display = 'none';
+            if (appBtn) appBtn.style.display = 'block';
+            // If already awaiting, show wait banner instead
+            if (complaint.status === 'Awaiting_Approval') {
+                if (appBtn) appBtn.style.display = 'none';
+                const waitEl = document.getElementById('complaintApprovalWait');
+                if (waitEl) waitEl.style.display = 'block';
+                complaintApprovalInterval = setInterval(pollComplaintApproval, 5000);
+            }
+        }
+        // Re-render table to show credit lines
+        renderDynamicTable();
+    }
+
+    function updateComplaintBanner() {
+        if (!activeComplaintRecord) return;
+        const badge = document.getElementById('complaintFaultBadge');
+        if (!badge) return;
+        const ft = activeComplaintRecord.fault_type;
+        badge.innerText = ft === 'service' ? '🔧 SERVICE FAULT' : '🔩 PART FAULT';
+        badge.style.background    = ft === 'service' ? '#fef2f2' : '#f0fdf4';
+        badge.style.color         = ft === 'service' ? '#991b1b' : '#166534';
+        badge.style.borderColor   = ft === 'service' ? '#fca5a5' : '#bbf7d0';
+    }
+
+    async function requestComplaintApproval() {
+        if (!activeComplaintRecord) return;
+        const btn = document.getElementById('btnComplaintApproval');
+        if (btn) { btn.disabled = true; btn.innerText = 'SENDING REQUEST…'; }
+        // Update complaint status
+        await supabaseClient.from('customer_complaints').update({ status: 'Awaiting_Approval' }).eq('id', activeComplaintRecord.id);
+        activeComplaintRecord.status = 'Awaiting_Approval';
+        // Create approval request for admin
+        await supabaseClient.from('approval_requests').insert({
+            request_type     : 'Complaint Resolution',
+            status           : 'Pending',
+            target_dept      : 'admin',
+            requested_by_role: sessionRole,
+            payload          : {
+                complaint_id : activeComplaintRecord.id,
+                jc_id        : targetJobId,
+                ref_jc_id    : activeComplaintRecord.reference_jc_id,
+                fault_type   : activeComplaintRecord.fault_type,
+                complaint_note: activeComplaintRecord.complaint_note
+            }
+        });
+        if (btn) btn.style.display = 'none';
+        const waitEl = document.getElementById('complaintApprovalWait');
+        if (waitEl) waitEl.style.display = 'block';
+        complaintApprovalInterval = setInterval(pollComplaintApproval, 5000);
+    }
+
+    async function pollComplaintApproval() {
+        const { data } = await supabaseClient.from('approval_requests')
+            .select('status').eq('request_type','Complaint Resolution')
+            .contains('payload', { jc_id: targetJobId })
+            .eq('status','Cleared').limit(1);
+        if (data && data.length > 0) {
+            clearInterval(complaintApprovalInterval);
+            complaintApproved = true;
+            const waitEl = document.getElementById('complaintApprovalWait');
+            if (waitEl) waitEl.style.display = 'none';
+            const payBtn = document.getElementById('btnPayNow');
+            if (payBtn) payBtn.style.display = 'block';
+            if (activeComplaintRecord) {
+                await supabaseClient.from('customer_complaints').update({ status: 'Approved' }).eq('id', activeComplaintRecord.id);
+                activeComplaintRecord.status = 'Approved';
+            }
+            alert('✅ Admin approved the complaint resolution. You may now proceed with payment.');
+        }
+    }
+
+    async function reclassifyFault() {
+        if (!activeComplaintRecord) return;
+        const current = activeComplaintRecord.fault_type;
+        const newType = current === 'part' ? 'service' : 'part';
+        const note = prompt(`Reclassifying: ${current.toUpperCase()} FAULT → ${newType.toUpperCase()} FAULT\nPlease provide a reason:`);
+        if (note === null) return;
+        const { error } = await supabaseClient.from('customer_complaints').update({
+            fault_type            : newType,
+            reclassification_note : note.toUpperCase(),
+            reclassified_by       : sessionRole,
+            reclassified_at       : new Date().toISOString()
+        }).eq('id', activeComplaintRecord.id);
+        if (error) { alert('Error: ' + error.message); return; }
+        activeComplaintRecord.fault_type = newType;
+        updateComplaintBanner();
+        // Update recover_from_mech on complaint_items accordingly
+        await supabaseClient.from('complaint_items').update({ recover_from_mech: newType === 'service' }).eq('complaint_id', activeComplaintRecord.id);
+        alert(`Fault reclassified to ${newType.toUpperCase()} FAULT. Refresh the page to reflect fine logic changes.`);
+    }
 
     initializeJobContext();
 </script>
