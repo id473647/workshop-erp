@@ -6,6 +6,8 @@
     <title>Retail POS Terminal - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --success: #27ae60; --primary: #2c3e50; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --warning: #d97706; --info: #2980b9; --danger: #e74c3c; }
@@ -122,6 +124,7 @@
     <div class="nav-actions">
         <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">POS</span>
     </div>
@@ -295,6 +298,100 @@
 </div>
 
 <!-- ══ INVOICE PREVIEW MODAL ══ -->
+<!-- ── PHASE 9: POS RETURN MODAL ─────────────────────────────────────── -->
+<div id="modalPosReturn" class="overlay-modal">
+  <div class="modal-card" style="max-width:540px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0;color:var(--primary);">↩ Product Return</h3>
+        <span id="prSaleRef" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="closePosReturn()" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+
+    <!-- Customer / sale info -->
+    <div id="prInfo" style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.83rem;"></div>
+
+    <!-- Items checklist -->
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">
+        Items to Return <span style="font-weight:400;">(tick items, adjust qty if partial)</span>
+      </label>
+      <div id="prItemsList" style="border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;background:#f8fafc;">
+        <div style="padding:12px;color:#94a3b8;font-size:.82rem;">Loading items...</div>
+      </div>
+    </div>
+
+    <!-- Return type -->
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Return Resolution</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:.88rem;padding:8px 14px;border-radius:6px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;">
+          <input type="radio" name="prType" value="replacement" checked style="width:auto;accent-color:#166534;"> 🔄 Replacement
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:.88rem;padding:8px 14px;border-radius:6px;background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;">
+          <input type="radio" name="prType" value="store_credit" style="width:auto;accent-color:#0369a1;"> 💳 Store Credit
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:.88rem;padding:8px 14px;border-radius:6px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;">
+          <input type="radio" name="prType" value="refund" style="width:auto;accent-color:#991b1b;"> 💵 Cash Refund (Admin)
+        </label>
+      </div>
+      <div style="font-size:.72rem;color:#64748b;margin-top:6px;">
+        Replacement = customer gets new item. Store Credit = added to customer account. Cash Refund = admin authorization required.
+      </div>
+    </div>
+
+    <!-- Reason -->
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Return Reason</label>
+      <textarea id="prReason" rows="2" placeholder="Why is the customer returning this?" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+
+    <!-- Return value display -->
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:.85rem;">
+      Total Return Value: <strong id="prTotalVal">₹0</strong>
+    </div>
+
+    <button id="btnConfirmPosReturn" onclick="confirmPosReturn()" style="width:100%;background:var(--success);color:white;border:none;padding:14px;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;">
+      CONFIRM RETURN
+    </button>
+  </div>
+</div>
+
+<!-- ── PHASE 9: CREDIT NOTE RECEIPT MODAL ─────────────────────────────── -->
+<div id="modalCreditNote" class="overlay-modal" style="z-index:600;">
+  <div class="modal-card" style="max-width:380px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
+      <div><h3 style="margin:0;color:var(--primary);">Credit Note</h3><span style="font-size:.7rem;color:#64748b;">Print or share with customer</span></div>
+      <button onclick="document.getElementById('modalCreditNote').style.display='none'" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <div id="creditNoteTarget" style="font-family:'Courier New',monospace;background:white;color:black;padding:12px;border:1px solid #ccc;font-size:.8rem;line-height:1.3;max-width:300px;margin:0 auto 16px;">
+      <div style="text-align:center;border-bottom:1px dashed black;padding-bottom:6px;margin-bottom:8px;">
+        <div style="font-size:.95rem;font-weight:bold;">GREEN SCOOTER CENTER</div>
+        <div style="font-size:.72rem;">Gurudwara Road, Ganj Betul</div>
+        <div style="font-size:.8rem;font-weight:bold;margin-top:4px;">STORE CREDIT NOTE</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;"><span>Date:</span><strong id="cnDate">—</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Ref:</span><strong id="cnRef">—</strong></div>
+      <div style="border-top:1px dashed black;border-bottom:1px dashed black;margin:6px 0;padding:4px 0;">
+        <div style="display:flex;justify-content:space-between;"><span>Customer:</span><strong id="cnCust">—</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span>Mobile:</span><strong id="cnMobile">—</strong></div>
+      </div>
+      <div id="cnItemsBlock" style="margin-bottom:6px;font-size:.75rem;"></div>
+      <div style="border-top:2px solid black;padding-top:6px;display:flex;justify-content:space-between;font-size:.9rem;font-weight:bold;">
+        <span>STORE CREDIT:</span><span id="cnAmount">₹0</span>
+      </div>
+      <div style="font-size:.7rem;text-align:center;margin-top:10px;border-top:1px dashed black;padding-top:6px;">
+        Redeemable against your next purchase.<br>Computer Generated Document.
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="printCreditNote('thermal')" style="flex:1;padding:10px;background:#1e293b;color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:.8rem;">🖨️ THERMAL</button>
+      <button onclick="printCreditNote('a5')" style="flex:1;padding:10px;background:var(--info);color:white;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:.8rem;">📄 A5</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalInspectInvoice" class="overlay-modal">
     <div class="modal-card">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
@@ -562,6 +659,11 @@
                 const ds = sale.status==='Closed'&&sale.closed_at?sale.closed_at:sale.created_at;
                 let actionBtn='';
                 if(currentPosTabMode==='AgedCredit'&&sale.status==='Closed') { const sn=(sale.customer_name||'').replace(/'/g,"\\'"); actionBtn=`<br><button onclick="openCreditLedgerModal('${sale.customer_mobile}','${sn}')" style="margin-top:6px;background:var(--warning);color:white;border:none;padding:4px 8px;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.7rem;">💳 PAY</button>`; }
+                /* PHASE 9: Return button for HistorySales within 31 days */
+                if(currentPosTabMode==='HistorySales'&&sale.status==='Closed'&&sale.closed_at){
+                  const daysSince=Math.floor((Date.now()-new Date(sale.closed_at))/86400000);
+                  if(daysSince<=31) actionBtn+=`<br><button onclick="openPosReturn('${sale.id}')" style="margin-top:6px;background:#f59e0b;color:#000;border:none;padding:4px 8px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.7rem;">↩ RETURN</button>`;
+                }
                 tbody.innerHTML+=`<tr><td><span class="clickable-ref" onclick="instantiateInspectionScope('${sale.id}')">POS-${sale.id.split('-')[0].toUpperCase()}</span>${actionBtn}</td><td>${sale.customer_mobile||'Walk-in'}<br><span style="font-size:0.7rem;color:#64748b;">${sale.customer_name||''}</span></td><td><strong>₹${sale.total_amount||0}</strong></td><td><span class="status-pill" style="${pill}">${sale.status}</span></td><td>${ds?new Date(ds).toLocaleDateString('en-IN'):'N/A'}</td></tr>`;
             });
         } else { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">No records matched.</td></tr>'; }
@@ -1400,6 +1502,151 @@
             row._pid=item.product_master_id;
         });
         compileDynamicInvoicerSums(); transitionFlowPanels('transactionInvoicerFlow');
+    }
+
+    // ── PHASE 9: POS RETURN FUNCTIONS ────────────────────────────────────
+    let _prSale=null, _prItems=[];
+
+    async function openPosReturn(saleId){
+      _prSale=null; _prItems=[];
+      document.getElementById('prReason').value='';
+      document.querySelector('input[name="prType"][value="replacement"]').checked=true;
+      document.getElementById('prTotalVal').innerText='₹0';
+      document.getElementById('modalPosReturn').style.display='flex';
+      document.getElementById('prItemsList').innerHTML='<div style="padding:12px;color:#94a3b8;font-size:.82rem;">Loading...</div>';
+
+      const{data:sale}=await supabaseClient.from('counter_sales').select('*').eq('id',saleId).single();
+      const{data:items}=await supabaseClient.from('counter_sale_items').select('*').eq('sale_id',saleId).order('created_at');
+      _prSale=sale; _prItems=items||[];
+
+      const ref='POS-'+saleId.split('-')[0].toUpperCase();
+      const closedStr=sale?.closed_at?new Date(sale.closed_at).toLocaleDateString('en-IN'):'—';
+      document.getElementById('prSaleRef').innerText=`Reference: ${ref} | Closed: ${closedStr}`;
+      document.getElementById('prInfo').innerHTML=
+        `<strong>${sale?.customer_name||'Walk-in'}</strong> | ${sale?.customer_mobile||'—'} &nbsp;|&nbsp; Total: <strong>₹${sale?.total_amount||0}</strong>`;
+
+      if(!_prItems.length){
+        document.getElementById('prItemsList').innerHTML='<div style="padding:12px;color:#94a3b8;font-size:.82rem;">No items found on this sale.</div>';
+        return;
+      }
+      document.getElementById('prItemsList').innerHTML=_prItems.map((item,idx)=>{
+        const amt=parseFloat(item.total_price)||0;
+        return`<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f1f5f9;font-size:.82rem;cursor:pointer;">
+          <input type="checkbox" class="pr-item-chk" data-idx="${idx}" data-unit="${parseFloat(item.unit_price)||0}" style="width:auto;" checked onchange="calcPrTotal()">
+          <span style="flex:1;"><strong>${item.item_name}</strong></span>
+          Qty: <input type="number" class="pr-item-qty" data-idx="${idx}" value="${item.qty||1}" min="1" max="${item.qty||1}" style="width:55px;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:.82rem;text-align:center;" oninput="calcPrTotal()">
+          <span style="white-space:nowrap;color:#64748b;">₹${amt}</span>
+        </label>`;
+      }).join('');
+      calcPrTotal();
+    }
+
+    function calcPrTotal(){
+      let total=0;
+      document.querySelectorAll('.pr-item-chk:checked').forEach(chk=>{
+        const idx=parseInt(chk.dataset.idx);
+        const qtyInp=document.querySelector(`.pr-item-qty[data-idx="${idx}"]`);
+        const qty=parseFloat(qtyInp?.value)||1;
+        const unit=parseFloat(chk.dataset.unit)||0;
+        total+=qty*unit;
+      });
+      document.getElementById('prTotalVal').innerText='₹'+Math.round(total);
+    }
+
+    function closePosReturn(){
+      document.getElementById('modalPosReturn').style.display='none';
+      _prSale=null; _prItems=[];
+    }
+
+    async function confirmPosReturn(){
+      if(!_prSale) return;
+      const reason=document.getElementById('prReason').value.trim().toUpperCase();
+      const retType=document.querySelector('input[name="prType"]:checked')?.value||'store_credit';
+      if(!reason){alert('Please enter a return reason.');return;}
+
+      const selectedItems=[];
+      document.querySelectorAll('.pr-item-chk:checked').forEach(chk=>{
+        const idx=parseInt(chk.dataset.idx);
+        const item=_prItems[idx];
+        const qtyInp=document.querySelector(`.pr-item-qty[data-idx="${idx}"]`);
+        const qty=parseFloat(qtyInp?.value)||1;
+        const unit=parseFloat(chk.dataset.unit)||0;
+        if(item) selectedItems.push({...item, return_qty:qty, return_value:Math.round(qty*unit)});
+      });
+      if(!selectedItems.length){alert('Select at least one item to return.');return;}
+
+      const totalReturnValue=selectedItems.reduce((s,i)=>s+i.return_value,0);
+      const btn=document.getElementById('btnConfirmPosReturn');
+      btn.disabled=true; btn.innerText='PROCESSING…';
+
+      // 1. Create pos_returns record
+      const retStatus=retType==='refund'?'Pending_Approval':'Approved';
+      const{data:posReturn,error:rErr}=await supabaseClient.from('pos_returns').insert({
+        original_sale_id    :_prSale.id,
+        return_date         :new Date().toISOString().split('T')[0],
+        customer_mobile     :_prSale.customer_mobile||null,
+        return_type         :retType,
+        total_return_value  :totalReturnValue,
+        reason              :reason,
+        status              :retStatus,
+        recorded_by         :localStorage.getItem('ERP_ACTIVE_ROLE')||'green'
+      }).select().single();
+      if(rErr){alert('Error: '+rErr.message);btn.disabled=false;btn.innerText='CONFIRM RETURN';return;}
+
+      // 2. Create pos_return_items
+      const returnItemRows=selectedItems.map(i=>({
+        return_id           :posReturn.id,
+        product_master_id   :i.product_master_id||null,
+        item_name           :i.item_name,
+        qty                 :i.return_qty,
+        unit_price          :parseFloat(i.unit_price)||0,
+        total_return_value  :i.return_value
+      }));
+      await supabaseClient.from('pos_return_items').insert(returnItemRows);
+
+      // 3. For store_credit: update outstanding_credit immediately
+      if(retType==='store_credit'&&_prSale.customer_mobile){
+        const{data:cust}=await supabaseClient.from('customers').select('outstanding_credit').eq('mobile_number',_prSale.customer_mobile).maybeSingle();
+        const currentCredit=parseFloat(cust?.outstanding_credit)||0;
+        await supabaseClient.from('customers').update({outstanding_credit:currentCredit+totalReturnValue}).eq('mobile_number',_prSale.customer_mobile);
+      }
+
+      closePosReturn();
+      btn.disabled=false; btn.innerText='CONFIRM RETURN';
+
+      // 4. Show credit note or receipt
+      if(retType==='store_credit'){
+        showCreditNote(_prSale,selectedItems,totalReturnValue,posReturn.id);
+      } else if(retType==='refund'){
+        alert(`Return logged. Total ₹${totalReturnValue} refund requires Admin approval in Approvals page.`);
+      } else {
+        alert(`Return logged. Please issue replacement item(s) as a new sale.\nReturn Ref: POS-RETURN-${posReturn.id.split('-')[0].toUpperCase()}`);
+      }
+      queryPosHistoryEngine();
+    }
+
+    function showCreditNote(sale,items,total,returnId){
+      const now=new Date();
+      document.getElementById('cnDate').innerText=now.toLocaleDateString('en-IN');
+      document.getElementById('cnRef').innerText='CR-'+returnId.split('-')[0].toUpperCase();
+      document.getElementById('cnCust').innerText=sale.customer_name||'Walk-in';
+      document.getElementById('cnMobile').innerText=sale.customer_mobile||'—';
+      document.getElementById('cnAmount').innerText='₹'+total;
+      document.getElementById('cnItemsBlock').innerHTML=items.map(i=>
+        `<div style="display:flex;justify-content:space-between;"><span>${i.item_name} ×${i.return_qty}</span><span>₹${i.return_value}</span></div>`
+      ).join('');
+      document.getElementById('modalCreditNote').style.display='flex';
+    }
+
+    function printCreditNote(format){
+      const target=document.getElementById('creditNoteTarget');
+      const origStyle=target.style.cssText;
+      if(format==='a5') target.style.cssText='font-family:Segoe UI,Arial,sans-serif;max-width:148mm;padding:10mm;font-size:11px;background:white;color:black;';
+      else target.style.cssText='font-family:Courier New,monospace;max-width:300px;padding:0;font-size:11px;background:white;color:black;border:none;';
+      document.body.classList.add('print-receipt');
+      target.style.visibility='visible';
+      window.onafterprint=()=>{document.body.classList.remove('print-receipt');target.style.cssText=origStyle;window.onafterprint=null;};
+      setTimeout(()=>window.print(),300);
     }
 
     initPosTerminal();
