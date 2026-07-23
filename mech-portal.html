@@ -191,6 +191,7 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
       <button class="tab-btn" onclick="switchTab('tabLedger',event)">Financial Ledger</button>
       <button class="tab-btn" onclick="switchTab('tabProfile',event)">My Profile</button>
       <button class="tab-btn" onclick="switchTab('tabEarnings',event)">💰 My Earnings</button>
+      <button class="tab-btn" onclick="switchTab('tabComplaints',event)">⚠️ Complaints</button>
     </div>
 
     <div id="tabJobs" class="tab-content active card">
@@ -297,6 +298,16 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
       <!-- Content rendered by loadMyEarnings() -->
       <div id="earningsContent">
         <p style="text-align:center;color:#94a3b8;font-size:.85rem;">Loading earnings...</p>
+      </div>
+    </div>
+
+    <!-- ── TAB: COMPLAINTS ────────────────────────────────────────────── -->
+    <div id="tabComplaints" class="tab-content card">
+      <div style="font-size:.82rem;color:#64748b;margin-bottom:14px;">
+        Complaints raised against job cards you worked on. Fine amounts shown here deduct progressively from your commission payouts.
+      </div>
+      <div id="complaintsContent">
+        <div style="text-align:center;color:#94a3b8;padding:20px;font-size:.85rem;">Loading complaints...</div>
       </div>
     </div>
 
@@ -1022,6 +1033,119 @@ function switchTab(tabId,evt){
   if(evt?.target) evt.target.classList.add('active');
   document.getElementById(tabId).classList.add('active');
   if(tabId==='tabEarnings') loadMyEarnings();
+  if(tabId==='tabComplaints') loadMyComplaints();
+}
+
+// ── PHASE 9: MY COMPLAINTS TAB ───────────────────────────────────────────
+async function loadMyComplaints(){
+  if(!activeMech) return;
+  const content=document.getElementById('complaintsContent');
+  content.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;font-size:.85rem;">Loading...</div>';
+
+  // Fetch complaints where this mechanic is responsible
+  // complaint.new_jc_id → job_cards.mech_id = activeMech.id
+  const{data:myJcs}=await sb.from('job_cards').select('id').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`);
+  const myJcIds=(myJcs||[]).map(j=>j.id);
+  if(!myJcIds.length){content.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">No complaints on record.</div>';return;}
+
+  // Find complaints where new_jc_id is one of their JCs
+  const{data:complaints}=await sb.from('customer_complaints')
+    .select('*').in('new_jc_id',myJcIds)
+    .order('created_at',{ascending:false});
+
+  if(!complaints||complaints.length===0){
+    content.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">No complaints raised against your job cards. ✅</div>';
+    return;
+  }
+
+  // Fetch fines for this mechanic
+  const complaintIds=complaints.map(c=>c.id);
+  const{data:fines}=await sb.from('complaint_fines')
+    .select('*').eq('mechanic_id',activeMech.id).in('complaint_id',complaintIds);
+  const fineMap={};(fines||[]).forEach(f=>fineMap[f.complaint_id]=f);
+
+  // Fetch reference JC info for display
+  const refJcIds=[...new Set(complaints.map(c=>c.reference_jc_id).filter(Boolean))];
+  const{data:refJcs}=await sb.from('job_cards').select('id,closed_at,labour_charges').in('id',refJcIds);
+  const refJcMap={};(refJcs||[]).forEach(j=>refJcMap[j.id]=j);
+
+  const cards=complaints.map(c=>{
+    const fine=fineMap[c.id];
+    const refJc=refJcMap[c.reference_jc_id];
+    const refShort='JC-'+(c.reference_jc_id||'').split('-')[0].toUpperCase();
+    const closedStr=refJc?.closed_at?new Date(refJc.closed_at).toLocaleDateString('en-IN'):'—';
+    const ft=c.fault_type;
+    const ftBadge=ft==='service'
+      ?'<span style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700;">🔧 SERVICE FAULT</span>'
+      :'<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700;">🔩 PART FAULT</span>';
+    const reclassNote=c.original_fault_type&&c.original_fault_type!==c.fault_type
+      ?`<div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Originally: ${c.original_fault_type.toUpperCase()} FAULT — reclassified${c.reclassification_note?' ('+c.reclassification_note+')':''}</div>`:'';
+
+    // Fine status block
+    let fineBlock='<div style="font-size:.82rem;color:#94a3b8;margin-top:8px;">No fine raised.</div>';
+    if(fine){
+      const approved=parseFloat(fine.approved_fine_amount)||0;
+      const deducted=parseFloat(fine.deducted_amount)||0;
+      const remaining=Math.max(0,approved-deducted);
+      const statusColors={
+        'Pending':'#854d0e','Confirmed':'#991b1b','Reduced':'#854d0e',
+        'Waived':'#166534','Partially_Deducted':'#991b1b','Settled':'#166534'
+      };
+      const statusIcons={
+        'Pending':'⏳','Confirmed':'🔴','Reduced':'🟡',
+        'Waived':'✅ Waived','Partially_Deducted':'🟡','Settled':'✅ Settled'
+      };
+      fineBlock=`<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px;margin-top:8px;">
+        <div style="font-size:.78rem;font-weight:700;color:${statusColors[fine.status]||'#64748b'};margin-bottom:6px;">
+          ${statusIcons[fine.status]||fine.status} &nbsp; ${fine.fine_type.replace(/_/g,' ').toUpperCase()}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:.8rem;">
+          <div><span style="color:#64748b;font-size:.68rem;">FINE AMOUNT</span><br><strong>₹${approved}</strong></div>
+          <div><span style="color:#64748b;font-size:.68rem;">DEDUCTED</span><br><strong style="color:var(--success);">₹${deducted}</strong></div>
+          <div><span style="color:#64748b;font-size:.68rem;">REMAINING</span><br><strong style="color:${remaining>0?'var(--danger)':'#166534'};">${remaining>0?'₹'+remaining:'Nil ✅'}</strong></div>
+        </div>
+        ${fine.mechanic_justification
+          ?`<div style="margin-top:8px;font-size:.78rem;background:#f8fafc;padding:6px 10px;border-radius:4px;"><strong>Your justification:</strong> ${fine.mechanic_justification}</div>`
+          :fine.status==='Pending'||fine.status==='Confirmed'
+            ?`<div style="margin-top:10px;">
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:4px;">SUBMIT YOUR JUSTIFICATION (optional)</label>
+                <textarea id="just_${fine.id}" rows="2" placeholder="Explain your side..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;box-sizing:border-box;resize:vertical;"></textarea>
+                <button onclick="submitJustification('${fine.id}')" style="margin-top:6px;background:var(--primary);color:white;border:none;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;">SUBMIT</button>
+              </div>`
+            :''}
+      </div>`;
+    }
+
+    return `<div style="background:${c.status==='Closed'?'#f8fafc':'white'};border:1px solid ${ft==='service'?'#fca5a5':'var(--border)'};border-radius:8px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+        <div>
+          <span style="font-weight:700;font-size:.9rem;">${refShort}</span>
+          <span style="color:#64748b;font-size:.78rem;margin-left:8px;">Closed: ${closedStr}</span>
+        </div>
+        <span style="font-size:.72rem;font-weight:700;color:${c.status==='Closed'?'#166534':c.status==='Approved'?'#2980b9':'#854d0e'};background:${c.status==='Closed'?'#f0fdf4':c.status==='Approved'?'#eff6ff':'#fffbeb'};padding:2px 8px;border-radius:10px;">${c.status}</span>
+      </div>
+      ${ftBadge}${reclassNote}
+      <div style="font-size:.82rem;color:var(--text);margin-top:6px;">${c.complaint_note||'—'}</div>
+      ${fineBlock}
+    </div>`;
+  }).join('');
+
+  content.innerHTML=cards||'<div style="text-align:center;color:#94a3b8;padding:20px;">No complaints on record.</div>';
+}
+
+async function submitJustification(fineId){
+  const textarea=document.getElementById(`just_${fineId}`);
+  const text=(textarea?.value||'').trim().toUpperCase();
+  if(!text){alert('Please write your justification before submitting.');return;}
+  const btn=textarea.nextElementSibling;
+  if(btn){btn.disabled=true;btn.innerText='SUBMITTING…';}
+  const{error}=await sb.from('complaint_fines').update({
+    mechanic_justification:text,
+    justification_at:new Date().toISOString()
+  }).eq('id',fineId);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerText='SUBMIT';}return;}
+  alert('Justification submitted. Admin will review.');
+  loadMyComplaints();
 }
 
 // ── MY EARNINGS TAB ───────────────────────────────────────────────────────
