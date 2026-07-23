@@ -6,6 +6,8 @@
     <title>New Job Card - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
@@ -33,6 +35,12 @@
         .new-badge { background: var(--danger); color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-left: 6px; display: inline-block; vertical-align: middle; font-weight: bold; }
         .credit-alert { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; margin-top: 16px; display: none; cursor: pointer; transition: opacity 0.2s; text-align: center; }
         .credit-alert:hover { opacity: 0.85; }
+        /* Phase 9: Complaint modal */
+        .overlay-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.75); z-index: 200; display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+        .modal-card { background: white; padding: 24px; border-radius: 12px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+        .complaint-item-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: .82rem; }
+        .complaint-item-row:last-child { border-bottom: none; }
+        .fault-btn { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: .9rem; padding: 9px 16px; border-radius: 6px; border-width: 1px; border-style: solid; }
 
         .data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
         .data-table th { padding: 8px 12px; text-align: left; font-size: 0.7rem; color: #64748b; border-bottom: 1px solid var(--border); background: #f8fafc; }
@@ -49,6 +57,7 @@
     <div class="nav-actions">
         <button class="btn-header" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header">🏠 HOME</a>
+        <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
         <!-- LOGOUT button — Universal Rule 3 -->
         <button class="btn-header" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html';">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
@@ -82,7 +91,7 @@
             <label style="display:block; margin-bottom:6px;">📋 Last 4 Workshop Transactions</label>
             <div style="overflow-x:auto; border:1px solid var(--border); border-radius:6px;">
                 <table class="data-table">
-                    <thead><tr><th>Ref</th><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th></tr></thead>
+                    <thead><tr><th>Ref</th><th>Closed</th><th>Amount</th><th>Mode</th><th>Action</th></tr></thead>
                     <tbody id="custHistoryBody"></tbody>
                 </table>
             </div>
@@ -181,6 +190,56 @@
         </div>
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
     </div>
+</div>
+
+<!-- ── PHASE 9: RAISE COMPLAINT MODAL ──────────────────────────────── -->
+<div id="modalComplaint" class="overlay-modal">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0;color:var(--primary);">⚠️ Raise Customer Complaint</h3>
+        <span id="complaintJcLabel" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="closeComplaintModal()" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+
+    <!-- JC info banner -->
+    <div id="complaintJcInfo" style="background:#f8fafc;padding:10px 14px;border-radius:6px;margin-bottom:16px;font-size:.83rem;border:1px solid var(--border);"></div>
+
+    <!-- Fault type -->
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Fault Type <span style="color:var(--danger);">*</span></label>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <label class="fault-btn" style="color:#15803d;background:#f0fdf4;border-color:#bbf7d0;">
+          <input type="radio" name="faultType" value="part" checked style="width:auto;accent-color:#15803d;"> 🔩 PART FAULT
+        </label>
+        <label class="fault-btn" style="color:#b91c1c;background:#fef2f2;border-color:#fca5a5;">
+          <input type="radio" name="faultType" value="service" style="width:auto;accent-color:#b91c1c;"> 🔧 SERVICE FAULT
+        </label>
+      </div>
+      <div style="margin-top:6px;font-size:.72rem;color:#64748b;">Part Fault = no fine to mechanic. Service Fault = fine at service manager's discretion.</div>
+    </div>
+
+    <!-- Complaint note -->
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Complaint Description <span style="color:var(--danger);">*</span></label>
+      <textarea id="complaintNote" rows="2" placeholder="Describe what the customer is complaining about..." oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+
+    <!-- Items checklist from old JC -->
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">
+        Items from Original JC <span style="font-weight:400;font-size:.7rem;">(tick items in question)</span>
+      </label>
+      <div id="complaintItemsList" style="border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;background:#f8fafc;">
+        <div style="padding:12px;color:#94a3b8;font-size:.82rem;">Loading items...</div>
+      </div>
+    </div>
+
+    <button id="btnCreateComplaintJC" onclick="createComplaintJC()" style="width:100%;background:var(--danger);color:white;border:none;padding:14px;border-radius:8px;font-weight:700;font-size:1rem;cursor:pointer;transition:opacity .15s;">
+      CREATE COMPLAINT JC & PROCEED TO BILLING →
+    </button>
+  </div>
 </div>
 
 <script>
@@ -308,20 +367,36 @@
         if (totalOut > 0) { alertBox.style.display = 'block'; document.getElementById('unifiedCreditBal').innerText = totalOut.toFixed(2); }
         else              { alertBox.style.display = 'none'; }
 
-        /* History table uses all closed JCs (not just credit) — query separately for display */
-        const { data: jcAll } = await supabaseClient.from('job_cards').select('id, total_invoice_value, created_at, payment_mode').eq('customer_mobile', mobile).eq('status', 'Closed').order('created_at', { ascending: false }).limit(4);
-        let mix = (jcAll || []).map(j => ({ id: j.id, type: 'Job Card', dt: j.created_at, amt: j.total_invoice_value, mode: j.payment_mode }));
-        mix.sort((a, b) => new Date(b.dt) - new Date(a.dt));
-        mix = mix.slice(0, 4);
+        /* History table — fetch closed JCs with closed_at for 31-day complaint window */
+        const { data: jcAll } = await supabaseClient.from('job_cards')
+            .select('id, total_invoice_value, closed_at, payment_mode, vehicle_id, mech_id, is_complaint_jc')
+            .eq('customer_mobile', mobile).eq('status', 'Closed')
+            .order('closed_at', { ascending: false }).limit(6);
 
         const tbody = document.getElementById('custHistoryBody');
         tbody.innerHTML = '';
-        if (mix.length === 0) {
+        const now = Date.now();
+        if (!jcAll || jcAll.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>';
         } else {
-            mix.forEach(x => {
-                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold; text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`;
-                tbody.innerHTML += `<tr><td>${refLink}</td><td>${new Date(x.dt).toLocaleDateString('en-IN')}</td><td style="font-weight:bold;">${x.type}</td><td style="font-weight:bold;">₹${x.amt||0}</td><td style="font-weight:bold; color:${x.mode === 'Credit' ? '#b91c1c' : '#15803d'};">${x.mode}</td></tr>`;
+            jcAll.forEach(x => {
+                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold;text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`;
+                const closedStr = x.closed_at ? new Date(x.closed_at).toLocaleDateString('en-IN') : '—';
+                const daysSince = x.closed_at ? Math.floor((now - new Date(x.closed_at)) / 86400000) : 999;
+                const canComplain = daysSince <= 31 && !x.is_complaint_jc;
+                const isComplaintJc = x.is_complaint_jc;
+                const actionCell = isComplaintJc
+                    ? `<span style="font-size:.7rem;color:#94a3b8;">Complaint JC</span>`
+                    : canComplain
+                        ? `<button onclick="openComplaintModal('${x.id}','${x.vehicle_id||''}','${x.mech_id||''}')" style="background:#f59e0b;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">⚠️ RAISE COMPLAINT</button>`
+                        : `<span style="font-size:.7rem;color:#cbd5e1;">${daysSince}d ago</span>`;
+                tbody.innerHTML += `<tr style="${canComplain ? 'background:#fffbeb;' : ''}">
+                    <td>${refLink}</td>
+                    <td style="font-size:.8rem;">${closedStr}</td>
+                    <td style="font-weight:bold;">₹${x.total_invoice_value||0}</td>
+                    <td style="font-weight:bold;color:${x.payment_mode==='Credit'?'#b91c1c':'#15803d'};">${x.payment_mode||'—'}</td>
+                    <td>${actionCell}</td>
+                </tr>`;
             });
         }
         document.getElementById('custHistoryPanel').style.display = 'block';
@@ -448,6 +523,132 @@
             feedback.style.color = '#dc2626';
             feedback.innerText = `⚠️ Code not found — JC will be created but referral bonus will not apply`;
         }
+    }
+
+    // ── PHASE 9: COMPLAINT MODAL ────────────────────────────────────────
+    let _cRefJcId    = null;
+    let _cVehicleId  = null;
+    let _cMechId     = null;
+    let _cItems      = [];
+
+    async function openComplaintModal(jcId, vehicleId, mechId) {
+        _cRefJcId   = jcId;
+        _cVehicleId = vehicleId || null;
+        _cMechId    = mechId   || null;
+        _cItems     = [];
+        document.getElementById('complaintNote').value = '';
+        document.querySelector('input[name="faultType"][value="part"]').checked = true;
+        document.getElementById('btnCreateComplaintJC').innerText = 'CREATE COMPLAINT JC & PROCEED TO BILLING →';
+        document.getElementById('btnCreateComplaintJC').disabled = false;
+        document.getElementById('modalComplaint').style.display = 'flex';
+
+        // Fetch JC header for banner
+        const { data: jc } = await supabaseClient.from('job_cards')
+            .select('closed_at, total_invoice_value, problem_mentioned, vehicles(reg_number, brand, make_model)')
+            .eq('id', jcId).single();
+
+        if (jc) {
+            const jcShort = 'JC-' + jcId.split('-')[0].toUpperCase();
+            document.getElementById('complaintJcLabel').innerText =
+                `Reference: ${jcShort} | Closed: ${new Date(jc.closed_at).toLocaleDateString('en-IN')}`;
+            document.getElementById('complaintJcInfo').innerHTML =
+                `<strong>${jc.vehicles?.reg_number || '—'}</strong> `+
+                `(${(jc.vehicles?.brand||'')} ${(jc.vehicles?.make_model||'')}) `+
+                `&nbsp;|&nbsp; Customer: <strong>${document.getElementById('jcName').value || document.getElementById('jcMobile').value}</strong>`+
+                `&nbsp;|&nbsp; Bill: <strong>₹${jc.total_invoice_value||0}</strong>`+
+                `<div style="margin-top:4px;font-size:.78rem;color:#64748b;">Problem on record: ${jc.problem_mentioned||'—'}</div>`;
+        }
+
+        // Fetch items from old JC
+        const { data: items } = await supabaseClient.from('job_card_items')
+            .select('id, item_name, brand, warehouse_type, total_price, qty, unit_metric')
+            .eq('job_card_id', jcId).order('created_at');
+
+        _cItems = items || [];
+        const list = document.getElementById('complaintItemsList');
+
+        if (!_cItems.length) {
+            list.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:.82rem;">No items found on this job card.</div>';
+            return;
+        }
+
+        list.innerHTML = _cItems.map((item, idx) => {
+            const wIcon = item.warehouse_type === 'Service' ? '🔧' : item.warehouse_type === 'Moped' ? '🔵' : '🟢';
+            const amt   = parseFloat(item.total_price) || 0;
+            return `<label class="complaint-item-row">
+                <input type="checkbox" class="c-item-chk" data-idx="${idx}" style="width:auto;" checked>
+                <span>${wIcon} <strong>${item.item_name}</strong>${item.brand ? ' — '+item.brand : ''}</span>
+                <span style="margin-left:auto;color:#64748b;font-size:.78rem;white-space:nowrap;">₹${amt} | ${item.qty||1} ${item.unit_metric||'pcs'}</span>
+            </label>`;
+        }).join('');
+    }
+
+    function closeComplaintModal() {
+        document.getElementById('modalComplaint').style.display = 'none';
+        _cRefJcId = null; _cVehicleId = null; _cMechId = null; _cItems = [];
+    }
+
+    async function createComplaintJC() {
+        const note      = document.getElementById('complaintNote').value.trim().toUpperCase();
+        const faultType = document.querySelector('input[name="faultType"]:checked')?.value || 'part';
+        const mobile    = document.getElementById('jcMobile').value.trim();
+        if (!note)           return alert('Please describe the complaint before proceeding.');
+        if (!_cRefJcId)      return alert('No reference job card selected.');
+
+        const selectedItems = Array.from(document.querySelectorAll('.c-item-chk:checked'))
+            .map(cb => _cItems[parseInt(cb.dataset.idx)]).filter(Boolean);
+
+        const btn = document.getElementById('btnCreateComplaintJC');
+        btn.innerText = 'CREATING…'; btn.disabled = true;
+
+        // 1. Create customer_complaints record
+        const { data: complaint, error: cErr } = await supabaseClient.from('customer_complaints').insert({
+            reference_jc_id     : _cRefJcId,
+            fault_type          : faultType,
+            original_fault_type : faultType,
+            complaint_note      : note,
+            customer_mobile     : mobile,
+            vehicle_id          : _cVehicleId || null,
+            reported_by         : activeRole,
+            status              : 'Open'
+        }).select().single();
+        if (cErr) { alert('Error saving complaint: ' + cErr.message); btn.innerText = 'CREATE COMPLAINT JC & PROCEED TO BILLING →'; btn.disabled = false; return; }
+
+        // 2. Create complaint_items (selected items from old JC)
+        if (selectedItems.length > 0) {
+            const itemRows = selectedItems.map(item => ({
+                complaint_id         : complaint.id,
+                original_jc_item_id  : item.id,
+                item_name            : item.item_name,
+                brand                : item.brand || null,
+                original_price       : parseFloat(item.total_price) || 0,
+                replacement_issued   : false,
+                recover_from_mech    : faultType === 'service'
+            }));
+            const { error: iErr } = await supabaseClient.from('complaint_items').insert(itemRows);
+            if (iErr) console.warn('complaint_items insert error:', iErr.message);
+        }
+
+        // 3. Create new complaint JC pre-filled
+        const refShort  = 'JC-' + _cRefJcId.split('-')[0].toUpperCase();
+        const probText  = `CUSTOMER COMPLAINT — Ref: ${refShort} | ${faultType.toUpperCase()} FAULT | ${note}`;
+        const { data: newJc, error: jcErr } = await supabaseClient.from('job_cards').insert({
+            customer_mobile   : mobile,
+            vehicle_id        : _cVehicleId || null,
+            mech_id           : _cMechId    || null,
+            problem_mentioned : probText,
+            status            : 'Open',
+            source_role       : activeRole,
+            is_complaint_jc   : true,
+            complaint_ref_id  : complaint.id
+        }).select().single();
+        if (jcErr) { alert('Error creating job card: ' + jcErr.message); btn.innerText = 'CREATE COMPLAINT JC & PROCEED TO BILLING →'; btn.disabled = false; return; }
+
+        // 4. Link new JC back to complaint record
+        await supabaseClient.from('customer_complaints').update({ new_jc_id: newJc.id }).eq('id', complaint.id);
+
+        // 5. Navigate to billing
+        window.location.href = `billing.html?id=${newJc.id}`;
     }
 
     initializeIntake();
