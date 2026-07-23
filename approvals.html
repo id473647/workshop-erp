@@ -6,6 +6,8 @@
 <title>Pending Approvals — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warning:#f59e0b;}
 *{box-sizing:border-box;}
@@ -27,12 +29,20 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 .tag-pending{background:#fef3c7;color:#b45309;}
 .tag-approved{background:#dcfce7;color:#166534;}
 .tag-rejected{background:#fee2e2;color:#991b1b;}
+.tag-cleared{background:#dcfce7;color:#166534;}
 .btn-view{background:var(--info);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;}
 .btn-view:hover{opacity:.9;}
 .empty-row td{text-align:center;color:#94a3b8;padding:24px;}
 .type-label{font-weight:700;color:var(--primary);}
 .change-pill{display:inline-block;background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:.78rem;margin:1px;}
 .change-arrow{color:var(--success);font-weight:700;}
+/* Phase 9: Complaint approval modal */
+.overlay-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.75);z-index:200;display:none;justify-content:center;align-items:center;padding:20px;box-sizing:border-box;}
+.modal-card{background:white;padding:24px;border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-sizing:border-box;}
+.fine-input{width:90px;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;font-weight:700;text-align:center;}
+.btn-approve{background:var(--success);color:white;border:none;padding:10px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.88rem;}
+.btn-approve-bare{background:#64748b;color:white;border:none;padding:10px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.88rem;}
+.btn-reject{background:var(--danger);color:white;border:none;padding:10px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.88rem;}
 </style>
 </head>
 <body>
@@ -45,6 +55,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   <div class="nav-actions">
     <button class="btn-header" onclick="history.back()">← BACK</button>
     <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
     <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">GUEST</span>
   </div>
@@ -103,6 +114,53 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 
 </div>
 
+<!-- ── PHASE 9: COMPLAINT RESOLUTION APPROVAL MODAL ────────────────── -->
+<div id="modalCA" class="overlay-modal">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0;color:var(--primary);">⚠️ Complaint Resolution — Admin Approval</h3>
+        <span id="caSubtitle" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="closeCA()" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+
+    <!-- Complaint info -->
+    <div id="caInfo" style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;font-size:.83rem;line-height:1.6;"></div>
+
+    <!-- Fine section — SERVICE FAULT only -->
+    <div id="caFineSection" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:.82rem;font-weight:700;color:#991b1b;margin-bottom:12px;">🔧 SERVICE FAULT — Fine Details</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <div>
+          <label style="font-size:.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">TOTAL FINE (₹)</label>
+          <input type="number" id="caFineTotal" class="fine-input" value="0" min="0" oninput="updateFineSplit()">
+        </div>
+        <button onclick="splitFineEqually()" style="background:#e2e8f0;border:none;padding:8px 12px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.78rem;align-self:flex-end;">SPLIT EQUALLY</button>
+      </div>
+      <div id="caMechSplit" style="margin-bottom:12px;"></div>
+      <div id="caRecoverBlock" style="display:none;">
+        <div style="font-size:.75rem;font-weight:700;color:#64748b;margin-bottom:6px;">PRODUCT COST RECOVERY (check to recover from mechanic)</div>
+        <div id="caRecoverList"></div>
+      </div>
+    </div>
+
+    <!-- Admin note -->
+    <div style="margin-bottom:16px;">
+      <label style="font-size:.75rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">ADMIN NOTE (optional)</label>
+      <textarea id="caAdminNote" rows="2" placeholder="Any note about this approval decision..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+
+    <!-- Action buttons — shown/hidden based on fault type -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button id="btnCAApproveWithFine" class="btn-approve" onclick="resolveComplaint('approve_fine')" style="display:none;">✅ APPROVE + RAISE FINE</button>
+      <button id="btnCAApprove"         class="btn-approve" onclick="resolveComplaint('approve')">✅ APPROVE RESOLUTION</button>
+      <button id="btnCAApproveNoFine"   class="btn-approve-bare" onclick="resolveComplaint('approve_no_fine')" style="display:none;">✅ APPROVE WITHOUT FINE</button>
+      <button                            class="btn-reject"  onclick="resolveComplaint('reject')">❌ REJECT</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
@@ -114,6 +172,7 @@ function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.h
 // Map request_type to the page that handles it
 function getViewUrl(rec){
   const t=rec.request_type;
+  if(t==='Complaint Resolution') return null; // handled inline by modal
   if(['commission_rate','opening_balance','opening_points','late_fine','attendance_exemption'].includes(t)){
     return `utility-router.html?tab=wsTech&approval=${rec.id}`;
   }
@@ -136,9 +195,168 @@ function typeLabel(t){
     attendance_exemption:'Attendance Exemption',
     customer_credit:'Customer Credit Limit',
     customer_discount:'Customer Discount',
-    pin_reset:'PIN Reset'
+    pin_reset:'PIN Reset',
+    'Complaint Resolution':'⚠️ Complaint Resolution',
+    'Discount Override':'Discount Override'
   };
   return map[t]||(t||'').replace(/_/g,' ');
+}
+
+// ── PHASE 9: COMPLAINT RESOLUTION APPROVAL ──────────────────────────────
+let _caRec=null, _caComplaint=null, _caMechs=[], _caItems=[];
+
+async function openCA(rec){
+  _caRec=rec; _caComplaint=null; _caMechs=[]; _caItems=[];
+  document.getElementById('caAdminNote').value='';
+  document.getElementById('caInfo').innerHTML='<div style="color:#94a3b8;font-size:.83rem;">Loading complaint details…</div>';
+  document.getElementById('caFineSection').style.display='none';
+  document.getElementById('btnCAApproveWithFine').style.display='none';
+  document.getElementById('btnCAApproveNoFine').style.display='none';
+  document.getElementById('btnCAApprove').style.display='inline-block';
+  document.getElementById('modalCA').style.display='flex';
+
+  const payload=rec.payload||{};
+  if(!payload.complaint_id){document.getElementById('caInfo').innerHTML='<div style="color:var(--danger);">Complaint data not found in payload.</div>';return;}
+
+  // Fetch complaint record
+  const {data:complaint}=await sb.from('customer_complaints').select('*').eq('id',payload.complaint_id).single();
+  _caComplaint=complaint;
+
+  // Fetch reference JC for labour_charges and mechanic details
+  const {data:refJc}=await sb.from('job_cards').select('id,labour_charges,mech_id,co_mech_id').eq('id',complaint.reference_jc_id).single();
+
+  // Fetch mechanic names
+  const mechIds=[refJc?.mech_id,refJc?.co_mech_id].filter(Boolean);
+  if(mechIds.length>0){
+    const {data:mechs}=await sb.from('mechanics').select('id,name').in('id',mechIds);
+    _caMechs=mechs||[];
+  }
+  const mechMap={};_caMechs.forEach(m=>mechMap[m.id]=m.name);
+
+  // Fetch complaint items
+  const {data:items}=await sb.from('complaint_items').select('*').eq('complaint_id',complaint.id);
+  _caItems=items||[];
+
+  const refShort='JC-'+(complaint.reference_jc_id||'').split('-')[0].toUpperCase();
+  const newShort=complaint.new_jc_id?'JC-'+complaint.new_jc_id.split('-')[0].toUpperCase():'—';
+  const ft=complaint.fault_type;
+  const primaryName=mechMap[refJc?.mech_id]||'Unknown';
+  const coName=refJc?.co_mech_id?mechMap[refJc.co_mech_id]:null;
+
+  document.getElementById('caSubtitle').innerText=`Reference: ${refShort} | Complaint JC: ${newShort}`;
+  document.getElementById('caInfo').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div><span style="color:#64748b;font-size:.72rem;">FAULT TYPE</span><br>
+        <strong style="color:${ft==='service'?'#991b1b':'#166534'}">${ft?.toUpperCase()||'—'} FAULT</strong>
+        ${complaint.reclassification_note?`<br><span style="font-size:.72rem;color:#94a3b8;">Reclassified: ${complaint.reclassification_note}</span>`:''}
+      </div>
+      <div><span style="color:#64748b;font-size:.72rem;">MECHANIC(S)</span><br>
+        <strong>${primaryName}</strong>${coName?` + ${coName} (co-mech)`:''}
+      </div>
+      <div><span style="color:#64748b;font-size:.72rem;">ORIGINAL SERVICE CHARGE</span><br>
+        <strong>₹${parseFloat(refJc?.labour_charges)||0}</strong>
+      </div>
+      <div><span style="color:#64748b;font-size:.72rem;">COMPLAINT NOTE</span><br>
+        <strong>${complaint.complaint_note||'—'}</strong>
+      </div>
+    </div>
+    ${_caItems.length>0?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+      <div style="font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:4px;">ITEMS IN QUESTION</div>
+      ${_caItems.map(i=>`<div style="font-size:.82rem;padding:2px 0;">• <strong>${i.item_name}</strong> — ₹${i.original_price||0}</div>`).join('')}
+    </div>`:''}
+  `;
+
+  // SERVICE FAULT: show fine section
+  if(ft==='service'){
+    document.getElementById('caFineSection').style.display='block';
+    document.getElementById('btnCAApproveWithFine').style.display='inline-block';
+    document.getElementById('btnCAApproveNoFine').style.display='inline-block';
+    document.getElementById('btnCAApprove').style.display='none';
+    const defaultFine=parseFloat(refJc?.labour_charges)||0;
+    document.getElementById('caFineTotal').value=defaultFine.toFixed(0);
+    // Build per-mechanic split inputs
+    const mechList=[refJc?.mech_id,refJc?.co_mech_id].filter(Boolean);
+    const perMech=mechList.length>0?(defaultFine/mechList.length).toFixed(0):'0';
+    document.getElementById('caMechSplit').innerHTML=mechList.map(id=>`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span style="font-weight:700;min-width:130px;font-size:.82rem;">${mechMap[id]||'Unknown'}</span>
+        Fine: <input type="number" class="fine-input ca-mech-fine" data-mech="${id}" value="${perMech}">
+      </div>`).join('');
+    // Product recovery
+    const recoverItems=_caItems.filter(i=>i.recover_from_mech);
+    if(recoverItems.length>0){
+      document.getElementById('caRecoverBlock').style.display='block';
+      document.getElementById('caRecoverList').innerHTML=recoverItems.map(i=>`
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:.82rem;cursor:pointer;">
+          <input type="checkbox" class="ca-recover-chk" data-item-id="${i.id}" data-name="${i.item_name}" data-amt="${i.original_price||0}" data-mech="${refJc?.mech_id||''}" style="width:auto;" checked>
+          ${i.item_name} — ₹${i.original_price||0} (from <strong>${primaryName}</strong>)
+        </label>`).join('');
+    }else{document.getElementById('caRecoverBlock').style.display='none';}
+  }
+}
+
+function splitFineEqually(){
+  const total=parseFloat(document.getElementById('caFineTotal').value)||0;
+  const inputs=document.querySelectorAll('.ca-mech-fine');
+  if(!inputs.length)return;
+  inputs.forEach(inp=>inp.value=(total/inputs.length).toFixed(0));
+}
+function updateFineSplit(){/* auto-update if needed */}
+
+function closeCA(){document.getElementById('modalCA').style.display='none';}
+
+async function resolveComplaint(action){
+  if(!_caRec||!_caComplaint) return;
+  const note=document.getElementById('caAdminNote').value.trim().toUpperCase();
+  const now=new Date().toISOString();
+
+  if(action==='reject'){
+    if(!confirm('Reject this complaint resolution? The complaint JC will remain open.')) return;
+    await sb.from('approval_requests').update({status:'rejected',actioned_by:role,actioned_at:now,action_note:note||'Rejected by admin'}).eq('id',_caRec.id);
+    await sb.from('customer_complaints').update({status:'Open'}).eq('id',_caComplaint.id);
+    closeCA(); loadApprovals(); return;
+  }
+
+  if(action==='approve_fine'){
+    // Validate fine inputs
+    const fineInputs=document.querySelectorAll('.ca-mech-fine');
+    const fineTotal=parseFloat(document.getElementById('caFineTotal').value)||0;
+    let fineSum=0;
+    const fineRows=[];
+    fineInputs.forEach(inp=>{
+      const amt=parseFloat(inp.value)||0;
+      fineSum+=amt;
+      if(amt>0) fineRows.push({
+        complaint_id: _caComplaint.id,
+        mechanic_id: inp.dataset.mech,
+        fine_type: 'service_fault',
+        gross_fine_amount: amt,
+        approved_fine_amount: amt,
+        status: 'Confirmed'
+      });
+    });
+    // Product recovery fines
+    document.querySelectorAll('.ca-recover-chk:checked').forEach(chk=>{
+      const amt=parseFloat(chk.dataset.amt)||0;
+      if(amt>0 && chk.dataset.mech) fineRows.push({
+        complaint_id: _caComplaint.id,
+        mechanic_id: chk.dataset.mech,
+        fine_type: 'product_recovery',
+        gross_fine_amount: amt,
+        approved_fine_amount: amt,
+        status: 'Confirmed'
+      });
+    });
+    if(fineRows.length===0){alert('Enter at least one fine amount.');return;}
+    const{error:fErr}=await sb.from('complaint_fines').insert(fineRows);
+    if(fErr){alert('Error raising fines: '+fErr.message);return;}
+  }
+
+  // APPROVE (with fine, without fine, or part fault)
+  await sb.from('approval_requests').update({status:'Cleared',actioned_by:role,actioned_at:now,action_note:note||null}).eq('id',_caRec.id);
+  await sb.from('customer_complaints').update({status:'Approved'}).eq('id',_caComplaint.id);
+  closeCA(); loadApprovals();
+  alert('✅ Complaint resolution approved. The billing PAY button is now active.');
 }
 
 function changePill(cur,prop){
@@ -183,10 +401,13 @@ async function loadApprovals(){
         <td><span class="type-label">${typeLabel(r.request_type)}</span></td>
         <td>${r.entity_label||r.entity_type||'—'}</td>
         <td>${changePill(r.current_value,r.proposed_value)}</td>
-        <td>${(r.requested_by||'—').toUpperCase()}</td>
+        <td>${(r.requested_by||r.requested_by_role||'—').toUpperCase()}</td>
         <td>${fmtDate(r.requested_at)}</td>
-        <td style="font-size:.78rem;color:#64748b;max-width:150px;">${r.reason||'—'}</td>
-        <td><button class="btn-view" onclick="window.location.href='${getViewUrl(r)}'">VIEW →</button></td>
+        <td style="font-size:.78rem;color:#64748b;max-width:150px;">${r.reason||(r.payload?.complaint_note||'—')}</td>
+        <td>${r.request_type==='Complaint Resolution'
+          ?`<button class="btn-view" style="background:var(--warning);color:#000;" onclick="openCA(${JSON.stringify(r).replace(/"/g,'&quot;')})">REVIEW →</button>`
+          :`<button class="btn-view" onclick="window.location.href='${getViewUrl(r)}'">VIEW →</button>`
+        }</td>
       </tr>`).join('');
   }
 
