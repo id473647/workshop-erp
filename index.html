@@ -6,6 +6,8 @@
 <title>Command Center — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root {
     --primary:#2c3e50; --success:#27ae60; --moped:#3498db; --service:#f39c12;
@@ -99,6 +101,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
     <div class="nav-actions">
         <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
@@ -242,6 +245,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
                         <th>Advances / Invoice</th>
                         <th>Status / Days</th>
                         <th>Assigned Tech</th>
+                        <th id="thAction" style="display:none;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="masterJobsTableBody">
@@ -614,7 +618,7 @@ const tabHints = {
     TodayActive:    'Job cards opened today. 🟡 Amber = open >24h   🔴 Red = open >3 days.',
     Overdue:        'Open job cards older than 24 hours — needs follow-up.',
     ReadyDelivery:  'Vehicles marked ready for delivery. Days waiting and parking charges shown.',
-    Historical:     'Last 40 closed job cards.'
+    Historical:     'Closed job cards — search by mobile for full history. ⚠️ RAISE COMPLAINT appears for JCs within 31 days.'
 };
 function switchListCategory(cat, btn) {
     document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
@@ -644,10 +648,16 @@ async function queryMasterJobRegisters() {
         } else if (currentListCategory === 'ReadyDelivery') {
             q = q.eq('status','Open').not('delivery_ready_at','is',null).order('delivery_ready_at',{ascending:true});
         } else if (currentListCategory === 'Historical') {
-            q = q.eq('status','Closed').order('closed_at',{ascending:false}).limit(40);
+            q = q.eq('status','Closed').order('closed_at',{ascending:false});
+            /* PHASE 9: Remove 40-record cap when mobile number entered — show full history */
+            if (!queryVal || !/^\d{10}$/.test(queryVal)) q = q.limit(40);
         }
 
-        if (dateVal) q = q.gte('created_at', dateVal+'T00:00:00').lte('created_at', dateVal+'T23:59:59');
+        /* PHASE 9: Historical uses closed_at for date filter; others use created_at */
+        if (dateVal) {
+            const dcol = currentListCategory === 'Historical' ? 'closed_at' : 'created_at';
+            q = q.gte(dcol, dateVal+'T00:00:00').lte(dcol, dateVal+'T23:59:59');
+        }
 
         const { data: records, error } = await q;
         if (error) { tbody.innerHTML=`<tr><td colspan="5" style="color:var(--danger);text-align:center;padding:16px;">${error.message}</td></tr>`; return; }
@@ -673,6 +683,10 @@ async function queryMasterJobRegisters() {
                 (custs||[]).forEach(c => { custMap[c.mobile_number] = { credit: parseFloat(c.outstanding_credit)||0, freeService: c.free_service_eligible===true }; });
             } catch(e) { /* badges non-critical */ }
         }
+
+        /* PHASE 9: Show Action column for Historical tab only */
+        const thAction = document.getElementById('thAction');
+        if (thAction) thAction.style.display = currentListCategory === 'Historical' ? '' : 'none';
 
         tbody.innerHTML = '';
         filtered.forEach(job => {
@@ -746,6 +760,19 @@ async function queryMasterJobRegisters() {
             const model = job.vehicles?.make_model || 'Unknown';
             const color = job.vehicles?.color ? ` — ${job.vehicles.color}` : '';
 
+            /* PHASE 9: Complaint action for Historical closed JCs within 31 days */
+            let complaintCell = '';
+            if (currentListCategory === 'Historical' && job.status === 'Closed' && job.closed_at) {
+                const daysSince = Math.floor((now - new Date(job.closed_at)) / 86400000);
+                if (daysSince <= 31 && !job.is_complaint_jc) {
+                    complaintCell = `<td><a href="new-jobcard.html?mobile=${job.customer_mobile||''}&amp;jcid=${job.id}" style="background:#f59e0b;color:#000;border:none;padding:4px 8px;border-radius:4px;font-weight:700;cursor:pointer;font-size:.72rem;text-decoration:none;display:inline-block;white-space:nowrap;">⚠️ RAISE COMPLAINT</a></td>`;
+                } else if (job.is_complaint_jc) {
+                    complaintCell = `<td><span style="font-size:.7rem;color:#94a3b8;">Complaint JC</span></td>`;
+                } else {
+                    complaintCell = `<td><span style="font-size:.7rem;color:#cbd5e1;">${daysSince}d ago</span></td>`;
+                }
+            }
+
             tbody.innerHTML += `<tr ${rowBg}>
                 <td>
                     <a class="clickable-ref" href="billing.html?id=${job.id}">${model}${color}</a>
@@ -760,6 +787,7 @@ async function queryMasterJobRegisters() {
                 <td>${valHtml}</td>
                 <td>${statusHtml}</td>
                 <td style="font-size:0.82rem;">${mech}</td>
+                ${complaintCell}
             </tr>`;
         });
 
