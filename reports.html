@@ -6,6 +6,8 @@
     <title>Enterprise Reports - My Care ERP</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="dark-mode.css">
+    <script src="dark-mode.js"></script>
     <style>
         :root { --primary: #2c3e50; --success: #27ae60; --info: #2980b9; --light: #f8fafc; --border: #e2e8f0; --text: #1e293b; --danger: #e74c3c; --warning: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light); padding: 0; margin: 0; box-sizing: border-box; color: var(--text); padding-bottom: 40px; }
@@ -65,6 +67,7 @@
     <div class="nav-actions">
         <button class="btn-header btn-back" onclick="history.back()">← BACK</button>
         <a href="index.html" class="btn-header btn-home">🏠 HOME</a>
+        <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
         <button class="btn-header btn-logout" onclick="executeSessionTermination()">LOGOUT</button>
         <span id="roleDisplay" class="badge-role">GUEST</span>
     </div>
@@ -73,11 +76,15 @@
 <div class="wrapper">
     <div class="card-panel">
         <div class="tabs-header" id="tabsHeader">
-            <button class="tab-btn active" onclick="switchTab('tabAnalytics')" id="btnTabAnalytics">New Customer Analytics</button>
-            <button class="tab-btn" onclick="switchTab('tabPromos')" id="btnTabPromos">Promotional Leads</button>
-            <button class="tab-btn" onclick="switchTab('tabLoyalty')" id="btnTabLoyalty">Loyalty & Referrals</button>
-            <button class="tab-btn" onclick="switchTab('tabLubeSales')" id="btnTabLubeSales">Lube Sales (R4)</button>
-            <button class="tab-btn" onclick="switchTab('tabLabourComm')" id="btnTabLabourComm">Labour & Comm (R3)</button>
+            <button class="tab-btn active" onclick="switchTab('tabAnalytics',this)" id="btnTabAnalytics">New Customer Analytics</button>
+            <button class="tab-btn" onclick="switchTab('tabPromos',this)" id="btnTabPromos">Promotional Leads</button>
+            <button class="tab-btn" onclick="switchTab('tabLoyalty',this)" id="btnTabLoyalty">Loyalty & Referrals</button>
+            <button class="tab-btn" onclick="switchTab('tabLubeSales',this)" id="btnTabLubeSales">Lube Sales (R4)</button>
+            <button class="tab-btn" onclick="switchTab('tabLabourComm',this)" id="btnTabLabourComm">Labour & Comm (R3)</button>
+            <!-- PHASE 9: Complaint and defective stock reports -->
+            <button class="tab-btn" onclick="switchTab('tabProductComplaints',this)" id="btnTabPC">🔩 Product Complaints</button>
+            <button class="tab-btn" onclick="switchTab('tabServiceComplaints',this)" id="btnTabSC">🔧 Service Complaints</button>
+            <button class="tab-btn" onclick="switchTab('tabDefectiveStock',this)" id="btnTabDS">📦 Defective Stock</button>
         </div>
 
         <div id="tabAnalytics" class="view-panel active">
@@ -150,6 +157,72 @@
             </div>
         </div>
 
+        <!-- ── PHASE 9: PRODUCT COMPLAINT REGISTER ─────────────────────── -->
+        <div id="tabProductComplaints" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>From Date</label><input type="date" id="pcFrom"></div>
+                <div class="field-group"><label>To Date</label><input type="date" id="pcTo"></div>
+                <div class="field-group"><label>Status</label>
+                    <select id="pcStatus"><option value="">All</option><option value="Open">Open</option><option value="Approved">Approved</option><option value="Closed">Closed</option></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runProductComplaints()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbPC','Product_Complaint_Register')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbPC">
+                    <thead><tr><th>Date</th><th>Complaint JC</th><th>Ref JC</th><th>Customer</th><th>Defective Item(s)</th><th>Original Cost (₹)</th><th>Replacement</th><th>Net Charged (₹)</th><th>Status</th></tr></thead>
+                    <tbody id="pcBody"><tr><td colspan="9" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── PHASE 9: SERVICE COMPLAINT REGISTER ─────────────────────── -->
+        <div id="tabServiceComplaints" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>From Date</label><input type="date" id="scFrom"></div>
+                <div class="field-group"><label>To Date</label><input type="date" id="scTo"></div>
+                <div class="field-group"><label>Fine Status</label>
+                    <select id="scFineStatus"><option value="">All</option><option value="Pending">Pending</option><option value="Confirmed">Confirmed</option><option value="Settled">Settled</option><option value="Waived">Waived</option></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runServiceComplaints()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbSC','Service_Complaint_Register')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbSC">
+                    <thead><tr><th>Date</th><th>Complaint JC</th><th>Ref JC</th><th>Customer</th><th>Issue</th><th>Mechanic</th><th>Fine Raised (₹)</th><th>Deducted (₹)</th><th>Remaining (₹)</th><th>Fine Status</th></tr></thead>
+                    <tbody id="scBody"><tr><td colspan="10" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── PHASE 9: DEFECTIVE STOCK REGISTER ───────────────────────── -->
+        <div id="tabDefectiveStock" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>From Date</label><input type="date" id="dsFrom"></div>
+                <div class="field-group"><label>To Date</label><input type="date" id="dsTo"></div>
+                <div class="field-group"><label>Status</label>
+                    <select id="dsStatus"><option value="">All</option><option value="In_Store">In Store</option><option value="Vendor_Claimed">Vendor Claimed</option><option value="Written_Off">Written Off</option></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runDefectiveStock()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbDS','Defective_Stock_Register')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PRINT</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbDS">
+                    <thead><tr><th>Date Logged</th><th>Item Name</th><th>Brand</th><th>Qty</th><th>Original Cost (₹)</th><th>Complaint JC</th><th>Defect Note</th><th>Status</th><th>Vendor Claim Ref</th></tr></thead>
+                    <tbody id="dsBody"><tr><td colspan="9" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -172,11 +245,142 @@
         XLSX.writeFile(wb, filename + "_" + new Date().toISOString().split('T')[0] + ".xlsx");
     }
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
-        event.target.classList.add('active');
+        if (btn) btn.classList.add('active');
+        else if (event?.target) event.target.classList.add('active');
         document.getElementById(tabId).classList.add('active');
+        if (tabId === 'tabProductComplaints') runProductComplaints();
+        else if (tabId === 'tabServiceComplaints') runServiceComplaints();
+        else if (tabId === 'tabDefectiveStock') runDefectiveStock();
+    }
+
+    // ── PHASE 9: PRODUCT COMPLAINT REGISTER ─────────────────────────────
+    async function runProductComplaints() {
+        const from   = document.getElementById('pcFrom').value;
+        const to     = document.getElementById('pcTo').value;
+        const status = document.getElementById('pcStatus').value;
+        const tbody  = document.getElementById('pcBody');
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px;">Loading...</td></tr>';
+        let q = supabaseClient.from('customer_complaints').select('*').eq('fault_type','part');
+        if (from)   q = q.gte('created_at', from+'T00:00:00');
+        if (to)     q = q.lte('created_at', to+'T23:59:59');
+        if (status) q = q.eq('status', status);
+        q = q.order('created_at', {ascending:false});
+        const { data: complaints, error } = await q;
+        if (error || !complaints?.length) { tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">${error?error.message:'No product complaints found.'}</td></tr>`; return; }
+        const cIds = complaints.map(c => c.id);
+        const { data: cItems } = await supabaseClient.from('complaint_items').select('*').in('complaint_id', cIds);
+        const itemsMap = {};
+        (cItems||[]).forEach(i => { if (!itemsMap[i.complaint_id]) itemsMap[i.complaint_id] = []; itemsMap[i.complaint_id].push(i); });
+        tbody.innerHTML = '';
+        complaints.forEach(c => {
+            const refShort  = 'JC-'+(c.reference_jc_id||'').split('-')[0].toUpperCase();
+            const newShort  = c.new_jc_id ? 'JC-'+c.new_jc_id.split('-')[0].toUpperCase() : '—';
+            const items     = itemsMap[c.id] || [];
+            const itemNames = items.map(i => i.item_name).join(', ') || '—';
+            const origCost  = items.reduce((s,i) => s + (parseFloat(i.original_price)||0), 0);
+            const replNames = items.filter(i => i.replacement_item_name).map(i => i.replacement_item_name).join(', ') || '—';
+            const netCharge = items.reduce((s,i) => s + (parseFloat(i.net_charge)||0), 0);
+            const dateStr   = c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—';
+            const stCol     = c.status==='Closed'?'#166534':c.status==='Approved'?'#2980b9':'#854d0e';
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><a href="billing.html?id=${c.new_jc_id||''}" target="_blank" style="color:var(--info);font-weight:700;">${newShort}</a></td>
+                <td><a href="billing.html?id=${c.reference_jc_id||''}" target="_blank" style="color:#64748b;">${refShort}</a></td>
+                <td>${c.customer_mobile||'—'}</td>
+                <td style="font-size:.78rem;">${itemNames}</td>
+                <td style="font-weight:700;">₹${origCost}</td>
+                <td style="font-size:.78rem;color:#166534;">${replNames}</td>
+                <td style="font-weight:700;">₹${netCharge}</td>
+                <td><span style="color:${stCol};font-weight:700;">${c.status}</span></td>
+            </tr>`;
+        });
+    }
+
+    // ── PHASE 9: SERVICE COMPLAINT REGISTER ─────────────────────────────
+    async function runServiceComplaints() {
+        const from       = document.getElementById('scFrom').value;
+        const to         = document.getElementById('scTo').value;
+        const fineStatus = document.getElementById('scFineStatus').value;
+        const tbody      = document.getElementById('scBody');
+        tbody.innerHTML  = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px;">Loading...</td></tr>';
+        let q = supabaseClient.from('customer_complaints').select('*').eq('fault_type','service');
+        if (from) q = q.gte('created_at', from+'T00:00:00');
+        if (to)   q = q.lte('created_at', to+'T23:59:59');
+        q = q.order('created_at', {ascending:false});
+        const { data: complaints, error } = await q;
+        if (error || !complaints?.length) { tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:20px;">${error?error.message:'No service complaints found.'}</td></tr>`; return; }
+        const cIds = complaints.map(c => c.id);
+        const { data: fines } = await supabaseClient.from('complaint_fines').select('*').in('complaint_id', cIds);
+        const finesMap = {};
+        (fines||[]).forEach(f => { if (!finesMap[f.complaint_id]) finesMap[f.complaint_id] = []; finesMap[f.complaint_id].push(f); });
+        const mechIds = [...new Set((fines||[]).map(f => f.mechanic_id).filter(Boolean))];
+        let mechMap = {};
+        if (mechIds.length > 0) { const { data: mechs } = await supabaseClient.from('mechanics').select('id,name').in('id', mechIds); (mechs||[]).forEach(m => mechMap[m.id] = m.name); }
+        const filtered = fineStatus ? complaints.filter(c => (finesMap[c.id]||[]).some(f => f.status === fineStatus)) : complaints;
+        tbody.innerHTML = '';
+        filtered.forEach(c => {
+            const refShort  = 'JC-'+(c.reference_jc_id||'').split('-')[0].toUpperCase();
+            const newShort  = c.new_jc_id ? 'JC-'+c.new_jc_id.split('-')[0].toUpperCase() : '—';
+            const cFines    = finesMap[c.id] || [];
+            const mechName  = cFines.length > 0 ? (mechMap[cFines[0].mechanic_id]||'—') : '—';
+            const grossFine = cFines.reduce((s,f) => s + (parseFloat(f.gross_fine_amount)||0), 0);
+            const deducted  = cFines.reduce((s,f) => s + (parseFloat(f.deducted_amount)||0), 0);
+            const remaining = cFines.reduce((s,f) => s + Math.max(0,(parseFloat(f.approved_fine_amount||f.gross_fine_amount)||0)-(parseFloat(f.deducted_amount)||0)), 0);
+            const fStatuses = [...new Set(cFines.map(f => f.status))].join(', ') || '—';
+            const dateStr   = c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—';
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><a href="billing.html?id=${c.new_jc_id||''}" target="_blank" style="color:var(--info);font-weight:700;">${newShort}</a></td>
+                <td><a href="billing.html?id=${c.reference_jc_id||''}" target="_blank" style="color:#64748b;">${refShort}</a></td>
+                <td>${c.customer_mobile||'—'}</td>
+                <td style="font-size:.78rem;">${c.complaint_note||'—'}</td>
+                <td style="font-weight:700;">${mechName}</td>
+                <td style="font-weight:700;color:#991b1b;">₹${grossFine}</td>
+                <td style="color:#166534;font-weight:700;">₹${deducted}</td>
+                <td style="color:${remaining>0?'#991b1b':'#166534'};font-weight:700;">${remaining>0?'₹'+Math.round(remaining):'Nil ✅'}</td>
+                <td style="font-size:.78rem;">${fStatuses}</td>
+            </tr>`;
+        });
+        if (!filtered.length) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:20px;">No service complaints matched.</td></tr>';
+    }
+
+    // ── PHASE 9: DEFECTIVE STOCK REGISTER ───────────────────────────────
+    async function runDefectiveStock() {
+        const from   = document.getElementById('dsFrom').value;
+        const to     = document.getElementById('dsTo').value;
+        const status = document.getElementById('dsStatus').value;
+        const tbody  = document.getElementById('dsBody');
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px;">Loading...</td></tr>';
+        let q = supabaseClient.from('defective_stock').select('*');
+        if (from)   q = q.gte('created_at', from+'T00:00:00');
+        if (to)     q = q.lte('created_at', to+'T23:59:59');
+        if (status) q = q.eq('status', status);
+        q = q.order('created_at', {ascending:false});
+        const { data: items, error } = await q;
+        if (error || !items?.length) { tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">${error?error.message:'No defective stock records found.'}</td></tr>`; return; }
+        const cIds = [...new Set(items.map(i => i.complaint_id).filter(Boolean))];
+        let cMap = {};
+        if (cIds.length > 0) { const { data: cs } = await supabaseClient.from('customer_complaints').select('id,new_jc_id').in('id', cIds); (cs||[]).forEach(c => cMap[c.id] = c.new_jc_id ? 'JC-'+c.new_jc_id.split('-')[0].toUpperCase() : '—'); }
+        tbody.innerHTML = '';
+        items.forEach(item => {
+            const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : '—';
+            const cJcRef  = cMap[item.complaint_id] || '—';
+            const stCol   = {In_Store:'#854d0e',Vendor_Claimed:'#2980b9',Written_Off:'#64748b'}[item.status] || '#64748b';
+            tbody.innerHTML += `<tr>
+                <td>${dateStr}</td>
+                <td><strong>${item.item_name||'—'}</strong></td>
+                <td>${item.brand||'—'}</td>
+                <td>${item.qty||1}</td>
+                <td style="font-weight:700;">₹${item.original_cost||0}</td>
+                <td style="font-size:.78rem;">${cJcRef}</td>
+                <td style="font-size:.75rem;color:#64748b;">${item.defect_note||'—'}</td>
+                <td><span style="color:${stCol};font-weight:700;">${(item.status||'').replace(/_/g,' ')}</span></td>
+                <td style="font-size:.78rem;">${item.vendor_claim_ref||'—'}</td>
+            </tr>`;
+        });
     }
 
     // Role-Based Access Control Setup
