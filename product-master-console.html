@@ -8,6 +8,8 @@
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script src="notifications.js"></script>
+<link rel="stylesheet" href="dark-mode.css">
+<script src="dark-mode.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--purple:#8e44ad;--gold:#f59e0b;}
 *{box-sizing:border-box;}
@@ -70,6 +72,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <button class="btn-header" onclick="history.back()">← BACK</button>
     <a href="utility-router.html" class="btn-header">🗂️ HUB</a>
     <a href="index.html" class="btn-header">🏠 HOME</a>
+    <button id="themeToggle" class="btn-header" onclick="toggleTheme()" title="Toggle Dark / Light Mode">🌙</button>
     <button class="btn-header btn-logout" onclick="doLogout()">LOGOUT</button>
     <span id="roleDisplay" class="badge-role">ADMIN</span>
   </div>
@@ -84,6 +87,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <button class="tab-btn" onclick="switchTab('tFamilies',event)">🗂️ Families</button>
     <button class="tab-btn" onclick="switchTab('tGroups',event)">🔗 Product Groups</button>
     <button class="tab-btn" onclick="switchTab('tBrands',event)">💰 Brand Discounts</button>
+    <button class="tab-btn" onclick="switchTab('tDefective',event)">🔴 Defective Stock</button>
   </div>
 
   <!-- ── TAB 1: UNVERIFIED QUEUE ──────────────────────────────────────────── -->
@@ -194,6 +198,44 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     </div>
   </div>
 
+  <!-- ── PHASE 9: DEFECTIVE STOCK TAB ────────────────────────────────────── -->
+  <div id="tDefective" class="tab-panel">
+    <div class="card-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:1rem;font-weight:700;color:var(--primary);">🔴 Defective Stock Register</div>
+          <div style="font-size:.78rem;color:#64748b;margin-top:2px;">Non-saleable parts returned under customer complaints. Vendor claim process in Phase 11.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="dsFilterStatus" onchange="loadDefectiveStock()" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.83rem;">
+            <option value="">All Statuses</option>
+            <option value="In_Store">In Store</option>
+            <option value="Vendor_Claimed">Vendor Claimed</option>
+            <option value="Written_Off">Written Off</option>
+          </select>
+          <button class="btn-action" style="background:var(--info);padding:7px 14px;font-size:.82rem;" onclick="loadDefectiveStock()">🔄 REFRESH</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+        <div id="dsCountInStore"  style="background:#fff7ed;border:1px solid #fde68a;border-radius:6px;padding:8px 16px;font-size:.82rem;"><span style="font-weight:700;font-size:1.1rem;color:#854d0e;" id="dsN1">0</span><br><span style="color:#b45309;">In Store</span></div>
+        <div id="dsCountClaimed"  style="background:#eff6ff;border:1px solid #bae6fd;border-radius:6px;padding:8px 16px;font-size:.82rem;"><span style="font-weight:700;font-size:1.1rem;color:#2980b9;" id="dsN2">0</span><br><span style="color:#0369a1;">Vendor Claimed</span></div>
+        <div id="dsCountOff"      style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:8px 16px;font-size:.82rem;"><span style="font-weight:700;font-size:1.1rem;color:#64748b;" id="dsN3">0</span><br><span style="color:#64748b;">Written Off</span></div>
+      </div>
+      <div class="table-wrapper">
+        <table id="dsTable">
+          <thead><tr>
+            <th>Date</th><th>Item Name</th><th>Brand</th><th>Qty</th>
+            <th>Cost (₹)</th><th>Complaint JC</th><th>Defect Note</th>
+            <th>Status</th><th class="no-print">Action</th>
+          </tr></thead>
+          <tbody id="dsTableBody">
+            <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">Loading defective stock...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end wrapper -->
 
 <!-- Scanner overlay -->
@@ -229,6 +271,71 @@ function switchTab(tabId,evt){
   if(tabId==='tFamilies') loadFamilies();
   if(tabId==='tGroups') loadGroups();
   if(tabId==='tBrands') loadBrands();
+  if(tabId==='tDefective') loadDefectiveStock();
+}
+
+// ── PHASE 9: DEFECTIVE STOCK ──────────────────────────────────────────────
+async function loadDefectiveStock(){
+  const statusFilter=document.getElementById('dsFilterStatus')?.value||'';
+  const tbody=document.getElementById('dsTableBody');
+  tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:16px;">Loading...</td></tr>';
+
+  let q=sb.from('defective_stock').select('*');
+  if(statusFilter) q=q.eq('status',statusFilter);
+  q=q.order('created_at',{ascending:false});
+  const{data:items,error}=await q;
+
+  if(error){tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:16px;">${error.message}</td></tr>`;return;}
+  if(!items||!items.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">No defective stock items found.</td></tr>';return;}
+
+  // Summary counts
+  const countAll=await sb.from('defective_stock').select('status');
+  const allItems=countAll.data||[];
+  document.getElementById('dsN1').innerText=allItems.filter(i=>i.status==='In_Store').length;
+  document.getElementById('dsN2').innerText=allItems.filter(i=>i.status==='Vendor_Claimed').length;
+  document.getElementById('dsN3').innerText=allItems.filter(i=>i.status==='Written_Off').length;
+
+  // Fetch complaint JC refs
+  const cIds=[...new Set(items.map(i=>i.complaint_id).filter(Boolean))];
+  let cMap={};
+  if(cIds.length>0){
+    const{data:cs}=await sb.from('customer_complaints').select('id,new_jc_id').in('id',cIds);
+    (cs||[]).forEach(c=>cMap[c.id]=c.new_jc_id?'JC-'+c.new_jc_id.split('-')[0].toUpperCase():'—');
+  }
+
+  const stColors={In_Store:'#854d0e',Vendor_Claimed:'#2980b9',Written_Off:'#64748b'};
+  const stBgs   ={In_Store:'#fff7ed',Vendor_Claimed:'#eff6ff',Written_Off:'#f8fafc'};
+  const canAdmin=sessionRole==='admin'||sessionRole==='service';
+
+  tbody.innerHTML='';
+  items.forEach(item=>{
+    const dateStr=item.created_at?new Date(item.created_at).toLocaleDateString('en-IN'):'—';
+    const cJcRef=cMap[item.complaint_id]||'—';
+    const stCol=stColors[item.status]||'#64748b';
+    const stBg =stBgs[item.status]||'#f8fafc';
+    const stLabel=(item.status||'').replace(/_/g,' ');
+    const actionCell=canAdmin&&item.status==='In_Store'
+      ?`<button onclick="writeOffDefective('${item.id}')" style="background:#64748b;color:white;border:none;padding:4px 8px;border-radius:4px;font-size:.72rem;font-weight:700;cursor:pointer;">WRITE OFF</button>`
+      :'—';
+    tbody.innerHTML+=`<tr>
+      <td style="font-size:.78rem;">${dateStr}</td>
+      <td><strong>${item.item_name||'—'}</strong></td>
+      <td style="font-size:.78rem;">${item.brand||'—'}</td>
+      <td>${item.qty||1}</td>
+      <td style="font-weight:700;">₹${item.original_cost||0}</td>
+      <td style="font-size:.78rem;">${cJcRef}</td>
+      <td style="font-size:.75rem;color:#64748b;max-width:180px;">${item.defect_note||'—'}</td>
+      <td><span style="background:${stBg};color:${stCol};padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">${stLabel}</span></td>
+      <td class="no-print">${actionCell}</td>
+    </tr>`;
+  });
+}
+
+async function writeOffDefective(itemId){
+  if(!confirm('Mark this item as Written Off? This cannot be undone.')) return;
+  const{error}=await sb.from('defective_stock').update({status:'Written_Off'}).eq('id',itemId);
+  if(error){alert('Error: '+error.message);return;}
+  loadDefectiveStock();
 }
 
 // ── TAB 1: UNVERIFIED QUEUE ────────────────────────────────────────────────
