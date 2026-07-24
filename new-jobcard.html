@@ -651,6 +651,28 @@
         window.location.href = `billing.html?id=${newJc.id}`;
     }
 
+    // ── URL PARAM HANDLER: RAISE COMPLAINT shortcut from index.html ─────────
+    (async()=>{
+      const _p=new URLSearchParams(window.location.search);
+      const _m=_p.get('mobile'); const _jcid=_p.get('jcid');
+      if(_m&&/^\d{10}$/.test(_m)){
+        const el=document.getElementById('jcMobile');
+        if(el){el.value=_m; await processCustomerLookup(_m);}
+        if(_jcid){
+          // Wait for history to load then auto-open complaint modal
+          setTimeout(async()=>{
+            const{data:jc}=await supabaseClient.from('job_cards')
+              .select('vehicle_id,mech_id,closed_at').eq('id',_jcid).single();
+            if(jc){
+              const days=Math.floor((Date.now()-new Date(jc.closed_at))/86400000);
+              if(days<=31) openComplaintModal(_jcid,jc.vehicle_id||'',jc.mech_id||'');
+              else alert('This JC is beyond the 31-day complaint window.');
+            }
+          },1200);
+        }
+      }
+    })();
+
     initializeIntake();
 </script>
 </body>
