@@ -1760,9 +1760,12 @@
             const coRate      = mechanicsCache.find(m => m.id === coMechId)?.commission_rate      || 0;
             const todayDate   = new Date().toISOString().split('T')[0];
             const ledgerEntries = [];
-            if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, log_date: todayDate, commission_rate_snap: primaryRate, commission_amount: primaryShare * (primaryRate / 100) });
-            if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)`, log_date: todayDate, commission_rate_snap: coRate, commission_amount: coShare * (coRate / 100) });
-            if (ledgerEntries.length > 0) await supabaseClient.from('staff_ledger').insert(ledgerEntries);
+            if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, log_date: todayDate, job_card_id: targetJobId, commission_rate_snap: primaryRate, commission_amount: primaryShare * (primaryRate / 100) });
+            if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)`, log_date: todayDate, job_card_id: targetJobId, commission_rate_snap: coRate, commission_amount: coShare * (coRate / 100) });
+            if (ledgerEntries.length > 0) {
+                const { error: slErr } = await supabaseClient.from('staff_ledger').insert(ledgerEntries);
+                if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nJC ' + jcRef + ' is closed but commission was not recorded. Please inform Admin.');
+            }
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
                  * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
