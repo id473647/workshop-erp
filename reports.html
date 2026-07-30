@@ -422,10 +422,12 @@
 
         document.getElementById('lsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;">Analyzing taxonomy & fetching data...</td></tr>';
 
-        // Fix 1 & 4: Fetch strictly by Product Category & extract exact Brands
+        // Fix: identify lubricant items by volume_ml > 0 (set at billing time) 
+        // instead of product_master category names which vary (Lube/Lubricant/Engine Oil etc.)
+        // Still use product_master for brand and volume_per_unit lookup when available
         const { data: pMaster } = await supabaseClient.from('product_master')
             .select('item_name, brand, category, volume_per_unit')
-            .or('category.eq.Lube,category.eq.Lubricant'); // Strict categorical isolation
+            .gt('volume_per_unit', 0);
 
         const lubeMap = {};
         (pMaster || []).forEach(p => lubeMap[p.item_name.toUpperCase()] = p);
@@ -461,22 +463,22 @@
             const rawName = (i.item_name || '').split('(')[0].trim().toUpperCase();
             const pInfo = lubeMap[rawName];
 
-            // Strict Filter Enforcement
-            if (pInfo) {
-                if(brandFlt && !(pInfo.brand||'').toUpperCase().includes(brandFlt)) return;
-                if(prodFlt && !rawName.includes(prodFlt)) return;
+            // Item is lube if: in product_master with volume_per_unit > 0 OR has volume_ml > 0 at line item level
+            const isLube = pInfo || parseFloat(i.volume_ml) > 0;
+            if (!isLube) return;
 
-                if (!aggregated[rawName]) aggregated[rawName] = { brand: pInfo.brand || '-', units: 0, litres: 0, rev: 0 };
-                
-                // Fix 2: Unit Counting (1 per row array) vs Volumetric Math
-                aggregated[rawName].units += 1; 
-                aggregated[rawName].rev += parseFloat(i.total_price) || 0;
-                
-                let volMath = 0;
-                if (pInfo.volume_per_unit) volMath = (pInfo.volume_per_unit * i.qty) / 1000;
-                else if (i.unit_metric === 'ML' || i.volume_ml) volMath = ((i.volume_ml || 1) * i.qty) / 1000;
-                aggregated[rawName].litres += volMath;
-            }
+            if(brandFlt && !(pInfo?.brand||'').toUpperCase().includes(brandFlt)) return;
+            if(prodFlt && !rawName.includes(prodFlt)) return;
+
+            if (!aggregated[rawName]) aggregated[rawName] = { brand: pInfo?.brand || '-', units: 0, litres: 0, rev: 0 };
+
+            aggregated[rawName].units += parseFloat(i.qty) || 1;
+            aggregated[rawName].rev += parseFloat(i.total_price) || 0;
+
+            let volMath = 0;
+            if (pInfo?.volume_per_unit) volMath = (parseFloat(pInfo.volume_per_unit) * (parseFloat(i.qty) || 0)) / 1000;
+            else if (parseFloat(i.volume_ml) > 0) volMath = (parseFloat(i.volume_ml) * (parseFloat(i.qty) || 0)) / 1000;
+            aggregated[rawName].litres += volMath;
         });
 
         let html = '';
@@ -502,12 +504,12 @@
 
         document.getElementById('lcBody').innerHTML = '<tr><td colspan="5" style="text-align:center;">Querying closed operations...</td></tr>';
 
-        // Fix: Targeting 'closed_at' exclusively & capturing fallback mechanics logic
+        // Fix: explicit FK hint resolves ambiguous mechanics relationship (mech_id vs co_mech_id)
         let query = supabaseClient.from('job_cards')
-            .select('id, closed_at, total_labour_charges, mech_id, mechanics(name, commission_rate)')
+            .select('id, closed_at, labour_charges, mech_id, mechanics!mech_id(name, commission_rate)')
             .gte('closed_at', start + 'T00:00:00')
             .lte('closed_at', end + 'T23:59:59')
-            .not('closed_at', 'is', null) // Bypasses syntax string errors by requiring timestamp
+            .not('closed_at', 'is', null)
             .eq('status', 'Closed');
 
         if (mechFlt !== 'ALL') query = query.eq('mech_id', mechFlt);
@@ -523,8 +525,8 @@
             const mName = j.mechanics?.name || 'Unassigned Staff';
             const cRate = j.mechanics?.commission_rate || 10; // Fix: Robust Fallback injection
             
-            // Fix: Fallback for varied labour column schemas
-            const labCharge = parseFloat(j.total_labour_charges) || 0; 
+            // Fix: correct column name is labour_charges not total_labour_charges
+            const labCharge = parseFloat(j.labour_charges) || 0;
             
             if(!agg[mId]) agg[mId] = { name: mName, rate: cRate, jobs: 0, gross: 0, comm: 0 };
             
