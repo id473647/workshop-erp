@@ -109,8 +109,8 @@ input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6
       </div>
       <div class="table-wrapper">
         <table>
-          <thead><tr><th></th><th>JC / Vehicle</th><th>Mechanic</th><th>Net Green</th><th>Net Moped</th><th>Net Labour+Lathe</th><th>Payment</th></tr></thead>
-          <tbody id="jcTableBody"><tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr></tbody>
+          <thead><tr><th></th><th>JC / Vehicle</th><th>Mechanic</th><th>Net Green</th><th>Net Moped</th><th>Net Labour</th><th>Net Lathe</th><th>Payment</th></tr></thead>
+          <tbody id="jcTableBody"><tr><td colspan="8" style="text-align:center;padding:20px;">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -345,12 +345,12 @@ function buildPrintSummaryTable(rows){
 // ─── JC DETAILS TAB ──────────────────────────────────────────────────────────
 async function loadJcDetails(){
   const tbody=document.getElementById('jcTableBody');
-  tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;">Loading...</td></tr>';
 
   const {data,error}=await supabaseClient.from('job_cards').select('*,vehicles(reg_number,make_model)')
     .or(`and(status.eq.Closed,closed_at.gte.${activeDate}T00:00:00,closed_at.lte.${activeDate}T23:59:59),and(advance_service_paid_at.gte.${activeDate}T00:00:00,advance_service_paid_at.lte.${activeDate}T23:59:59),and(prepaid_green_paid_at.gte.${activeDate}T00:00:00,prepaid_green_paid_at.lte.${activeDate}T23:59:59),and(prepaid_moped_paid_at.gte.${activeDate}T00:00:00,prepaid_moped_paid_at.lte.${activeDate}T23:59:59)`);
 
-  if(error){tbody.innerHTML=`<tr><td colspan="7" style="color:red;text-align:center;">${error.message}</td></tr>`;return;}
+  if(error){tbody.innerHTML=`<tr><td colspan="8" style="color:red;text-align:center;">${error.message}</td></tr>`;return;}
 
   let rows=data||[];
   if(activeRole==='green') rows=rows.filter(j=>(parseFloat(j.green_total)||0)>0||j.prepaid_green_paid_at);
@@ -367,11 +367,12 @@ async function loadJcDetails(){
   }
 
   tbody.innerHTML='';
-  if(rows.length===0){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">No job cards for this date.</td></tr>';return;}
+  if(rows.length===0){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:#94a3b8;">No job cards for this date.</td></tr>';return;}
 
   rows.forEach((j,idx)=>{
     const grn=parseFloat(j.green_total)||0,mop=parseFloat(j.moped_total)||0;
-    const lab=(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);
+    const lab=parseFloat(j.labour_charges)||0;
+    const lathe=parseFloat(j.lathe_welding)||0;
     const cash=parseFloat(j.cash_amount)||0,upi=parseFloat(j.upi_amount)||0,cr=parseFloat(j.credit_amount)||0;
     const isOpen=j.status!=='Closed';
 
@@ -394,7 +395,7 @@ async function loadJcDetails(){
     tr.innerHTML=`<td><span class="arrow" id="arr-${idx}">▶</span></td>
       <td><b>${jcRef(j.id)}</b>${openBadge}<br><span style="font-size:.75rem;color:#64748b;">${j.vehicles?.reg_number||''} ${j.vehicles?.make_model||''}</span></td>
       <td>${mechName(j.mech_id)}</td>
-      <td>${dashOrFmt(grn)}</td><td>${dashOrFmt(mop)}</td><td>${dashOrFmt(lab)}</td><td>${payStr}</td>`;
+      <td>${dashOrFmt(grn)}</td><td>${dashOrFmt(mop)}</td><td>${dashOrFmt(lab)}</td><td>${dashOrFmt(lathe)}</td><td>${payStr}</td>`;
     tr.onclick=()=>toggleJcRow(idx,j);
     tbody.appendChild(tr);
 
@@ -759,7 +760,8 @@ async function loadMechEarnings(){
   const from12=d12.toISOString().split('T')[0];
 
   // Parallel fetch: job cards + payouts for last 40 days
-  // Phase 8: read pre-computed commission from staff_ledger instead of scanning job_cards
+  // Phase 8 (restored): staff_ledger backfilled 389 entries confirmed 2026-07-26.
+  // Reading commission_amount from staff_ledger — pre-computed, rate-snapped, single source of truth.
   const[ledgerRes,payRes]=await Promise.all([
     supabaseClient.from('staff_ledger')
       .select('mechanic_id,log_date,commission_amount')
@@ -773,7 +775,7 @@ async function loadMechEarnings(){
       .order('payout_date',{ascending:false})
   ]);
 
-  // Build earnMap: date → { mechId: commission_amount } — direct from staff_ledger
+  // Build earnMap: date → { mechId: commission_amount } from staff_ledger
   const earnMap={};
   (ledgerRes.data||[]).forEach(row=>{
     if(!row.log_date||!row.mechanic_id) return;
@@ -1113,12 +1115,14 @@ function printJcDetails(){
   let rows='';
   jcCache.forEach(j=>{
     const isOpen=j.status!=='Closed';
-    const grn=parseFloat(j.green_total)||0,mop=parseFloat(j.moped_total)||0,lab=(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0);
+    const grn=parseFloat(j.green_total)||0,mop=parseFloat(j.moped_total)||0;
+    const lab=parseFloat(j.labour_charges)||0;
+    const lathe=parseFloat(j.lathe_welding)||0;
     const payCell=isOpen?`Adv ${fmt(j.advance_service)} — OPEN`:`Cash ${fmt(j.cash_amount)} UPI ${fmt(j.upi_amount)} Cr ${fmt(j.credit_amount)}`;
-    rows+=`<tr style="${isOpen?'background:#fffbeb;':''}"><td>${jcRef(j.id)}${isOpen?' [OPEN]':''}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>${payCell}</td></tr>`;
+    rows+=`<tr style="${isOpen?'background:#fffbeb;':''}"><td>${jcRef(j.id)}${isOpen?' [OPEN]':''}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>${fmt(lathe)}</td><td>${payCell}</td></tr>`;
   });
   openPrintWindow('JC Details '+activeDate,`<h2>MY CARE — JC DAILY REGISTER — ${activeDate}</h2>${summaryTable}${ccLine}${openNote}
-    <table><thead><tr><th>JC No</th><th>Vehicle</th><th>Mechanic</th><th>Net Grn</th><th>Net Mop</th><th>Net Lab+Lathe</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>`,'A4 landscape');
+    <table><thead><tr><th>JC No</th><th>Vehicle</th><th>Mechanic</th><th>Net Grn</th><th>Net Mop</th><th>Net Labour</th><th>Net Lathe</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>`,'A4 landscape');
 }
 
 // FIX9: printEodOnly — use properly structured content
