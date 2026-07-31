@@ -90,9 +90,13 @@
         <div id="tabAnalytics" class="view-panel active">
             <div class="inputs-grid" style="background:#f1f5f9; padding:12px; border-radius:8px;">
                 <div class="field-group"><label>Date Range</label><select id="dateRange" onchange="runNewCustomerReport()"><option value="today">Today</option><option value="week">This Week</option><option value="month">This Month</option><option value="all">All Time</option></select></div>
-                <button class="btn-action" style="background:var(--primary);" onclick="runNewCustomerReport()">RUN REPORT</button>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);" onclick="runNewCustomerReport()">RUN REPORT</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('analyticsTable','New_Customer_Analytics')">📊 EXCEL</button>
+                </div>
             </div>
-            <div class="table-wrapper"><table class="data-table"><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px;">Scanning...</td></tr></tbody></table></div>
+            <div id="analyticsSummary" style="font-size:.83rem;color:#64748b;margin-bottom:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid var(--border);display:none;"></div>
+            <div class="table-wrapper"><table class="data-table" id="analyticsTable"><thead><tr><th>Registration Date</th><th>Customer Phone</th><th>Name</th><th>First Vehicle Type</th><th>Day-1 AMC?</th></tr></thead><tbody id="analyticsTableBody"><tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">Select a date range and click RUN REPORT.</td></tr></tbody></table></div>
         </div>
 
         <div id="tabPromos" class="view-panel">
@@ -549,8 +553,170 @@
     }
 
     // Dummy Wrappers to prevent errors for pre-existing UI buttons
-    function runNewCustomerReport() { alert("Analytics active."); }
-    function exportLeads() { alert("Extracting leads..."); }
+    // ── NEW CUSTOMER ANALYTICS ───────────────────────────────────────────────
+    async function runNewCustomerReport() {
+        const range  = document.getElementById('dateRange').value;
+        const tbody  = document.getElementById('analyticsTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">Loading...</td></tr>';
+
+        // Date range calculation
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        let startStr;
+        if (range === 'today')  startStr = todayStr;
+        else if (range === 'week')  { const d=new Date(today); d.setDate(d.getDate()-7);  startStr=d.toISOString().split('T')[0]; }
+        else if (range === 'month') { const d=new Date(today); d.setMonth(d.getMonth()-1); startStr=d.toISOString().split('T')[0]; }
+        else startStr = '2020-01-01';
+
+        // Step 1: Fetch new customers in range
+        const { data: custs, error } = await supabaseClient.from('customers')
+            .select('mobile_number, name, created_at, enrollment_date, is_loyalty_member')
+            .gte('created_at', startStr + 'T00:00:00')
+            .lte('created_at', todayStr + 'T23:59:59')
+            .order('created_at', { ascending: false });
+
+        if (error) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:20px;">${error.message}</td></tr>`; return; }
+        if (!custs || !custs.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No new customers in this period.</td></tr>'; return; }
+
+        // Step 2: Fetch first vehicle per customer (use category_group for vehicle type)
+        const mobiles = custs.map(c => c.mobile_number);
+        const { data: vehicles } = await supabaseClient.from('vehicles')
+            .select('customer_mobile, brand, make_model, category_group, created_at')
+            .in('customer_mobile', mobiles)
+            .order('created_at', { ascending: true });
+
+        const firstVehMap = {};
+        (vehicles || []).forEach(v => {
+            if (!firstVehMap[v.customer_mobile]) firstVehMap[v.customer_mobile] = v;
+        });
+
+        // Step 3: Fetch AMC subscriptions for these customers
+        const { data: amcs } = await supabaseClient.from('amc_subscriptions')
+            .select('customer_mobile, created_at').in('customer_mobile', mobiles);
+        const amcDateMap = {};
+        (amcs || []).forEach(a => {
+            if (!amcDateMap[a.customer_mobile]) amcDateMap[a.customer_mobile] = a.created_at;
+        });
+
+        // Build rows
+        tbody.innerHTML = '';
+        custs.forEach(c => {
+            const regDate    = c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—';
+            const veh        = firstVehMap[c.mobile_number];
+            const vehType    = veh ? `${veh.brand||''} ${veh.make_model||''}`.trim() + (veh.category_group ? ` (${veh.category_group})` : '') : '—';
+            const amcDate    = amcDateMap[c.mobile_number];
+            let amcBadge     = '<span style="color:#991b1b;font-size:.78rem;">❌ No AMC</span>';
+            if (amcDate) {
+                const custDay = new Date(c.created_at).toISOString().split('T')[0];
+                const amcDay  = new Date(amcDate).toISOString().split('T')[0];
+                amcBadge = custDay === amcDay
+                    ? '<span style="color:#166534;font-size:.78rem;font-weight:700;">✅ Day-1</span>'
+                    : '<span style="color:#854d0e;font-size:.78rem;">⏳ Later</span>';
+            }
+            tbody.innerHTML += `<tr>
+                <td style="font-size:.82rem;">${regDate}</td>
+                <td style="font-weight:700;">${c.mobile_number}</td>
+                <td>${c.name || '—'}</td>
+                <td style="font-size:.78rem;">${vehType}</td>
+                <td>${amcBadge}</td>
+            </tr>`;
+        });
+
+        // Summary line above table
+        const total = custs.length;
+        const withAmc = Object.keys(amcDateMap).filter(m => mobiles.includes(m)).length;
+        const day1Amc = custs.filter(c => {
+            const amcDate = amcDateMap[c.mobile_number];
+            if (!amcDate) return false;
+            return new Date(c.created_at).toISOString().split('T')[0] === new Date(amcDate).toISOString().split('T')[0];
+        }).length;
+        const sumEl = document.getElementById('analyticsSummary');
+        if (sumEl) {
+            sumEl.style.display = 'block';
+            sumEl.innerHTML = `<strong>${total}</strong> new customers &nbsp;|&nbsp; <strong style="color:#166534;">${withAmc}</strong> have AMC &nbsp;|&nbsp; <strong style="color:#2980b9;">${day1Amc}</strong> Day-1 AMC &nbsp;|&nbsp; <strong style="color:#991b1b;">${total-withAmc}</strong> no AMC yet`;
+        }
+    }
+
+    // ── PROMOTIONAL LEADS — SMS EXTRACTOR ────────────────────────────────────
+    async function exportLeads(vehicleCategory) {
+        const btn = event?.target;
+        if (btn) { btn.disabled = true; btn.innerText = 'Loading...'; }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Step 1: Get vehicles matching the category
+        const catLower = vehicleCategory.toLowerCase();
+        const { data: vehs } = await supabaseClient.from('vehicles')
+            .select('customer_mobile, reg_number, brand, make_model, category_group');
+
+        // Filter by category (flexible match)
+        const matchedVehs = (vehs || []).filter(v => {
+            const cg = (v.category_group || '').toLowerCase();
+            const mm = (v.make_model || '').toLowerCase();
+            if (catLower === 'motorcycle') return cg.includes('motorcycle') || cg.includes('bike') || (!cg.includes('scooter') && !cg.includes('moped') && cg !== '');
+            if (catLower === 'scooter')    return cg.includes('scooter') || mm.includes('activa') || mm.includes('dio') || mm.includes('jupiter') || mm.includes('access') || mm.includes('ntorq');
+            return true;
+        });
+
+        if (!matchedVehs.length) {
+            alert(`No ${vehicleCategory} vehicles found in the system.`);
+            if (btn) { btn.disabled = false; btn.innerText = `📥 ${vehicleCategory.toUpperCase()} LEADS`; }
+            return;
+        }
+
+        const allMobiles = [...new Set(matchedVehs.map(v => v.customer_mobile).filter(Boolean))];
+
+        // Step 2: Get active AMC holders (exclude from leads)
+        const { data: activeAmcs } = await supabaseClient.from('amc_subscriptions')
+            .select('customer_mobile').eq('status', 'Active').gte('expires_at', today);
+        const { data: activeContracts } = await supabaseClient.from('amc_contracts')
+            .select('customer_mobile').eq('is_active', true);
+        const amcHolders = new Set([
+            ...(activeAmcs || []).map(a => a.customer_mobile),
+            ...(activeContracts || []).map(a => a.customer_mobile)
+        ]);
+
+        // Step 3: Get customer names for the leads
+        const leadMobiles = allMobiles.filter(m => !amcHolders.has(m));
+        if (!leadMobiles.length) {
+            alert(`All ${vehicleCategory} owners already have active AMC plans. No leads to export.`);
+            if (btn) { btn.disabled = false; btn.innerText = `📥 ${vehicleCategory.toUpperCase()} LEADS`; }
+            return;
+        }
+
+        const { data: custs } = await supabaseClient.from('customers')
+            .select('mobile_number, name').in('mobile_number', leadMobiles);
+        const custMap = {};
+        (custs || []).forEach(c => custMap[c.mobile_number] = c.name || '');
+
+        // Step 4: Build CSV
+        const rows = [['Mobile Number', 'Customer Name', 'Vehicle', 'Registration', 'Category']];
+        leadMobiles.forEach(mobile => {
+            const custVehs = matchedVehs.filter(v => v.customer_mobile === mobile);
+            custVehs.forEach(v => {
+                rows.push([
+                    mobile,
+                    custMap[mobile] || '',
+                    `${v.brand || ''} ${v.make_model || ''}`.trim(),
+                    v.reg_number || '',
+                    v.category_group || vehicleCategory
+                ]);
+            });
+        });
+
+        // Step 5: Export CSV
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = `${vehicleCategory}_Leads_${today}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        alert(`✅ ${leadMobiles.length} ${vehicleCategory} leads exported (${allMobiles.length} total owners, ${amcHolders.size} already have AMC).`);
+        if (btn) { btn.disabled = false; btn.innerText = `📥 ${vehicleCategory.toUpperCase()} LEADS`; }
+    }
 
     applyRoleFilters();
 </script>
