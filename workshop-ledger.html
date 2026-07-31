@@ -508,11 +508,19 @@ async function loadEodSummary(){
   const container=document.getElementById('eodContent');
   container.innerHTML='<div style="text-align:center;padding:20px;">Compiling EOD...</div>';
 
+  // Determine entity for expense and credit_payment filtering
+  // admin sees Workshop (service) view; each role sees only its own entity
+  const eodEntity=(activeRole==='admin')?'service':activeRole;
+
   const [jobsRes,expRes,credPaysRes]=await Promise.all([
     supabaseClient.from('job_cards').select('id,cash_amount,upi_amount,credit_amount,advance_service,prepaid_green,prepaid_moped,green_total,moped_total,labour_charges,lathe_welding,status,closed_at')
       .gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59').eq('status','Closed'),
-    supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59'),
-    supabaseClient.from('credit_payments').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59')
+    supabaseClient.from('workshop_expenses').select('*')
+      .gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59')
+      .eq('warehouse_type',eodEntity),
+    supabaseClient.from('credit_payments').select('*')
+      .gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59')
+      .eq('paid_by_role',eodEntity)
   ]);
 
   const jobs=jobsRes.data||[], exp=expRes.data||[], credPays=credPaysRes.data||[];
@@ -529,11 +537,12 @@ async function loadEodSummary(){
   let ocCash=0,ouUpi=0;
   credPays.forEach(p=>{const amt=parseFloat(p.amount_paid)||0; if(amt>0){if((p.payment_mode||'').toLowerCase().includes('upi')) ouUpi+=amt; else ocCash+=amt;}});
 
-  let expCash=0,expUpi=0,tpg=0,tpm=0; let expByCat={};
+  let expCash=0,expUpi=0,tpg=0,tpm=0,labourPay=0; let expByCat={};
   exp.forEach(e=>{const amt=parseFloat(e.amount)||0;
     if((e.payment_mode||'Cash')==='UPI') expUpi+=amt; else expCash+=amt;
     if((e.expense_category||'').toLowerCase().includes('transfer to green')) tpg+=amt;
     if((e.expense_category||'').toLowerCase().includes('transfer to moped')) tpm+=amt;
+    if((e.expense_category||'').toLowerCase()==='labour payments') labourPay+=amt;
     expByCat[e.expense_category]=(expByCat[e.expense_category]||0)+amt;
   });
 
@@ -575,8 +584,10 @@ async function loadEodSummary(){
       <div class="table-wrapper"><table><thead><tr><th>Category</th><th>Amount</th></tr></thead><tbody>
         ${Object.keys(expByCat).length?Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join(''):'<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
       </tbody></table></div>
+      ${labourPay>0?`<div class="jc-detail-box" style="background:#fff7ed;border:1px solid #fde68a;margin-top:8px;">💰 Labour Payments (Commission Paid Today): <b style="color:#854d0e;">${fmt(labourPay)}</b></div>`:''}
       <div class="jc-detail-box" style="display:inline-block;margin-top:8px;">
         Cash in Hand = ${fmt(cashIn)} − ${fmt(expCash)} − ${fmt(tpg)} − ${fmt(tpm)} = <b>${fmt(cashInHand)}</b>
+        ${labourPay>0?`<span style="font-size:.78rem;color:#854d0e;margin-left:8px;">(incl. ₹${fmt(labourPay)} commission paid)</span>`:''}
       </div>`;
   } else {
     const wh=activeRole==='green'?'Green':'Moped';
@@ -611,6 +622,7 @@ async function loadEodSummary(){
       <div class="table-wrapper"><table><thead><tr><th>Category</th><th>Amount</th></tr></thead><tbody>
         ${Object.keys(expByCat).length?Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join(''):'<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
       </tbody></table></div>
+      ${labourPay>0?`<div class="jc-detail-box" style="background:#fff7ed;border:1px solid #fde68a;margin-top:8px;">💰 Labour Payments (Commission Paid Today): <b style="color:#854d0e;">${fmt(labourPay)}</b></div>`:''}
       <div class="jc-detail-box" style="display:inline-block;margin-top:8px;">
         Cash in Counter = ${fmt(grossCash)} − ${fmt(expCash)} + Transfer ${fmt(transferIn)} = <b>${fmt(cashInCounter)}</b>
       </div>`;
