@@ -263,7 +263,10 @@
     <div class="inline-add-strip-wrapper" id="uiPartEntryBlock">
         <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
             <div style="position:relative;">
-                <input type="text" id="nPart" placeholder="Search Parts, Lubes, or Services..." style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
+                <div style="display:flex;gap:4px;">
+                    <input type="text" id="nPart" placeholder="Search Parts, Lubes, or Services..." style="flex:1; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
+                    <button id="btnScanBarcode" onclick="openBarcodeCamera()" title="Scan Barcode or QR Code — works with hardware scanner and camera" class="input-lockable" style="padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:#f0f9ff;color:var(--info);cursor:pointer;font-size:1rem;line-height:1;flex-shrink:0;white-space:nowrap;">📷</button>
+                </div>
                 <div id="autolist-n" class="autocomplete-container"></div>
             </div>
             <input type="text" id="nBrand" placeholder="BRAND" style="padding:8px; border-radius:4px; border:1px solid var(--border);" oninput="this.value=this.value.toUpperCase()">
@@ -846,6 +849,24 @@
 </div>
 
 <!-- ══════════════════ JAVASCRIPT ══════════════════ -->
+<!-- ══════════════════ PHASE 11A: BARCODE / QR CAMERA SCANNER MODAL ══════════════════ -->
+<div id="modalBarcodeScanner" class="overlay-modal" style="z-index:500;">
+    <div class="modal-card" style="max-width:400px;text-align:center;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px;">
+            <div>
+                <h3 style="margin:0;color:var(--primary);">📷 Scan Barcode / QR Code</h3>
+                <div style="font-size:.75rem;color:#64748b;">Point camera at product barcode or QR label</div>
+            </div>
+            <button onclick="closeBarcodeCamera()" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+        </div>
+        <video id="barcodeScanVideo" style="width:100%;border-radius:8px;border:2px solid var(--border);background:#000;max-height:280px;" muted playsinline></video>
+        <div style="margin-top:10px;font-size:.78rem;color:#64748b;">
+            Works with 1D product barcodes and your QR shelf labels.<br>
+            Hardware USB scanners work directly without opening this.
+        </div>
+    </div>
+</div>
+
 <!-- ══════════════════ REFUND COLLECTION MODAL ══════════════════ -->
 <div id="modalRefund" class="overlay-modal">
     <div class="modal-card" style="max-width: 400px;">
@@ -1040,6 +1061,59 @@
         document.getElementById('modalCollectionReceipt').style.display = 'flex';
     }
 
+    // ── PHASE 11A: WORKSHOP SETTINGS CACHE ──────────────────────────────────────
+    window._settings = {};
+    async function loadWorkshopSettings() {
+        const { data: settings } = await supabaseClient.from('workshop_settings')
+            .select('setting_key, setting_value, value_type');
+        (settings || []).forEach(s => {
+            if (s.value_type === 'boolean')     window._settings[s.setting_key] = s.setting_value === 'true';
+            else if (s.value_type === 'number') window._settings[s.setting_key] = parseFloat(s.setting_value);
+            else                                window._settings[s.setting_key] = s.setting_value;
+        });
+    }
+
+    // ── PHASE 11A: BARCODE CAMERA SCAN ──────────────────────────────────────────
+    async function openBarcodeCamera() {
+        if (!window.ZXing) {
+            const sc = document.createElement('script');
+            sc.src = 'https://unpkg.com/@zxing/library@latest/umd/index.min.js';
+            await new Promise((res, rej) => { sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+        }
+        document.getElementById('modalBarcodeScanner').style.display = 'flex';
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+        window._barcodeReader = codeReader;
+        try {
+            await codeReader.decodeFromVideoDevice(null, 'barcodeScanVideo', (result, err) => {
+                if (result) { const code = result.getText(); closeBarcodeCamera(); lookupByBarcode(code); }
+            });
+        } catch(e) { alert('Camera not available: ' + (e.message || e)); closeBarcodeCamera(); }
+    }
+
+    function closeBarcodeCamera() {
+        if (window._barcodeReader) { try { window._barcodeReader.reset(); } catch(e){} window._barcodeReader = null; }
+        document.getElementById('modalBarcodeScanner').style.display = 'none';
+    }
+
+    function lookupByBarcode(code) {
+        if (!code) return;
+        const codeUpper = code.trim().toUpperCase();
+        const found = globalCatalogCache.find(p =>
+            p.source === 'product' && p.barcode_id && p.barcode_id.trim().toUpperCase() === codeUpper
+        );
+        if (found) {
+            document.getElementById('nPart').value = '';
+            applySelectedCatalogItem(found.item_name, found.brand||'', found.mrp||found.default_price||0,
+                found.default_price||0, found.unit_metric||'Pcs', found.category||'Spare', found.id, found.mac||0);
+        } else {
+            const nPart = document.getElementById('nPart');
+            nPart.value = codeUpper;
+            queryCatalogAutocomplete(nPart);
+            nPart.focus();
+            alert('⚠️ Barcode "' + code + '" not in catalog. Search results shown below.');
+        }
+    }
+
     async function initializeJobContext() {
         setupRoleBasedDropdown(); toggleLubeUI();
 
@@ -1083,6 +1157,7 @@
         const mechPromise = supabaseClient.from('mechanics').select('id, name, staff_role, commission_rate').eq('is_active', true).order('name');
         const jobPromise = supabaseClient.from('job_cards').select('*, vehicles(*)').eq('id', targetJobId).single();
         const catalogPromise = prefetchCentralCatalog();
+        loadWorkshopSettings(); /* PHASE 11A: load settings in background, non-blocking */
         const [mechRes, jobRes] = await Promise.all([mechPromise, jobPromise, catalogPromise]);
         const staffList = mechRes.data;
         mechanicsCache = staffList || [];
@@ -1809,11 +1884,15 @@
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { const lc = document.getElementById('autolist-n'); if (lc) lc.style.display = 'none'; } });
     function hideAutoSuggestions() { setTimeout(() => { const auto = document.getElementById('autolist-n'); if (auto) auto.style.display = 'none'; }, 200); }
 
-    async function queryCatalogAutocomplete(inputRef) { const upperVal = inputRef.value.toUpperCase(); if (inputRef.value !== upperVal) { const cursorPos = inputRef.selectionStart; inputRef.value = upperVal; inputRef.setSelectionRange(cursorPos, cursorPos); } const q = upperVal.trim(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; listContainer.style.display = 'none'; currentFocus = -1; if (q.length < 2) return; const tokens = q.split(' ').filter(t=>t.length>0); let results = []; if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { let pResults = globalCatalogCache.filter(p => p.source === 'product'); pResults = pResults.filter(p => { const txt = (p.item_name + ' ' + (p.brand || '')).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...pResults); } if(sessionRole === 'service' || sessionRole === 'admin') { let sResults = globalCatalogCache.filter(p => p.source === 'service'); sResults = sResults.filter(s => { const txt = (s.item_name).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...sResults); } results = results.slice(0,10); results.forEach(p => { if(p.source === 'product') { const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`; const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : ''; listContainer.innerHTML += `<div class="autocomplete-item" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } else { listContainer.innerHTML += `<div class="autocomplete-item" style="background:#fef3c7;" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '', 0, ${p.default_price||0}, 'Pkg', '⚙️ Fixed Protocol', null, 0)"><div><strong style="color:#b45309;">🏷️ ${p.item_name}</strong></div><div style="display:flex;gap:6px;"><span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } }); listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onclick="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`; listContainer.style.display = 'block'; }
+    async function queryCatalogAutocomplete(inputRef) { const upperVal = inputRef.value.toUpperCase(); if (inputRef.value !== upperVal) { const cursorPos = inputRef.selectionStart; inputRef.value = upperVal; inputRef.setSelectionRange(cursorPos, cursorPos); } const q = upperVal.trim(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; listContainer.style.display = 'none'; currentFocus = -1; if (q.length < 2) return;
+      /* PHASE 11A: Barcode-first lookup — if typed/scanned value matches a barcode_id exactly, auto-fill immediately */
+      const exactBarcode = globalCatalogCache.find(p => p.source === 'product' && p.barcode_id && p.barcode_id.toUpperCase().trim() === q.trim());
+      if (exactBarcode) { inputRef.value = ''; applySelectedCatalogItem(exactBarcode.item_name, exactBarcode.brand||'', exactBarcode.mrp||exactBarcode.default_price||0, exactBarcode.default_price||0, exactBarcode.unit_metric||'Pcs', exactBarcode.category||'Spare', exactBarcode.id, exactBarcode.mac||0); return; }
+      const tokens = q.split(' ').filter(t=>t.length>0); let results = []; if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { let pResults = globalCatalogCache.filter(p => p.source === 'product'); pResults = pResults.filter(p => { const txt = (p.item_name + ' ' + (p.brand || '')).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...pResults); } if(sessionRole === 'service' || sessionRole === 'admin') { let sResults = globalCatalogCache.filter(p => p.source === 'service'); sResults = sResults.filter(s => { const txt = (s.item_name).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...sResults); } results = results.slice(0,10); results.forEach(p => { if(p.source === 'product') { const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`; const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : ''; const macTag = (sessionRole==='admin'||window._settings?.mac_visible_all) && (p.mac||0)>0 ? `<span style="color:#94a3b8;font-size:0.68rem;border:1px solid #e2e8f0;padding:1px 4px;border-radius:3px;" title="Purchase cost (MAC)">₹${p.mac} cost</span>` : ''; listContainer.innerHTML += `<div class="autocomplete-item" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;">${stk}${mrpTag}${macTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } else { listContainer.innerHTML += `<div class="autocomplete-item" style="background:#fef3c7;" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '', 0, ${p.default_price||0}, 'Pkg', '⚙️ Fixed Protocol', null, 0)"><div><strong style="color:#b45309;">🏷️ ${p.item_name}</strong></div><div style="display:flex;gap:6px;"><span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } }); listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onclick="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`; listContainer.style.display = 'block'; }
 
     function flagNewItemForReview() { const inp = document.getElementById('nPart'); const raw = inp.value.trim().toUpperCase(); inp.value = raw; document.getElementById('autolist-n').style.display='none'; window._pendingItemUnverified = true; }
     function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) { document.getElementById('nPart').value = name; document.getElementById('nBrand').value = brand; document.getElementById('nRate').value = defRate || mrpVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal; const typeSelect = document.getElementById('nType'); if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube'; else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol'; else typeSelect.value = 'Spare'; toggleLubeUI(); document.getElementById('autolist-n').style.display = 'none'; window._pid = pid; window._pmac = mac; window._pmrp = mrpVal; window._pendingItemUnverified = false; if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus(); }
-    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate,is_premium_service,premium_label'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, is_premium_service: s.is_premium_service || false, premium_label: s.premium_label || null, unit_metric: 'Pkg', source: 'service' }); }); } }
+    async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac,barcode_id,hsn_code'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate,is_premium_service,premium_label'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, is_premium_service: s.is_premium_service || false, premium_label: s.premium_label || null, unit_metric: 'Pkg', source: 'service' }); }); } }
 
     async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified' }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus(); } else { alert("Database Error: " + error.message); } }
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
