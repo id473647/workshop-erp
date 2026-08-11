@@ -437,13 +437,42 @@
         its dedicated button are redundant and have been removed.
     -->
     <div id="adminEditBlock" style="display:none; margin-bottom:20px;">
-        <div style="background:#fffbeb; border:1px solid #f59e0b; padding:16px; border-radius:8px; text-align:center;">
-            <p style="margin:0 0 10px 0; font-weight:bold; color:#b45309;">⚠️ ADMIN BACKDATED EDIT MODE ACTIVE</p>
-            <div style="display:flex; gap:10px; justify-content:center;">
-                <button class="btn-action btn-cash" onclick="commitInvoiceSettlement('Cash', 'Closed')">UPDATE AS CASH</button>
-                <button class="btn-action btn-upi" onclick="commitInvoiceSettlement('UPI', 'Closed')">UPDATE AS UPI</button>
-                <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">UPDATE AS CREDIT</button>
+        <div style="background:#fffbeb; border:2px solid #f59e0b; padding:16px; border-radius:8px;">
+            <p style="margin:0 0 6px 0; font-weight:bold; color:#b45309; font-size:1rem;">⚠️ ADMIN BACKDATED EDIT MODE</p>
+            <p style="font-size:.78rem; color:#92400e; margin:0 0 14px 0;">
+                Original close date is permanently preserved. Loyalty points and referral bonuses will NOT be re-applied.
+                Only corrected amounts, payment mode and items will be saved to the audit log.
+            </p>
+            <div style="display:grid; grid-template-columns:140px 1fr 1fr; gap:10px; align-items:end; margin-bottom:10px;">
+                <div>
+                    <span style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px;">Payment Mode</span>
+                    <select id="amendPayMode" class="field-input" onchange="toggleAmendSplit()" style="border-color:#f59e0b;">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Credit">Credit Bill</option>
+                        <option value="Split">Split Cash+UPI</option>
+                    </select>
+                </div>
+                <div id="amendSplitBlock" style="display:none; grid-column:span 2;">
+                    <span style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:4px;">Split Breakdown</span>
+                    <div style="display:flex;gap:8px;">
+                        <input type="number" id="amendCashAmt" placeholder="Cash ₹" min="0"
+                            style="flex:1;padding:10px;border:1px solid var(--border);border-radius:6px;font-weight:bold;"
+                            oninput="calcAmendSplit()">
+                        <input type="number" id="amendUpiAmt" placeholder="UPI ₹" min="0" readonly
+                            style="flex:1;padding:10px;border:1px solid var(--border);border-radius:6px;font-weight:bold;background:#f1f5f9;">
+                    </div>
+                </div>
             </div>
+            <div style="margin-bottom:10px;">
+                <span style="font-size:.7rem;font-weight:700;color:#b91c1c;text-transform:uppercase;display:block;margin-bottom:4px;">Reason for Amendment (mandatory — goes to audit log)</span>
+                <input type="text" id="amendNote" placeholder="e.g. Wrong payment mode corrected / Labour charge updated by admin"
+                    oninput="this.value=this.value.toUpperCase()"
+                    style="width:100%;padding:10px;border:2px solid #fca5a5;border-radius:6px;box-sizing:border-box;font-size:.88rem;">
+            </div>
+            <button class="btn-action" style="background:#b45309;width:100%;font-size:1rem;" onclick="adminAmendJC()">
+                💾 SAVE AMENDMENT
+            </button>
         </div>
     </div>
 </div>
@@ -1825,6 +1854,191 @@
         const stBtn = document.getElementById('btnSaveTotal');
         if (stBtn) stBtn.disabled = false;
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = false; el.style.background = 'white'; });
+
+        /* STEP 4: Snapshot current values for amendment audit trail — captured at unlock time */
+        window._amendmentSnapshot = {
+            total_invoice_value: activeJobContext?.total_invoice_value,
+            labour_charges      : activeJobContext?.labour_charges,
+            lathe_welding       : activeJobContext?.lathe_welding,
+            green_total         : activeJobContext?.green_total,
+            moped_total         : activeJobContext?.moped_total,
+            payment_mode        : activeJobContext?.payment_mode,
+            cash_amount         : activeJobContext?.cash_amount,
+            upi_amount          : activeJobContext?.upi_amount,
+            credit_amount       : activeJobContext?.credit_amount
+        };
+
+        /* Pre-select payment mode in amendment dropdown to match current JC */
+        const pm = activeJobContext?.payment_mode || 'Cash';
+        const modeEl = document.getElementById('amendPayMode');
+        if (modeEl) {
+            if (pm.startsWith('Split'))    modeEl.value = 'Split';
+            else if (pm === 'UPI')         modeEl.value = 'UPI';
+            else if (pm === 'Credit')      modeEl.value = 'Credit';
+            else                           modeEl.value = 'Cash';
+            toggleAmendSplit();
+        }
+    }
+
+    function toggleAmendSplit() {
+        const mode = document.getElementById('amendPayMode')?.value;
+        const block = document.getElementById('amendSplitBlock');
+        if (block) block.style.display = (mode === 'Split') ? 'block' : 'none';
+    }
+
+    function calcAmendSplit() {
+        const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
+        const cash   = parseFloat(document.getElementById('amendCashAmt').value) || 0;
+        const upi    = Math.max(0, netVal - cash);
+        document.getElementById('amendUpiAmt').value = parseFloat(upi.toFixed(2));
+    }
+
+    /* ── STANDALONE upsertLedgerEntry ────────────────────────────────────────────
+       Used by both commitInvoiceSettlement (first close) and adminAmendJC (reclose).
+       logDate = original closed_at date (preserves correct earning date on amendment).
+       SKIP  if entry exists with same commission (double-click protection).
+       UPDATE if entry exists with different commission (admin changed labour amount).
+       INSERT if no entry exists (first closure). */
+    async function upsertLedgerEntry(mechId, share, rate, desc, logDate) {
+        if (!mechId || share < 0) return;
+        const newCommission = share * (rate / 100);
+        const { data: existing } = await supabaseClient.from('staff_ledger')
+            .select('id, commission_amount')
+            .eq('job_card_id', targetJobId)
+            .eq('mechanic_id', mechId)
+            .eq('entry_type', 'Labour Credit')
+            .maybeSingle();
+        if (existing) {
+            const diff = Math.abs((existing.commission_amount || 0) - newCommission);
+            if (diff < 0.5) return; // Same amount within rounding — skip completely
+            // Labour amount genuinely changed — update the existing entry
+            await supabaseClient.from('staff_ledger').update({
+                amount              : share,
+                commission_rate_snap: rate,
+                commission_amount   : newCommission,
+                log_date            : logDate
+            }).eq('id', existing.id);
+        } else {
+            // No prior entry — normal first closure
+            const { error: slErr } = await supabaseClient.from('staff_ledger').insert([{
+                mechanic_id         : mechId,
+                amount              : share,
+                entry_type          : 'Labour Credit',
+                description         : desc,
+                log_date            : logDate,
+                job_card_id         : targetJobId,
+                commission_rate_snap: rate,
+                commission_amount   : newCommission
+            }]);
+            if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nInform Admin.');
+        }
+    }
+
+    /* ── ADMIN AMENDMENT FUNCTION ────────────────────────────────────────────────
+       Replaces the old UPDATE AS CASH / UPI / CREDIT buttons.
+       KEY DIFFERENCE from commitInvoiceSettlement:
+         → Does NOT change closed_at (original date preserved forever)
+         → Does NOT re-run loyalty points or referral bonuses
+         → Does NOT re-run customer outstanding_credit logic
+         → DOES update amounts, payment mode, items
+         → DOES update staff_ledger via upsertLedgerEntry
+         → DOES write full audit record to jc_amendments table */
+    async function adminAmendJC() {
+        const note = document.getElementById('amendNote')?.value.trim().toUpperCase();
+        if (!note) return alert('Amendment reason is mandatory. It will be saved to the audit log.');
+
+        const mode    = document.getElementById('amendPayMode')?.value || 'Cash';
+        const netVal  = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
+        const pUsed   = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
+
+        let cashAmt = 0, upiAmt = 0, creditAmt = 0;
+        if (mode === 'Cash')   { cashAmt   = netVal; }
+        else if (mode === 'UPI')    { upiAmt    = netVal; }
+        else if (mode === 'Credit') { creditAmt = netVal; }
+        else if (mode === 'Split')  {
+            cashAmt = parseFloat(document.getElementById('amendCashAmt').value) || 0;
+            upiAmt  = parseFloat(document.getElementById('amendUpiAmt').value)  || 0;
+            if (Math.abs(cashAmt + upiAmt - netVal) > 0.5)
+                return alert(`Cash + UPI must equal ₹${netVal}. Current: ₹${cashAmt + upiAmt}`);
+        }
+
+        const btn = document.querySelector('#adminEditBlock button.btn-action');
+        if (btn) { btn.disabled = true; btn.innerText = 'SAVING…'; }
+
+        /* Build update — NOTE: closed_at is intentionally NOT included */
+        const updates = {
+            total_invoice_value: netVal,
+            labour_charges      : servicePkgGrossTotal || 0,
+            lathe_welding       : internalLatheNet     || 0,
+            green_total         : internalGreenNet     || 0,
+            moped_total         : internalMopedNet     || 0,
+            lubricant_total     : internalLubeNet      || 0,
+            payment_mode        : mode,
+            cash_amount         : cashAmt,
+            upi_amount          : upiAmt,
+            credit_amount       : creditAmt,
+            future_advice       : document.getElementById('vFutureAdvice').value.trim(),
+            mech_id             : document.getElementById('primaryMech').value || null,
+            co_mech_id          : document.getElementById('coMech').value      || null,
+            points_used         : pUsed,
+            last_modified_at    : new Date().toISOString(),
+            last_modified_by    : sessionRole,
+            amendment_count     : (parseInt(activeJobContext?.amendment_count) || 0) + 1
+        };
+
+        const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
+        if (error) {
+            if (btn) { btn.disabled = false; btn.innerText = '💾 SAVE AMENDMENT'; }
+            return alert('Amendment error: ' + error.message);
+        }
+
+        /* Update staff_ledger if labour changed — uses original closed_at date */
+        const totalLabour    = servicePkgGrossTotal || 0;
+        const hasCo          = !!(document.getElementById('coMech').value);
+        const primaryShare   = hasCo ? totalLabour / 2 : totalLabour;
+        const coShare        = hasCo ? totalLabour / 2 : 0;
+        const primaryMechId  = document.getElementById('primaryMech').value;
+        const coMechId       = document.getElementById('coMech').value;
+        const primaryRate    = mechanicsCache.find(m => m.id === primaryMechId)?.commission_rate || 0;
+        const coRate         = mechanicsCache.find(m => m.id === coMechId)?.commission_rate      || 0;
+        /* CRITICAL: use original closed_at date — not today */
+        const origDate       = (activeJobContext?.closed_at || new Date().toISOString()).split('T')[0];
+        const jcRef          = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+        await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate,
+            `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, origDate);
+        if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
+            `${jcRef} (50% split - co-mechanic)`, origDate);
+
+        /* Write full audit record — permanent, never deleted */
+        const valuesAfter = {
+            total_invoice_value: netVal,
+            labour_charges      : servicePkgGrossTotal,
+            green_total         : internalGreenNet,
+            payment_mode        : mode,
+            cash_amount         : cashAmt,
+            upi_amount          : upiAmt,
+            credit_amount       : creditAmt
+        };
+        const changedFields = Object.keys(valuesAfter)
+            .filter(k => String(window._amendmentSnapshot?.[k]) !== String(valuesAfter[k]));
+        await supabaseClient.from('jc_amendments').insert({
+            job_card_id   : targetJobId,
+            amended_by    : sessionRole,
+            amendment_note: note,
+            fields_changed: changedFields,
+            values_before : window._amendmentSnapshot || {},
+            values_after  : valuesAfter
+        });
+
+        /* Update local context and re-lock */
+        Object.assign(activeJobContext, updates);
+        activeJobContext.status = 'Closed';
+        window._amendmentSnapshot = null;
+        document.getElementById('adminEditBlock').style.display = 'none';
+        lockUserInterface();
+
+        if (btn) { btn.disabled = false; btn.innerText = '💾 SAVE AMENDMENT'; }
+        alert(`✅ Amendment saved to audit log.\nOriginal close date preserved: ${origDate}\nFields changed: ${changedFields.join(', ') || 'none detected'}\nReason: ${note}`);
     }
 
     async function cancelJobCard() { const reason = prompt("Please provide a reason for cancelling this job card:"); if(!reason || reason.trim() === '') return alert("Cancellation requires a valid reason."); if(confirm("Are you absolutely sure you want to CANCEL this Job Card?")) { await supabaseClient.from('job_cards').update({ status: 'Cancelled', cancellation_reason: reason.trim() }).eq('id', targetJobId); alert("Job Card Cancelled."); window.location.href = 'index.html'; } }
@@ -2017,40 +2231,13 @@
             const coRate      = mechanicsCache.find(m => m.id === coMechId)?.commission_rate      || 0;
             const todayDate   = new Date().toISOString().split('T')[0];
             const ledgerEntries = [];
-            /* ── FIX C: Check-before-write on staff_ledger ──────────────────────
-               PROBLEM: Double-click PAY NOW or admin reclose creates duplicate entries.
-               SOLUTION: For each mechanic, check if an entry already exists for
-               this JC. If same amount → skip (staff double-click). If different
-               amount → UPDATE (admin changed labour during reopen). If none → INSERT. */
-            async function upsertLedgerEntry(mechId, share, rate, desc) {
-                if (!mechId || share <= 0) return;
-                const newCommission = share * (rate / 100);
-                const { data: existing } = await supabaseClient.from('staff_ledger')
-                    .select('id, commission_amount')
-                    .eq('job_card_id', targetJobId)
-                    .eq('mechanic_id', mechId)
-                    .eq('entry_type', 'Labour Credit')
-                    .maybeSingle();
-                if (existing) {
-                    const diff = Math.abs((existing.commission_amount || 0) - newCommission);
-                    if (diff < 0.5) return; // Same amount (within rounding) — skip, no duplicate
-                    // Different amount — admin changed labour charge during reopen → UPDATE
-                    await supabaseClient.from('staff_ledger').update({
-                        amount: share, commission_rate_snap: rate,
-                        commission_amount: newCommission, log_date: todayDate
-                    }).eq('id', existing.id);
-                } else {
-                    // First closure — INSERT
-                    const { error: slErr } = await supabaseClient.from('staff_ledger').insert([{
-                        mechanic_id: mechId, amount: share, entry_type: 'Labour Credit',
-                        description: desc, log_date: todayDate, job_card_id: targetJobId,
-                        commission_rate_snap: rate, commission_amount: newCommission
-                    }]);
-                    if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nJC ' + jcRef + ' — inform Admin.');
-                }
-            }
-            await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate, `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`);
-            if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate, `${jcRef} (50% split - co-mechanic)`);
+            /* ── FIX C: Use standalone upsertLedgerEntry (defined below adminAmendJC)
+               Checks if entry exists for this JC+mechanic before inserting.
+               Same amount → skip. Different amount → UPDATE. No entry → INSERT. */
+            await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate,
+                `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, todayDate);
+            if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
+                `${jcRef} (50% split - co-mechanic)`, todayDate);
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
                  * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
