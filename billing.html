@@ -1947,6 +1947,15 @@
     }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
+        /* ── FIX A: Guard against double-closure ───────────────────────────────
+           If staff clicked PAY NOW twice on same billing tab, activeJobContext
+           will already have status=Closed from first run. Exit immediately. */
+        if (statusTarget === 'Closed' && activeJobContext?.status === 'Closed') {
+            alert('⚠️ This Job Card is already closed. Returning to Home.');
+            window.location.href = 'index.html';
+            return;
+        }
+
         const netVal = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0;
         const pointsRedeemed = parseFloat(document.getElementById('vPointsUsed')?.value) || 0;
 
@@ -1992,6 +2001,15 @@
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
+        /* ── FIX B: Lock UI immediately after successful DB closure ────────────
+           Updating activeJobContext.status here means Fix A guard activates
+           instantly. lockUserInterface() locks the page visually so staff
+           cannot click PAY NOW again even if receipt modal is dismissed. */
+        if (statusTarget === 'Closed' && !error) {
+            if (activeJobContext) activeJobContext.status = 'Closed';
+            lockUserInterface();
+        }
+
         if (statusTarget === 'Closed' && !error) {
             const totalLabour = servicePkgGrossTotal; const hasCo = !!document.getElementById('coMech').value; const primaryShare = hasCo ? totalLabour / 2 : totalLabour; const coShare = hasCo ? totalLabour / 2 : 0; const primaryMechId = document.getElementById('primaryMech').value; const coMechId = document.getElementById('coMech').value; const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`;
             // Rate lookup — mechanicsCache already in memory from page load, zero extra DB call
@@ -1999,12 +2017,40 @@
             const coRate      = mechanicsCache.find(m => m.id === coMechId)?.commission_rate      || 0;
             const todayDate   = new Date().toISOString().split('T')[0];
             const ledgerEntries = [];
-            if (primaryMechId) ledgerEntries.push({ mechanic_id: primaryMechId, amount: primaryShare, entry_type: 'Labour Credit', description: `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, log_date: todayDate, job_card_id: targetJobId, commission_rate_snap: primaryRate, commission_amount: primaryShare * (primaryRate / 100) });
-            if (hasCo && coMechId) ledgerEntries.push({ mechanic_id: coMechId, amount: coShare, entry_type: 'Labour Credit', description: `${jcRef} (50% split - co-mechanic)`, log_date: todayDate, job_card_id: targetJobId, commission_rate_snap: coRate, commission_amount: coShare * (coRate / 100) });
-            if (ledgerEntries.length > 0) {
-                const { error: slErr } = await supabaseClient.from('staff_ledger').insert(ledgerEntries);
-                if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nJC ' + jcRef + ' is closed but commission was not recorded. Please inform Admin.');
+            /* ── FIX C: Check-before-write on staff_ledger ──────────────────────
+               PROBLEM: Double-click PAY NOW or admin reclose creates duplicate entries.
+               SOLUTION: For each mechanic, check if an entry already exists for
+               this JC. If same amount → skip (staff double-click). If different
+               amount → UPDATE (admin changed labour during reopen). If none → INSERT. */
+            async function upsertLedgerEntry(mechId, share, rate, desc) {
+                if (!mechId || share <= 0) return;
+                const newCommission = share * (rate / 100);
+                const { data: existing } = await supabaseClient.from('staff_ledger')
+                    .select('id, commission_amount')
+                    .eq('job_card_id', targetJobId)
+                    .eq('mechanic_id', mechId)
+                    .eq('entry_type', 'Labour Credit')
+                    .maybeSingle();
+                if (existing) {
+                    const diff = Math.abs((existing.commission_amount || 0) - newCommission);
+                    if (diff < 0.5) return; // Same amount (within rounding) — skip, no duplicate
+                    // Different amount — admin changed labour charge during reopen → UPDATE
+                    await supabaseClient.from('staff_ledger').update({
+                        amount: share, commission_rate_snap: rate,
+                        commission_amount: newCommission, log_date: todayDate
+                    }).eq('id', existing.id);
+                } else {
+                    // First closure — INSERT
+                    const { error: slErr } = await supabaseClient.from('staff_ledger').insert([{
+                        mechanic_id: mechId, amount: share, entry_type: 'Labour Credit',
+                        description: desc, log_date: todayDate, job_card_id: targetJobId,
+                        commission_rate_snap: rate, commission_amount: newCommission
+                    }]);
+                    if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nJC ' + jcRef + ' — inform Admin.');
+                }
             }
+            await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate, `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`);
+            if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate, `${jcRef} (50% split - co-mechanic)`);
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
                  * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
