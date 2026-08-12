@@ -64,6 +64,9 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 <div class="wrapper">
 
   <!-- PENDING SECTION -->
+  <!-- Customer Refunds Notification Card — visible to admin when refunds pending -->
+  <div id="refundNotifCard" style="display:none;background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:16px;margin-bottom:16px;"></div>
+
   <div class="card-panel" id="pendingPanel">
     <div class="section-title">
       ⏳ Pending — Action Required
@@ -377,20 +380,49 @@ async function loadApprovals(){
   let historyQ = sb.from('approval_requests').select('*').neq('status','pending').order('actioned_at',{ascending:false}).limit(50);
 
   if(role==='service'){
-    // Service sees items they raised (staff proposals + attendance)
     pendingQ = pendingQ.eq('requested_by','service');
     historyQ = historyQ.eq('requested_by','service');
   }
 
-  const [pendRes, histRes] = await Promise.all([pendingQ, historyQ]);
+  // Also fetch pending customer refunds (admin only)
+  const refundsQ = role==='admin'
+    ? sb.from('customer_refunds').select('id,refund_amount,refund_type,customer_mobile,job_card_id,reason,created_at').eq('refund_status','pending')
+    : Promise.resolve({data:[]});
+
+  const [pendRes, histRes, refRes] = await Promise.all([pendingQ, historyQ, refundsQ]);
   const pending = pendRes.data||[];
   const history = histRes.data||[];
+  const pendingRefunds = refRes.data||[];
 
   // Filter history to last 30 days
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
   const recentHistory = history.filter(h=>new Date(h.actioned_at||h.requested_at)>=cutoff);
 
-  // Render pending
+  // Render pending refunds notification card at top if any
+  const refundNotifEl = document.getElementById('refundNotifCard');
+  if(refundNotifEl) {
+    if(pendingRefunds.length > 0) {
+      const totalAmt = pendingRefunds.reduce((s,r)=>s+(parseFloat(r.refund_amount)||0),0);
+      refundNotifEl.style.display='block';
+      refundNotifEl.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <span style="font-weight:700;font-size:1rem;">💸 ${pendingRefunds.length} Customer Refund${pendingRefunds.length>1?'s':''} Pending Payment</span>
+            <div style="font-size:.78rem;color:#64748b;margin-top:2px;">Total: ₹${Math.round(totalAmt)} needs to be handed to customers</div>
+            <div style="font-size:.75rem;color:#94a3b8;margin-top:4px;">
+              ${pendingRefunds.slice(0,3).map(r=>`JC-${(r.job_card_id||'').split('-')[0].toUpperCase()} ₹${Math.round(r.refund_amount)}`).join(' &nbsp;·&nbsp; ')}
+              ${pendingRefunds.length>3?` &nbsp;·&nbsp; +${pendingRefunds.length-3} more`:''}
+            </div>
+          </div>
+          <button class="btn-action" style="background:#b91c1c;"
+            onclick="window.location.href='utility-router.html'">MANAGE REFUNDS →</button>
+        </div>`;
+    } else {
+      refundNotifEl.style.display='none';
+    }
+  }
+
+  // Render pending approvals
   document.getElementById('pendingCount').innerText = pending.length;
   const pBody = document.getElementById('pendingBody');
   if(pending.length===0){
