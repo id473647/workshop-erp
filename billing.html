@@ -209,7 +209,15 @@
     <div id="bannerAsset" class="context-banner">
         <div style="flex: 1;">
             <div class="plate-header" id="regPlate" title="Click to edit vehicle number" onclick="editVehicleReg()">Loading active instance...</div>
-            <span id="modelLabel" class="meta-text" style="display:block; margin-top:4px;">Syncing pipeline maps...</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                <span id="modelLabel" class="meta-text">Syncing pipeline maps...</span>
+                <button id="btnChangeVehicle" onclick="openChangeVehiclePanel()" title="Correct wrong vehicle or switch vehicle"
+                    class="input-lockable"
+                    style="font-size:.68rem;background:#fef3c7;border:1px solid #fde68a;color:#854d0e;border-radius:4px;padding:2px 7px;cursor:pointer;font-weight:700;white-space:nowrap;">
+                    ✏️ Change Vehicle
+                </button>
+            </div>
+            <div id="changeVehiclePanel" style="display:none;border:1px solid #fde68a;border-radius:6px;background:white;margin-top:6px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>
             <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                 <span style="font-size:0.75rem; font-weight:bold; color:#64748b;">TECH:</span>
                 <select id="primaryMech" class="input-lockable" style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); font-size:0.75rem; font-weight:bold; color:var(--primary); background:#f8fafc;"><option value="">-- Unassigned --</option></select>
@@ -980,6 +988,127 @@
     function convertNumberToWords(amount) { const words = { 0:'', 1:'One', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', 11:'Eleven', 12:'Twelve', 13:'Thirteen', 14:'Fourteen', 15:'Fifteen', 16:'Sixteen', 17:'Seventeen', 18:'Eighteen', 19:'Nineteen', 20:'Twenty', 30:'Thirty', 40:'Forty', 50:'Fifty', 60:'Sixty', 70:'Seventy', 80:'Eighty', 90:'Ninety' }; let num = Math.floor(amount); if (num === 0) return 'Zero Rupees Only'; function helper(n) { if (n < 20) return words[n]; if (n < 100) return words[Math.floor(n / 10) * 10] + (n % 10 !== 0 ? ' ' + words[n % 10] : ''); if (n < 1000) return words[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + helper(n % 100) : ''); if (n < 100000) return helper(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + helper(n % 1000) : ''); if (n < 10000000) return helper(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + helper(n % 100000) : ''); return helper(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + helper(n % 10000000) : ''); } return helper(num) + ' Rupees Only'; }
 
     async function editVehicleReg() { if(!activeJobContext || !activeJobContext.vehicle_id) return; const newReg = prompt("Enter Correct Vehicle Number:", document.getElementById('regPlate').innerText); if(newReg && newReg.trim() !== '') { await supabaseClient.from('vehicles').update({ reg_number: newReg.trim().toUpperCase() }).eq('id', activeJobContext.vehicle_id); document.getElementById('regPlate').innerText = newReg.trim().toUpperCase(); alert("Updated."); } }
+
+    /* ── PHASE 11A: Change/Correct Vehicle on Open JC ──────────────────────── */
+    let _vmCache = null;
+    async function openChangeVehiclePanel() {
+        if(!activeJobContext) return;
+        const panel = document.getElementById('changeVehiclePanel');
+        if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+
+        panel.style.display = 'block';
+        panel.innerHTML = '<div style="padding:8px;color:#94a3b8;font-size:.82rem;">Loading...</div>';
+
+        // Fetch vehicle master if not cached
+        if (!_vmCache) {
+            const {data} = await supabaseClient.from('vehicle_master')
+                .select('id,brand,model_name,emission_standard,category_group,status')
+                .in('status',['active','pending']).order('brand').order('model_name');
+            _vmCache = data || [];
+        }
+
+        // Fetch customer's other vehicles
+        const mobile = activeJobContext.customer_mobile;
+        const {data: custVehs} = mobile ? await supabaseClient.from('vehicles')
+            .select('id,reg_number,make_model,brand,vehicle_master_id')
+            .eq('customer_mobile', mobile) : {data:[]};
+
+        panel.innerHTML = `
+            <div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 12px;font-size:.78rem;color:#92400e;">
+              ✏️ <strong>Correct Vehicle</strong> — changes will update this JC and all historical JCs for this bike
+            </div>
+            <div style="padding:10px 12px;">
+              <div style="margin-bottom:8px;">
+                <div style="font-size:.72rem;font-weight:700;color:#64748b;margin-bottom:4px;">CORRECT MODEL (same bike, wrong variant selected)</div>
+                <div style="position:relative;">
+                  <input type="text" id="cvSearch" placeholder="Type model name or brand..." autocomplete="off"
+                    oninput="filterCvResults(this.value)"
+                    style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+                  <div id="cvResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:300;max-height:200px;overflow-y:auto;"></div>
+                </div>
+              </div>
+              ${(custVehs||[]).length > 1 ? `<div style="border-top:1px solid #f1f5f9;padding-top:8px;margin-top:4px;">
+                <div style="font-size:.72rem;font-weight:700;color:#64748b;margin-bottom:4px;">OR SWITCH TO ANOTHER VEHICLE OF THIS CUSTOMER</div>
+                ${(custVehs||[]).filter(v=>v.id!==activeJobContext.vehicle_id).map(v=>
+                  `<div onclick="changeJcVehicle('${v.id}','${(v.make_model||'').replace(/'/g,"\\'")}',null)"
+                    style="padding:6px 10px;cursor:pointer;border-radius:4px;font-size:.82rem;background:#f8fafc;margin-bottom:4px;"
+                    onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background='#f8fafc'">
+                    <strong>${v.reg_number}</strong> — ${v.brand||''} ${v.make_model||''}
+                  </div>`).join('')}
+              </div>` : ''}
+              <div id="cvSelectedInfo" style="display:none;font-size:.78rem;color:#15803d;padding:6px 0;font-weight:700;"></div>
+              <button id="cvConfirmBtn" onclick="confirmVehicleChange()" style="display:none;width:100%;background:#15803d;color:white;border:none;padding:8px;border-radius:6px;font-weight:700;cursor:pointer;margin-top:6px;">✅ CONFIRM VEHICLE CORRECTION</button>
+            </div>`;
+    }
+
+    let _cvSelectedId = null;
+    function filterCvResults(q) {
+        const results = document.getElementById('cvResults');
+        _cvSelectedId = null;
+        document.getElementById('cvConfirmBtn').style.display = 'none';
+        document.getElementById('cvSelectedInfo').style.display = 'none';
+        if (!q || q.trim().length < 2) { results.style.display = 'none'; return; }
+        const qUp = q.trim().toUpperCase();
+        const tokens = qUp.split(/\s+/).filter(t => t.length > 0);
+        const matches = (_vmCache||[]).map(vm => {
+            const label = `${vm.brand} ${vm.model_name} ${vm.emission_standard}`.toUpperCase();
+            return { ...vm, score: tokens.filter(t => label.includes(t)).length };
+        }).filter(v => v.score > 0).sort((a,b) => b.score - a.score).slice(0, 8);
+
+        if (!matches.length) { results.innerHTML='<div style="padding:8px;font-size:.78rem;color:#94a3b8;">No match</div>'; results.style.display='block'; return; }
+        const emitCol = {'BS6':'#15803d','BS4':'#b45309','Pre-BS4':'#64748b','Electric AIS156':'#2980b9'};
+        results.innerHTML = matches.map(vm => `<div
+            onclick="selectCvVehicle('${vm.id}','${vm.brand.replace(/'/g,"\\'")} — ${vm.model_name.replace(/'/g,"\\'")} (${vm.emission_standard})')"
+            style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f1f5f9;"
+            onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+            <strong>${vm.brand}</strong> — ${vm.model_name}
+            <span style="color:${emitCol[vm.emission_standard]||'#64748b'};font-weight:700;"> (${vm.emission_standard})</span>
+        </div>`).join('');
+        results.style.display = 'block';
+    }
+
+    function selectCvVehicle(vmId, displayLabel) {
+        _cvSelectedId = vmId;
+        document.getElementById('cvResults').style.display = 'none';
+        document.getElementById('cvSearch').value = displayLabel;
+        const info = document.getElementById('cvSelectedInfo');
+        info.style.display = 'block';
+        info.innerText = `✅ ${displayLabel} — will update this bike's record`;
+        document.getElementById('cvConfirmBtn').style.display = 'block';
+    }
+
+    async function confirmVehicleChange() {
+        if (!_cvSelectedId || !activeJobContext?.vehicle_id) return;
+        const vm = _vmCache.find(v => v.id === _cvSelectedId);
+        if (!vm) return;
+        if (!confirm(`Correct this vehicle to:\n${vm.brand} — ${vm.model_name} (${vm.emission_standard})\n\nThis will update this bike's record and ALL previous JCs for this vehicle.`)) return;
+
+        const { error } = await supabaseClient.from('vehicles').update({
+            brand: vm.brand, make_model: vm.model_name,
+            category_group: vm.category_group||'Other',
+            vehicle_master_id: vm.id
+        }).eq('id', activeJobContext.vehicle_id);
+
+        if (error) return alert('Error: ' + error.message);
+
+        // Update local context and display
+        if (activeJobContext.vehicles) {
+            activeJobContext.vehicles.brand = vm.brand;
+            activeJobContext.vehicles.make_model = vm.model_name;
+        }
+        document.getElementById('modelLabel').innerText = `${vm.brand} ${vm.model_name} (${vm.emission_standard}) | ${document.getElementById('modelLabel').innerText.split('|')[1]||''}`;
+        document.getElementById('changeVehiclePanel').style.display = 'none';
+        alert(`✅ Vehicle corrected to ${vm.brand} — ${vm.model_name} (${vm.emission_standard})`);
+    }
+
+    async function changeJcVehicle(vehicleId, displayLabel, vmId) {
+        if (!confirm(`Switch this JC to vehicle: ${displayLabel}?\n\nThe JC will be linked to this different bike.`)) return;
+        const { error } = await supabaseClient.from('job_cards').update({ vehicle_id: vehicleId }).eq('id', targetJobId);
+        if (error) return alert('Error: ' + error.message);
+        document.getElementById('modelLabel').innerText = displayLabel + ' | ' + (document.getElementById('modelLabel').innerText.split('|')[1]||'');
+        document.getElementById('changeVehiclePanel').style.display = 'none';
+        alert(`✅ JC switched to vehicle ${displayLabel}`);
+    }
 
     function toggleLubeUI() { const type = document.getElementById('nType').value; const packSizeEl = document.getElementById('nPackSize'); const customMLEl = document.getElementById('nCustomML'); const qtyEl = document.getElementById('nQty'); const rateEl = document.getElementById('nRate'); const mrpEl = document.getElementById('nMrp'); const brandEl = document.getElementById('nBrand'); if (type === 'Lube') { packSizeEl.style.display = ''; qtyEl.placeholder = 'Bottle Count'; qtyEl.style.display = ''; rateEl.style.display = ''; mrpEl.style.display = ''; brandEl.disabled = false; brandEl.style.display = ''; brandEl.style.background = 'white'; toggleCustomML(); } else if (type === '⚙️ Custom Labour' || type === '⚙️ Custom Lathe' || type === '⚙️ Fixed Protocol') { packSizeEl.style.display = 'none'; customMLEl.style.display = 'none'; qtyEl.style.display = 'none'; qtyEl.value = '1'; mrpEl.style.display = 'none'; rateEl.style.display = ''; rateEl.placeholder = 'Charge (₹)'; brandEl.value = ''; brandEl.disabled = true; brandEl.style.display = 'none'; } else { packSizeEl.style.display = 'none'; customMLEl.style.display = 'none'; qtyEl.style.display = ''; qtyEl.placeholder = 'Qty'; rateEl.style.display = ''; mrpEl.style.display = ''; rateEl.placeholder = 'Rate (₹)'; brandEl.disabled = false; brandEl.style.display = ''; brandEl.style.background = 'white'; } }
     function toggleCustomML() { const pack = document.getElementById('nPackSize').value; if (pack === 'Custom') document.getElementById('nCustomML').style.display = ''; else document.getElementById('nCustomML').style.display = 'none'; }
