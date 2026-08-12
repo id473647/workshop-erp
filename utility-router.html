@@ -84,6 +84,9 @@
             <div class="u-card" id="cardApprovals" style="display:none; border-left:4px solid #dc2626;" onclick="window.location.href='approvals.html'">
                 <h4 class="u-title">📋 Pending Approvals</h4><p class="u-desc">Review and action pending commission, balance, and staff change requests.</p>
             </div>
+            <div class="u-card" id="cardRefunds" style="display:none; border-left:4px solid #b91c1c;" onclick="openWorkspaceTarget('wsRefunds')">
+                <h4 class="u-title">💸 Customer Refunds</h4><p class="u-desc">Manage pending money refunds and product returns from billing amendments.</p>
+            </div>
             <div class="u-card" onclick="window.location.href='mechanic-admin.html'">
                 <h4 class="u-title">👨‍💼 Staff & Payroll</h4><p class="u-desc">Manage Mechanics, Managers, Attendance & Commission Rules.</p>
             </div>
@@ -106,6 +109,19 @@
     </div>
 
     <!-- CRM WORKSPACE (only remaining inline workspace) -->
+    <div id="wsRefunds" class="card-panel utility-workspace">
+        <div class="block-title">💸 Customer Refunds — Pending & History</div>
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <select id="refundFilter" class="field-input" style="width:180px;" onchange="loadRefunds()">
+                <option value="pending">Pending Payment</option>
+                <option value="paid">Paid (History)</option>
+                <option value="all">All Refunds</option>
+            </select>
+            <button class="btn-action" onclick="loadRefunds()">🔄 REFRESH</button>
+        </div>
+        <div id="refundsList" style="font-size:.88rem;">Loading...</div>
+    </div>
+
     <div id="wsCustomers" class="card-panel utility-workspace">
         <div class="block-title">Customer Relationship Manager</div>
         <div class="inputs-grid" style="background:#f8fafc; padding:16px; border-radius:8px;">
@@ -142,6 +158,145 @@
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
     const activeSessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleDisplay').innerText = activeSessionRole.toUpperCase();
+    async function loadRefunds() {
+        const statusFilter = document.getElementById('refundFilter')?.value || 'pending';
+        const listEl = document.getElementById('refundsList');
+        if(!listEl) return;
+        listEl.innerHTML = '<div style="text-align:center;padding:16px;color:#94a3b8;">Loading...</div>';
+
+        let q = supabaseClient.from('customer_refunds')
+            .select('*').order('created_at', {ascending:false}).limit(50);
+        if(statusFilter !== 'all') q = q.eq('refund_status', statusFilter);
+        const {data:refunds, error} = await q;
+        if(error) { listEl.innerHTML = `<div style="color:red;">${error.message}</div>`; return; }
+        if(!refunds?.length) { listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">No refunds found.</div>'; return; }
+
+        const statusColor = {pending:'#b91c1c', paid:'#166534', cancelled:'#64748b'};
+        listEl.innerHTML = refunds.map(r => {
+            const retItems = r.returned_items ? JSON.parse(JSON.stringify(r.returned_items)) : [];
+            const itemsHtml = retItems.length > 0
+                ? `<div style="font-size:.76rem;color:#64748b;margin-top:4px;">Returned: ${retItems.map(i=>`${i.item_name} × ${i.qty}`).join(', ')}</div>` : '';
+            const isPending = r.refund_status === 'pending';
+            const jcShort = r.job_card_id ? 'JC-' + r.job_card_id.split('-')[0].toUpperCase() : '—';
+            const refundDate = r.refunded_at ? new Date(r.refunded_at).toLocaleDateString('en-IN') : '—';
+            return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:${isPending?'#fef2f2':'#f8fafc'};">
+                <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+                    <div>
+                        <span style="font-weight:700;">${jcShort}</span>
+                        <span style="font-size:.72rem;background:${statusColor[r.refund_status]};color:white;padding:2px 8px;border-radius:4px;margin-left:8px;font-weight:700;">
+                            ${r.refund_status?.toUpperCase()}
+                        </span>
+                        <span style="font-size:.72rem;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:4px;margin-left:4px;">
+                            ${r.refund_type === 'money_refund' ? '💰 Money Refund' : '📦 Product Return'}
+                        </span>
+                    </div>
+                    <div style="font-size:1.1rem;font-weight:900;color:#b91c1c;">₹${Math.round(r.refund_amount)}</div>
+                </div>
+                <div style="font-size:.78rem;color:#64748b;margin-top:6px;">${r.reason || '—'}</div>
+                ${itemsHtml}
+                <div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">
+                    Customer: ${r.customer_mobile || '—'} &nbsp;|&nbsp;
+                    Created by: ${r.created_by || '—'} on ${new Date(r.created_at).toLocaleDateString('en-IN')} &nbsp;|&nbsp;
+                    Source: ${(r.refund_source||'').toUpperCase()}
+                    ${r.refund_status==='paid' ? ` | Paid: ${refundDate} by ${r.refunded_by||'—'}` : ''}
+                </div>
+                ${isPending ? `
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+                    <select id="src_${r.id}" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+                        <option value="service" ${r.refund_source==='service'?'selected':''}>From Workshop (Service)</option>
+                        <option value="green" ${r.refund_source==='green'?'selected':''}>From Green Counter</option>
+                    </select>
+                    ${r.refund_type==='product_return' && !r.stock_restored ? `
+                    <label style="font-size:.78rem;display:flex;align-items:center;gap:4px;">
+                        <input type="checkbox" id="restore_${r.id}"> Restore stock
+                    </label>` : ''}
+                    <button class="btn-action" style="background:#15803d;padding:6px 14px;font-size:.82rem;"
+                        onclick="markRefundPaid('${r.id}')">✅ MARK AS PAID & PRINT RECEIPT</button>
+                    <button class="btn-action danger" style="padding:6px 14px;font-size:.82rem;"
+                        onclick="cancelRefund('${r.id}')">❌ CANCEL</button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    async function markRefundPaid(refundId) {
+        const src = document.getElementById(`src_${refundId}`)?.value || 'service';
+        const restoreStock = document.getElementById(`restore_${refundId}`)?.checked || false;
+
+        const updates = {
+            refund_status: 'paid',
+            refunded_at  : new Date().toISOString(),
+            refunded_by  : activeSessionRole,
+            refund_source: src
+        };
+        if(restoreStock) updates.stock_restored = true;
+
+        const {data:refund, error} = await supabaseClient.from('customer_refunds')
+            .update(updates).eq('id', refundId).select('*').single();
+        if(error) return alert('Error: ' + error.message);
+
+        /* Restore stock if requested */
+        if(restoreStock && refund.returned_items) {
+            const items = Array.isArray(refund.returned_items) ? refund.returned_items : [];
+            for(const item of items) {
+                if(!item.product_master_id) continue;
+                const {data:pm} = await supabaseClient.from('product_master')
+                    .select('current_stock').eq('id', item.product_master_id).single();
+                if(pm) {
+                    await supabaseClient.from('product_master').update({
+                        current_stock: (pm.current_stock || 0) + (parseInt(item.qty) || 1)
+                    }).eq('id', item.product_master_id);
+                }
+            }
+        }
+
+        /* Print refund receipt */
+        const jcShort = refund.job_card_id ? 'JC-' + refund.job_card_id.split('-')[0].toUpperCase() : '—';
+        const now = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const entityName = src === 'green' ? 'Green Scooter Center' : 'My Care Service Centre';
+        const w = window.open('','_blank','width=400,height:600');
+        if(w) {
+            w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+            <style>body{font-family:'Courier New',monospace;font-size:12px;padding:20px;width:300px;}
+            h2{font-size:14px;text-align:center;} .center{text-align:center;} .bold{font-weight:bold;}
+            hr{border:1px dashed #000;} .big{font-size:18px;font-weight:900;text-align:center;}</style></head><body>
+            <h2>${entityName}</h2>
+            <div class="center">GSTIN: 23ANAPB4613K1ZJ</div>
+            <div class="center">Gurudwara Road, Ganj Betul</div>
+            <hr>
+            <div>Date: ${now}</div>
+            <div>Ref: ${jcShort}</div>
+            <div>Customer: ${refund.customer_mobile || '—'}</div>
+            <hr>
+            <div class="center bold" style="font-size:13px;">CUSTOMER REFUND RECEIPT</div>
+            <div style="font-size:10px;text-align:center;">${refund.refund_type === 'money_refund' ? 'Money Refund — Price Correction' : 'Product Return Refund'}</div>
+            <hr>
+            <div class="big">₹${Math.round(refund.refund_amount)}</div>
+            <div class="center">Mode: Cash</div>
+            <hr>
+            <div style="font-size:10px;">Reason: ${refund.reason || '—'}</div>
+            <div style="font-size:10px;">Original charge: ₹${Math.round(refund.original_amount)} | Corrected: ₹${Math.round(refund.corrected_amount)}</div>
+            ${restoreStock ? '<div style="font-size:10px;">Stock restored for returned items.</div>' : ''}
+            <hr>
+            <div class="center" style="font-size:10px;">Authorised by: ${activeSessionRole.toUpperCase()}</div>
+            <div class="center" style="font-size:9px;margin-top:8px;">Computer Generated. My Care ERP.</div>
+            </body></html>`);
+            w.document.close();
+            setTimeout(() => w.print(), 400);
+        }
+
+        loadRefunds();
+    }
+
+    async function cancelRefund(refundId) {
+        if(!confirm('Cancel this refund? This cannot be undone.')) return;
+        const {error} = await supabaseClient.from('customer_refunds')
+            .update({refund_status:'cancelled', refunded_by:activeSessionRole, refunded_at:new Date().toISOString()})
+            .eq('id', refundId);
+        if(error) return alert('Error: ' + error.message);
+        loadRefunds();
+    }
+
     function executeSessionTermination() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href = 'login.html'; }
 
     /* Lazy html2canvas */
@@ -150,6 +305,7 @@
     window.onload = () => {
         if (['admin', 'green', 'moped'].includes(activeSessionRole)) document.getElementById('cardProductGroups').style.display = 'flex';
         if (['admin', 'service'].includes(activeSessionRole)) document.getElementById('cardApprovals').style.display = 'flex';
+        if (activeSessionRole === 'admin') document.getElementById('cardRefunds').style.display = 'flex';
         loadDailyCollection();
         // Handle ?crm= URL param
         const crmMobile = new URLSearchParams(window.location.search).get('crm');
