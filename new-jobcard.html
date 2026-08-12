@@ -112,21 +112,33 @@
         </div>
 
         <div id="newVehicleBlock" style="display:none; background:#f1f5f9; padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:20px;">
-            <h4 style="margin:0 0 12px 0; color:var(--info); font-size:0.9rem;">Register New Asset</h4>
+            <h4 style="margin:0 0 12px 0; color:var(--info); font-size:0.9rem;">Register New Vehicle</h4>
             <div class="inputs-grid" style="margin-bottom:0;">
                 <div class="field-group">
-                    <label>Registration Plate</label>
+                    <label>Registration Plate <span style="color:var(--danger);">*</span></label>
                     <input type="text" id="nvReg" placeholder="e.g. MP48AB1234" oninput="this.value=(this.value||'').toUpperCase().replace(/\s+/g, '')">
                 </div>
-                <div class="field-group">
-                    <label>Brand</label>
-                    <input type="text" id="nvBrand" list="brandList" placeholder="Type or Select Brand" oninput="this.value=(this.value||'').toUpperCase(); populateModels()" onchange="populateModels()">
-                    <datalist id="brandList"></datalist>
-                </div>
-                <div class="field-group">
-                    <label>Model Name</label>
-                    <input type="text" id="nvModel" list="modelList" placeholder="Type or Select Model" oninput="this.value=(this.value||'').toUpperCase()">
-                    <datalist id="modelList"></datalist>
+                <div class="field-group" style="grid-column:span 2;">
+                    <label>Search Vehicle (Brand + Model + Emission) <span style="color:var(--danger);">*</span></label>
+                    <div style="position:relative;">
+                        <input type="text" id="nvVehicleSearch"
+                            placeholder="e.g. Splendour Plus BS6, CT110X, Activa 6G..."
+                            oninput="searchVehicleMaster(this.value)"
+                            onblur="setTimeout(()=>document.getElementById('vmDropdown').style.display='none',200)"
+                            autocomplete="off"
+                            style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;">
+                        <div id="vmDropdown" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:200;max-height:240px;overflow-y:auto;"></div>
+                    </div>
+                    <!-- Hidden fields populated by selection -->
+                    <input type="hidden" id="nvVehicleMasterId">
+                    <input type="hidden" id="nvBrand">
+                    <input type="hidden" id="nvModel">
+                    <input type="hidden" id="nvEmission">
+                    <input type="hidden" id="nvCategoryGroup">
+                    <div id="nvSelectedDisplay" style="display:none;font-size:.78rem;color:#15803d;margin-top:5px;font-weight:700;padding:4px 8px;background:#f0fdf4;border-radius:4px;"></div>
+                    <div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">
+                        💡 Registration before Apr 2020 = likely BS4 &nbsp;|&nbsp; After Apr 2020 = likely BS6 &nbsp;|&nbsp; Not found? Type and select "+ Add as pending"
+                    </div>
                 </div>
                 <div class="field-group">
                     <label>Color</label>
@@ -190,6 +202,46 @@
         </div>
         <button class="btn-action" id="btnCreateJc" onclick="commitNewJobCard()">CREATE JOB CARD & PROCEED TO BILLING</button>
     </div>
+</div>
+
+<!-- ── ADD NEW PENDING VEHICLE MODAL ───────────────────────────────────────── -->
+<div id="modalAddVehicle" class="overlay-modal">
+  <div class="modal-card" style="max-width:460px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
+      <div><h3 style="margin:0;color:var(--primary);">➕ Add Vehicle to Master List</h3>
+        <span style="font-size:.75rem;color:#64748b;">Creates a pending entry — admin will review and approve</span></div>
+      <button onclick="document.getElementById('modalAddVehicle').style.display='none'" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:#92400e;">
+      💡 Before Apr 2017 = Pre-BS4 | Apr 2017–Mar 2020 = BS4 | After Apr 2020 = BS6
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div><label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:5px;">Brand *</label>
+        <input type="text" id="addVehBrand" placeholder="e.g. HERO" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+      <div><label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:5px;">Model Name *</label>
+        <input type="text" id="addVehModel" placeholder="e.g. SPLENDOUR PLUS" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+      <div><label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:5px;">Category *</label>
+        <select id="addVehCategory" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;">
+          <option value="">-- Select --</option>
+          <option>100cc Motorcycle &amp; Below</option><option>125cc Motorcycle</option>
+          <option>150-160cc Motorcycle</option><option>200-250cc Motorcycle</option>
+          <option>300cc+ Motorcycle</option><option>Scooter</option>
+          <option>Electric Scooter</option><option>Electric Motorcycle</option><option>Other</option>
+        </select></div>
+      <div><label style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:5px;">Emission Std *</label>
+        <select id="addVehEmission" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;">
+          <option value="">-- Select --</option>
+          <option value="BS6">BS6 (after Apr 2020)</option>
+          <option value="BS4">BS4 (2017–2020)</option>
+          <option value="Pre-BS4">Pre-BS4 (before 2017)</option>
+          <option value="BS6 OBD2">BS6 OBD2 (after Apr 2023)</option>
+          <option value="Electric AIS156">Electric AIS156</option>
+        </select></div>
+    </div>
+    <button class="btn-action" style="width:100%;background:var(--info);" onclick="confirmAddVehicle()">
+      ➕ ADD AS PENDING VEHICLE & CONTINUE
+    </button>
+  </div>
 </div>
 
 <!-- ── PHASE 9: RAISE COMPLAINT MODAL ──────────────────────────────── -->
@@ -263,21 +315,113 @@
         const cSel = document.getElementById('intakeCoMech');
         (staff || []).forEach(m => { pSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; cSel.innerHTML += `<option value="${m.id}">${m.name}</option>`; });
 
-        const { data: vMaster } = await supabaseClient.from('vehicle_master').select('*').order('brand').order('model_name');
+        const { data: vMaster } = await supabaseClient.from('vehicle_master')
+            .select('id,brand,model_name,category_group,emission_standard,status')
+            .in('status',['active','pending'])
+            .order('brand').order('model_name').order('emission_standard');
         globalVehicleMaster = vMaster || [];
-        const brands = [...new Set(globalVehicleMaster.map(item => item.brand))];
-        const brandList = document.getElementById('brandList');
-        brandList.innerHTML = '';
-        brands.forEach(b => { brandList.innerHTML += `<option value="${b}">`; });
     }
 
-    function populateModels() {
-        const selectedBrand = document.getElementById('nvBrand').value.trim().toUpperCase();
-        const modelList = document.getElementById('modelList');
-        modelList.innerHTML = '';
-        globalVehicleMaster.filter(item => item.brand.toUpperCase() === selectedBrand).forEach(m => {
-            modelList.innerHTML += `<option value="${m.model_name}">`;
+    /* ── PHASE 11A: Smart combined vehicle search ──────────────────────────── */
+    function searchVehicleMaster(q) {
+        const dropdown = document.getElementById('vmDropdown');
+        // Clear hidden fields on new search
+        ['nvVehicleMasterId','nvBrand','nvModel','nvEmission','nvCategoryGroup'].forEach(id => {
+            document.getElementById(id).value = '';
         });
+        document.getElementById('nvSelectedDisplay').style.display = 'none';
+
+        if (!q || q.trim().length < 2) { dropdown.style.display = 'none'; return; }
+        const qUp = q.trim().toUpperCase();
+        const tokens = qUp.split(/\s+/).filter(t => t.length > 0);
+
+        const results = globalVehicleMaster.map(vm => {
+            const label = `${vm.brand} ${vm.model_name} ${vm.emission_standard}`.toUpperCase();
+            const score = tokens.filter(t => label.includes(t)).length;
+            return { ...vm, score };
+        }).filter(vm => vm.score > 0)
+          .sort((a,b) => b.score - a.score || a.brand.localeCompare(b.brand))
+          .slice(0, 12);
+
+        const emitCol = { 'BS6':'#15803d','BS4':'#b45309','Pre-BS4':'#64748b','BS6 OBD2':'#0369a1','Electric AIS156':'#2980b9' };
+
+        if (results.length === 0) {
+            dropdown.innerHTML = `<div style="padding:10px 14px;font-size:.82rem;color:#64748b;">
+                No match found for "${q}".
+                <a href="#" onclick="openAddVehicleModal('${qUp.replace(/'/g,"\\'")}');return false;"
+                   style="color:var(--info);font-weight:700;margin-left:6px;">+ Add as new pending vehicle</a>
+            </div>`;
+        } else {
+            dropdown.innerHTML = results.map(vm => {
+                const col = emitCol[vm.emission_standard] || '#64748b';
+                const badge = vm.status==='pending' ? '<span style="background:#fde68a;color:#854d0e;font-size:.65rem;padding:1px 5px;border-radius:3px;margin-left:4px;">PENDING</span>' : '';
+                const safe_b = vm.brand.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                const safe_m = vm.model_name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                return `<div onclick="selectVehicleMaster('${vm.id}','${safe_b}','${safe_m}','${vm.emission_standard}','${(vm.category_group||'').replace(/'/g,"\\'")}','${safe_b} — ${safe_m} (${vm.emission_standard})')"
+                    style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.85rem;transition:background .1s;"
+                    onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+                    <strong>${vm.brand}</strong> — ${vm.model_name}
+                    <span style="color:${col};font-weight:700;margin-left:6px;">(${vm.emission_standard})</span>${badge}
+                    <span style="display:block;font-size:.7rem;color:#94a3b8;">${vm.category_group||''}</span>
+                </div>`;
+            }).join('') + `<div style="padding:8px 14px;border-top:1px solid #e2e8f0;font-size:.75rem;color:#94a3b8;">
+                Vehicle not listed? <a href="#" onclick="openAddVehicleModal('${qUp.replace(/'/g,"\\'")}');return false;" style="color:var(--info);font-weight:700;">+ Add new pending vehicle</a>
+            </div>`;
+        }
+        dropdown.style.display = 'block';
+    }
+
+    function selectVehicleMaster(id, brand, model, emission, category, displayLabel) {
+        document.getElementById('nvVehicleMasterId').value = id;
+        document.getElementById('nvBrand').value = brand;
+        document.getElementById('nvModel').value = model;
+        document.getElementById('nvEmission').value = emission;
+        document.getElementById('nvCategoryGroup').value = category;
+        document.getElementById('nvVehicleSearch').value = `${brand} — ${model} (${emission})`;
+        document.getElementById('vmDropdown').style.display = 'none';
+        const disp = document.getElementById('nvSelectedDisplay');
+        disp.style.display = 'block';
+        disp.innerText = `✅ ${displayLabel}`;
+    }
+
+    function openAddVehicleModal(prefill) {
+        const knownBrands = [...new Set(globalVehicleMaster.map(v => v.brand))];
+        const matchedBrand = knownBrands.find(b => prefill.toUpperCase().startsWith(b.toUpperCase()));
+        document.getElementById('addVehBrand').value = matchedBrand || '';
+        document.getElementById('addVehModel').value = matchedBrand ? prefill.slice(matchedBrand.length).trim() : prefill;
+        document.getElementById('addVehCategory').value = '';
+        document.getElementById('addVehEmission').value = '';
+        document.getElementById('modalAddVehicle').style.display = 'flex';
+    }
+
+    async function confirmAddVehicle() {
+        const brand = document.getElementById('addVehBrand').value.trim().toUpperCase();
+        const model = document.getElementById('addVehModel').value.trim().toUpperCase();
+        const cat   = document.getElementById('addVehCategory').value;
+        const emit  = document.getElementById('addVehEmission').value;
+        if (!brand || !model) return alert('Brand and Model are required.');
+        if (!cat)             return alert('Select a category.');
+        if (!emit)            return alert('Select an emission standard.');
+
+        // Check if already exists in cache
+        const exists = globalVehicleMaster.find(v =>
+            v.brand===brand && v.model_name===model && v.emission_standard===emit);
+        if (exists) {
+            selectVehicleMaster(exists.id, brand, model, emit, exists.category_group||'', `${brand} — ${model} (${emit})`);
+            document.getElementById('modalAddVehicle').style.display='none';
+            return;
+        }
+
+        const { data: newVm, error } = await supabaseClient.from('vehicle_master').insert({
+            brand, model_name: model, category_group: cat,
+            emission_standard: emit, status: 'pending', added_by: activeRole
+        }).select().single();
+        if (error) return alert('Error: ' + error.message);
+
+        globalVehicleMaster.push(newVm);
+        selectVehicleMaster(newVm.id, brand, model, emit, cat, `${brand} — ${model} (${emit}) ⏳`);
+        document.getElementById('modalAddVehicle').style.display='none';
+        alert(`✅ "${brand} — ${model} (${emit})" added as PENDING.\nAdmin will review and approve in product-master-console.`);
     }
 
     async function processCustomerLookup(mobileStr) {
@@ -455,23 +599,18 @@
             const reg   = document.getElementById('nvReg').value.trim().toUpperCase().replace(/\s+/g, '');
             const brand = document.getElementById('nvBrand').value.trim().toUpperCase();
             const model = document.getElementById('nvModel').value.trim().toUpperCase();
+            const vmId  = document.getElementById('nvVehicleMasterId').value || null;
+            const cat   = document.getElementById('nvCategoryGroup').value || 'Other';
 
             if (!reg || !brand || !model) {
-                alert("Registration No, Brand, and Model are required.");
+                alert("Registration No and Vehicle selection are required.");
                 btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return;
-            }
-
-            let cat = 'Unclassified';
-            const matchedModel = globalVehicleMaster.find(m => m.brand.toUpperCase() === brand && m.model_name.toUpperCase() === model);
-            if (matchedModel) {
-                cat = matchedModel.category_group;
-            } else {
-                await supabaseClient.from('vehicle_master').insert({ brand, model_name: model, category_group: 'Unclassified' });
             }
 
             const { data: newVeh, error: vehErr } = await supabaseClient.from('vehicles').insert({
                 customer_mobile: mobile, reg_number: reg, brand, make_model: model,
-                color: document.getElementById('nvColor').value.toUpperCase(), category_group: cat
+                color: document.getElementById('nvColor').value.toUpperCase(),
+                category_group: cat, vehicle_master_id: vmId
             }).select().single();
 
             if (vehErr) { alert("Error: " + vehErr.message); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
