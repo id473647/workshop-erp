@@ -67,6 +67,9 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   <!-- Customer Refunds Notification Card — visible to admin when refunds pending -->
   <div id="refundNotifCard" style="display:none;background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:16px;margin-bottom:16px;"></div>
 
+  <!-- Pending Vehicles Notification Card — visible to admin when vehicles pending -->
+  <div id="vehicleNotifCard" style="display:none;background:#f0f9ff;border:2px solid #bae6fd;border-radius:10px;padding:16px;margin-bottom:16px;"></div>
+
   <div class="card-panel" id="pendingPanel">
     <div class="section-title">
       ⏳ Pending — Action Required
@@ -389,10 +392,16 @@ async function loadApprovals(){
     ? sb.from('customer_refunds').select('id,refund_amount,refund_type,customer_mobile,job_card_id,reason,created_at').eq('refund_status','pending')
     : Promise.resolve({data:[]});
 
-  const [pendRes, histRes, refRes] = await Promise.all([pendingQ, historyQ, refundsQ]);
+  // Also fetch pending vehicles (admin only)
+  const vehiclesQ = role==='admin'
+    ? sb.from('vehicle_master').select('id,brand,model_name,emission_standard,added_by,created_at').eq('status','pending')
+    : Promise.resolve({data:[]});
+
+  const [pendRes, histRes, refRes, vehRes] = await Promise.all([pendingQ, historyQ, refundsQ, vehiclesQ]);
   const pending = pendRes.data||[];
   const history = histRes.data||[];
   const pendingRefunds = refRes.data||[];
+  const pendingVehicles = vehRes.data||[];
 
   // Filter history to last 30 days
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
@@ -419,6 +428,29 @@ async function loadApprovals(){
         </div>`;
     } else {
       refundNotifEl.style.display='none';
+    }
+  }
+
+  // Render pending vehicles notification card
+  const vehNotifEl = document.getElementById('vehicleNotifCard');
+  if(vehNotifEl) {
+    if(pendingVehicles.length > 0) {
+      vehNotifEl.style.display='block';
+      vehNotifEl.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <span style="font-weight:700;font-size:1rem;">🚗 ${pendingVehicles.length} Vehicle${pendingVehicles.length>1?'s':''} Pending Approval</span>
+            <div style="font-size:.78rem;color:#64748b;margin-top:2px;">Added by staff during job card creation — review and approve to add to master list</div>
+            <div style="font-size:.75rem;color:#94a3b8;margin-top:4px;">
+              ${pendingVehicles.slice(0,3).map(v=>`${v.brand} ${v.model_name} (${v.emission_standard})`).join(' &nbsp;·&nbsp; ')}
+              ${pendingVehicles.length>3?` &nbsp;·&nbsp; +${pendingVehicles.length-3} more`:''}
+            </div>
+          </div>
+          <button class="btn-action" style="background:#2c3e50;"
+            onclick="window.location.href='product-master-console.html'">REVIEW VEHICLES →</button>
+        </div>`;
+    } else {
+      vehNotifEl.style.display='none';
     }
   }
 
