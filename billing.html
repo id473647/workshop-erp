@@ -1867,6 +1867,8 @@
             upi_amount          : activeJobContext?.upi_amount,
             credit_amount       : activeJobContext?.credit_amount
         };
+        /* Also snapshot line items to detect deleted items for product return flow */
+        window._amendmentSnapshotItems = JSON.parse(JSON.stringify(lineItemsLocalMemory || []));
 
         /* Pre-select payment mode in amendment dropdown to match current JC */
         const pm = activeJobContext?.payment_mode || 'Cash';
@@ -2021,14 +2023,53 @@
         };
         const changedFields = Object.keys(valuesAfter)
             .filter(k => String(window._amendmentSnapshot?.[k]) !== String(valuesAfter[k]));
-        await supabaseClient.from('jc_amendments').insert({
+        const { data: amendData } = await supabaseClient.from('jc_amendments').insert({
             job_card_id   : targetJobId,
             amended_by    : sessionRole,
             amendment_note: note,
             fields_changed: changedFields,
             values_before : window._amendmentSnapshot || {},
             values_after  : valuesAfter
-        });
+        }).select('id').single();
+        const amendmentId = amendData?.id;
+
+        /* ── Customer Refund Detection ─────────────────────────────────────────
+           Compare original total vs amended total.
+           Also detect physically deleted line items (product return scenario). */
+        const originalTotal = parseFloat(window._amendmentSnapshot?.total_invoice_value) || 0;
+        const refundAmt     = Math.round(originalTotal - netVal);
+
+        const snapshotItems = window._amendmentSnapshotItems || [];
+        const currentIds    = new Set((lineItemsLocalMemory || []).map(i => i.id));
+        const deletedItems  = snapshotItems.filter(i => !currentIds.has(i.id)
+            && i.warehouse_type !== 'Service'); // service protocol deletions don't create product returns
+
+        if (refundAmt > 0 || deletedItems.length > 0) {
+            const refundType = deletedItems.length > 0 ? 'product_return' : 'money_refund';
+            await supabaseClient.from('customer_refunds').insert({
+                job_card_id    : targetJobId,
+                amendment_id   : amendmentId || null,
+                customer_mobile: activeJobContext?.customer_mobile || null,
+                refund_type    : refundType,
+                refund_amount  : Math.max(refundAmt, 0),
+                payment_mode   : 'Cash',
+                refund_source  : 'service',
+                refund_status  : refundAmt > 0 ? 'pending' : 'cancelled',
+                returned_items : deletedItems.length > 0 ? deletedItems.map(i => ({
+                    item_name       : i.item_name,
+                    qty             : i.qty || 1,
+                    unit_price      : i.unit_price || 0,
+                    total_price     : i.total_price || 0,
+                    product_master_id: i.product_master_id || null,
+                    warehouse_type  : i.warehouse_type
+                })) : null,
+                stock_restored : false,
+                reason         : note,
+                original_amount: originalTotal,
+                corrected_amount: netVal,
+                created_by     : sessionRole
+            });
+        }
 
         /* Update local context and re-lock */
         Object.assign(activeJobContext, updates);
@@ -2038,7 +2079,11 @@
         lockUserInterface();
 
         if (btn) { btn.disabled = false; btn.innerText = '💾 SAVE AMENDMENT'; }
-        alert(`✅ Amendment saved to audit log.\nOriginal close date preserved: ${origDate}\nFields changed: ${changedFields.join(', ') || 'none detected'}\nReason: ${note}`);
+        const refundMsg = refundAmt > 0
+            ? `\n💸 ₹${refundAmt} refund logged as PENDING — visible in Approvals.`
+            : deletedItems.length > 0 ? `\n📦 Product return logged — visible in Approvals for stock restore.`
+            : '';
+        alert(`✅ Amendment saved to audit log.\nOriginal close date preserved: ${origDate}\nFields changed: ${changedFields.join(', ') || 'none detected'}\nReason: ${note}${refundMsg}`);
     }
 
     async function cancelJobCard() { const reason = prompt("Please provide a reason for cancelling this job card:"); if(!reason || reason.trim() === '') return alert("Cancellation requires a valid reason."); if(confirm("Are you absolutely sure you want to CANCEL this Job Card?")) { await supabaseClient.from('job_cards').update({ status: 'Cancelled', cancellation_reason: reason.trim() }).eq('id', targetJobId); alert("Job Card Cancelled."); window.location.href = 'index.html'; } }
