@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="notifications.js"></script>
 <link rel="stylesheet" href="dark-mode.css">
 <script src="dark-mode.js"></script>
@@ -88,6 +89,9 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <button class="tab-btn" onclick="switchTab('tGroups',event)">🔗 Product Groups</button>
     <button class="tab-btn" onclick="switchTab('tBrands',event)">💰 Brand Discounts</button>
     <button class="tab-btn" onclick="switchTab('tDefective',event)">🔴 Defective Stock</button>
+    <button class="tab-btn" id="tabPendingVeh" onclick="switchTab('tPendingVehicles',event)">
+      🚗 Pending Vehicles <span id="pendingVehCount" style="display:none;background:#dc2626;color:white;font-size:.65rem;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:900;"></span>
+    </button>
   </div>
 
   <!-- ── TAB 1: UNVERIFIED QUEUE ──────────────────────────────────────────── -->
@@ -103,22 +107,50 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   <div id="tCatalog" class="tab-panel">
     <div class="card-panel">
       <div class="block-title">📦 Live Product Catalog</div>
-      <div class="search-bar">
-        <input type="text" id="catSearch" placeholder="Search by item name or brand..." oninput="loadCatalog()">
+      <div class="search-bar" style="flex-wrap:wrap;gap:6px;">
+        <input type="text" id="catSearch" placeholder="Search by item name or brand..." oninput="loadCatalog()" style="flex:1;min-width:180px;">
+        <select id="catWarehouse" onchange="loadCatalog()" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <option value="">All Warehouses</option>
+          <option value="green">Green</option>
+          <option value="moped">Moped</option>
+          <option value="service">Service</option>
+          <option value="universal">Universal</option>
+        </select>
         <select id="catScope" onchange="loadCatalog()">
           <option value="">All Scopes</option>
           <option value="universal">Universal</option>
           <option value="generic">Generic</option>
           <option value="specific">Specific</option>
         </select>
-        <button class="btn-action warn" onclick="bulkPrintLabels()">🏷️ Print Selected Labels</button>
+        <select id="catSmartFilter" onchange="loadCatalog()" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <option value="">All Products</option>
+          <option value="no_qr">🆕 No QR label yet</option>
+          <option value="low_stock">📉 Low Stock</option>
+          <option value="recent">🕐 Added Recently</option>
+        </select>
+        <select id="labelSize" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <option value="large">Label: Large 62×38mm</option>
+          <option value="medium">Label: Medium 50×25mm</option>
+          <option value="small">Label: Small 30×20mm</option>
+        </select>
+        <select id="labelType" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
+          <option value="qr">QR Code</option>
+          <option value="barcode">1D Barcode</option>
+        </select>
+        <button class="btn-action warn" onclick="bulkPrintLabels()">🏷️ Print Selected</button>
+        <button class="btn-action" style="background:#7c3aed;" onclick="openAddProductModal()">➕ ADD PRODUCT</button>
+        <button class="btn-action" style="background:#15803d;" onclick="exportCatalogExcel()">📊 EXPORT</button>
+        <label class="btn-action" style="background:var(--info);cursor:pointer;margin:0;">
+          📥 IMPORT
+          <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleImportFile(this)">
+        </label>
       </div>
       <div class="table-wrapper">
         <table id="catTable">
           <thead><tr>
             <th><input type="checkbox" id="catCheckAll" onchange="toggleAllChecks()"></th>
             <th>Item Name</th><th>Brand</th><th>Scope</th>
-            <th>Track Stock</th><th>MRP</th><th>Sell Price</th><th>Action</th>
+            <th>Stock</th><th>MRP</th><th>Sell Price</th><th>HSN</th><th>MAC (Cost)</th><th>Action</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -247,6 +279,290 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 <!-- Print area (hidden, print-only) -->
 <div id="printArea"></div>
 
+
+  <!-- ── PHASE 11A: PENDING VEHICLES TAB ─────────────────────────────────── -->
+  <div id="tPendingVehicles" class="tab-panel">
+    <div class="block-title">🚗 Pending Vehicle Approvals</div>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:14px;">
+      Vehicles added by staff during job card creation. Approve to add to master list, Edit+Approve to correct first, or Merge if it duplicates an existing vehicle.
+    </p>
+    <div id="pendingVehList"><div style="text-align:center;padding:20px;color:#94a3b8;">Loading...</div></div>
+    <!-- Inline edit panel -->
+    <div id="pendingVehEditPanel" style="display:none;border:2px solid #fde68a;border-radius:8px;padding:16px;background:#fffbeb;margin-top:16px;">
+      <h4 style="margin:0 0 12px 0;color:#b45309;">✏️ Edit Before Approving</h4>
+      <input type="hidden" id="pvEditId">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
+        <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">BRAND</label>
+          <input type="text" id="pvEditBrand" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">MODEL NAME</label>
+          <input type="text" id="pvEditModel" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">CATEGORY</label>
+          <select id="pvEditCat" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+            <option>100cc Motorcycle &amp; Below</option><option>125cc Motorcycle</option>
+            <option>150-160cc Motorcycle</option><option>200-250cc Motorcycle</option>
+            <option>300cc+ Motorcycle</option><option>Scooter</option>
+            <option>Electric Scooter</option><option>Electric Motorcycle</option><option>Other</option>
+          </select></div>
+        <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">EMISSION</label>
+          <select id="pvEditEmit" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+            <option value="BS6">BS6</option><option value="BS4">BS4</option>
+            <option value="Pre-BS4">Pre-BS4</option><option value="BS6 OBD2">BS6 OBD2</option>
+            <option value="Electric AIS156">Electric AIS156</option>
+          </select></div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-action" style="background:#15803d;" onclick="saveEditAndApprove()">✅ SAVE & APPROVE</button>
+        <button class="btn-action danger" onclick="document.getElementById('pendingVehEditPanel').style.display='none'">CANCEL</button>
+      </div>
+    </div>
+    <!-- Merge panel -->
+    <div id="pendingVehMergePanel" style="display:none;border:2px solid #fca5a5;border-radius:8px;padding:16px;background:#fef2f2;margin-top:16px;">
+      <h4 style="margin:0 0 8px 0;color:#b91c1c;">🔀 Merge with Existing Vehicle</h4>
+      <input type="hidden" id="pvMergeId">
+      <p style="font-size:.78rem;color:#64748b;margin:0 0 10px 0;">
+        All customer bikes linked to the pending entry will be re-linked to the vehicle you select. The pending entry is then deleted permanently.
+      </p>
+      <input type="text" id="pvMergeSearch" placeholder="Type to search active vehicles..."
+        oninput="searchMergeTarget(this.value)" autocomplete="off"
+        style="width:100%;padding:8px;border:1px solid #fca5a5;border-radius:6px;box-sizing:border-box;margin-bottom:8px;">
+      <div id="pvMergeResults" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;display:none;background:white;"></div>
+      <input type="hidden" id="pvMergeTargetId">
+      <div id="pvMergeSelected" style="display:none;font-size:.78rem;color:#15803d;font-weight:700;padding:6px 0;"></div>
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <button class="btn-action danger" id="pvMergeConfirmBtn" onclick="confirmMerge()" style="display:none;">🔀 CONFIRM MERGE</button>
+        <button class="btn-action" style="background:#64748b;" onclick="document.getElementById('pendingVehMergePanel').style.display='none'">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+
+<!-- ── ADD PRODUCT MODAL ─────────────────────────────────────────────────── -->
+<div id="modalAddProduct" class="overlay-modal">
+  <div class="modal-card" style="max-width:660px;max-height:92vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;position:sticky;top:0;background:white;z-index:1;padding-top:4px;">
+      <h3 id="apModalTitle" style="margin:0;color:#7c3aed;">➕ Add New Product</h3>
+      <button onclick="closeAddProductModal()" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <input type="hidden" id="apEditId">
+
+    <!-- PRODUCT NAME with autocomplete + reference panel -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">PRODUCT NAME * (ALL CAPS)</label>
+      <div style="position:relative;">
+        <input type="text" id="apName" oninput="this.value=this.value.toUpperCase();searchExistingProducts(this.value)"
+          placeholder="e.g. CHAIN KIT SPL Y2K — type to search existing"
+          style="width:100%;padding:10px;border:2px solid #7c3aed;border-radius:6px;box-sizing:border-box;font-weight:700;">
+        <div id="apNameDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <!-- Reference panel — loads on product name selection -->
+      <div id="apRefPanel" style="display:none;margin-top:8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px;font-size:.78rem;">
+        <div style="font-weight:700;color:#0369a1;margin-bottom:6px;" id="apRefTitle"></div>
+        <div id="apRefRows"></div>
+        <div style="color:#0369a1;font-size:.72rem;margin-top:6px;">↓ Fill Brand and Price below to add a new variant for this product</div>
+      </div>
+    </div>
+
+    <!-- SHARED FIELDS (auto-fill from existing product or fill fresh) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">BRAND *</label>
+        <input type="text" id="apBrand" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. ROLON"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">WAREHOUSE *</label>
+        <select id="apWarehouse" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          <option value="green">Green</option>
+          <option value="moped">Moped</option>
+          <option value="service">Service</option>
+          <option value="universal">Universal (all counters)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">CATEGORY</label>
+        <select id="apCategory" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          <option value="SPARE">Spare Part</option><option value="LUBE">Lubricant</option>
+          <option value="ELECTRICAL">Electrical</option><option value="TYRE">Tyre/Tube</option>
+          <option value="ACCESSORY">Accessory</option><option value="CONSUMABLE">Consumable</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">SCOPE</label>
+        <select id="apScope" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          <option value="generic">Generic (many vehicles)</option>
+          <option value="specific">Specific (one model only)</option>
+          <option value="universal">Universal (all vehicles)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">FAMILY NAME</label>
+        <input type="text" id="apFamily" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. CHAIN KIT"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">UNIT</label>
+        <select id="apUnit" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          <option value="Pcs">Pcs</option><option value="Set">Set</option><option value="Pair">Pair</option>
+          <option value="Ltr">Ltr</option><option value="ML">ML</option><option value="Kg">Kg</option><option value="Mtr">Mtr</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">BARCODE ID (leave blank = auto)</label>
+        <input type="text" id="apBarcode" placeholder="Scan manufacturer barcode or leave blank"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">HSN CODE (accounting only)</label>
+        <input type="text" id="apHsn" placeholder="e.g. 8708"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">TRACK STOCK</label>
+        <select id="apTrackStock" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+          <option value="true">Yes — count inventory</option>
+          <option value="false">No — bin item (nuts, bolts etc.)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">VOLUME PER UNIT ML (lubes only)</label>
+        <input type="number" id="apVolMl" placeholder="e.g. 900"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+      </div>
+    </div>
+
+    <!-- VENDOR SECTION -->
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px;">
+      <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">PRIMARY VENDOR (type alias)</label>
+      <div style="position:relative;">
+        <input type="text" id="apVendorSearch" placeholder="e.g. rolonjbp, wuerth, powerzone..."
+          oninput="searchVendorFor(this.value)" autocomplete="off"
+          style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+        <div id="apVendorDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:100;max-height:160px;overflow-y:auto;"></div>
+      </div>
+      <input type="hidden" id="apVendorId">
+      <!-- Vendor contact shown on selection -->
+      <div id="apVendorSelected" style="display:none;font-size:.75rem;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;padding:6px 10px;margin-top:6px;"></div>
+    </div>
+
+    <!-- PRICING SECTION -->
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px;">
+      <div style="font-size:.72rem;font-weight:700;color:#64748b;margin-bottom:8px;">PRICING</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">MRP *</label>
+          <input type="number" id="apMrp" placeholder="₹0" oninput="recalcMAC()"
+            style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">NET DISCOUNT %</label>
+          <input type="number" id="apDiscount" placeholder="e.g. 30" value="0" min="0" max="100" oninput="recalcMAC()"
+            style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">MAC (auto / editable)</label>
+          <input type="number" id="apMac" placeholder="₹0" oninput="macManuallyEdited=true"
+            style="width:100%;padding:8px;border:2px solid #fde68a;border-radius:6px;box-sizing:border-box;font-weight:700;background:#fffbeb;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">SELLING PRICE *</label>
+          <input type="number" id="apSellPrice" placeholder="₹0" oninput="recalcMAC()"
+            style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">GST % (reference)</label>
+          <select id="apGstPct" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
+            <option value="0">0% (exempt)</option><option value="5">5%</option>
+            <option value="12">12%</option><option value="18" selected>18%</option>
+            <option value="28">28%</option><option value="NA">N/A (no ITC this entry)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">OPENING STOCK</label>
+          <input type="number" id="apStock" value="0" min="0"
+            style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+        </div>
+      </div>
+      <!-- Live pricing summary -->
+      <div id="apPriceSummary" style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:.82rem;color:#64748b;">
+        Enter MRP and discount to see buying cost and margin
+      </div>
+    </div>
+
+    <!-- PHOTO SECTION -->
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:14px;">
+      <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">PRODUCT PHOTO (optional — useful for fiber/electrical parts)</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="apPhotoPreview" style="width:80px;height:80px;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:.7rem;text-align:center;overflow:hidden;">
+          No photo
+        </div>
+        <div>
+          <label style="background:var(--info);color:white;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:700;display:inline-block;">
+            📸 Choose Photo
+            <input type="file" id="apPhotoFile" accept="image/*" style="display:none;" onchange="previewAddPhoto(this)">
+          </label>
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">Photo uploads after product is saved</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="apSaveBtn" class="btn-action" style="width:100%;background:#7c3aed;font-size:1rem;" onclick="saveNewProduct()">
+      ✅ SAVE PRODUCT TO CATALOG
+    </button>
+  </div>
+</div>
+
+<div id="modalProductPhoto" class="overlay-modal">
+  <div class="modal-card" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
+      <h3 id="ppName" style="margin:0;color:var(--primary);">Product Details</h3>
+      <button onclick="document.getElementById('modalProductPhoto').style.display='none'" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <div id="ppPhotoArea" style="text-align:center;margin-bottom:12px;min-height:120px;background:#f8fafc;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+      <span style="color:#94a3b8;font-size:.82rem;">No photo uploaded</span>
+    </div>
+    <div id="ppVendorInfo" style="font-size:.8rem;color:#64748b;margin-bottom:12px;"></div>
+    <label class="btn-action" style="width:100%;background:var(--info);cursor:pointer;display:block;text-align:center;box-sizing:border-box;">
+      📸 Upload / Change Photo
+      <input type="file" id="ppPhotoInput" accept="image/*" style="display:none;" onchange="uploadProductPhoto(this)">
+    </label>
+    <input type="hidden" id="ppProductId">
+  </div>
+</div>
+
+<!-- ── PHASE 11A: IMPORT PREVIEW MODAL ─────────────────────────────────────── -->
+<div id="modalImportPreview" class="overlay-modal">
+  <div class="modal-card" style="max-width:720px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
+      <div>
+        <h3 style="margin:0;color:var(--primary);">📥 Import Preview</h3>
+        <span id="importPreviewCount" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="document.getElementById('modalImportPreview').style.display='none';_importRows=[];" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <div style="font-size:.82rem;color:#64748b;margin-bottom:10px;background:#fffbeb;padding:10px;border-radius:6px;border:1px solid #fde68a;">
+      ⚠️ <strong>Existing products</strong> (matched by name+brand) will have stock, price, barcode and HSN <strong>updated</strong>. New rows will be <strong>created as live products</strong>.
+    </div>
+    <div style="overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+        <thead><tr style="background:#f1f5f9;">
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);">Item Name</th>
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);">Brand</th>
+          <th style="padding:6px 10px;border-bottom:1px solid var(--border);">MRP</th>
+          <th style="padding:6px 10px;border-bottom:1px solid var(--border);">Sell</th>
+          <th style="padding:6px 10px;border-bottom:1px solid var(--border);">Stock</th>
+          <th style="padding:6px 10px;border-bottom:1px solid var(--border);">Barcode</th>
+          <th style="padding:6px 10px;border-bottom:1px solid var(--border);">HSN</th>
+        </tr></thead>
+        <tbody id="importPreviewBody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button id="btnConfirmImport" class="btn-action" style="background:#15803d;flex:1;" onclick="confirmImport()">✅ CONFIRM IMPORT</button>
+      <button class="btn-action danger" style="flex:0.5;" onclick="document.getElementById('modalImportPreview').style.display='none';_importRows=[];">CANCEL</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
@@ -255,9 +571,25 @@ const sessionRole=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase
 document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
-// Access guard — admin only
-if(sessionRole!=='admin'){
-  document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:var(--danger);font-weight:700;font-size:1.2rem;">ACCESS DENIED. Admin login required.</div>';
+let catalogCache = []; // used by Add Product name autocomplete
+
+// Access guard — admin, moped, green only
+if(!['admin','moped','green'].includes(sessionRole)){
+  document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:var(--danger);font-weight:700;font-size:1.2rem;">ACCESS DENIED. Admin, Green or Moped login required.</div>';
+} else if(sessionRole==='moped'||sessionRole==='green'){
+  // Non-admin: hide tabs that don't apply to them
+  const hideTabs=['tUnverified','tFamilies','tGroups','tBrands','tPendingVehicles'];
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    const onclick=btn.getAttribute('onclick')||'';
+    if(hideTabs.some(t=>onclick.includes(t))) btn.style.display='none';
+  });
+  // Default to Full Catalog tab
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tCatalog').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    if((b.getAttribute('onclick')||'').includes('tCatalog')) b.classList.add('active');
+    else b.classList.remove('active');
+  });
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
@@ -272,6 +604,167 @@ function switchTab(tabId,evt){
   if(tabId==='tGroups') loadGroups();
   if(tabId==='tBrands') loadBrands();
   if(tabId==='tDefective') loadDefectiveStock();
+  if(tabId==='tPendingVehicles') loadPendingVehicles();
+}
+
+/* ── PHASE 11A: PENDING VEHICLES FUNCTIONS ───────────────────────────────── */
+
+let _activeVehicleMaster = []; // cache of active vehicles for merge search
+
+async function loadPendingVehicles() {
+  const listEl = document.getElementById('pendingVehList');
+  if(!listEl) return;
+  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Loading...</div>';
+
+  const { data: pending, error } = await sb.from('vehicle_master')
+    .select('id,brand,model_name,category_group,emission_standard,status,added_by,created_at,added_for_jc')
+    .eq('status','pending').order('created_at',{ascending:false});
+
+  // Update count badge
+  const badge = document.getElementById('pendingVehCount');
+  if(badge) {
+    if((pending||[]).length > 0) {
+      badge.style.display = 'inline'; badge.innerText = pending.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if(error) { listEl.innerHTML = `<div style="color:red;">${error.message}</div>`; return; }
+  if(!pending?.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;">✅ No pending vehicles — all clear.</div>';
+    return;
+  }
+
+  // Also load active vehicles for merge search cache
+  const { data: active } = await sb.from('vehicle_master')
+    .select('id,brand,model_name,emission_standard,category_group').eq('status','active').order('brand');
+  _activeVehicleMaster = active || [];
+
+  listEl.innerHTML = pending.map(v => {
+    const added = new Date(v.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+    const jcRef = v.added_for_jc ? 'JC-'+v.added_for_jc.split('-')[0].toUpperCase() : '—';
+    const emitCol = {BS6:'#15803d',BS4:'#b45309','Pre-BS4':'#64748b','Electric AIS156':'#2980b9'};
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:#f8fafc;">
+      <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
+        <div>
+          <span style="font-weight:900;font-size:1rem;">${v.brand}</span>
+          <span style="font-size:.95rem;margin-left:8px;">${v.model_name}</span>
+          <span style="color:${emitCol[v.emission_standard]||'#64748b'};font-weight:700;font-size:.82rem;margin-left:8px;">(${v.emission_standard})</span>
+          <span style="display:block;font-size:.72rem;color:#94a3b8;margin-top:3px;">
+            ${v.category_group||'Uncategorised'} &nbsp;|&nbsp; Added by: ${(v.added_by||'—').toUpperCase()} on ${added} &nbsp;|&nbsp; JC: ${jcRef}
+          </span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-action" style="background:#15803d;padding:6px 12px;font-size:.78rem;"
+            onclick="approveVehicle('${v.id}')">✅ APPROVE</button>
+          <button class="btn-action" style="background:#b45309;padding:6px 12px;font-size:.78rem;"
+            onclick="openEditVehicle('${v.id}','${v.brand.replace(/'/g,"\\'")}','${v.model_name.replace(/'/g,"\\'")}','${v.category_group||'Other'}','${v.emission_standard}')">✏️ EDIT+APPROVE</button>
+          <button class="btn-action danger" style="padding:6px 12px;font-size:.78rem;"
+            onclick="openMergeVehicle('${v.id}','${v.brand.replace(/'/g,"\\'")} ${v.model_name.replace(/'/g,"\\'")}')">🔀 MERGE</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function approveVehicle(id) {
+  const { error } = await sb.from('vehicle_master').update({status:'active'}).eq('id',id);
+  if(error) return alert('Error: '+error.message);
+  loadPendingVehicles();
+}
+
+function openEditVehicle(id, brand, model, cat, emit) {
+  document.getElementById('pvEditId').value = id;
+  document.getElementById('pvEditBrand').value = brand;
+  document.getElementById('pvEditModel').value = model;
+  document.getElementById('pvEditCat').value = cat;
+  document.getElementById('pvEditEmit').value = emit;
+  document.getElementById('pendingVehEditPanel').style.display = 'block';
+  document.getElementById('pendingVehMergePanel').style.display = 'none';
+  document.getElementById('pendingVehEditPanel').scrollIntoView({behavior:'smooth'});
+}
+
+async function saveEditAndApprove() {
+  const id    = document.getElementById('pvEditId').value;
+  const brand = document.getElementById('pvEditBrand').value.trim().toUpperCase();
+  const model = document.getElementById('pvEditModel').value.trim().toUpperCase();
+  const cat   = document.getElementById('pvEditCat').value;
+  const emit  = document.getElementById('pvEditEmit').value;
+  if(!brand||!model) return alert('Brand and Model are required.');
+
+  const { error } = await sb.from('vehicle_master')
+    .update({brand, model_name:model, category_group:cat, emission_standard:emit, status:'active'})
+    .eq('id',id);
+  if(error) return alert('Error: '+error.message);
+  document.getElementById('pendingVehEditPanel').style.display='none';
+  loadPendingVehicles();
+}
+
+function openMergeVehicle(pendingId, pendingLabel) {
+  document.getElementById('pvMergeId').value = pendingId;
+  document.getElementById('pvMergeSearch').value = '';
+  document.getElementById('pvMergeResults').style.display = 'none';
+  document.getElementById('pvMergeTargetId').value = '';
+  document.getElementById('pvMergeSelected').style.display = 'none';
+  document.getElementById('pvMergeConfirmBtn').style.display = 'none';
+  document.getElementById('pendingVehMergePanel').style.display = 'block';
+  document.getElementById('pendingVehEditPanel').style.display = 'none';
+  document.getElementById('pendingVehMergePanel').scrollIntoView({behavior:'smooth'});
+}
+
+function searchMergeTarget(q) {
+  const results = document.getElementById('pvMergeResults');
+  document.getElementById('pvMergeTargetId').value = '';
+  document.getElementById('pvMergeConfirmBtn').style.display = 'none';
+  document.getElementById('pvMergeSelected').style.display = 'none';
+  if(!q||q.trim().length<2){results.style.display='none';return;}
+  const qUp = q.trim().toUpperCase();
+  const tokens = qUp.split(/\s+/);
+  const matches = _activeVehicleMaster.filter(v=>{
+    const label = `${v.brand} ${v.model_name} ${v.emission_standard}`.toUpperCase();
+    return tokens.every(t=>label.includes(t));
+  }).slice(0,8);
+  const emitCol={BS6:'#15803d',BS4:'#b45309','Pre-BS4':'#64748b'};
+  results.innerHTML = matches.length
+    ? matches.map(v=>`<div onclick="selectMergeTarget('${v.id}','${v.brand.replace(/'/g,"\\'")} — ${v.model_name.replace(/'/g,"\\'")} (${v.emission_standard})')"
+        style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f1f5f9;"
+        onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+        <strong>${v.brand}</strong> — ${v.model_name}
+        <span style="color:${emitCol[v.emission_standard]||'#64748b'};font-weight:700;"> (${v.emission_standard})</span>
+      </div>`).join('')
+    : '<div style="padding:8px 12px;font-size:.78rem;color:#94a3b8;">No match found</div>';
+  results.style.display='block';
+}
+
+function selectMergeTarget(targetId, displayLabel) {
+  document.getElementById('pvMergeTargetId').value = targetId;
+  document.getElementById('pvMergeResults').style.display = 'none';
+  document.getElementById('pvMergeSearch').value = displayLabel;
+  const sel = document.getElementById('pvMergeSelected');
+  sel.style.display='block';
+  sel.innerText = `✅ Will merge into: ${displayLabel}`;
+  document.getElementById('pvMergeConfirmBtn').style.display = 'inline-block';
+}
+
+async function confirmMerge() {
+  const pendingId  = document.getElementById('pvMergeId').value;
+  const targetId   = document.getElementById('pvMergeTargetId').value;
+  if(!pendingId||!targetId) return alert('Select a target vehicle first.');
+  if(!confirm('Merge pending vehicle into the selected canonical entry?\nAll customer bikes linked to the pending entry will be re-linked. The pending entry will be permanently deleted.')) return;
+
+  // Re-link all customer vehicles pointing to pending entry → canonical entry
+  const { error: relink } = await sb.from('vehicles')
+    .update({vehicle_master_id:targetId}).eq('vehicle_master_id',pendingId);
+  if(relink) return alert('Relink error: '+relink.message);
+
+  // Delete the pending entry
+  const { error: del } = await sb.from('vehicle_master').delete().eq('id',pendingId);
+  if(del) return alert('Delete error: '+del.message);
+
+  document.getElementById('pendingVehMergePanel').style.display='none';
+  alert('✅ Merge complete. Customer vehicles re-linked to canonical entry.');
+  loadPendingVehicles();
 }
 
 // ── PHASE 9: DEFECTIVE STOCK ──────────────────────────────────────────────
@@ -423,26 +916,58 @@ async function deleteProduct(id,isCatalog){
 
 // ── TAB 2: FULL CATALOG ────────────────────────────────────────────────────
 async function loadCatalog(){
-  let q=sb.from('product_master').select('id,item_name,brand,scope,track_stock,mrp,retail_price,barcode_id').eq('catalog_status','live').order('item_name').limit(150);
+  // Role-based warehouse filter
+  const whSel = document.getElementById('catWarehouse');
+  if(sessionRole==='moped'){ whSel.value='moped'; whSel.disabled=true; }
+  else if(sessionRole==='green'){ whSel.value='green'; whSel.disabled=true; }
+  const catWh = whSel.value;
+  const smartFilter = document.getElementById('catSmartFilter')?.value || '';
+
+  let q=sb.from('product_master').select('id,item_name,brand,scope,track_stock,mrp,retail_price,barcode_id,hsn_code,mac,cost_price,current_stock,warehouse_type,photo_url,primary_vendor_id,gst_percent').eq('catalog_status','live').order('item_name').limit(200);
   const search=document.getElementById('catSearch').value.trim();
   const scope=document.getElementById('catScope').value;
   if(search) q=q.ilike('item_name',`%${search}%`);
   if(scope) q=q.eq('scope',scope);
+  if(catWh) q=q.eq('warehouse_type',catWh);
+  if(smartFilter==='no_qr') q=q.is('barcode_id',null);
+  if(smartFilter==='low_stock') q=q.lt('current_stock',4).eq('track_stock',true);
+  if(smartFilter==='recent') q=q.order('created_at',{ascending:false});
   const{data}=await q;
+  // Build name cache for Add Product autocomplete
+  if(data) { catalogCache=data; _catalogNameCache=[...new Set(data.map(p=>p.item_name).filter(Boolean))].sort(); }
   const tbody=document.querySelector('#catTable tbody'); tbody.innerHTML='';
+  const isAdmin=sessionRole==='admin';
+  const canEdit=(sessionRole==='admin'||sessionRole==='moped'||sessionRole==='green');
   (data||[]).forEach(p=>{
+    const stkColor=(p.current_stock||0)>0?'#15803d':'#dc2626';
+    const stkText=p.track_stock===false?'Bin':(p.current_stock||0);
+    const macCell=isAdmin?`<td style="font-size:.78rem;color:#64748b;">${(p.mac||0)>0?'₹'+(p.mac):'—'}</td>`:'<td style="font-size:.78rem;color:#94a3b8;">—</td>';
+    const photoBtn=`<span onclick="viewProductPhoto('${p.id}','${(p.item_name||'').replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}','${p.photo_url||''}','${p.primary_vendor_id||''}')" style="cursor:pointer;font-size:1rem;" title="${p.photo_url?'View photo':'Upload photo'}">
+      ${p.photo_url?'📸':'📷'}
+    </span>`;
+    const whBadgeColor=p.warehouse_type==='moped'?'#3498db':p.warehouse_type==='green'?'#27ae60':'#94a3b8';
     tbody.innerHTML+=`<tr>
-      <td><input type="checkbox" class="cat-check" value="${p.id}" data-name="${p.item_name}" data-mrp="${p.mrp||0}" data-ret="${p.retail_price||0}" data-bar="${p.barcode_id||''}"></td>
-      <td><strong>${p.item_name}</strong></td>
+      <td><input type="checkbox" class="cat-check" value="${p.id}" data-name="${p.item_name}" data-brand="${p.brand||''}" data-mrp="${p.mrp||0}" data-ret="${p.retail_price||0}" data-bar="${p.barcode_id||''}" data-hsn="${p.hsn_code||''}" data-mac="${p.mac||0}" data-stk="${p.current_stock||0}"></td>
+      <td>
+        <strong style="cursor:pointer;" onclick="viewProductPhoto('${p.id}','${(p.item_name||'').replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}','${p.photo_url||''}','${p.primary_vendor_id||''}')" title="Click to view details">${p.item_name}</strong>
+        <span style="display:inline-block;background:${whBadgeColor};color:white;font-size:.6rem;padding:1px 5px;border-radius:3px;margin-left:5px;font-weight:700;">${(p.warehouse_type||'').toUpperCase()}</span>
+        <br><span style="font-size:.72rem;color:#94a3b8;">${p.barcode_id?'🏷 '+p.barcode_id:''}</span>
+      </td>
       <td>${p.brand||'—'}</td>
       <td><span style="font-size:.72rem;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-weight:700;">${p.scope}</span></td>
-      <td>${p.track_stock?'✅ Yes':'—'}</td>
+      <td><span style="color:${stkColor};font-weight:700;">${stkText}</span></td>
       <td style="color:#b45309;font-weight:700;">₹${p.mrp||0}</td>
       <td>₹${p.retail_price||0}</td>
-      <td><button class="btn-action danger" style="padding:4px 8px;font-size:.75rem;" onclick="deleteProduct('${p.id}',true)">DEL</button></td>
+      <td style="font-size:.78rem;">${p.hsn_code||'—'}</td>
+      ${macCell}
+      <td style="white-space:nowrap;">
+        ${photoBtn}
+        ${canEdit?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;margin-left:4px;background:var(--info);" onclick="editProduct('${p.id}')">EDIT</button>`:''}
+        ${canEdit?`<button class="btn-action danger" style="padding:3px 7px;font-size:.72rem;margin-left:2px;" onclick="deleteProduct('${p.id}',true)">DEL</button>`:''}
+      </td>
     </tr>`;
   });
-  if(!data||data.length===0) tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px;">No products found.</td></tr>';
+  if(!data||data.length===0) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px;">No products found.</td></tr>';
 }
 
 function toggleAllChecks(){
@@ -450,29 +975,536 @@ function toggleAllChecks(){
   document.querySelectorAll('.cat-check').forEach(c=>c.checked=v);
 }
 
-function bulkPrintLabels(){
-  const printTarget=document.getElementById('printArea');
-  printTarget.innerHTML='';
-  let count=0;
-  document.querySelectorAll('.cat-check:checked').forEach(c=>{
-    count++;
-    const svgId=`lbl-${c.value}`;
-    printTarget.innerHTML+=`<div style="width:62mm;height:38mm;border:1px solid #000;padding:2mm;box-sizing:border-box;font-family:Arial;page-break-inside:avoid;">
-      <div style="font-size:7pt;font-weight:bold;text-align:center;">My Care Service Center</div>
-      <div style="font-size:6pt;margin:2px 0;">${(c.dataset.name||'').substring(0,30)}</div>
-      <div style="font-size:6pt;color:#7c3aed;">MRP: ₹${c.dataset.mrp} | Sell: ₹${c.dataset.ret}</div>
-      <div style="text-align:center;"><svg id="${svgId}"></svg></div>
+/* ── PHASE 11B: ADD PRODUCT FUNCTIONS ────────────────────────────────────── */
+
+let _vendorsCache = [];
+let _catalogNameCache = []; // distinct product names for autocomplete
+let macManuallyEdited = false;
+
+async function openAddProductModal(prefillData) {
+  if (!_vendorsCache.length) {
+    const{data}=await sb.from('parties').select('id,party_name,trading_name,city,contact_person,mobile')
+      .eq('party_type','supplier').eq('is_active',true).order('trading_name');
+    _vendorsCache=data||[];
+  }
+  // Build distinct name cache from existing catalog cache if available
+  if (!_catalogNameCache.length && catalogCache.length) {
+    const nameSet=new Set(catalogCache.map(p=>p.item_name).filter(Boolean));
+    _catalogNameCache=[...nameSet].sort();
+  }
+
+  const whSel=document.getElementById('apWarehouse');
+  if(sessionRole==='moped'){whSel.value='moped';whSel.disabled=true;}
+  else if(sessionRole==='green'){whSel.value='green';whSel.disabled=true;}
+  else{whSel.disabled=false;}
+
+  // Reset form
+  document.getElementById('apEditId').value='';
+  document.getElementById('apModalTitle').innerText='➕ Add New Product';
+  document.getElementById('apSaveBtn').innerText='✅ SAVE PRODUCT TO CATALOG';
+  ['apName','apBrand','apBarcode','apHsn','apFamily','apVendorSearch','apMrp','apSellPrice','apVolMl'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('apDiscount').value='0';
+  document.getElementById('apMac').value='';
+  document.getElementById('apStock').value='0';
+  document.getElementById('apTrackStock').value='true';
+  document.getElementById('apGstPct').value='18';
+  document.getElementById('apVendorId').value='';
+  document.getElementById('apVendorSelected').style.display='none';
+  document.getElementById('apRefPanel').style.display='none';
+  document.getElementById('apNameDrop').style.display='none';
+  document.getElementById('apPriceSummary').innerText='Enter MRP and discount to see buying cost and margin';
+  document.getElementById('apPhotoPreview').innerHTML='No photo';
+  document.getElementById('apPhotoFile').value='';
+  macManuallyEdited=false;
+
+  // Pre-fill for edit mode
+  if(prefillData){
+    document.getElementById('apEditId').value=prefillData.id;
+    document.getElementById('apModalTitle').innerText='✏️ Edit Product';
+    document.getElementById('apSaveBtn').innerText='💾 SAVE CHANGES';
+    document.getElementById('apName').value=prefillData.item_name||'';
+    document.getElementById('apBrand').value=prefillData.brand||'';
+    document.getElementById('apCategory').value=prefillData.category||'SPARE';
+    document.getElementById('apScope').value=prefillData.scope||'generic';
+    document.getElementById('apFamily').value=prefillData.family_name||'';
+    document.getElementById('apUnit').value=prefillData.unit_metric||'Pcs';
+    document.getElementById('apBarcode').value=prefillData.barcode_id||'';
+    document.getElementById('apHsn').value=prefillData.hsn_code||'';
+    document.getElementById('apTrackStock').value=prefillData.track_stock?'true':'false';
+    document.getElementById('apVolMl').value=prefillData.volume_per_unit||'';
+    document.getElementById('apStock').value=prefillData.current_stock||0;
+    document.getElementById('apMrp').value=prefillData.mrp||'';
+    document.getElementById('apDiscount').value='';
+    document.getElementById('apMac').value=prefillData.mac||prefillData.cost_price||'';
+    document.getElementById('apSellPrice').value=prefillData.retail_price||'';
+    document.getElementById('apGstPct').value=prefillData.gst_percent||'18';
+    if(prefillData.warehouse_type)document.getElementById('apWarehouse').value=prefillData.warehouse_type;
+    if(prefillData.primary_vendor_id){
+      const v=_vendorsCache.find(x=>x.id===prefillData.primary_vendor_id);
+      if(v){
+        document.getElementById('apVendorId').value=v.id;
+        document.getElementById('apVendorSearch').value=v.trading_name||v.party_name;
+        showVendorContact(v);
+      }
+    }
+    if(prefillData.photo_url){
+      document.getElementById('apPhotoPreview').innerHTML=`<img src="${prefillData.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`;
+    }
+    macManuallyEdited=true; // don't auto-recalc when editing
+    recalcMAC();
+  }
+  document.getElementById('modalAddProduct').style.display='flex';
+}
+
+function closeAddProductModal(){
+  document.getElementById('modalAddProduct').style.display='none';
+}
+
+/* Product name autocomplete — searches distinct names from cache */
+function searchExistingProducts(q){
+  const drop=document.getElementById('apNameDrop');
+  document.getElementById('apRefPanel').style.display='none';
+  if(!q||q.length<2){drop.style.display='none';return;}
+  const qU=q.trim().toUpperCase();
+  const matches=_catalogNameCache.filter(n=>n.includes(qU)).slice(0,10);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(n=>`<div onclick="selectExistingProductName('${n.replace(/'/g,"\'")}')"
+    style="padding:8px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f1f5f9;font-weight:600;"
+    onmouseover="this.style.background='#f5f3ff'" onmouseout="this.style.background='white'">${n}</div>`).join('');
+  drop.style.display='block';
+}
+
+/* When existing product name is selected — one targeted DB call */
+async function selectExistingProductName(name){
+  document.getElementById('apName').value=name;
+  document.getElementById('apNameDrop').style.display='none';
+
+  const refPanel=document.getElementById('apRefPanel');
+  refPanel.innerHTML='<div style="color:#94a3b8;font-size:.78rem;">Loading existing brands...</div>';
+  refPanel.style.display='block';
+
+  const{data:rows}=await sb.from('product_master')
+    .select('id,brand,warehouse_type,mrp,mac,cost_price,current_stock,scope,category,unit_metric,family_name,gst_percent')
+    .eq('item_name',name).eq('catalog_status','live').order('brand');
+
+  if(!rows||!rows.length){refPanel.style.display='none';return;}
+
+  // Auto-fill shared fields from first row
+  const first=rows[0];
+  document.getElementById('apCategory').value=first.category||'SPARE';
+  document.getElementById('apScope').value=first.scope||'generic';
+  document.getElementById('apFamily').value=first.family_name||'';
+  document.getElementById('apUnit').value=first.unit_metric||'Pcs';
+  if(first.gst_percent&&first.gst_percent!='NA')document.getElementById('apGstPct').value=first.gst_percent;
+
+  document.getElementById('apRefTitle').innerText=`${name} — ${rows.length} brand${rows.length>1?'s':''} already in catalog:`;
+  const whCol={moped:'#3498db',green:'#27ae60',service:'#f39c12',universal:'#8e44ad'};
+  document.getElementById('apRefRows').innerHTML=rows.map(r=>
+    `<div style="display:flex;gap:12px;padding:4px 0;border-bottom:1px solid #e0f2fe;font-size:.75rem;align-items:center;">
+      <span style="font-weight:700;min-width:60px;">${r.brand||'NO BRAND'}</span>
+      <span style="background:${whCol[r.warehouse_type]||'#94a3b8'};color:white;font-size:.6rem;padding:1px 5px;border-radius:3px;">${(r.warehouse_type||'').toUpperCase()}</span>
+      <span style="color:#b45309;">MRP ₹${r.mrp||0}</span>
+      <span style="color:#64748b;">Cost ₹${r.mac||r.cost_price||0}</span>
+      <span style="color:${(r.current_stock||0)>0?'#15803d':'#dc2626'};">Stock: ${r.current_stock||0}</span>
+    </div>`).join('');
+  refPanel.style.display='block';
+}
+
+/* MAC auto-calculation: MRP × (1 - discount%) */
+function recalcMAC(){
+  if(macManuallyEdited) {
+    // Just update summary display using manually entered MAC
+    const mac=parseFloat(document.getElementById('apMac').value)||0;
+    const sell=parseFloat(document.getElementById('apSellPrice').value)||0;
+    const mrp=parseFloat(document.getElementById('apMrp').value)||0;
+    const margin=sell>0?((sell-mac)/sell*100).toFixed(1):'—';
+    const warn=sell>0&&mac>0&&mac>sell;
+    document.getElementById('apPriceSummary').innerHTML=
+      `MRP: ₹${mrp} &nbsp;|&nbsp; Buying Cost (MAC): <strong>₹${mac}</strong> &nbsp;|&nbsp; Margin: ${margin}%`+
+      (warn?'<br><span style="color:#dc2626;font-weight:700;">⚠️ Selling price is below buying cost — you will lose money on each sale</span>':'');
+    return;
+  }
+  const mrp=parseFloat(document.getElementById('apMrp').value)||0;
+  const disc=parseFloat(document.getElementById('apDiscount').value)||0;
+  const sell=parseFloat(document.getElementById('apSellPrice').value)||0;
+  if(!mrp){document.getElementById('apPriceSummary').innerText='Enter MRP and discount to see buying cost and margin';return;}
+  const mac=Math.round(mrp*(1-disc/100));
+  const margin=sell>0?((sell-mac)/sell*100).toFixed(1):'—';
+  const warn=sell>0&&mac>0&&mac>sell;
+  document.getElementById('apMac').value=mac;
+  document.getElementById('apPriceSummary').innerHTML=
+    `MRP: ₹${mrp} &nbsp;|&nbsp; Discount: ${disc}% &nbsp;|&nbsp; Buying Cost (MAC): <strong>₹${mac}</strong> &nbsp;|&nbsp; Margin: ${margin}%`+
+    (warn?'<br><span style="color:#dc2626;font-weight:700;">⚠️ Selling price is below buying cost — you will lose money on each sale</span>':'');
+}
+
+/* Auto-generate barcode_id: MC-[initials]-[brand3] */
+async function generateBarcodeId(name,brand){
+  const words=name.trim().split(/\s+/).filter(w=>w.length>0);
+  const initials=words.slice(0,4).map(w=>w[0]).join('');
+  const brandCode=(brand||'STD').toUpperCase().replace(/[^A-Z0-9]/g,'').substring(0,3);
+  let code=`MC-${initials}-${brandCode}`;
+  // Check conflicts
+  const{data:existing}=await sb.from('product_master').select('id').eq('barcode_id',code).maybeSingle();
+  if(existing){
+    let n=2;
+    while(true){
+      const candidate=`${code}-${n}`;
+      const{data:chk}=await sb.from('product_master').select('id').eq('barcode_id',candidate).maybeSingle();
+      if(!chk){code=candidate;break;}
+      n++;
+    }
+  }
+  return code;
+}
+
+function previewAddPhoto(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById('apPhotoPreview').innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function searchVendorFor(q){
+  const dd=document.getElementById('apVendorDropdown');
+  document.getElementById('apVendorId').value='';
+  document.getElementById('apVendorSelected').style.display='none';
+  if(!q||q.trim().length<1){dd.style.display='none';return;}
+  const qU=q.trim().toLowerCase();
+  const matches=_vendorsCache.filter(v=>(v.trading_name||'').toLowerCase().includes(qU)||(v.party_name||'').toLowerCase().includes(qU)).slice(0,8);
+  if(!matches.length){dd.style.display='none';return;}
+  dd.innerHTML=matches.map(v=>`<div onclick="selectVendorFor('${v.id}','${(v.trading_name||v.party_name).replace(/'/g,"\'")}','${v.party_name.replace(/'/g,"\'")}','${v.city||''}','${v.contact_person||''}','${v.mobile||''}')"
+    style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #f1f5f9;"
+    onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+    <strong>${v.trading_name||'—'}</strong> — ${v.party_name} <span style="font-size:.7rem;color:#94a3b8;">${v.city||''}</span>
+  </div>`).join('');
+  dd.style.display='block';
+}
+
+function selectVendorFor(id,alias,fullName,city,contact,phone){
+  document.getElementById('apVendorId').value=id;
+  document.getElementById('apVendorSearch').value=alias;
+  document.getElementById('apVendorDropdown').style.display='none';
+  const v={id,trading_name:alias,party_name:fullName,city,contact_person:contact,mobile:phone};
+  showVendorContact(v);
+}
+
+function showVendorContact(v){
+  const sel=document.getElementById('apVendorSelected');
+  sel.style.display='block';
+  sel.innerHTML=`✅ <strong>${v.trading_name||v.party_name}</strong> — ${v.party_name} (${v.city||''})
+    &nbsp;|&nbsp; ${v.contact_person||''} &nbsp;<strong>${v.mobile||''}</strong>`;
+}
+
+async function saveNewProduct(){
+  const editId=document.getElementById('apEditId').value;
+  const name  =document.getElementById('apName').value.trim().toUpperCase();
+  const brand =document.getElementById('apBrand').value.trim().toUpperCase();
+  const mrp   =parseFloat(document.getElementById('apMrp').value)||0;
+  const sell  =parseFloat(document.getElementById('apSellPrice').value)||0;
+  const mac   =parseFloat(document.getElementById('apMac').value)||0;
+  const wh    =document.getElementById('apWarehouse').value;
+
+  if(!name) return alert('Product name is required.');
+  if(!brand)return alert('Brand is required.');
+  if(!wh)   return alert('Select a warehouse.');
+  if(mrp<=0)return alert('MRP must be greater than 0.');
+
+  // Selling price below MAC warning
+  if(sell>0&&mac>0&&mac>sell){
+    if(!confirm(`⚠️ Selling price ₹${sell} is below buying cost ₹${mac}.\nYou will lose ₹${mac-sell} per unit sold.\nSave anyway?`)) return;
+  }
+
+  // Duplicate check
+  if(!editId){
+    const{data:dup}=await sb.from('product_master').select('id,warehouse_type,mrp,current_stock')
+      .eq('item_name',name).eq('brand',brand).maybeSingle();
+    if(dup){
+      if(dup.warehouse_type===wh){
+        if(!confirm(`⚠️ ${name} | ${brand} already exists in ${wh.toUpperCase()} warehouse.\nMRP ₹${dup.mrp||0} | Stock: ${dup.current_stock||0}\n\nAdding another entry will create duplicate stock records. Are you sure?`)) return;
+      } else {
+        if(!confirm(`ℹ️ ${name} | ${brand} already exists in ${dup.warehouse_type?.toUpperCase()} warehouse.\nThis will create a separate ${wh.toUpperCase()} entry with independent stock and pricing.\nContinue?`)) return;
+      }
+    }
+  }
+
+  // Auto-generate barcode_id if blank
+  let barcode=document.getElementById('apBarcode').value.trim();
+  if(!barcode&&!editId) barcode=await generateBarcodeId(name,brand);
+
+  const payload={
+    item_name         :name,
+    brand             :brand||null,
+    category          :document.getElementById('apCategory').value,
+    warehouse_type    :wh,
+    scope             :document.getElementById('apScope').value,
+    unit_metric       :document.getElementById('apUnit').value,
+    barcode_id        :barcode||null,
+    hsn_code          :document.getElementById('apHsn').value.trim()||null,
+    family_name       :document.getElementById('apFamily').value.trim()||null,
+    volume_per_unit   :parseInt(document.getElementById('apVolMl').value)||null,
+    track_stock       :document.getElementById('apTrackStock').value==='true',
+    current_stock     :parseInt(document.getElementById('apStock').value)||0,
+    primary_vendor_id :document.getElementById('apVendorId').value||null,
+    mrp,retail_price  :sell,cost_price:mac,mac,
+    gst_percent       :document.getElementById('apGstPct').value,
+    catalog_status    :(editId||sessionRole==='admin'||sessionRole==='moped')?'live':'unverified'
+  };
+
+  let savedId=editId;
+  if(editId){
+    const{error}=await sb.from('product_master').update(payload).eq('id',editId);
+    if(error) return alert('Update error: '+error.message);
+  } else {
+    const{data:saved,error}=await sb.from('product_master').insert(payload).select('id').single();
+    if(error) return alert('Save error: '+error.message);
+    savedId=saved.id;
+  }
+
+  // Upload photo if selected
+  const photoFile=document.getElementById('apPhotoFile').files[0];
+  if(photoFile&&savedId){
+    const ext=photoFile.name.split('.').pop().toLowerCase();
+    const{error:upErr}=await sb.storage.from('product-photos').upload(`${savedId}.${ext}`,photoFile,{upsert:true});
+    if(!upErr){
+      const{data:urlData}=sb.storage.from('product-photos').getPublicUrl(`${savedId}.${ext}`);
+      await sb.from('product_master').update({photo_url:urlData.publicUrl}).eq('id',savedId);
+    }
+  }
+
+  closeAddProductModal();
+  _catalogNameCache=[]; // clear cache so new product appears in autocomplete
+
+  // Show QR print option after save
+  if(!editId){
+    const doPrint=confirm(`✅ "${name} | ${brand}" added.\nBarcode: ${barcode||'not set'}\n\nPrint QR label now?`);
+    if(doPrint) printSingleLabel(name,brand,mrp,sell,barcode||'');
+  } else {
+    alert(`✅ "${name}" updated.`);
+  }
+  loadCatalog();
+}
+
+/* Print single label immediately after product save */
+function printSingleLabel(name,brand,mrp,sell,barId){
+  const printDiv=document.getElementById('printArea');
+  const codeId='single-lbl-'+Date.now();
+  printDiv.innerHTML=`<div style="width:62mm;height:38mm;border:0.5px solid #000;padding:1.5mm;box-sizing:border-box;font-family:Arial;page-break-inside:avoid;overflow:hidden;">
+    <div style="font-size:7pt;font-weight:bold;overflow:hidden;white-space:nowrap;">${name}</div>
+    <div style="font-size:6pt;color:#555;">${brand}</div>
+    <div style="font-size:6pt;color:#7c3aed;">MRP:₹${mrp} Sell:₹${sell}</div>
+    <div style="font-size:5pt;color:#94a3b8;">${barId}</div>
+    <div id="${codeId}" style="text-align:center;height:20mm;overflow:hidden;"></div>
+  </div>`;
+  setTimeout(async()=>{
+    if(!window.QRCode){
+      await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';sc.onload=res;sc.onerror=rej;document.head.appendChild(sc);});
+    }
+    const url=await new Promise((res,rej)=>QRCode.toDataURL(barId||name,{width:80,margin:1},(e,u)=>e?rej(e):res(u)));
+    document.getElementById(codeId).innerHTML=`<img src="${url}" style="height:100%;width:auto;">`;
+    setTimeout(()=>window.print(),400);
+  },200);
+}
+
+/* EDIT product — open modal prefilled */
+async function editProduct(id){
+  const{data:p}=await sb.from('product_master').select('*').eq('id',id).single();
+  if(!p) return alert('Product not found.');
+  // Warn if product has billing history
+  const{count}=await sb.from('job_card_items').select('id',{count:'exact',head:true}).eq('product_master_id',id);
+  if(count>0){
+    if(!confirm(`⚠️ This product appears in ${count} existing JC bill${count>1?'s':''}. Editing name or price will NOT change historical invoices — only future billing. Proceed?`)) return;
+  }
+  openAddProductModal(p);
+}
+
+
+// ── PHASE 11A: LABEL PRINTING (QR + 1D, 3 sizes) ─────────────────────────
+async function bulkPrintLabels(){
+  const checks = Array.from(document.querySelectorAll('.cat-check:checked'));
+  if(!checks.length){alert('Select at least one product to print labels.');return;}
+  const size = document.getElementById('labelSize')?.value || 'large';
+  const type = document.getElementById('labelType')?.value || 'qr';
+
+  // Lazy-load QRCode library for QR mode
+  if(type==='qr' && !window.QRCode){
+    await new Promise((res,rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+      sc.onload=res; sc.onerror=rej; document.head.appendChild(sc);
+    });
+  }
+
+  const dims = {large:{w:'62mm',h:'38mm',nameSize:'7pt',infoSize:'6pt',codeH:'28mm'},
+                medium:{w:'50mm',h:'25mm',nameSize:'6pt',infoSize:'5pt',codeH:'18mm'},
+                small:{w:'30mm',h:'20mm',nameSize:'5pt',infoSize:'5pt',codeH:'14mm'}};
+  const d = dims[size];
+
+  const printTarget = document.getElementById('printArea');
+  printTarget.innerHTML = '';
+  printTarget.style.cssText = 'display:flex;flex-wrap:wrap;gap:2mm;padding:4mm;background:white;';
+
+  checks.forEach(c=>{
+    const bar = c.dataset.bar || c.value.split('-')[0].toUpperCase();
+    const codeId = `lbl-${c.value}`;
+    const name = (c.dataset.name||'').substring(0,28);
+    const brand = c.dataset.brand || '';
+    const mrp = c.dataset.mrp || '0';
+    const sell = c.dataset.ret || '0';
+    const barId = c.dataset.bar || c.value.split('-')[0].toUpperCase();
+    printTarget.innerHTML += `<div id="wrap-${c.value}" style="width:${d.w};height:${d.h};border:0.5px solid #000;padding:1.5mm;box-sizing:border-box;font-family:Arial;page-break-inside:avoid;overflow:hidden;">
+      <div style="font-size:${d.nameSize};font-weight:bold;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${name}</div>
+      ${brand&&size!=='small'?`<div style="font-size:${d.infoSize};color:#555;overflow:hidden;white-space:nowrap;">${brand}</div>`:''}
+      <div style="font-size:${d.infoSize};color:#7c3aed;">MRP:₹${mrp} ${size!=='small'?`Sell:₹${sell}`:''}</div>
+      ${size==='large'?`<div style="font-size:${d.infoSize};color:#94a3b8;overflow:hidden;">${barId}</div>`:''}
+      <div id="${codeId}" style="text-align:center;height:${d.codeH};overflow:hidden;"></div>
     </div>`;
   });
-  if(count===0){alert('Select at least one product to print labels.');return;}
-  setTimeout(()=>{
-    document.querySelectorAll('.cat-check:checked').forEach(c=>{
-      const bar=c.dataset.bar||'000000';
-      try{JsBarcode(`#lbl-${c.value}`,bar==='000000'?'TEST':bar,{format:'CODE128',width:1.2,height:25,displayValue:true,fontSize:8,margin:0});}
-      catch(e){console.warn('Barcode error:',e);}
-    });
-    window.print();
-  },400);
+
+  // Generate codes after DOM update
+  setTimeout(async ()=>{
+    for(const c of checks){
+      const bar = c.dataset.bar || c.value.split('-')[0].toUpperCase();
+      const codeId = `lbl-${c.value}`;
+      const el = document.getElementById(codeId);
+      if(!el) continue;
+      if(type==='qr'){
+        try{
+          const url = await new Promise((res,rej)=>QRCode.toDataURL(bar,{width:80,margin:1,errorCorrectionLevel:'M'},(e,u)=>e?rej(e):res(u)));
+          el.innerHTML=`<img src="${url}" style="height:100%;width:auto;">`;
+        }catch(e){ el.innerHTML=`<div style="font-size:5pt;word-break:break-all;">${bar}</div>`; }
+      } else {
+        el.innerHTML=`<svg id="svg-${c.value}"></svg>`;
+        try{JsBarcode(`#svg-${c.value}`,bar,{format:'CODE128',width:1,height:30,displayValue:true,fontSize:7,margin:0});}
+        catch(e){ el.innerHTML=`<div style="font-size:5pt;">${bar}</div>`; }
+      }
+    }
+    setTimeout(()=>{ window.print(); printTarget.style.display='none'; },600);
+  },200);
+}
+
+// ── PHASE 11A: EXCEL EXPORT ─────────────────────────────────────────────────
+async function exportCatalogExcel(){
+  const{data,error}=await sb.from('product_master')
+    .select('item_name,brand,category,scope,mrp,retail_price,cost_price,mac,current_stock,barcode_id,hsn_code,track_stock,unit_metric,family_name')
+    .eq('catalog_status','live').order('item_name');
+  if(error){alert('Export error: '+error.message);return;}
+
+  const rows=[['Item Name','Brand','Category','Scope','MRP','Sell Price','Cost Price','MAC','Current Stock','Barcode ID','HSN Code','Track Stock','Unit','Family']];
+  (data||[]).forEach(p=>{
+    rows.push([p.item_name,p.brand||'',p.category||'',p.scope||'',p.mrp||0,p.retail_price||0,p.cost_price||0,p.mac||0,p.current_stock||0,p.barcode_id||'',p.hsn_code||'',p.track_stock?'YES':'NO',p.unit_metric||'Pcs',p.family_name||'']);
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:30},{wch:15},{wch:15},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:12},{wch:10},{wch:8},{wch:18}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Product Catalog');
+  XLSX.writeFile(wb,`MyCare_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ── PHASE 11A: EXCEL IMPORT WITH PREVIEW ────────────────────────────────────
+let _importRows = [];
+
+async function handleImportFile(input){
+  const file=input.files[0]; if(!file) return;
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(rawRows.length<2){alert('File appears empty.');return;}
+
+  // Map headers (case-insensitive)
+  const header=rawRows[0].map(h=>(h||'').toString().toLowerCase().trim());
+  const col=k=>header.indexOf(k);
+  const COL={
+    name:     col('item name'),
+    brand:    col('brand'),
+    category: col('category'),
+    scope:    col('scope'),
+    mrp:      col('mrp'),
+    sell:     col('sell price'),
+    cost:     col('cost price'),
+    stock:    col('current stock'),
+    barcode:  col('barcode id'),
+    hsn:      col('hsn code'),
+    unit:     col('unit'),
+    family:   col('family')
+  };
+  if(COL.name<0){alert('Column "Item Name" not found. Please use the exported template.');input.value='';return;}
+
+  _importRows=rawRows.slice(1).filter(r=>(r[COL.name]||'').toString().trim()).map(r=>({
+    item_name   : (r[COL.name]||'').toString().trim().toUpperCase(),
+    brand       : COL.brand>=0?(r[COL.brand]||'').toString().trim().toUpperCase():'',
+    category    : COL.category>=0?(r[COL.category]||'').toString().trim():'',
+    scope       : COL.scope>=0?(r[COL.scope]||'').toString().toLowerCase().trim()||'generic':'generic',
+    mrp         : COL.mrp>=0?parseFloat(r[COL.mrp])||0:0,
+    retail_price: COL.sell>=0?parseFloat(r[COL.sell])||0:0,
+    cost_price  : COL.cost>=0?parseFloat(r[COL.cost])||0:0,
+    current_stock:COL.stock>=0?parseFloat(r[COL.stock])||0:0,
+    barcode_id  : COL.barcode>=0?(r[COL.barcode]||'').toString().trim():'',
+    hsn_code    : COL.hsn>=0?(r[COL.hsn]||'').toString().trim():'',
+    unit_metric : COL.unit>=0?(r[COL.unit]||'Pcs').toString().trim():'Pcs',
+    family_name : COL.family>=0?(r[COL.family]||'').toString().trim().toUpperCase():''
+  }));
+
+  // Show preview modal
+  const tbody=document.getElementById('importPreviewBody');
+  tbody.innerHTML=_importRows.slice(0,20).map(r=>`<tr>
+    <td>${r.item_name}</td><td>${r.brand}</td><td>${r.mrp}</td>
+    <td>${r.retail_price}</td><td>${r.current_stock}</td><td>${r.barcode_id||'—'}</td><td>${r.hsn_code||'—'}</td>
+  </tr>`).join('');
+  document.getElementById('importPreviewCount').innerText=`${_importRows.length} rows found${_importRows.length>20?' (showing first 20)':''}`;
+  document.getElementById('modalImportPreview').style.display='flex';
+  input.value='';
+}
+
+async function confirmImport(){
+  if(!_importRows.length){alert('No rows to import.');return;}
+  const btn=document.getElementById('btnConfirmImport');
+  btn.disabled=true; btn.innerText='IMPORTING…';
+
+  let created=0,updated=0,errors=0;
+  for(const row of _importRows){
+    // Check if product already exists (match on item_name + brand)
+    const{data:existing}=await sb.from('product_master')
+      .select('id').eq('item_name',row.item_name).eq('brand',row.brand||'').maybeSingle();
+
+    const payload={
+      item_name:row.item_name, brand:row.brand||null, catalog_status:'live',
+      scope:row.scope, mrp:row.mrp||null, retail_price:row.retail_price||null,
+      cost_price:row.cost_price||null, current_stock:row.current_stock||0,
+      barcode_id:row.barcode_id||null, hsn_code:row.hsn_code||null,
+      unit_metric:row.unit_metric, family_name:row.family_name||null,
+      track_stock:true
+    };
+    if(row.cost_price>0){ payload.mac=row.cost_price; } // set MAC from cost on import
+
+    let err;
+    if(existing){
+      // Update only stock + barcode + hsn + prices — preserve other fields
+      const upd={current_stock:row.current_stock};
+      if(row.barcode_id) upd.barcode_id=row.barcode_id;
+      if(row.hsn_code) upd.hsn_code=row.hsn_code;
+      if(row.mrp>0) upd.mrp=row.mrp;
+      if(row.retail_price>0) upd.retail_price=row.retail_price;
+      if(row.cost_price>0){upd.cost_price=row.cost_price;upd.mac=row.cost_price;}
+      ({error:err}=await sb.from('product_master').update(upd).eq('id',existing.id));
+      if(!err) updated++;
+    } else {
+      ({error:err}=await sb.from('product_master').insert(payload));
+      if(!err) created++;
+    }
+    if(err) errors++;
+  }
+
+  btn.disabled=false; btn.innerText='✅ CONFIRM IMPORT';
+  document.getElementById('modalImportPreview').style.display='none';
+  _importRows=[];
+  alert(`Import complete!\n✅ Created: ${created}\n🔄 Updated: ${updated}\n❌ Errors: ${errors}`);
+  loadCatalog();
 }
 
 // ── TAB 3: FAMILIES ────────────────────────────────────────────────────────
@@ -507,7 +1539,6 @@ async function deleteFamily(id){
 }
 
 // ── TAB 4: PRODUCT GROUPS (uses actual schema: product_master_id) ──────────
-let catalogCache=[];
 async function fetchCatalogCache(){
   if(catalogCache.length) return;
   const{data}=await sb.from('product_master').select('id,item_name,brand').eq('catalog_status','live').order('item_name').limit(500);
@@ -667,7 +1698,15 @@ function closeScanner(){
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-if(sessionRole==='admin') loadUnverified();
+if(sessionRole==='admin') {
+  loadUnverified();
+  // Show pending vehicle count badge on tab without loading full list
+  sb.from('vehicle_master').select('id',{count:'exact',head:true}).eq('status','pending').then(({count})=>{
+    if(count>0){const b=document.getElementById('pendingVehCount');if(b){b.style.display='inline';b.innerText=count;}}
+  });
+} else if(sessionRole==='moped'||sessionRole==='green') {
+  loadCatalog(); // load catalog directly for warehouse roles
+}
 </script>
 </body>
 </html>
