@@ -227,7 +227,7 @@
         <div style="flex: 1.5; text-align: center; display: flex; flex-direction: column; justify-content: center; padding: 0 15px;">
             <div id="customerHeaderInfo" style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:6px;">👤 Client: Syncing...</div>
             <div id="complaintLabel" style="font-size: 0.85rem; font-weight: bold; color: var(--danger); margin-bottom: 4px;">Problem: --</div>
-            <button id="btnViewPhoto" onclick="document.getElementById('modalPhoto').style.display='flex'" style="display:none; background:var(--info); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer; margin: 0 auto 6px auto; width: fit-content;">📸 View Attached Photo</button>
+            <button id="btnViewGallery" onclick="openJcGallery()" style="display:none;background:var(--info);color:white;border:none;padding:4px 10px;border-radius:4px;font-size:.75rem;font-weight:bold;cursor:pointer;margin:0 auto 6px auto;width:fit-content;">📸 Photos <span id="galleryCount" style="background:rgba(255,255,255,.3);padding:1px 5px;border-radius:8px;margin-left:3px;">0</span></button>
             <div id="splitIndicator" style="display:none; color:var(--info); font-size:0.75rem; font-weight:bold; margin-top:4px;">Labour Split Active</div>
         </div>
         <div style="flex: 1; text-align: right;">
@@ -486,7 +486,46 @@
 </div>
 
 <!-- ══════════════════ EXISTING MODALS (unchanged) ══════════════════ -->
-<div id="modalPhoto" class="overlay-modal"><div class="modal-card" style="text-align:center;"><div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:12px;"><h3 style="margin:0; color:var(--primary);">Visual Attachment</h3><button onclick="document.getElementById('modalPhoto').style.display='none'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button></div><img id="attachedImagePreview" src="" style="max-width:100%; max-height:60vh; border-radius:8px; border:1px solid var(--border);"></div></div>
+<!-- ── JC PHOTO GALLERY MODAL (replaces old single-photo modal) ───────────── -->
+<div id="modalJcGallery" class="overlay-modal" style="z-index:450;">
+  <div class="modal-card" style="max-width:560px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
+      <div>
+        <h3 style="margin:0;color:var(--primary);">📸 JC Photos</h3>
+        <span id="galleryJcRef" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="document.getElementById('modalJcGallery').style.display='none'" style="border:none;background:none;font-size:1.3rem;font-weight:700;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <!-- Gallery grid -->
+    <div id="billingPhotoGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;min-height:80px;"></div>
+    <!-- Add photo section (service manager) -->
+    <div style="border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Add Photo</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <select id="galleryPhotoType" style="padding:7px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;flex:1;">
+          <option value="intake">📥 Intake</option>
+          <option value="pre_work">🔍 Pre-Work</option>
+          <option value="in_progress">🔧 In Progress</option>
+          <option value="delivery" selected>✅ Delivery</option>
+          <option value="damage_record">⚠️ Damage Record</option>
+          <option value="general">📷 General</option>
+        </select>
+        <input type="text" id="galleryPhotoNote" maxlength="100" placeholder="Note (optional)"
+          style="padding:7px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;flex:2;">
+      </div>
+      <label class="btn-action" style="display:block;text-align:center;cursor:pointer;background:var(--info);">
+        📷 Choose / Take Photo
+        <input type="file" id="galleryPhotoFile" accept="image/*" capture="environment" style="display:none;" onchange="uploadBillingPhoto(this)">
+      </label>
+      <div id="galleryUploadStatus" style="text-align:center;font-size:.78rem;color:#64748b;margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Full-size viewer -->
+<div id="modalPhotoFull" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:500;align-items:center;justify-content:center;" onclick="this.style.display='none'">
+  <img id="photoFullImg" style="max-width:96%;max-height:96vh;border-radius:8px;">
+</div>
 
 <div id="modalPayNow" class="overlay-modal"><div class="modal-card"><h3 style="margin-top:0; color:var(--primary);">Settle Payment</h3><p style="font-size:0.85rem; color:#64748b;">Total Payable: ₹<span id="payTotalDisplay">0</span></p><div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;"><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">Cash Received (₹)</label><input type="number" id="payCashInput" value="0" min="0" oninput="calcPaySplit()" style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box;"></div><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">UPI / Card Received (₹)</label><input type="number" id="payUpiInput" value="0" min="0" readonly style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box; background:#f1f5f9;"></div></div><p style="font-size:0.7rem; color:#94a3b8; margin-top:8px; margin-bottom:0;">Leave Cash as the full amount for a pure cash payment. Adjust either field and UPI auto-fills the remainder — the system saves it as Cash, UPI, or Split automatically based on what you enter.</p><div style="display:flex; gap:10px; margin-top:16px;"><button id="btnConfirmPayNow" class="btn-action btn-success" style="flex:1;" onclick="confirmPayNow()">CONFIRM PAYMENT</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPayNow').style.display='none'">CANCEL</button></div></div></div>
 
@@ -1219,6 +1258,148 @@
         document.getElementById('modalCollectionReceipt').style.display = 'flex';
     }
 
+
+    /* ── JC PHOTO GALLERY FUNCTIONS (billing.html) ─────────────────────────── */
+    const _tagLabels = {
+      intake:'📥 Intake', pre_work:'🔍 Pre-Work', in_progress:'🔧 In Progress',
+      delivery:'✅ Delivery', damage_record:'⚠️ Damage', general:'📷 General',
+      problem_found:'🔍 Problem Found', work_in_progress:'🔧 In Progress',
+      work_complete:'✅ Complete', additional_issue:'⚠️ Extra Issue',
+      part_replaced:'📦 Part Replaced', customer_to_verify:'👁️ Verify'
+    };
+
+    async function openJcGallery() {
+      document.getElementById('modalJcGallery').style.display = 'flex';
+      document.getElementById('galleryUploadStatus').innerText = '';
+      document.getElementById('galleryPhotoNote').value = '';
+      await loadBillingGallery();
+    }
+
+    async function loadBillingGallery() {
+      const grid = document.getElementById('billingPhotoGrid');
+      grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:16px;grid-column:span 3;">Loading...</div>';
+      const { data: photos } = await supabaseClient.from('jc_photos')
+        .select('id,photo_url,photo_type,quick_tag,note,uploaded_by,uploaded_at')
+        .eq('job_card_id', targetJobId)
+        .order('uploaded_at', { ascending: true });
+
+      // Also include legacy photo_url if no jc_photos entries
+      const allPhotos = photos || [];
+      if (!allPhotos.length && activeJobContext?.photo_url) {
+        // Legacy single photo
+        allPhotos.push({
+          id:'legacy', photo_url: activeJobContext.photo_url,
+          photo_type:'intake', quick_tag:'intake', note:'Original attachment',
+          uploaded_by:'system', uploaded_at: activeJobContext.created_at
+        });
+      }
+
+      // Update count
+      document.getElementById('galleryCount').innerText = allPhotos.length;
+
+      if (!allPhotos.length) {
+        grid.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:.82rem;padding:20px;grid-column:span 3;">No photos yet for this JC</div>';
+        return;
+      }
+
+      grid.innerHTML = allPhotos.map(p => {
+        const tag = _tagLabels[p.quick_tag||p.photo_type] || '📷';
+        const time = new Date(p.uploaded_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        return `<div style="cursor:pointer;" onclick="showFullPhoto('${p.photo_url}')">
+          <img src="${p.photo_url}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--border);">
+          <div style="font-size:.65rem;color:#0369a1;margin-top:3px;font-weight:700;">${tag}</div>
+          <div style="font-size:.6rem;color:#94a3b8;">${p.uploaded_by||'—'} · ${time}</div>
+          ${p.note?`<div style="font-size:.62rem;color:#475569;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="${p.note}">${p.note}</div>`:''}
+        </div>`;
+      }).join('');
+    }
+
+    function showFullPhoto(url) {
+      document.getElementById('photoFullImg').src = url;
+      document.getElementById('modalPhotoFull').style.display = 'flex';
+    }
+
+    async function uploadBillingPhoto(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const status = document.getElementById('galleryUploadStatus');
+      const type   = document.getElementById('galleryPhotoType').value;
+      const note   = document.getElementById('galleryPhotoNote').value.trim();
+
+      status.innerText = 'Uploading...';
+
+      const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
+      const path = `${targetJobId}/${Date.now()}_${type}.${ext}`;
+
+      const { error: upErr } = await supabaseClient.storage.from('job_card_photos').upload(path, file, { upsert: false });
+      if (upErr) { status.innerText = '❌ Upload failed: ' + upErr.message; return; }
+
+      const { data: urlData } = supabaseClient.storage.from('job_card_photos').getPublicUrl(path);
+      const photoUrl = urlData.publicUrl;
+
+      await supabaseClient.from('jc_photos').insert({
+        job_card_id : targetJobId,
+        photo_url   : photoUrl,
+        photo_type  : type,
+        quick_tag   : type,
+        note        : note || null,
+        uploaded_by : sessionRole
+      });
+
+      // Also update legacy job_cards.photo_url if empty
+      if (!activeJobContext?.photo_url) {
+        await supabaseClient.from('job_cards').update({ photo_url: photoUrl }).eq('id', targetJobId);
+        if (activeJobContext) activeJobContext.photo_url = photoUrl;
+      }
+
+      input.value = '';
+      status.innerText = '✅ Photo added!';
+      await loadBillingGallery();
+      setTimeout(() => { status.innerText = ''; }, 3000);
+    }
+
+    /* ── MANDATORY PHOTO CHECK before PAY NOW ──────────────────────────────── */
+    async function checkMandatoryPhoto() {
+      if (!window._settings) return true; // settings not loaded, skip check
+      const threshold = window._settings.photo_mandatory_amount || 2500;
+      const overnight = window._settings.photo_overnight_check !== false;
+
+      const labour   = parseFloat(servicePkgGrossTotal) || 0;
+      const lathe    = parseFloat(internalLatheNet) || 0;
+      const total    = labour + lathe;
+
+      const jcDate   = activeJobContext?.jc_date?.split('T')[0];
+      const today    = new Date().toISOString().split('T')[0];
+      const isOvernight = jcDate && jcDate < today;
+
+      const needsPhoto = (total >= threshold) || (overnight && isOvernight);
+      if (!needsPhoto) return true;
+
+      // Check if at least one delivery photo exists
+      const { count } = await supabaseClient.from('jc_photos')
+        .select('id', { count: 'exact', head: true })
+        .eq('job_card_id', targetJobId)
+        .in('photo_type', ['delivery', 'in_progress', 'general']);
+
+      const hasPhoto = (count || 0) > 0 || !!activeJobContext?.photo_url;
+      if (hasPhoto) return true;
+
+      const reason = total >= threshold
+        ? `This JC has labour+lathe of ₹${total} (above ₹${threshold} threshold).`
+        : 'This vehicle was overnight.';
+
+      const proceed = confirm(
+        `📸 PHOTO REQUIRED
+
+${reason}
+At least one delivery photo must be added before closing.
+
+Click OK to open the photo gallery and upload, then close the JC.`
+      );
+      if (proceed) openJcGallery();
+      return false; // block PAY NOW until photo is added and user tries again
+    }
+
     // ── PHASE 11A: WORKSHOP SETTINGS CACHE ──────────────────────────────────────
     window._settings = {};
     async function loadWorkshopSettings() {
@@ -1339,7 +1520,16 @@
             document.getElementById('vAdvanceService').value = parseFloat(job.advance_service) || 0;
             document.getElementById('vPrepaidGreen').value = parseFloat(job.prepaid_green) || 0;
             document.getElementById('vPrepaidMoped').value = parseFloat(job.prepaid_moped) || 0;
-            if (job.photo_url) { document.getElementById('btnViewPhoto').style.display = 'inline-block'; document.getElementById('attachedImagePreview').src = job.photo_url; }
+            /* Gallery button — shown always, count loaded async */
+document.getElementById('btnViewGallery').style.display='inline-block';
+document.getElementById('galleryJcRef').innerText='JC-'+targetJobId.split('-')[0].toUpperCase();
+/* Load photo count in background */
+sb.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_card_id',targetJobId).then(({count})=>{
+  const cnt=count||0;
+  document.getElementById('galleryCount').innerText=cnt;
+  if(!cnt&&job.photo_url){/* legacy single photo — count as 1 */
+    document.getElementById('galleryCount').innerText='1';}
+});
 
             const promises = [loadInventoryLedgers()];
             if (job.customer_mobile) promises.push(fetchCustomerContext(job));
@@ -2332,6 +2522,15 @@
             /* CHANGE 4: No ₹ symbol inside the string — regex parser requires plain numbers */
             commitInvoiceSettlement(`Split (Cash: ${cash}, UPI: ${upi})`, 'Closed');
         }
+    }
+
+    async function triggerSettlement(modeTarget, statusTarget) {
+        /* Wrapper that runs mandatory photo check before settling */
+        if (statusTarget === 'Closed') {
+            const photoOk = await checkMandatoryPhoto();
+            if (!photoOk) return;
+        }
+        await commitInvoiceSettlement(modeTarget, statusTarget);
     }
 
     async function commitInvoiceSettlement(modeTarget, statusTarget) {
