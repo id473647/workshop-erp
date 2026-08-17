@@ -329,6 +329,73 @@ input[type="tel"]{width:100%;padding:14px;border:1px solid var(--border);border-
   </div>
 </div>
 
+<!-- ── MECHANIC JC PHOTO MODAL ────────────────────────────────────────────── -->
+<div id="mechPhotoModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:400;overflow-y:auto;">
+  <div style="background:white;margin:16px;border-radius:12px;padding:16px;max-width:500px;margin-left:auto;margin-right:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;">
+      <div>
+        <h3 style="margin:0;font-size:1rem;color:var(--primary);">📸 JC Photos</h3>
+        <span id="mechPhotoJcRef" style="font-size:.75rem;color:#64748b;"></span>
+      </div>
+      <button onclick="closeMechPhotoModal()" style="border:none;background:none;font-size:1.4rem;font-weight:700;cursor:pointer;color:#64748b;padding:4px 8px;">×</button>
+    </div>
+
+    <!-- EXISTING PHOTOS GALLERY -->
+    <div id="mechPhotoGallery" style="margin-bottom:14px;">
+      <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Existing Photos</div>
+      <div id="mechPhotoGalleryGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        <div style="text-align:center;color:#94a3b8;font-size:.78rem;padding:12px;grid-column:span 3;">Loading...</div>
+      </div>
+    </div>
+
+    <!-- UPLOAD NEW PHOTO -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:10px;">Add New Photo</div>
+
+      <!-- Quick Tags — large buttons for shop floor -->
+      <div style="margin-bottom:12px;">
+        <div style="font-size:.72rem;color:#64748b;margin-bottom:6px;">What is this photo about?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="quickTagBtns">
+          <button onclick="selectQuickTag(this,'problem_found')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">🔍 Problem Found</button>
+          <button onclick="selectQuickTag(this,'work_in_progress')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">🔧 Work in Progress</button>
+          <button onclick="selectQuickTag(this,'work_complete')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">✅ Work Complete</button>
+          <button onclick="selectQuickTag(this,'additional_issue')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">⚠️ Additional Issue</button>
+          <button onclick="selectQuickTag(this,'part_replaced')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">📦 Part Replaced</button>
+          <button onclick="selectQuickTag(this,'customer_to_verify')" class="qtag-btn" style="padding:10px;border:2px solid var(--border);border-radius:8px;background:white;font-size:.82rem;cursor:pointer;font-weight:700;">👁️ Customer to Verify</button>
+        </div>
+        <input type="hidden" id="selectedQuickTag" value="">
+      </div>
+
+      <!-- Optional note -->
+      <div style="margin-bottom:12px;">
+        <input type="text" id="mechPhotoNote" maxlength="100" placeholder="Short note (optional — max 100 chars)"
+          style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;font-size:.85rem;">
+      </div>
+
+      <!-- Photo file input — camera-first on mobile -->
+      <div id="mechPhotoPreviewBox" style="display:none;margin-bottom:10px;text-align:center;">
+        <img id="mechPhotoPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">
+      </div>
+
+      <label style="display:block;background:var(--primary);color:white;padding:14px;border-radius:8px;text-align:center;cursor:pointer;font-weight:700;font-size:.95rem;margin-bottom:10px;">
+        📷 Take / Choose Photo
+        <input type="file" id="mechPhotoFile" accept="image/*" capture="environment" style="display:none;" onchange="previewMechPhoto(this)">
+      </label>
+
+      <button id="mechPhotoUploadBtn" onclick="uploadMechPhoto()" disabled
+        style="width:100%;background:#15803d;color:white;border:none;padding:14px;border-radius:8px;font-weight:700;font-size:.95rem;cursor:pointer;opacity:.5;">
+        ⬆️ UPLOAD PHOTO
+      </button>
+      <div id="mechPhotoStatus" style="text-align:center;font-size:.78rem;color:#64748b;margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Full-size photo viewer -->
+<div id="mechPhotoViewer" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.9);z-index:500;display:none;align-items:center;justify-content:center;" onclick="this.style.display='none'">
+  <img id="mechPhotoViewerImg" style="max-width:95%;max-height:95vh;border-radius:8px;">
+</div>
+
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
@@ -883,7 +950,7 @@ async function loadMechanicData(){
     if(job.status==='Closed') totalNetShare+=myShare;
     const splitTag=hasCo?` <span style="color:var(--info);font-size:.7rem;">(50% Co-Mech)</span>`:'';
     const statClass=job.status==='Open'?'open':'closed';
-    jList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong><span class="pill ${statClass}">${job.status}</span></div><div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div><div style="font-size:.82rem;color:#475569;">Labour: ₹${gross}${splitTag}</div><div style="font-size:.82rem;font-weight:700;color:var(--success);">Your Share (${commRate}%): ₹${myShare.toFixed(2)}</div></div>`;
+    jList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong><span class="pill ${statClass}">${job.status}</span></div><div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div><div style="font-size:.82rem;color:#475569;">Labour: ₹${gross}${splitTag}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;"><div style="font-size:.82rem;font-weight:700;color:var(--success);">Your Share (${commRate}%): ₹${myShare.toFixed(2)}</div>${job.status==='Open'?`<button onclick="openMechPhotoModal('${job.id}')" style="background:var(--info);color:white;border:none;padding:6px 12px;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">📸 Photos</button>`:''}</div></div>`;
     if(job.is_reviewed&&job.mech_id===activeMech.id){
       const stars='★'.repeat(job.review_rating||0)+'☆'.repeat(5-(job.review_rating||0));
       rList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:.8rem;color:#475569;font-style:italic;">"${job.review_mech_feedback||'No feedback'}"</div></div>`;
@@ -1285,6 +1352,178 @@ window.onload=async()=>{
   showView('vMobile');
   document.getElementById('loginMobile').focus();
 };
+
+/* ── MECHANIC JC PHOTO FUNCTIONS ─────────────────────────────────────────── */
+
+let _mechPhotoJcId = null;
+
+async function openMechPhotoModal(jcId) {
+  _mechPhotoJcId = jcId;
+  const jcShort = 'JC-' + jcId.split('-')[0].toUpperCase();
+  document.getElementById('mechPhotoJcRef').innerText = jcShort;
+  document.getElementById('mechPhotoModal').style.display = 'block';
+  document.getElementById('mechPhotoNote').value = '';
+  document.getElementById('selectedQuickTag').value = '';
+  document.getElementById('mechPhotoPreviewBox').style.display = 'none';
+  document.getElementById('mechPhotoFile').value = '';
+  document.getElementById('mechPhotoUploadBtn').disabled = true;
+  document.getElementById('mechPhotoUploadBtn').style.opacity = '.5';
+  document.getElementById('mechPhotoStatus').innerText = '';
+  // Reset tag button styles
+  document.querySelectorAll('.qtag-btn').forEach(b => {
+    b.style.background = 'white';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = '#1e293b';
+  });
+  await loadMechPhotoGallery(jcId);
+}
+
+function closeMechPhotoModal() {
+  document.getElementById('mechPhotoModal').style.display = 'none';
+  _mechPhotoJcId = null;
+}
+
+async function loadMechPhotoGallery(jcId) {
+  const grid = document.getElementById('mechPhotoGalleryGrid');
+  grid.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:.78rem;padding:12px;grid-column:span 3;">Loading...</div>';
+  const { data: photos } = await sb.from('jc_photos')
+    .select('id,photo_url,photo_type,quick_tag,note,uploaded_by,uploaded_at')
+    .eq('job_card_id', jcId)
+    .order('uploaded_at', { ascending: false });
+  if (!photos || !photos.length) {
+    grid.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:.78rem;padding:16px;grid-column:span 3;">No photos yet — be the first to add one</div>';
+    return;
+  }
+  const tagLabels = {
+    problem_found:'🔍 Problem Found', work_in_progress:'🔧 In Progress',
+    work_complete:'✅ Complete', additional_issue:'⚠️ Extra Issue',
+    part_replaced:'📦 Part Replaced', customer_to_verify:'👁️ Customer to Verify',
+    intake:'📥 Intake', pre_work:'🔍 Pre-Work', delivery:'✅ Delivery',
+    damage_record:'⚠️ Damage', general:'📷 General', in_progress:'🔧 In Progress'
+  };
+  grid.innerHTML = photos.map(p => {
+    const tag = tagLabels[p.quick_tag||p.photo_type] || '📷';
+    const time = new Date(p.uploaded_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const date = new Date(p.uploaded_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+    return `<div style="cursor:pointer;" onclick="viewFullPhoto('${p.photo_url}')">
+      <img src="${p.photo_url}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:2px solid var(--border);">
+      <div style="font-size:.65rem;color:#64748b;margin-top:3px;text-align:center;">${tag}</div>
+      <div style="font-size:.6rem;color:#94a3b8;text-align:center;">${date} ${time}</div>
+      ${p.note?`<div style="font-size:.62rem;color:#475569;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="${p.note}">${p.note}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function selectQuickTag(btn, tag) {
+  document.querySelectorAll('.qtag-btn').forEach(b => {
+    b.style.background = 'white';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = '#1e293b';
+  });
+  btn.style.background = '#0369a1';
+  btn.style.borderColor = '#0369a1';
+  btn.style.color = 'white';
+  document.getElementById('selectedQuickTag').value = tag;
+  checkUploadReady();
+}
+
+function previewMechPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('mechPhotoPreviewImg').src = e.target.result;
+    document.getElementById('mechPhotoPreviewBox').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+  checkUploadReady();
+}
+
+function checkUploadReady() {
+  const hasFile  = document.getElementById('mechPhotoFile').files.length > 0;
+  const hasTag   = !!document.getElementById('selectedQuickTag').value;
+  const uploadBtn = document.getElementById('mechPhotoUploadBtn');
+  const ready = hasFile && hasTag;
+  uploadBtn.disabled = !ready;
+  uploadBtn.style.opacity = ready ? '1' : '.5';
+}
+
+async function uploadMechPhoto() {
+  const jcId   = _mechPhotoJcId;
+  const file   = document.getElementById('mechPhotoFile').files[0];
+  const tag    = document.getElementById('selectedQuickTag').value;
+  const note   = document.getElementById('mechPhotoNote').value.trim();
+  const status = document.getElementById('mechPhotoStatus');
+
+  if (!jcId || !file || !tag) return;
+
+  const btn = document.getElementById('mechPhotoUploadBtn');
+  btn.disabled = true;
+  btn.innerText = '⬆️ Uploading...';
+  status.innerText = 'Uploading photo...';
+
+  const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const path = `${jcId}/${Date.now()}_${tag}.${ext}`;
+
+  const { error: upErr } = await sb.storage.from('job_card_photos').upload(path, file, { upsert: false });
+  if (upErr) {
+    status.innerText = '❌ Upload failed: ' + upErr.message;
+    btn.disabled = false;
+    btn.innerText = '⬆️ UPLOAD PHOTO';
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from('job_card_photos').getPublicUrl(path);
+  const photoUrl = urlData.publicUrl;
+
+  // Map quick_tag to photo_type
+  const typeMap = {
+    problem_found: 'pre_work', work_in_progress: 'in_progress',
+    work_complete: 'delivery', additional_issue: 'general',
+    part_replaced: 'in_progress', customer_to_verify: 'general'
+  };
+
+  await sb.from('jc_photos').insert({
+    job_card_id : jcId,
+    photo_url   : photoUrl,
+    photo_type  : typeMap[tag] || 'general',
+    quick_tag   : tag,
+    note        : note || null,
+    uploaded_by : activeMech?.name || 'MECHANIC',
+    mechanic_id : activeMech?.id || null
+  });
+
+  // Also update job_cards.photo_url if no main photo yet (backward compat)
+  const { data: jcCheck } = await sb.from('job_cards').select('photo_url').eq('id', jcId).single();
+  if (!jcCheck?.photo_url) {
+    await sb.from('job_cards').update({ photo_url: photoUrl }).eq('id', jcId);
+  }
+
+  status.innerText = '✅ Photo uploaded!';
+  btn.innerText = '⬆️ UPLOAD PHOTO';
+
+  // Reset upload section
+  document.getElementById('mechPhotoFile').value = '';
+  document.getElementById('mechPhotoPreviewBox').style.display = 'none';
+  document.getElementById('mechPhotoNote').value = '';
+  document.getElementById('selectedQuickTag').value = '';
+  document.querySelectorAll('.qtag-btn').forEach(b => {
+    b.style.background = 'white';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = '#1e293b';
+  });
+  btn.disabled = true;
+  btn.style.opacity = '.5';
+
+  // Refresh gallery
+  await loadMechPhotoGallery(jcId);
+  setTimeout(() => { status.innerText = ''; }, 3000);
+}
+
+function viewFullPhoto(url) {
+  const viewer = document.getElementById('mechPhotoViewer');
+  document.getElementById('mechPhotoViewerImg').src = url;
+  viewer.style.display = 'flex';
+}
+
 </script>
-</body>
-</html>
