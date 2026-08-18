@@ -218,6 +218,14 @@
                 </button>
             </div>
             <div id="changeVehiclePanel" style="display:none;border:1px solid #fde68a;border-radius:6px;background:white;margin-top:6px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>
+            <!-- Phase 11B: Job type tags display -->
+            <div id="jobTagsDisplay" style="display:none;margin-top:8px;flex-wrap:wrap;gap:4px;"></div>
+            <!-- Phase 11B: Customer flagged amber banner -->
+            <div id="flaggedBanner" style="display:none;background:#fffbeb;border:1.5px solid #fde68a;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:.8rem;color:#854d0e;">
+                <strong>⚠️ Customer Flagged Issues:</strong>
+                <span id="flaggedList"></span>
+                <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;" id="flaggedActions"></div>
+            </div>
             <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                 <span style="font-size:0.75rem; font-weight:bold; color:#64748b;">TECH:</span>
                 <select id="primaryMech" class="input-lockable" style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); font-size:0.75rem; font-weight:bold; color:var(--primary); background:#f8fafc;"><option value="">-- Unassigned --</option></select>
@@ -1259,7 +1267,66 @@
     }
 
 
-    /* ── JC PHOTO GALLERY FUNCTIONS (billing.html) ─────────────────────────── */
+    /* ── PHASE 11B: Render job type tags + flagged banner in billing header ── */
+    function renderJobTagsHeader(jobTypeIds) {
+        const tagsDisplay = document.getElementById('jobTagsDisplay');
+        const flaggedBanner = document.getElementById('flaggedBanner');
+        const flaggedList = document.getElementById('flaggedList');
+        const flaggedActions = document.getElementById('flaggedActions');
+
+        if (!jobTypeIds || jobTypeIds === '[]') {
+            tagsDisplay.style.display = 'none';
+            flaggedBanner.style.display = 'none';
+            return;
+        }
+
+        let tags = [];
+        try { tags = typeof jobTypeIds === 'string' ? JSON.parse(jobTypeIds) : jobTypeIds; }
+        catch(e) { return; }
+        if (!tags.length) return;
+
+        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
+        const flagged = tags.filter(t => t.customer_flagged);
+
+        // Show tag pills
+        tagsDisplay.style.display = 'flex';
+        tagsDisplay.innerHTML = tags.map(t => {
+            const bg = t.customer_flagged ? '#fef3c7' : '#eff6ff';
+            const border = t.customer_flagged ? '#fde68a' : '#bfdbfe';
+            const color = t.customer_flagged ? '#854d0e' : '#1e40af';
+            return `<span style="background:${bg};border:1px solid ${border};color:${color};padding:3px 9px;border-radius:12px;font-size:.72rem;font-weight:700;white-space:nowrap;">
+                ${t.customer_flagged ? '⚠️ ' : ''}${t.name_hi}
+                ${t.labour_price > 0 ? `<span style="font-size:.65rem;opacity:.7;">₹${t.labour_price}</span>` : ''}
+            </span>`;
+        }).join('');
+
+        // Show flagged banner if any
+        if (flagged.length > 0) {
+            flaggedBanner.style.display = 'block';
+            flaggedList.innerHTML = ' ' + flagged.map(t => `<strong>${t.name_hi}</strong>`).join(', ');
+            flaggedActions.innerHTML = flagged.map(t => `
+                <button onclick="addFlaggedNote('${t.id}','${t.name_hi.replace(/'/g,"\\'")}')"
+                    class="btn-action info input-lockable" style="padding:3px 10px;font-size:.72rem;">
+                    📝 Add Note: ${t.name_hi}
+                </button>`).join('');
+        } else {
+            flaggedBanner.style.display = 'none';
+        }
+    }
+
+    function addFlaggedNote(tagId, tagName) {
+        const note = prompt(`Add note for flagged issue: "${tagName}"\n\nWhat was found / what was done?`);
+        if (!note || !note.trim()) return;
+        const noteUpper = note.trim().toUpperCase();
+        // Store note on job_cards in a notes JSONB or problem_mentioned extension
+        supabaseClient.from('job_cards').update({
+            problem_mentioned: (activeJobContext?.problem_mentioned || '') +
+                `\n[FLAGGED: ${tagName}] ${noteUpper}`
+        }).eq('id', targetJobId).then(({error}) => {
+            if (error) alert('Error: ' + error.message);
+            else alert(`✅ Note added for ${tagName}`);
+        });
+    }
     const _tagLabels = {
       intake:'📥 Intake', pre_work:'🔍 Pre-Work', in_progress:'🔧 In Progress',
       delivery:'✅ Delivery', damage_record:'⚠️ Damage', general:'📷 General',
@@ -1360,46 +1427,46 @@
 
     /* ── MANDATORY PHOTO CHECK before PAY NOW ──────────────────────────────── */
     async function checkMandatoryPhoto() {
-      if (!window._settings) return true; // settings not loaded, skip check
+      if (!window._settings) return true;
       const threshold = window._settings.photo_mandatory_amount || 2500;
       const overnight = window._settings.photo_overnight_check !== false;
-
-      const labour   = parseFloat(servicePkgGrossTotal) || 0;
-      const lathe    = parseFloat(internalLatheNet) || 0;
-      const total    = labour + lathe;
-
-      const jcDate   = activeJobContext?.jc_date?.split('T')[0];
-      const today    = new Date().toISOString().split('T')[0];
+      const promptFlag = window._settings.flagged_item_manager_prompt !== false;
+      const requirePhoto = window._settings.require_flagged_photo === true;
+      const labour = parseFloat(servicePkgGrossTotal)||0;
+      const lathe  = parseFloat(internalLatheNet)||0;
+      const total  = labour + lathe;
+      const jcDate = activeJobContext?.jc_date?.split('T')[0];
+      const today  = new Date().toISOString().split('T')[0];
       const isOvernight = jcDate && jcDate < today;
-
-      const needsPhoto = (total >= threshold) || (overnight && isOvernight);
-      if (!needsPhoto) return true;
-
-      // Check if at least one delivery photo exists
-      const { count } = await supabaseClient.from('jc_photos')
-        .select('id', { count: 'exact', head: true })
-        .eq('job_card_id', targetJobId)
-        .in('photo_type', ['delivery', 'in_progress', 'general']);
-
-      const hasPhoto = (count || 0) > 0 || !!activeJobContext?.photo_url;
-      if (hasPhoto) return true;
-
-      const reason = total >= threshold
-        ? `This JC has labour+lathe of ₹${total} (above ₹${threshold} threshold).`
-        : 'This vehicle was overnight.';
-
-      const proceed = confirm(
-        `📸 PHOTO REQUIRED
-
-${reason}
-At least one delivery photo must be added before closing.
-
-Click OK to open the photo gallery and upload, then close the JC.`
-      );
-      if (proceed) openJcGallery();
-      return false; // block PAY NOW until photo is added and user tries again
+      const needsPhoto = (total >= threshold)||(overnight&&isOvernight);
+      if (needsPhoto) {
+        const{count}=await supabaseClient.from('jc_photos').select('id',{count:'exact',head:true})
+          .eq('job_card_id',targetJobId).in('photo_type',['delivery','in_progress','general']);
+        if(!(count||0)&&!activeJobContext?.photo_url){
+          const reason=total>=threshold?`Labour+lathe ₹${total} above ₹${threshold} threshold.`:'Vehicle was overnight.';
+          const proceed=confirm(`📸 PHOTO REQUIRED\n\n${reason}\nPlease upload a delivery photo before closing.\n\nClick OK to open gallery.`);
+          if(proceed)openJcGallery();
+          return false;
+        }
+      }
+      // Phase 11B: Soft prompt for customer-flagged items
+      if (promptFlag && activeJobContext?.job_type_ids) {
+        let tags=[];
+        try{tags=typeof activeJobContext.job_type_ids==='string'?JSON.parse(activeJobContext.job_type_ids):activeJobContext.job_type_ids;}catch(e){}
+        const flagged=tags.filter(t=>t.customer_flagged);
+        if (flagged.length > 0) {
+          const flaggedNames=flagged.map(t=>t.name_hi).join(', ');
+          if (requirePhoto) {
+            const{count:fCount}=await supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_card_id',targetJobId);
+            if(!fCount){alert(`⚠️ Customer flagged items require photo before closing.\nFlagged: ${flaggedNames}`);openJcGallery();return false;}
+          } else {
+            const proceed=confirm(`⚠️ CUSTOMER FLAGGED ITEMS\n\nFlagged: ${flaggedNames}\n\nHas the customer\'s concern been addressed?\n[OK] = Yes, close\n[Cancel] = Go back`);
+            if(!proceed) return false;
+          }
+        }
+      }
+      return true;
     }
-
     // ── PHASE 11A: WORKSHOP SETTINGS CACHE ──────────────────────────────────────
     window._settings = {};
     async function loadWorkshopSettings() {
@@ -1516,6 +1583,8 @@ Click OK to open the photo gallery and upload, then close the JC.`
             document.getElementById('complaintLabel').innerText = `Problem: ${job.problem_mentioned || 'Routine Maintenance'}`;
             if (job.mech_id) document.getElementById('primaryMech').value = job.mech_id;
             if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
+            /* Phase 11B: render job type tags and flagged banner */
+            renderJobTagsHeader(job.job_type_ids);
             document.getElementById('vFutureAdvice').value = job.future_advice || '';
             document.getElementById('vAdvanceService').value = parseFloat(job.advance_service) || 0;
             document.getElementById('vPrepaidGreen').value = parseFloat(job.prepaid_green) || 0;
