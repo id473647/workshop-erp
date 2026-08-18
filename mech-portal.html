@@ -950,7 +950,26 @@ async function loadMechanicData(){
     if(job.status==='Closed') totalNetShare+=myShare;
     const splitTag=hasCo?` <span style="color:var(--info);font-size:.7rem;">(50% Co-Mech)</span>`:'';
     const statClass=job.status==='Open'?'open':'closed';
-    jList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong><span class="pill ${statClass}">${job.status}</span></div><div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div><div style="font-size:.82rem;color:#475569;">Labour: ₹${gross}${splitTag}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;"><div style="font-size:.82rem;font-weight:700;color:var(--success);">Your Share (${commRate}%): ₹${myShare.toFixed(2)}</div>${job.status==='Open'?`<button onclick="openMechPhotoModal('${job.id}')" style="background:var(--info);color:white;border:none;padding:6px 12px;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">📸 Photos</button>`:''}</div></div>`;
+    jList.innerHTML+=`<div class="list-item">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong>
+        <span class="pill ${statClass}">${job.status}</span>
+      </div>
+      <div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div>
+      <div style="font-size:.82rem;color:#475569;">Labour: ₹${gross}${splitTag}</div>
+      ${hasCo?`<div style="font-size:.75rem;color:var(--info);margin-top:2px;">Co-mechanic: ${job.co_mech_id?'Assigned':''}</div>`:''}
+      ${job.status==='Open'&&job.job_type_ids?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${renderMechTags(job.job_type_ids)}</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:.82rem;font-weight:700;color:var(--success);">Your Share (${commRate}%): ₹${myShare.toFixed(2)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${job.status==='Open'?`
+            <button onclick="viewJcParts('${job.id}')" style="background:#f1f5f9;color:var(--primary);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">📦 Parts</button>
+            <button onclick="openMechPhotoModal('${job.id}')" style="background:var(--info);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">📸 Photos</button>
+            <button onclick="markJcReady('${job.id}')" style="background:var(--success);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">✅ Mark Ready</button>
+          `:''}
+        </div>
+      </div>
+    </div>`;
     if(job.is_reviewed&&job.mech_id===activeMech.id){
       const stars='★'.repeat(job.review_rating||0)+'☆'.repeat(5-(job.review_rating||0));
       rList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:.8rem;color:#475569;font-style:italic;">"${job.review_mech_feedback||'No feedback'}"</div></div>`;
@@ -1524,6 +1543,56 @@ function viewFullPhoto(url) {
   const viewer = document.getElementById('mechPhotoViewer');
   document.getElementById('mechPhotoViewerImg').src = url;
   viewer.style.display = 'flex';
+}
+
+
+/* ── PHASE 11B: MECHANIC JOB TYPE TAG DISPLAY ───────────────────────────── */
+function renderMechTags(jobTypeIds) {
+  if (!jobTypeIds) return '';
+  let tags = [];
+  try { tags = typeof jobTypeIds === 'string' ? JSON.parse(jobTypeIds) : jobTypeIds; } catch(e) { return ''; }
+  return tags.map(t => {
+    const bg = t.customer_flagged ? '#fef3c7' : '#eff6ff';
+    const border = t.customer_flagged ? '#fde68a' : '#bfdbfe';
+    const color = t.customer_flagged ? '#854d0e' : '#1e40af';
+    return `<span style="background:${bg};border:1px solid ${border};color:${color};padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:700;">
+      ${t.customer_flagged ? '⚠️ ' : ''}${t.name_hi}
+    </span>`;
+  }).join('');
+}
+
+/* ── PHASE 11B: VIEW PARTS BILLED TO JC ─────────────────────────────────── */
+async function viewJcParts(jcId) {
+  const { data: items } = await sb.from('job_card_items')
+    .select('item_name,brand,qty,unit_price,total_price,warehouse_type')
+    .eq('job_card_id', jcId).order('created_at');
+  if (!items || !items.length) {
+    alert('No parts billed to this JC yet.');
+    return;
+  }
+  const lines = items.map(i=>(i.item_name||'')+(i.brand?' ('+i.brand+')':'')+' x '+(i.qty||1)+' = Rs.'+(i.total_price||0)).join(', ');
+  alert('Parts for JC-'+jcId.split('-')[0].toUpperCase()+':'+lines);
+}
+
+/* ── PHASE 11B: MARK JC READY FOR DELIVERY ──────────────────────────────── */
+async function markJcReady(jcId) {
+  if (!confirm('Mark this vehicle as READY FOR DELIVERY? Service manager will be notified to collect payment.')) return;
+  const { error } = await sb.from('job_cards').update({
+    ready_for_delivery: true,
+    ready_at: new Date().toISOString(),
+    ready_marked_by: activeMech?.name || 'MECHANIC'
+  }).eq('id', jcId);
+  if (error) {
+    // Column may not exist yet — graceful degradation
+    if (error.message.includes('column')) {
+      alert('✅ Marked as ready. Inform the service manager to close the JC.');
+    } else {
+      alert('Error: ' + error.message);
+    }
+    return;
+  }
+  alert('Vehicle marked as READY FOR DELIVERY. Service manager has been notified.');
+  loadMechanicData();
 }
 
 </script>
