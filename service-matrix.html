@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Service Matrices — My Care ERP</title>
+<title>Service Matrix — My Care ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="notifications.js"></script>
 <style>
-:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;}
+:root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--warn:#f59e0b;}
 *{box-sizing:border-box;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:0;padding:0;color:var(--text);padding-bottom:60px;}
 .sticky-nav{max-width:950px;margin:0 auto;background:white;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.02);position:sticky;top:0;z-index:100;}
@@ -19,15 +19,38 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--light);margin:
 .wrapper{max-width:950px;margin:0 auto;padding:20px;}
 .card-panel{background:white;padding:20px;border-radius:10px;border:1px solid var(--border);margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.02);}
 .block-title{font-size:1.05rem;font-weight:700;color:var(--primary);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:16px;}
-.inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;align-items:end;}
-.field-group{display:flex;flex-direction:column;gap:4px;}
+.tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;padding-bottom:0;}
+.tab-btn{padding:10px 16px;background:none;border:none;font-weight:700;color:#64748b;border-bottom:3px solid transparent;cursor:pointer;font-size:.84rem;white-space:nowrap;transition:color .15s;}
+.tab-btn.active{color:var(--info);border-bottom-color:var(--info);}
+.tab-panel{display:none;}.tab-panel.active{display:block;}
+input,select,textarea{padding:9px 10px;border:1px solid var(--border);border-radius:6px;font-size:.87rem;width:100%;box-sizing:border-box;}
+.btn-action{background:var(--success);color:white;border:none;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.84rem;white-space:nowrap;}
+.btn-action.info{background:var(--info);}
+.btn-action.warn{background:var(--warn);color:#1e293b;}
+.btn-action.danger{background:var(--danger);}
+.tbl{width:100%;border-collapse:collapse;font-size:.83rem;}
+.tbl th{background:#f8fafc;padding:9px 10px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;}
+.tbl td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.tbl tr:hover td{background:#f8fafc;}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:700;}
+.pill-active{background:#dcfce7;color:#166534;}
+.pill-inactive{background:#f1f5f9;color:#64748b;}
+.pill-pending{background:#fef3c7;color:#854d0e;}
+.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.search-bar input{flex:1;min-width:180px;}
+.overlay-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;}
+.modal-card{background:white;border-radius:12px;padding:24px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto;}
+.field-group{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
 .field-group label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;}
-input,select{padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;}
-.btn-action{background:var(--success);color:white;border:none;padding:10px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.85rem;}
-.table-wrapper{border-radius:8px;border:1px solid var(--border);overflow-x:auto;margin-top:12px;}
-table{width:100%;border-collapse:collapse;font-size:.83rem;}
-th{background:#f8fafc;padding:9px 12px;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;}
-td{padding:9px 12px;border-bottom:1px solid #f1f5f9;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.check-col{text-align:center;color:var(--success);font-size:1.1rem;}
+/* Protocol checklist print */
+@media print{
+  body *{visibility:hidden;}
+  #printTarget,#printTarget *{visibility:visible;}
+  #printTarget{position:fixed;top:0;left:0;width:100%;font-family:'Segoe UI',sans-serif;}
+}
 </style>
 </head>
 <body>
@@ -44,37 +67,560 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;}
     <span id="roleDisplay" class="badge-role">STAFF</span>
   </div>
 </nav>
+
 <div class="wrapper">
-  <div class="card-panel">
-    <div class="block-title">📋 Static Service Protocols</div>
-    <div class="inputs-grid" style="background:#f0fdf4;padding:16px;border-radius:8px;border:1px solid #bbf7d0;">
-      <div class="field-group"><label>Protocol Name</label><input type="text" id="srvName" placeholder="e.g. QUICK SERVICE" oninput="this.value=this.value.toUpperCase()"></div>
-      <div class="field-group"><label>Vehicle Category</label>
-        <select id="srvCat">
-          <option value="(A) Commuter Bikes 100CC Old">(A) Commuter Bikes 100CC Old</option>
-          <option value="(B) Commuter Bikes 100CC BS6">(B) Commuter Bikes 100CC BS6</option>
-          <option value="(I) Scooterate">(I) Scooterate</option>
-        </select>
-      </div>
-      <div class="field-group"><label>Base Rate (₹)</label><input type="number" id="srvRate" value="99"></div>
-      <button class="btn-action" onclick="saveServiceProtocol()">ADD PROTOCOL</button>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('tPackages',this)">📊 Service Packages</button>
+    <button class="tab-btn" onclick="switchTab('tChecklist',this)">📋 Protocol Checklist</button>
+    <button class="tab-btn" onclick="switchTab('tJobTypes',this)">🏷️ Job Types</button>
+    <button class="tab-btn" onclick="switchTab('tSegments',this)">🚗 Vehicle Segments</button>
+    <button class="tab-btn" onclick="switchTab('tAnalytics',this)">📈 Analytics</button>
+  </div>
+
+  <!-- ── TAB 1: SERVICE PACKAGES ────────────────────────────────────────── -->
+  <div id="tPackages" class="tab-panel active card-panel">
+    <div class="block-title">📊 Service Packages &amp; Rates</div>
+    <div class="search-bar">
+      <input id="pkgSearch" placeholder="Search by protocol name or vehicle category..." oninput="loadPackages()">
+      <button class="btn-action info" onclick="openAddPackageModal()">➕ ADD PROTOCOL</button>
     </div>
-    <div class="table-wrapper">
-      <table><thead><tr><th>Protocol Name</th><th>Vehicle Category</th><th>Fixed Rate</th><th>Action</th></tr></thead>
-      <tbody id="srvTableBody"></tbody></table>
+    <div style="overflow-x:auto;">
+      <table class="tbl" id="pkgTable">
+        <thead><tr>
+          <th>Protocol Name</th><th>Vehicle Category</th>
+          <th>Rate ₹</th><th>Min Min</th><th>Max Min</th><th>Action</th>
+        </tr></thead>
+        <tbody id="pkgBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB 2: PROTOCOL CHECKLIST ──────────────────────────────────────── -->
+  <div id="tChecklist" class="tab-panel card-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="block-title" style="margin:0;border:none;padding:0;">📋 Protocol Checklist (Red Board)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-action info" onclick="openAddChecklistModal()">➕ ADD ITEM</button>
+        <button class="btn-action warn" onclick="printComparisonTable()">🖨️ PRINT COMPARISON TABLE</button>
+      </div>
+    </div>
+    <div style="font-size:.78rem;color:#64748b;margin-bottom:12px;background:#fffbeb;border:1px solid #fde68a;padding:8px 12px;border-radius:6px;">
+      ☺ = Included in that service level. Click any checkbox to toggle and auto-save. Changes reflect in the printed comparison table immediately.
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="tbl" id="checklistTable">
+        <thead><tr>
+          <th style="width:36px;">No.</th>
+          <th>कार्य का विवरण</th>
+          <th style="text-align:center;">क्विक</th>
+          <th style="text-align:center;">जनरल</th>
+          <th style="text-align:center;">प्रीमियम</th>
+          <th style="text-align:center;">जंबो</th>
+          <th>Category</th>
+          <th>Action</th>
+        </tr></thead>
+        <tbody id="checklistBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB 3: JOB TYPES ───────────────────────────────────────────────── -->
+  <div id="tJobTypes" class="tab-panel card-panel">
+    <div class="block-title">🏷️ Job Types (Individual Billable Tasks)</div>
+    <div class="search-bar">
+      <input id="jtSearch" placeholder="Search in Hindi or English — e.g. clutch, क्लच, brake, ब्रेक..." oninput="loadJobTypes()">
+      <select id="jtCat" onchange="loadJobTypes()" style="width:160px;flex:none;">
+        <option value="">All Categories</option>
+        <option value="MECHANICAL">Mechanical</option>
+        <option value="ELECTRICAL">Electrical</option>
+        <option value="BODY">Body</option>
+        <option value="TYRES">Tyres</option>
+        <option value="GENERAL">General</option>
+      </select>
+      <select id="jtStatus" onchange="loadJobTypes()" style="width:120px;flex:none;">
+        <option value="active">Active</option>
+        <option value="pending">Pending</option>
+        <option value="inactive">Inactive</option>
+        <option value="">All</option>
+      </select>
+      <button class="btn-action info" onclick="openAddJobTypeModal()">➕ ADD TAG</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="tbl" id="jtTable">
+        <thead><tr>
+          <th>Hindi Name</th><th>English Name</th><th>Category</th>
+          <th>Min ₹</th><th>Max ₹</th><th>Min Min</th><th>Max Min</th>
+          <th>Status</th><th>Action</th>
+        </tr></thead>
+        <tbody id="jtBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB 4: VEHICLE SEGMENTS ────────────────────────────────────────── -->
+  <div id="tSegments" class="tab-panel card-panel">
+    <div class="block-title">🚗 Vehicle Segments &amp; Smart Learning</div>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin-bottom:16px;font-size:.85rem;color:#1e40af;">
+      <strong>Phase 12 Feature.</strong> The system will automatically learn which vehicle model belongs to which service segment based on actual JC history. After 3+ months of data, each model (e.g. Pulsar NS 125cc) will have its own suggested service rate learned from what was actually charged — overriding the category default when confidence is high.
+    </div>
+    <div style="overflow-x:auto;" id="segmentContent">
+      <div style="text-align:center;color:#94a3b8;padding:30px;">Loading vehicle categories...</div>
+    </div>
+  </div>
+
+  <!-- ── TAB 5: ANALYTICS ───────────────────────────────────────────────── -->
+  <div id="tAnalytics" class="tab-panel card-panel">
+    <div class="block-title">📈 Service Analytics</div>
+    <div style="text-align:center;padding:40px;color:#94a3b8;">
+      <div style="font-size:3rem;margin-bottom:12px;">📊</div>
+      <div style="font-weight:700;font-size:1rem;color:#64748b;margin-bottom:8px;">Analytics Coming in Phase 12</div>
+      <div style="font-size:.85rem;max-width:400px;margin:0 auto;">
+        Requires 3+ months of job type data from closed JCs. Admin can enable from Workshop Settings when data is sufficient.
+      </div>
+      <div style="margin-top:20px;font-size:.78rem;color:#94a3b8;">
+        Will show: Revenue per minute by vehicle category · Most common job types · Labour price vs actual charged · Protocol effectiveness
+      </div>
     </div>
   </div>
 </div>
+
+<!-- ── ADD / EDIT PACKAGE MODAL ───────────────────────────────────────────── -->
+<div id="modalPackage" class="overlay-modal">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <h3 id="pkgModalTitle" style="margin:0;color:var(--primary);">Add Protocol</h3>
+      <button onclick="document.getElementById('modalPackage').style.display='none'" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <input type="hidden" id="pkgEditId">
+    <div class="field-group"><label>Protocol Name *</label>
+      <input id="pkgName" placeholder="e.g. QUICK SERVICE" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="field-group"><label>Vehicle Category *</label>
+      <input id="pkgCat" placeholder="e.g. (A) Commuter Bikes 100CC Old" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="grid3">
+      <div class="field-group"><label>Base Rate ₹ *</label><input type="number" id="pkgRate" placeholder="299"></div>
+      <div class="field-group"><label>Min Minutes</label><input type="number" id="pkgMinMin" placeholder="0"></div>
+      <div class="field-group"><label>Max Minutes</label><input type="number" id="pkgMaxMin" placeholder="0"></div>
+    </div>
+    <button class="btn-action" style="width:100%;margin-top:8px;" onclick="savePackage()">✅ SAVE PROTOCOL</button>
+  </div>
+</div>
+
+<!-- ── ADD CHECKLIST ITEM MODAL ───────────────────────────────────────────── -->
+<div id="modalChecklist" class="overlay-modal">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <h3 style="margin:0;color:var(--primary);">Add Checklist Item</h3>
+      <button onclick="document.getElementById('modalChecklist').style.display='none'" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <div class="field-group"><label>Hindi Name *</label>
+      <input id="clNameHi" placeholder="कार्य का नाम हिंदी में"></div>
+    <div class="field-group"><label>English Name</label>
+      <input id="clNameEn" placeholder="Task name in English"></div>
+    <div class="field-group"><label>Category</label>
+      <select id="clCat">
+        <option value="MECHANICAL">Mechanical</option>
+        <option value="ELECTRICAL">Electrical</option>
+        <option value="BODY">Body</option>
+        <option value="GENERAL">General</option>
+      </select>
+    </div>
+    <div class="grid2" style="margin-bottom:12px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="clQ"> Included in Quick</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="clG"> Included in General</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="clP"> Included in Premium</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="clJ" checked> Included in Jumbo</label>
+    </div>
+    <button class="btn-action" style="width:100%;" onclick="saveChecklistItem()">✅ ADD ITEM</button>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT JOB TYPE MODAL ─────────────────────────────────────────── -->
+<div id="modalJobType" class="overlay-modal">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <h3 id="jtModalTitle" style="margin:0;color:var(--primary);">Add Job Type</h3>
+      <button onclick="document.getElementById('modalJobType').style.display='none'" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#64748b;">×</button>
+    </div>
+    <input type="hidden" id="jtEditId">
+    <div class="field-group"><label>Hindi Name *</label>
+      <input id="jtNameHi" placeholder="हिंदी में नाम लिखें"></div>
+    <div class="field-group"><label>English Name *</label>
+      <input id="jtNameEn" placeholder="English name"></div>
+    <div class="field-group"><label>Category</label>
+      <select id="jtEditCat">
+        <option value="MECHANICAL">Mechanical</option>
+        <option value="ELECTRICAL">Electrical</option>
+        <option value="BODY">Body</option>
+        <option value="TYRES">Tyres</option>
+        <option value="GENERAL">General</option>
+      </select>
+    </div>
+    <div class="grid2">
+      <div class="field-group"><label>Min Price ₹</label><input type="number" id="jtMinPrice"></div>
+      <div class="field-group"><label>Max Price ₹</label><input type="number" id="jtMaxPrice"></div>
+      <div class="field-group"><label>Min Minutes</label><input type="number" id="jtMinMin"></div>
+      <div class="field-group"><label>Max Minutes</label><input type="number" id="jtMaxMin"></div>
+    </div>
+    <div class="field-group"><label>Keywords (for search — comma separated)</label>
+      <input id="jtKeywords" placeholder="e.g. clutch, cable, क्लच, केबल"></div>
+    <div class="field-group"><label>Status</label>
+      <select id="jtEditStatus">
+        <option value="active">Active</option>
+        <option value="pending">Pending Approval</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+    <button class="btn-action" style="width:100%;margin-top:8px;" onclick="saveJobType()">✅ SAVE JOB TYPE</button>
+  </div>
+</div>
+
+<!-- ── PRINT TARGET (hidden until print) ─────────────────────────────────── -->
+<div id="printTarget" style="display:none;">
+  <div style="font-family:'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;">
+    <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px;">
+      <div style="font-size:1.2rem;font-weight:900;">MY CARE SERVICE CENTRE</div>
+      <div style="font-size:.85rem;color:#64748b;">तुलनात्मक विवरण — Comparison of Service Protocols</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="border:1px solid #ccc;padding:8px;text-align:left;">S.No</th>
+          <th style="border:1px solid #ccc;padding:8px;text-align:left;">कार्य का विवरण</th>
+          <th style="border:1px solid #ccc;padding:8px;text-align:center;width:60px;">क्विक</th>
+          <th style="border:1px solid #ccc;padding:8px;text-align:center;width:60px;">जनरल</th>
+          <th style="border:1px solid #ccc;padding:8px;text-align:center;width:70px;">प्रीमियम</th>
+          <th style="border:1px solid #ccc;padding:8px;text-align:center;width:60px;">जंबो</th>
+        </tr>
+      </thead>
+      <tbody id="printBody"></tbody>
+    </table>
+    <div style="margin-top:16px;font-size:.82rem;border-top:1px solid #ccc;padding-top:10px;text-align:center;">
+      उपरोक्त शुल्क केवल लेबर चार्ज का है |
+      ग्रीस व पेट्रोल डीजल अथवा केरोसिन का शुल्क अतिरिक्त देय है |
+    </div>
+    <div style="margin-top:8px;font-size:.75rem;text-align:center;color:#64748b;">
+      Printed from My Care ERP · my-care-erp.com
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL='https://jycoirrphpvxkrwrjcwf.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k';
 const sb=supabase.createClient(SB_URL,SB_KEY);
-document.getElementById('roleDisplay').innerText=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toUpperCase();
+const sessionRole=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase();
+document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
-async function loadServices(){const{data}=await sb.from('service_packages').select('*').order('vehicle_category');const tb=document.getElementById('srvTableBody');tb.innerHTML='';(data||[]).forEach(s=>{tb.innerHTML+=`<tr><td><strong>${s.package_name}</strong></td><td>${s.vehicle_category}</td><td>₹${s.base_rate}</td><td><button onclick="deleteSrv('${s.id}')" style="color:var(--danger);background:none;border:none;cursor:pointer;font-weight:700;">[DEL]</button></td></tr>`;});}
-async function saveServiceProtocol(){const name=document.getElementById('srvName').value;const cat=document.getElementById('srvCat').value;const rate=document.getElementById('srvRate').value;if(!name)return;const{error}=await sb.from('service_packages').insert({package_name:name,vehicle_category:cat,base_rate:rate});if(error)alert('Error: '+error.message);else{document.getElementById('srvName').value='';loadServices();}}
-async function deleteSrv(id){const{error}=await sb.from('service_packages').delete().eq('id',id);if(error)alert('Error: '+error.message);else loadServices();}
-loadServices();
+if(!['admin','service'].includes(sessionRole)){
+  document.querySelector('.wrapper').innerHTML='<div style="text-align:center;padding:60px;color:var(--danger);font-weight:700;">ACCESS DENIED. Admin or Service login required.</div>';
+}
+
+/* ── TAB SWITCHING ─────────────────────────────────────────────────────── */
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='tPackages')  loadPackages();
+  if(id==='tChecklist') loadChecklist();
+  if(id==='tJobTypes')  loadJobTypes();
+  if(id==='tSegments')  loadSegments();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAB 1 — SERVICE PACKAGES
+══════════════════════════════════════════════════════════════════════════ */
+async function loadPackages(){
+  const q=document.getElementById('pkgSearch').value.trim().toUpperCase();
+  let query=sb.from('service_packages').select('*').order('vehicle_category').order('package_name');
+  if(q) query=query.or(`package_name.ilike.%${q}%,vehicle_category.ilike.%${q}%`);
+  const{data}=await query;
+  const tbody=document.getElementById('pkgBody');
+  tbody.innerHTML='';
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px;">No protocols found.</td></tr>';return;}
+  data.forEach(p=>{
+    tbody.innerHTML+=`<tr>
+      <td><strong>${p.package_name}</strong></td>
+      <td style="font-size:.78rem;color:#64748b;">${p.vehicle_category}</td>
+      <td style="font-weight:700;color:var(--primary);">₹${p.base_rate||0}</td>
+      <td style="font-size:.78rem;">${p.min_minutes||0}</td>
+      <td style="font-size:.78rem;">${p.max_minutes||0}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn-action info" style="padding:4px 10px;font-size:.75rem;" onclick="editPackage('${p.id}','${(p.package_name||'').replace(/'/g,"\\'")}','${(p.vehicle_category||'').replace(/'/g,"\\'")}',${p.base_rate||0},${p.min_minutes||0},${p.max_minutes||0})">✏️ EDIT</button>
+        <button class="btn-action danger" style="padding:4px 10px;font-size:.75rem;margin-left:4px;" onclick="deletePackage('${p.id}')">DEL</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function openAddPackageModal(){
+  document.getElementById('pkgEditId').value='';
+  document.getElementById('pkgModalTitle').innerText='Add Protocol';
+  ['pkgName','pkgCat','pkgRate','pkgMinMin','pkgMaxMin'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('modalPackage').style.display='flex';
+}
+
+function editPackage(id,name,cat,rate,minMin,maxMin){
+  document.getElementById('pkgEditId').value=id;
+  document.getElementById('pkgModalTitle').innerText='Edit Protocol';
+  document.getElementById('pkgName').value=name;
+  document.getElementById('pkgCat').value=cat;
+  document.getElementById('pkgRate').value=rate;
+  document.getElementById('pkgMinMin').value=minMin;
+  document.getElementById('pkgMaxMin').value=maxMin;
+  document.getElementById('modalPackage').style.display='flex';
+}
+
+async function savePackage(){
+  const id=document.getElementById('pkgEditId').value;
+  const payload={
+    package_name:document.getElementById('pkgName').value.trim().toUpperCase(),
+    vehicle_category:document.getElementById('pkgCat').value.trim().toUpperCase(),
+    base_rate:parseFloat(document.getElementById('pkgRate').value)||0,
+    min_minutes:parseInt(document.getElementById('pkgMinMin').value)||0,
+    max_minutes:parseInt(document.getElementById('pkgMaxMin').value)||0
+  };
+  if(!payload.package_name||!payload.vehicle_category) return alert('Protocol name and vehicle category are required.');
+  const{error}=id
+    ? await sb.from('service_packages').update(payload).eq('id',id)
+    : await sb.from('service_packages').insert(payload);
+  if(error) return alert('Error: '+error.message);
+  document.getElementById('modalPackage').style.display='none';
+  loadPackages();
+}
+
+async function deletePackage(id){
+  if(!confirm('Delete this protocol? This cannot be undone.')) return;
+  const{error}=await sb.from('service_packages').delete().eq('id',id);
+  if(error) return alert('Error: '+error.message);
+  loadPackages();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAB 2 — PROTOCOL CHECKLIST
+══════════════════════════════════════════════════════════════════════════ */
+async function loadChecklist(){
+  const{data}=await sb.from('protocol_checklist_items').select('*').order('display_order');
+  const tbody=document.getElementById('checklistBody');
+  tbody.innerHTML='';
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px;">No items. Run Phase11B_Checklist.sql first.</td></tr>';return;}
+  data.forEach(item=>{
+    const ck=(col,val)=>`<input type="checkbox" ${val?'checked':''} onchange="toggleChecklist('${item.id}','${col}',this.checked)" style="width:18px;height:18px;cursor:pointer;">`;
+    tbody.innerHTML+=`<tr>
+      <td style="font-size:.78rem;color:#94a3b8;">${item.item_no}</td>
+      <td>
+        <div style="font-weight:600;">${item.name_hi}</div>
+        ${item.name_en?`<div style="font-size:.72rem;color:#94a3b8;">${item.name_en}</div>`:''}
+      </td>
+      <td class="check-col">${ck('in_quick',item.in_quick)}</td>
+      <td class="check-col">${ck('in_general',item.in_general)}</td>
+      <td class="check-col">${ck('in_premium',item.in_premium)}</td>
+      <td class="check-col">${ck('in_jumbo',item.in_jumbo)}</td>
+      <td><span style="font-size:.72rem;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;">${item.category}</span></td>
+      <td><button class="btn-action danger" style="padding:3px 8px;font-size:.72rem;" onclick="deleteChecklistItem('${item.id}')">DEL</button></td>
+    </tr>`;
+  });
+}
+
+async function toggleChecklist(id,col,val){
+  const{error}=await sb.from('protocol_checklist_items').update({[col]:val}).eq('id',id);
+  if(error) alert('Error: '+error.message);
+}
+
+function openAddChecklistModal(){
+  ['clNameHi','clNameEn'].forEach(id=>document.getElementById(id).value='');
+  ['clQ','clG','clP','clJ'].forEach(id=>document.getElementById(id).checked=false);
+  document.getElementById('clJ').checked=true;
+  document.getElementById('modalChecklist').style.display='flex';
+}
+
+async function saveChecklistItem(){
+  const nameHi=document.getElementById('clNameHi').value.trim();
+  if(!nameHi) return alert('Hindi name is required.');
+  const{data:last}=await sb.from('protocol_checklist_items').select('item_no').order('item_no',{ascending:false}).limit(1).single();
+  const nextNo=(last?.item_no||0)+1;
+  const{error}=await sb.from('protocol_checklist_items').insert({
+    item_no:nextNo,
+    name_hi:nameHi,
+    name_en:document.getElementById('clNameEn').value.trim()||null,
+    category:document.getElementById('clCat').value,
+    in_quick:document.getElementById('clQ').checked,
+    in_general:document.getElementById('clG').checked,
+    in_premium:document.getElementById('clP').checked,
+    in_jumbo:document.getElementById('clJ').checked,
+    display_order:nextNo
+  });
+  if(error) return alert('Error: '+error.message);
+  document.getElementById('modalChecklist').style.display='none';
+  loadChecklist();
+}
+
+async function deleteChecklistItem(id){
+  if(!confirm('Remove this item from the checklist?')) return;
+  const{error}=await sb.from('protocol_checklist_items').delete().eq('id',id);
+  if(error) return alert('Error: '+error.message);
+  loadChecklist();
+}
+
+/* ── PRINT COMPARISON TABLE ─────────────────────────────────────────────── */
+async function printComparisonTable(){
+  const{data}=await sb.from('protocol_checklist_items').select('*').order('display_order');
+  if(!data||!data.length) return alert('No checklist items found.');
+  const tbody=document.getElementById('printBody');
+  tbody.innerHTML=data.map(item=>`<tr>
+    <td style="border:1px solid #ccc;padding:7px;font-size:.78rem;color:#64748b;">${item.item_no}</td>
+    <td style="border:1px solid #ccc;padding:7px;">${item.name_hi}${item.name_en?`<br><span style="font-size:.72rem;color:#94a3b8;">${item.name_en}</span>`:''}</td>
+    <td style="border:1px solid #ccc;padding:7px;text-align:center;font-size:1.1rem;">${item.in_quick?'☺':''}</td>
+    <td style="border:1px solid #ccc;padding:7px;text-align:center;font-size:1.1rem;">${item.in_general?'☺':''}</td>
+    <td style="border:1px solid #ccc;padding:7px;text-align:center;font-size:1.1rem;">${item.in_premium?'☺':''}</td>
+    <td style="border:1px solid #ccc;padding:7px;text-align:center;font-size:1.1rem;">${item.in_jumbo?'☺':''}</td>
+  </tr>`).join('');
+  document.getElementById('printTarget').style.display='block';
+  setTimeout(()=>{window.print();document.getElementById('printTarget').style.display='none';},400);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAB 3 — JOB TYPES
+══════════════════════════════════════════════════════════════════════════ */
+async function loadJobTypes(){
+  const q=document.getElementById('jtSearch').value.trim();
+  const cat=document.getElementById('jtCat').value;
+  const status=document.getElementById('jtStatus').value;
+  let query=sb.from('job_types').select('*').order('category').order('name_hi');
+  if(q){
+    query=query.or(`name_hi.ilike.%${q}%,name_en.ilike.%${q}%,keywords.ilike.%${q}%`);
+  }
+  if(cat)    query=query.eq('category',cat);
+  if(status) query=query.eq('status',status);
+  const{data}=await query;
+  const tbody=document.getElementById('jtBody');
+  tbody.innerHTML='';
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px;">No job types found.</td></tr>';return;}
+  const catCol={MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
+  data.forEach(jt=>{
+    const statusPill=jt.status==='active'?'pill-active':jt.status==='pending'?'pill-pending':'pill-inactive';
+    tbody.innerHTML+=`<tr>
+      <td><strong>${jt.name_hi}</strong></td>
+      <td style="font-size:.78rem;color:#64748b;">${jt.name_en||'—'}</td>
+      <td><span style="font-size:.7rem;background:#e0f2fe;color:${catCol[jt.category]||'#64748b'};padding:2px 6px;border-radius:4px;font-weight:700;">${jt.category}</span></td>
+      <td>₹${jt.min_price||0}</td>
+      <td>₹${jt.max_price||0}</td>
+      <td style="font-size:.78rem;">${jt.min_minutes||0}</td>
+      <td style="font-size:.78rem;">${jt.max_minutes||0}</td>
+      <td><span class="pill ${statusPill}">${jt.status}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-action info" style="padding:4px 9px;font-size:.72rem;" onclick="editJobType(${JSON.stringify(JSON.stringify(jt))})">✏️ EDIT</button>
+        <button class="btn-action" style="padding:4px 9px;font-size:.72rem;background:${jt.status==='active'?'#64748b':'var(--success)'};margin-left:3px;" onclick="toggleJobTypeStatus('${jt.id}','${jt.status}')">${jt.status==='active'?'PAUSE':'ACTIVATE'}</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function openAddJobTypeModal(){
+  document.getElementById('jtEditId').value='';
+  document.getElementById('jtModalTitle').innerText='Add New Job Type';
+  ['jtNameHi','jtNameEn','jtMinPrice','jtMaxPrice','jtMinMin','jtMaxMin','jtKeywords'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('jtEditCat').value='MECHANICAL';
+  document.getElementById('jtEditStatus').value='pending';
+  document.getElementById('modalJobType').style.display='flex';
+}
+
+function editJobType(jtJson){
+  const jt=JSON.parse(jtJson);
+  document.getElementById('jtEditId').value=jt.id;
+  document.getElementById('jtModalTitle').innerText='Edit Job Type';
+  document.getElementById('jtNameHi').value=jt.name_hi||'';
+  document.getElementById('jtNameEn').value=jt.name_en||'';
+  document.getElementById('jtEditCat').value=jt.category||'MECHANICAL';
+  document.getElementById('jtMinPrice').value=jt.min_price||'';
+  document.getElementById('jtMaxPrice').value=jt.max_price||'';
+  document.getElementById('jtMinMin').value=jt.min_minutes||'';
+  document.getElementById('jtMaxMin').value=jt.max_minutes||'';
+  document.getElementById('jtKeywords').value=jt.keywords||'';
+  document.getElementById('jtEditStatus').value=jt.status||'active';
+  document.getElementById('modalJobType').style.display='flex';
+}
+
+async function saveJobType(){
+  const id=document.getElementById('jtEditId').value;
+  const nameHi=document.getElementById('jtNameHi').value.trim();
+  const nameEn=document.getElementById('jtNameEn').value.trim();
+  if(!nameHi) return alert('Hindi name is required.');
+  if(!nameEn) return alert('English name is required.');
+  const minP=parseFloat(document.getElementById('jtMinPrice').value)||0;
+  const maxP=parseFloat(document.getElementById('jtMaxPrice').value)||0;
+  const payload={
+    name_hi:nameHi, name_en:nameEn,
+    category:document.getElementById('jtEditCat').value,
+    min_price:minP, max_price:maxP,
+    labour_price:Math.round((minP+maxP)/2)||minP,
+    min_minutes:parseInt(document.getElementById('jtMinMin').value)||0,
+    max_minutes:parseInt(document.getElementById('jtMaxMin').value)||0,
+    keywords:document.getElementById('jtKeywords').value.trim()||
+      (nameEn.toLowerCase()+','+nameHi),
+    status:document.getElementById('jtEditStatus').value
+  };
+  const{error}=id
+    ? await sb.from('job_types').update(payload).eq('id',id)
+    : await sb.from('job_types').insert(payload);
+  if(error) return alert('Error: '+error.message);
+  // Log the change
+  if(id){
+    await sb.from('job_type_log').insert({
+      job_type_id:id, action:'approved',
+      done_by:sessionRole,
+      note:`Updated: ${nameEn}`,
+      new_price:payload.max_price
+    }).catch(()=>{});
+  }
+  document.getElementById('modalJobType').style.display='none';
+  loadJobTypes();
+}
+
+async function toggleJobTypeStatus(id,currentStatus){
+  const newStatus=currentStatus==='active'?'inactive':'active';
+  const action=newStatus==='active'?'reactivated':'deactivated';
+  const{error}=await sb.from('job_types').update({status:newStatus}).eq('id',id);
+  if(error) return alert('Error: '+error.message);
+  await sb.from('job_type_log').insert({
+    job_type_id:id, action,
+    done_by:sessionRole, done_at:new Date().toISOString()
+  }).catch(()=>{});
+  loadJobTypes();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TAB 4 — VEHICLE SEGMENTS
+══════════════════════════════════════════════════════════════════════════ */
+async function loadSegments(){
+  const{data}=await sb.from('vehicle_master')
+    .select('category_group').order('category_group');
+  if(!data||!data.length) return;
+  const cats=[...new Set(data.map(v=>v.category_group).filter(Boolean))];
+  const counts={};
+  data.forEach(v=>{counts[v.category_group]=(counts[v.category_group]||0)+1;});
+  document.getElementById('segmentContent').innerHTML=`
+    <table class="tbl">
+      <thead><tr>
+        <th>Vehicle Category (from vehicle_master)</th>
+        <th>Model Count</th>
+        <th>Phase 12 — Smart Segment</th>
+      </tr></thead>
+      <tbody>${cats.map(c=>`<tr>
+        <td><strong>${c}</strong></td>
+        <td style="color:#64748b;">${counts[c]} models</td>
+        <td style="font-size:.78rem;color:#94a3b8;font-style:italic;">
+          Auto-detected from JC history in Phase 12
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div style="margin-top:12px;font-size:.78rem;color:#64748b;background:#f8fafc;padding:10px;border-radius:6px;">
+      💡 Phase 12 will analyse closed JCs per model and automatically map each vehicle to its correct service segment with a confidence score. Models with less than 5 JCs will remain unclassified until more data is collected.
+    </div>`;
+}
+
+/* ── INIT ────────────────────────────────────────────────────────────────── */
+loadPackages();
 </script>
 </body>
 </html>
