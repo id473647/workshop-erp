@@ -154,8 +154,28 @@
             <div class="field-group"><label>Primary Technician</label><select id="intakePrimaryMech"><option value="">-- Unassigned --</option></select></div>
             <div class="field-group"><label>Co-Mechanic (50% Split)</label><select id="intakeCoMech"><option value="">-- None --</option></select></div>
         </div>
+        <!-- ── PHASE 11B: JOB TYPE TAGS ─────────────────────────────────── -->
+        <div class="field-group" style="margin-bottom:14px;">
+            <label>Job Type Tags <span style="font-size:.72rem;color:#64748b;font-weight:400;">(type in Hindi or English — select to add)</span></label>
+            <!-- Selected tag pills -->
+            <div id="jobTagPills" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px;margin-bottom:8px;"></div>
+            <!-- Autocomplete input -->
+            <div style="position:relative;">
+                <input type="text" id="jobTagInput"
+                    placeholder="e.g. brake, ब्रेक, clutch, क्लच, chain..."
+                    oninput="searchJobTags(this.value)"
+                    onblur="setTimeout(()=>document.getElementById('jobTagDrop').style.display='none',200)"
+                    autocomplete="off"
+                    style="padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.88rem;width:100%;box-sizing:border-box;">
+                <div id="jobTagDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:200;max-height:220px;overflow-y:auto;"></div>
+            </div>
+            <div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">
+                💡 Tag the job types the customer mentioned. Toggle ⚠️ flag on a tag if customer specifically reported that issue.
+            </div>
+        </div>
+
         <div class="field-group" style="margin-bottom: 20px;">
-            <label>Problem Mentioned by Customer <span style="color:var(--danger);">*</span></label>
+            <label id="problemLabel">Problem Mentioned by Customer <span style="color:var(--danger);">*</span> <span id="problemOptional" style="display:none;font-weight:400;color:#64748b;font-size:.75rem;">(optional — tags already describe the job)</span></label>
             <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea>
         </div>
         <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;">
@@ -306,6 +326,86 @@
     }
 
     let globalVehicleMaster = [];
+    let globalJobTypes = [];       // Phase 11B: cached job types for tag autocomplete
+    let selectedJobTypes = [];     // Phase 11B: array of {id, name_hi, name_en, labour_price, customer_flagged}
+
+    /* ── PHASE 11B: JOB TYPE TAG FUNCTIONS ──────────────────────────────── */
+    async function loadJobTypesCache() {
+        if (globalJobTypes.length) return;
+        const { data } = await supabaseClient.from('job_types')
+            .select('id,name_hi,name_en,category,labour_price,min_price,max_price,keywords')
+            .eq('status','active').order('category').order('name_hi');
+        globalJobTypes = data || [];
+    }
+
+    function searchJobTags(q) {
+        const drop = document.getElementById('jobTagDrop');
+        if (!q || q.trim().length < 2) { drop.style.display = 'none'; return; }
+        const qL = q.trim().toLowerCase();
+        const results = globalJobTypes.filter(jt => {
+            const already = selectedJobTypes.find(s => s.id === jt.id);
+            if (already) return false;
+            return (jt.name_hi||'').includes(q.trim()) ||
+                   (jt.name_en||'').toLowerCase().includes(qL) ||
+                   (jt.keywords||'').toLowerCase().includes(qL);
+        }).slice(0, 10);
+
+        if (!results.length) { drop.innerHTML='<div style="padding:10px 14px;font-size:.82rem;color:#94a3b8;">No match — tag not found</div>'; drop.style.display='block'; return; }
+
+        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
+        drop.innerHTML = results.map(jt => `<div
+            onclick="addJobTag('${jt.id}','${jt.name_hi.replace(/'/g,"\\'")}','${(jt.name_en||'').replace(/'/g,"\\'")}','${jt.category}',${jt.labour_price||0},${jt.min_price||0},${jt.max_price||0})"
+            style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.85rem;"
+            onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+            <span style="font-weight:700;">${jt.name_hi}</span>
+            <span style="font-size:.75rem;color:#64748b;margin-left:6px;">${jt.name_en||''}</span>
+            <span style="float:right;font-size:.72rem;background:#e0f2fe;color:${catColor[jt.category]||'#64748b'};padding:1px 6px;border-radius:4px;">${jt.category}</span>
+        </div>`).join('');
+        drop.style.display = 'block';
+    }
+
+    function addJobTag(id, nameHi, nameEn, category, price, minP, maxP) {
+        if (selectedJobTypes.find(s => s.id === id)) return;
+        selectedJobTypes.push({ id, name_hi: nameHi, name_en: nameEn, category, labour_price: price, min_price: minP, max_price: maxP, customer_flagged: false });
+        document.getElementById('jobTagInput').value = '';
+        document.getElementById('jobTagDrop').style.display = 'none';
+        renderJobTagPills();
+        updateProblemOptional();
+    }
+
+    function removeJobTag(id) {
+        selectedJobTypes = selectedJobTypes.filter(s => s.id !== id);
+        renderJobTagPills();
+        updateProblemOptional();
+    }
+
+    function toggleFlagged(id) {
+        const tag = selectedJobTypes.find(s => s.id === id);
+        if (tag) tag.customer_flagged = !tag.customer_flagged;
+        renderJobTagPills();
+    }
+
+    function renderJobTagPills() {
+        const container = document.getElementById('jobTagPills');
+        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
+        container.innerHTML = selectedJobTypes.map(t => {
+            const bgColor = t.customer_flagged ? '#fef3c7' : '#eff6ff';
+            const borderColor = t.customer_flagged ? '#fde68a' : '#bfdbfe';
+            const textColor = t.customer_flagged ? '#854d0e' : '#1e40af';
+            return `<div style="display:inline-flex;align-items:center;gap:4px;background:${bgColor};border:1.5px solid ${borderColor};color:${textColor};padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:700;white-space:nowrap;">
+                ${t.name_hi}
+                <button onclick="toggleFlagged('${t.id}')" title="Toggle: Customer specifically flagged this issue"
+                    style="border:none;background:none;cursor:pointer;font-size:.85rem;padding:0 2px;color:${t.customer_flagged?'#b45309':'#94a3b8'};">⚠️</button>
+                <button onclick="removeJobTag('${t.id}')"
+                    style="border:none;background:none;cursor:pointer;font-size:.9rem;color:#94a3b8;padding:0 2px;line-height:1;">×</button>
+            </div>`;
+        }).join('');
+    }
+
+    function updateProblemOptional() {
+        const hasTag = selectedJobTypes.length > 0;
+        document.getElementById('problemOptional').style.display = hasTag ? 'inline' : 'none';
+    }
 
     async function initializeIntake() {
         const { data: staff } = await supabaseClient.from('mechanics').select('id, name').eq('staff_role', 'Mechanic').eq('is_active', true);
@@ -320,6 +420,7 @@
             .in('status',['active','pending'])
             .order('brand').order('model_name').order('emission_standard');
         globalVehicleMaster = vMaster || [];
+        loadJobTypesCache(); // Phase 11B: preload job types for tag autocomplete
     }
 
     /* ── PHASE 11A: Smart combined vehicle search ──────────────────────────── */
@@ -579,7 +680,8 @@
         const currentOdometer = document.getElementById('nvOdo').value || null;
 
         if (mobile.length !== 10) return alert("Valid 10-digit mobile required.");
-        if (!name || !problem)    return alert("Customer Name and Problem required.");
+        const hasTagsProblem = selectedJobTypes.length > 0 || problem.length > 0;
+        if (!name || !hasTagsProblem) return alert("Customer Name and at least one Job Type Tag or Problem Description required.");
 
         const btn = document.getElementById('btnCreateJc');
         btn.innerText = "PROCESSING..."; btn.disabled = true;
@@ -632,7 +734,14 @@
             status           : 'Open',
             source_role      : activeRole,
             odometer         : currentOdometer,
-            referral_code    : referralCode   /* Phase 2: saves referral code permanently on the JC */
+            referral_code    : referralCode,
+            job_type_ids     : selectedJobTypes.length > 0 ? JSON.stringify(selectedJobTypes.map(t=>({
+                id             : t.id,
+                name_hi        : t.name_hi,
+                name_en        : t.name_en,
+                labour_price   : t.labour_price || 0,
+                customer_flagged: t.customer_flagged || false
+            }))) : null
         }).select().single();
 
         if (jcErr) { alert("Error: " + jcErr.message); btn.innerText = "CREATE JOB CARD & PROCEED TO BILLING"; btn.disabled = false; return; }
