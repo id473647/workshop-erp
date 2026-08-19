@@ -392,8 +392,13 @@
             const bgColor = t.customer_flagged ? '#fef3c7' : '#eff6ff';
             const borderColor = t.customer_flagged ? '#fde68a' : '#bfdbfe';
             const textColor = t.customer_flagged ? '#854d0e' : '#1e40af';
+            /* Phase 11C: show price range hint on pill */
+            const hasPrice = (t.min_price > 0 || t.max_price > 0);
+            const priceHint = hasPrice
+                ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.min_price}${t.max_price > t.min_price ? '–' + t.max_price : ''}</span>`
+                : (t.labour_price > 0 ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.labour_price}</span>` : '');
             return `<div style="display:inline-flex;align-items:center;gap:4px;background:${bgColor};border:1.5px solid ${borderColor};color:${textColor};padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:700;white-space:nowrap;">
-                ${t.name_hi}
+                ${t.name_hi}${priceHint}
                 <button onclick="toggleFlagged('${t.id}')" title="Toggle: Customer specifically flagged this issue"
                     style="border:none;background:none;cursor:pointer;font-size:.85rem;padding:0 2px;color:${t.customer_flagged?'#b45309':'#94a3b8'};">⚠️</button>
                 <button onclick="removeJobTag('${t.id}')"
