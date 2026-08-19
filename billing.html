@@ -226,6 +226,16 @@
                 <span id="flaggedList"></span>
                 <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;" id="flaggedActions"></div>
             </div>
+            <!-- Phase 11C: Time tracking bar (shown when enable_time_tracking = true) -->
+            <div id="timeTrackingBar" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 12px;margin-top:6px;align-items:center;gap:10px;font-size:.78rem;flex-wrap:wrap;">
+                <span id="timeTrackStatus" style="font-weight:700;color:#166534;">⏱️ Active</span>
+                <select id="pauseReason" class="input-lockable" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:.75rem;">
+                    <option value="waiting_parts">⏳ Waiting for Part</option>
+                    <option value="lunch">🍽️ Lunch Break</option>
+                    <option value="other">📌 Other</option>
+                </select>
+                <button id="btnPauseResume" onclick="toggleTimeTracking()" class="input-lockable btn-action" style="padding:4px 12px;font-size:.75rem;background:#b45309;">⏸️ PAUSE</button>
+            </div>
             <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
                 <span style="font-size:0.75rem; font-weight:bold; color:#64748b;">TECH:</span>
                 <select id="primaryMech" class="input-lockable" style="padding:4px 8px; border-radius:4px; border:1px solid var(--border); font-size:0.75rem; font-weight:bold; color:var(--primary); background:#f8fafc;"><option value="">-- Unassigned --</option></select>
@@ -1267,6 +1277,111 @@
     }
 
 
+        /* ── PHASE 11C: AUTO-TAG SUGGESTION FROM PRODUCT ───────────────────────── */
+    async function suggestJobTagFromProduct(itemName) {
+        if (!itemName || !targetJobId) return;
+        const words = itemName.replace(/[^a-zA-Zऀ-ॿ\s]/g,'').trim().split(/\s+/);
+        const searchKey = words[0] || '';
+        if (searchKey.length < 3) return;
+        let existingTags = [];
+        try {
+            const raw = activeJobContext?.job_type_ids;
+            existingTags = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+        } catch(e) {}
+        const { data: matches } = await supabaseClient.from('job_types')
+            .select('id,name_hi,name_en,labour_price,min_price,max_price')
+            .eq('status','active')
+            .or(`name_en.ilike.%${searchKey}%,keywords.ilike.%${searchKey}%`)
+            .limit(1);
+        if (!matches?.length) return;
+        const match = matches[0];
+        if (existingTags.find(t => t.id === match.id)) return;
+        showAutoTagToast(match);
+    }
+
+    function showAutoTagToast(jt) {
+        document.getElementById('autoTagToast')?.remove();
+        const toast = document.createElement('div');
+        toast.id = 'autoTagToast';
+        toast.style.cssText = 'position:fixed;bottom:80px;right:20px;background:#0369a1;color:white;padding:10px 14px;border-radius:8px;font-size:.82rem;z-index:600;box-shadow:0 4px 12px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;max-width:300px;';
+        const safeHi = jt.name_hi;
+        const safeId = jt.id;
+        const safeEn = jt.name_en || '';
+        const p0 = jt.labour_price || 0;
+        const p1 = jt.min_price || 0;
+        const p2 = jt.max_price || 0;
+        const addFn = `addTagFromToast('${safeId}','${safeHi.replace(/'/g,"\\'")}','${safeEn.replace(/'/g,"\\'")}',${p0},${p1},${p2})`;
+        toast.innerHTML = `<div style="flex:1;">Add job tag?<br><strong>${safeHi}</strong></div>
+            <button onclick="${addFn}" style="background:white;color:#0369a1;border:none;padding:4px 10px;border-radius:4px;font-weight:700;cursor:pointer;font-size:.78rem;white-space:nowrap;">ADD TAG</button>
+            <button onclick="document.getElementById('autoTagToast').remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:1.2rem;line-height:1;">×</button>`;
+        document.body.appendChild(toast);
+        setTimeout(() => document.getElementById('autoTagToast')?.remove(), 9000);
+    }
+
+    async function addTagFromToast(id, nameHi, nameEn, price, minP, maxP) {
+        document.getElementById('autoTagToast')?.remove();
+        if (!activeJobContext || !targetJobId) return;
+        let existing = [];
+        try { const raw = activeJobContext.job_type_ids; existing = typeof raw === 'string' ? JSON.parse(raw) : (raw || []); } catch(e) {}
+        if (existing.find(t => t.id === id)) return;
+        existing.push({ id, name_hi: nameHi, name_en: nameEn, labour_price: price, min_price: minP, max_price: maxP, customer_flagged: false });
+        const newIds = JSON.stringify(existing);
+        await supabaseClient.from('job_cards').update({ job_type_ids: newIds }).eq('id', targetJobId);
+        activeJobContext.job_type_ids = newIds;
+        renderJobTagsHeader(newIds);
+    }
+
+    /* ── PHASE 11C: TIME TRACKING ────────────────────────────────────────────── */
+    let _timeTrackingPaused = false;
+
+    async function initTimeTracking() {
+        if (!window._settings?.enable_time_tracking) return;
+        if (activeJobContext?.status === 'Closed') return;
+        const mechId = document.getElementById('primaryMech')?.value;
+        if (!mechId || !targetJobId) return;
+        const { data: events } = await supabaseClient.from('jc_time_log')
+            .select('id,event_type').eq('job_card_id', targetJobId)
+            .order('logged_at', { ascending: false }).limit(1);
+        if (!events?.length) {
+            await supabaseClient.from('jc_time_log').insert({
+                job_card_id: targetJobId, mechanic_id: mechId,
+                event_type: 'start', logged_at: new Date().toISOString()
+            });
+        }
+        _timeTrackingPaused = events?.[0]?.event_type === 'pause';
+        const bar = document.getElementById('timeTrackingBar');
+        if (bar) { bar.style.display = 'flex'; updateTimeTrackUI(); }
+    }
+
+    function updateTimeTrackUI() {
+        const btn = document.getElementById('btnPauseResume');
+        const status = document.getElementById('timeTrackStatus');
+        const reasonSel = document.getElementById('pauseReason');
+        if (!btn) return;
+        if (_timeTrackingPaused) {
+            btn.innerText = '▶️ RESUME'; btn.style.background = '#15803d';
+            if (status) status.innerText = '⏸️ PAUSED';
+            if (reasonSel) reasonSel.style.display = 'none';
+        } else {
+            btn.innerText = '⏸️ PAUSE'; btn.style.background = '#b45309';
+            if (status) status.innerText = '⏱️ Active';
+            if (reasonSel) reasonSel.style.display = 'inline-block';
+        }
+    }
+
+    async function toggleTimeTracking() {
+        const mechId = document.getElementById('primaryMech')?.value || null;
+        const eventType = _timeTrackingPaused ? 'resume' : 'pause';
+        const reason = !_timeTrackingPaused ? (document.getElementById('pauseReason')?.value || 'other') : null;
+        await supabaseClient.from('jc_time_log').insert({
+            job_card_id: targetJobId, mechanic_id: mechId,
+            event_type: eventType, pause_reason: reason,
+            logged_at: new Date().toISOString()
+        });
+        _timeTrackingPaused = !_timeTrackingPaused;
+        updateTimeTrackUI();
+    }
+
     /* ── PHASE 11B: Render job type tags + flagged banner in billing header ── */
     function renderJobTagsHeader(jobTypeIds) {
         const tagsDisplay = document.getElementById('jobTagsDisplay');
@@ -1585,6 +1700,8 @@
             if (job.co_mech_id) document.getElementById('coMech').value = job.co_mech_id;
             /* Phase 11B: render job type tags and flagged banner */
             renderJobTagsHeader(job.job_type_ids);
+            /* Phase 11C: initialise time tracking if admin has enabled it */
+            setTimeout(() => initTimeTracking(), 500);
             document.getElementById('vFutureAdvice').value = job.future_advice || '';
             document.getElementById('vAdvanceService').value = parseFloat(job.advance_service) || 0;
             document.getElementById('vPrepaidGreen').value = parseFloat(job.prepaid_green) || 0;
@@ -2541,7 +2658,10 @@ sb.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_card_id',tar
     function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) { document.getElementById('nPart').value = name; document.getElementById('nBrand').value = brand; document.getElementById('nRate').value = defRate || mrpVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal; const typeSelect = document.getElementById('nType'); if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube'; else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol'; else typeSelect.value = 'Spare'; toggleLubeUI(); document.getElementById('autolist-n').style.display = 'none'; window._pid = pid; window._pmac = mac; window._pmrp = mrpVal; window._pendingItemUnverified = false; if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus(); }
     async function prefetchCentralCatalog() { globalCatalogCache = []; if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { const { data: master } = await supabaseClient.from('product_master').select('id,item_name,brand,default_price,mrp,current_stock,unit_metric,category,track_stock,mac,barcode_id,hsn_code'); master?.forEach(m => globalCatalogCache.push({...m, source: 'product'})); } if (sessionRole === 'service' || sessionRole === 'admin') { const { data: servs } = await supabaseClient.from('service_packages').select('id,package_name,base_rate,is_premium_service,premium_label'); servs?.forEach(s => { globalCatalogCache.push({ id: s.id, item_name: s.package_name, category: '⚙️ Fixed Protocol', default_price: s.base_rate, is_premium_service: s.is_premium_service || false, premium_label: s.premium_label || null, unit_metric: 'Pkg', source: 'service' }); }); } }
 
-    async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified' }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus(); } else { alert("Database Error: " + error.message); } }
+    async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'unverified' }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTarget, unit_metric: metricTarget, default_price: rVal, category: typeSelect }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus();
+            /* Phase 11C: Auto-tag suggestion from product family */
+            if (!isServiceGroup) suggestJobTagFromProduct(finalItemName);
+            } else { alert("Database Error: " + error.message); } }
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
     async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
 
