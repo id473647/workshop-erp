@@ -2595,12 +2595,15 @@ sb.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_card_id',tar
 
     async function fetchCustomerContext(job) {
         /* PERF: Run customer + AMC subscription queries in parallel — Round 2 */
-        const [custRes, subsRes] = await Promise.all([
-            supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).single(),
-            supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString())
-        ]);
-        const custData = custRes.data;
-        const subs = subsRes.data;
+        /* FIX: Wrapped in try-catch — if customer fetch fails for any reason,
+           page must NOT hang. Show mobile number as fallback and continue. */
+        try {
+            const [custRes, subsRes] = await Promise.all([
+                supabaseClient.from('customers').select('*').eq('mobile_number', job.customer_mobile).maybeSingle(),
+                supabaseClient.from('amc_subscriptions').select('id').eq('customer_mobile', job.customer_mobile).gt('expires_at', new Date().toISOString())
+            ]);
+            const custData = custRes?.data || null;
+            const subs = subsRes?.data || [];
         if (custData) {
             activeCustomerProfile = custData;
             activeCustomerName = custData.name;
@@ -2632,6 +2635,20 @@ sb.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_card_id',tar
         /* subs already fetched in parallel above — use directly */
         if (subs && subs.length > 0) document.getElementById('receiptPromoHindi').style.display = 'none';
         else document.getElementById('receiptPromoHindi').style.display = 'block';
+        } catch(fetchErr) {
+            /* FALLBACK: any network error or DB error — show mobile number, never hang */
+            console.warn('fetchCustomerContext failed:', fetchErr?.message || fetchErr);
+            try {
+                document.getElementById('customerHeaderInfo').innerText =
+                    `👤 Client: ${job.customer_mobile || 'Walk-in'}`;
+                document.getElementById('vPointsUsed').disabled = true;
+                document.getElementById('vPointsUsed').placeholder = 'Not available';
+                const lBlock = document.getElementById('pointsRedemptionBlock');
+                if (lBlock) lBlock.style.display = 'none';
+                const promoDiv = document.getElementById('receiptPromoHindi');
+                if (promoDiv) promoDiv.style.display = 'block';
+            } catch(uiErr) { /* suppress secondary UI errors */ }
+        }
     }
     
     async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true }); lineItemsLocalMemory = items || []; renderDynamicTable(); }
