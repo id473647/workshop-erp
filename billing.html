@@ -188,8 +188,11 @@
         <a href="index.html" class="nav-anchor">🏠 HOME</a>
     </div>
     <div style="display:flex; gap:12px; align-items:center;">
-        <button onclick="openIntakePrintModal()" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📋 INTAKE TICKET</button>
-        <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🔧 MECHANIC TICKET</button>
+        <div id="btnMechPrintTop" style="display:none; gap:12px; align-items:center;">
+            <button onclick="openIntakePrintModal()" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📋 INTAKE TICKET</button>
+            <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🔧 MECHANIC TICKET</button>
+        </div>
+        <button id="btnViewInvoiceTop" onclick="showHistoricalInvoice()" style="display:none; background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📄 VIEW / PRINT INVOICE</button>
         <button id="themeToggle" onclick="toggleTheme()" title="Toggle Dark / Light Mode" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:5px 10px; cursor:pointer; font-size:1rem; line-height:1;">🌙</button>
         <span id="roleTag" class="badge-role">GUEST</span>
         <a href="login.html" class="nav-anchor" onclick="localStorage.removeItem('ERP_ACTIVE_ROLE')" style="background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">🚪 LOGOUT</a>
@@ -595,6 +598,19 @@
             <div class="receipt-meta" id="rowAdvSrv" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Service Adv:</span><strong id="thAdvSrv">₹0</strong></div>
             <div class="receipt-meta" id="rowPrepGrn" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Grn Prepaid:</span><strong id="thPrepGrn">₹0</strong></div>
             <div class="receipt-meta" id="rowPrepMop" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Mop Prepaid:</span><strong id="thPrepMop">₹0</strong></div>
+            <!-- GST Breakup Section — populated by populateReceiptDocument() -->
+            <div id="gstBreakupSection" style="display:none; font-size:0.72rem; margin:4px 0;">
+                <div style="font-weight:700; text-align:center; background:#f8fafc; border-top:1px dashed black; border-bottom:1px dashed black; padding:2px 0; margin:4px 0; letter-spacing:0.5px;">GST BREAKUP (INCLUSIVE BASIS)</div>
+                <div id="gstBreakupRows"></div>
+                <div style="display:flex; justify-content:space-between; font-weight:700;"><span>Total GST Included:</span><strong id="thTotalGst">₹0</strong></div>
+            </div>
+            <!-- Credit Note Section — shown only on amendment reprints with product exchanges -->
+            <div id="creditNoteSection" style="display:none; font-size:0.72rem; margin:6px 0; border:2px dashed #dc2626; padding:6px; border-radius:4px; background:#fff7f7;">
+                <div style="font-weight:900; text-align:center; color:#dc2626; font-size:0.82rem; border-bottom:1px dashed #dc2626; padding-bottom:3px; margin-bottom:4px;">CREDIT NOTE</div>
+                <div id="creditNoteRows"></div>
+                <div style="display:flex; justify-content:space-between; font-weight:700; color:#dc2626; border-top:1px dashed #dc2626; margin-top:3px; padding-top:3px;"><span>Credit Note Value:</span><strong id="thCreditNoteAmt">₹0</strong></div>
+                <div id="creditNoteAmendInfo" style="font-size:0.65rem; color:#666; margin-top:2px;"></div>
+            </div>
             <div class="receipt-divider"></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div>
             <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div>
@@ -2081,7 +2097,15 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
 
     /* ══════════════════ EXISTING FUNCTIONS (unchanged unless noted) ══════════════════ */
 
-    function showHistoricalInvoice() { if(!activeJobContext) return; populateReceiptDocument(activeJobContext.payment_mode, activeJobContext.total_invoice_value, activeJobContext); }
+    async function showHistoricalInvoice() {
+        if(!activeJobContext) return;
+        /* Fetch amendment audit records and any logged refunds for this JC */
+        const [{ data: amendments }, { data: refunds }] = await Promise.all([
+            supabaseClient.from('jc_amendments').select('*').eq('job_card_id', targetJobId).order('created_at', {ascending: false}),
+            supabaseClient.from('customer_refunds').select('*').eq('job_card_id', targetJobId).order('created_at', {ascending: false})
+        ]);
+        populateReceiptDocument(activeJobContext.payment_mode, activeJobContext.total_invoice_value, activeJobContext, amendments || [], refunds || []);
+    }
 
     /*
      * PHASE 3: validateAndApplyCoupon
@@ -2335,6 +2359,8 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         document.getElementById('columnDestroyer').style.display = 'none';
         document.getElementById('btnMechPrintTop').style.display = 'none';
         document.getElementById('historicalPrintActions').style.display = 'flex';
+        const _btnInvTop = document.getElementById('btnViewInvoiceTop');
+        if (_btnInvTop) _btnInvTop.style.display = 'inline-block';
         /* CHANGE 1: hide LOG COLLECTION button when locked */
         const lcBtn = document.getElementById('btnLogCollection');
         if (lcBtn) lcBtn.style.display = 'none';
@@ -2350,8 +2376,10 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         document.getElementById('adminEditBlock').style.display = 'block';
         document.getElementById('uiPartEntryBlock').style.display = 'flex';
         document.getElementById('columnDestroyer').style.display = 'table-cell';
-        document.getElementById('btnMechPrintTop').style.display = 'inline-block';
+        document.getElementById('btnMechPrintTop').style.display = 'flex';
         document.getElementById('historicalPrintActions').style.display = 'none';
+        const _btnInvTop2 = document.getElementById('btnViewInvoiceTop');
+        if (_btnInvTop2) _btnInvTop2.style.display = 'none';
         /* CHANGE 1: restore LOG COLLECTION button on unlock */
         const lcBtn = document.getElementById('btnLogCollection');
         if (lcBtn) lcBtn.style.display = 'block';
@@ -2935,11 +2963,117 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; else document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
     }
 
-    function populateReceiptDocument(paymentMode, finalNet, scopeVals) { const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; } }); const totalSavings = totalMrpValue - totalActualValue; if (totalSavings > 0) { const savingsEl = document.getElementById('receiptSavingsSummary'); savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;"><span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span></div>`; } document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; }
+    function populateReceiptDocument(paymentMode, finalNet, scopeVals, amendments, refunds) { amendments = amendments || []; refunds = refunds || []; const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div></div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (line.total_price / line.qty) : line.unit_price; displayRate = Number.isInteger(displayRate) ? displayRate : displayRate.toFixed(2); const mrpLine = (mrpSnap>0&&displayRate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||''}</span><span>Rate: ₹${displayRate}</span></div>${mrpLine}</div>`; } }); const totalSavings = totalMrpValue - totalActualValue; if (totalSavings > 0) { const savingsEl = document.getElementById('receiptSavingsSummary'); savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#7c3aed;font-weight:700;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.8rem;font-weight:700;color:#15803d;"><span>You Saved Today:</span><span>₹${Math.round(totalSavings)}</span></div>`; } document.getElementById('thPartsSum').innerText = `₹${partsGrossTotal}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `₹${vDisc}`; } else { dDisc.style.display = 'none'; }
         /* PHASE 3: Referral discount row — show only when first-visit coupon is active */
         const dRef = document.getElementById('rowReferralDisc');
         if (referralDiscountActive && referralDiscountAmount > 0 && dRef) { dRef.style.display = 'flex'; document.getElementById('thReferralCode').innerText = activeJobContext.referral_code || '--'; document.getElementById('thReferralAmt').innerText = `-₹${referralDiscountAmount}`; } else if (dRef) { dRef.style.display = 'none'; }
-        const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; } const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; } const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; } const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; } document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } const promoDiv = document.getElementById('receiptPromoHindi'); if(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true) promoDiv.style.display = 'none'; else promoDiv.style.display = 'block'; document.getElementById('modalReceipt').style.display = 'flex'; }
+        const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; } const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; } const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; } const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; } document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } const promoDiv = document.getElementById('receiptPromoHindi'); if(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true) promoDiv.style.display = 'none'; else promoDiv.style.display = 'block';
+        /* ══ GST BREAKUP (INCLUSIVE BASIS — standard Indian tax invoice format) ══
+           Prices in the system are treated as inclusive of GST.
+           Taxable value = price / (1 + gst_rate/100)
+           GST amount    = price - taxable_value
+           Default rate  = 18% for all items unless line.gst_percent is set.
+           Labour/Service lines use 18% GST on services (SAC code 998714). */
+        (function renderGstBreakup() {
+            const gstMap = {}; // key = "18" or product-specific %, value = {taxable, gst, label}
+            lineItemsLocalMemory.forEach(function(line) {
+                const tp = parseFloat(line.total_price) || 0;
+                if (tp <= 0) return;
+                const gstPct = parseFloat(line.gst_percent) || 18;
+                const divisor = 1 + (gstPct / 100);
+                const taxable = tp / divisor;
+                const gstAmt  = tp - taxable;
+                if (!gstMap[gstPct]) gstMap[gstPct] = { taxable: 0, gst: 0 };
+                gstMap[gstPct].taxable += taxable;
+                gstMap[gstPct].gst     += gstAmt;
+            });
+            /* Labour charges are billed by the primary entity (not a line item) — add at 18% */
+            const labourCharge = parseFloat(scopeVals.labour_charges) || 0;
+            if (labourCharge > 0) {
+                if (!gstMap[18]) gstMap[18] = { taxable: 0, gst: 0 };
+                gstMap[18].taxable += labourCharge / 1.18;
+                gstMap[18].gst     += labourCharge - (labourCharge / 1.18);
+            }
+            const keys = Object.keys(gstMap);
+            if (keys.length === 0) return; // no items — skip GST section
+            let gstRowsHTML = '';
+            let totalGstAmt = 0;
+            keys.sort((a, b) => Number(a) - Number(b)).forEach(function(pct) {
+                const v = gstMap[pct];
+                gstRowsHTML += '<div style="display:flex;justify-content:space-between;">'
+                    + '<span>Taxable @' + pct + '%:</span>'
+                    + '<span>&#8377;' + Math.round(v.taxable) + '</span></div>'
+                    + '<div style="display:flex;justify-content:space-between;">'
+                    + '<span>GST @' + pct + '%:</span>'
+                    + '<span>&#8377;' + Math.round(v.gst) + '</span></div>';
+                totalGstAmt += v.gst;
+            });
+            const gstSection = document.getElementById('gstBreakupSection');
+            const gstRowsEl  = document.getElementById('gstBreakupRows');
+            const gstTotalEl = document.getElementById('thTotalGst');
+            if (gstSection && gstRowsEl && gstTotalEl) {
+                gstRowsEl.innerHTML = gstRowsHTML;
+                gstTotalEl.innerText = '&#8377;' + Math.round(totalGstAmt);
+                gstSection.style.display = 'block';
+            }
+        })();
+        /* ══ CREDIT NOTE (shown on amendment reprints when product exchange occurred) ══
+           A credit note is generated when:
+           (a) customer_refunds has a record for this JC with returned_items (product_return), OR
+           (b) customer_refunds has a money_refund record (amount correction amendment).
+           Both same-product and different-product replacements trigger a credit note.
+           The credit note prints WITHIN the invoice before NET PAYABLE for paper trail. */
+        (function renderCreditNote() {
+            const creditSection = document.getElementById('creditNoteSection');
+            if (!creditSection) return;
+            if (!refunds || refunds.length === 0) { creditSection.style.display = 'none'; return; }
+            /* Pick the most recent refund record */
+            const refund = refunds[0];
+            let noteRowsHTML = '';
+            let creditTotal  = 0;
+            /* Product return: itemised credit lines */
+            if (refund.refund_type === 'product_return' && refund.returned_items && refund.returned_items.length > 0) {
+                refund.returned_items.forEach(function(item) {
+                    const tp = parseFloat(item.total_price) || 0;
+                    creditTotal += tp;
+                    noteRowsHTML += '<div style="display:flex;justify-content:space-between;margin-bottom:1px;">'
+                        + '<span>' + item.item_name + ' x' + (item.qty || 1) + ' (returned)</span>'
+                        + '<span style="color:#dc2626;">-&#8377;' + tp + '</span></div>';
+                });
+                /* If original_amount !== corrected_amount also show net cash difference */
+                const origAmt = parseFloat(refund.original_amount) || 0;
+                const corrAmt = parseFloat(refund.corrected_amount) || 0;
+                const cashDiff = origAmt - corrAmt;
+                if (cashDiff > 0 && cashDiff !== creditTotal) {
+                    noteRowsHTML += '<div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#666;">'
+                        + '<span>Net cash difference</span><span>&#8377;' + Math.round(cashDiff) + '</span></div>';
+                }
+            } else if (refund.refund_type === 'money_refund') {
+                /* Amount correction amendment — show original vs corrected */
+                const origAmt = parseFloat(refund.original_amount) || 0;
+                const corrAmt = parseFloat(refund.corrected_amount) || 0;
+                creditTotal   = Math.max(origAmt - corrAmt, 0);
+                noteRowsHTML  = '<div style="display:flex;justify-content:space-between;">'
+                    + '<span>Original Invoice Amount:</span><span>&#8377;' + Math.round(origAmt) + '</span></div>'
+                    + '<div style="display:flex;justify-content:space-between;">'
+                    + '<span>Revised Invoice Amount:</span><span>&#8377;' + Math.round(corrAmt) + '</span></div>';
+            }
+            if (creditTotal <= 0 && noteRowsHTML === '') { creditSection.style.display = 'none'; return; }
+            const creditRowsEl = document.getElementById('creditNoteRows');
+            const creditAmtEl  = document.getElementById('thCreditNoteAmt');
+            const creditInfoEl = document.getElementById('creditNoteAmendInfo');
+            if (creditRowsEl) creditRowsEl.innerHTML = noteRowsHTML;
+            if (creditAmtEl)  creditAmtEl.innerText  = '&#8377;' + Math.round(creditTotal);
+            if (creditInfoEl) {
+                const amd = amendments && amendments[0];
+                creditInfoEl.innerText = amd
+                    ? 'Amended on: ' + new Date(amd.created_at).toLocaleDateString('en-IN')
+                      + ' | Reason: ' + (amd.amendment_note || '--') + ' | By: ' + (amd.amended_by || '--')
+                    : 'Amendment record attached to this job card.';
+            }
+            creditSection.style.display = 'block';
+        })();
+        document.getElementById('modalReceipt').style.display = 'flex'; }
 
     function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : ''; const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + summaryHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; document.getElementById('btnLandscapePrint').style.display = 'block'; }
 
