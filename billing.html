@@ -1400,10 +1400,13 @@
 
     /* ── PHASE 11B: Render job type tags + flagged banner in billing header ── */
     function renderJobTagsHeader(jobTypeIds) {
-        const tagsDisplay = document.getElementById('jobTagsDisplay');
-        const flaggedBanner = document.getElementById('flaggedBanner');
-        const flaggedList = document.getElementById('flaggedList');
+        const tagsDisplay    = document.getElementById('jobTagsDisplay');
+        const flaggedBanner  = document.getElementById('flaggedBanner');
+        const flaggedList    = document.getElementById('flaggedList');
         const flaggedActions = document.getElementById('flaggedActions');
+
+        /* Remove any stale protocol suggestion bar from previous JC load */
+        document.getElementById('protocolSuggestionBar')?.remove();
 
         if (!jobTypeIds || jobTypeIds === '[]') {
             tagsDisplay.style.display = 'none';
@@ -1416,32 +1419,62 @@
         catch(e) { return; }
         if (!tags.length) return;
 
-        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
-        const flagged = tags.filter(t => t.customer_flagged);
+        const flagged   = tags.filter(t => t.customer_flagged);
+        const protocols = tags.filter(t => t.tag_type === 'protocol');
 
-        // Show tag pills
+        /* Render tag pills — protocols get blue PROTOCOL badge, flagged jobs get amber */
         tagsDisplay.style.display = 'flex';
         tagsDisplay.innerHTML = tags.map(t => {
-            const bg = t.customer_flagged ? '#fef3c7' : '#eff6ff';
-            const border = t.customer_flagged ? '#fde68a' : '#bfdbfe';
-            const color = t.customer_flagged ? '#854d0e' : '#1e40af';
+            const isProto  = t.tag_type === 'protocol';
+            const bg       = isProto ? '#dbeafe' : (t.customer_flagged ? '#fef3c7' : '#eff6ff');
+            const border   = isProto ? '#93c5fd' : (t.customer_flagged ? '#fde68a' : '#bfdbfe');
+            const color    = isProto ? '#1e40af' : (t.customer_flagged ? '#854d0e' : '#1e40af');
+            const badge    = isProto
+                ? '<span style="font-size:.58rem;background:#1e40af;color:white;padding:1px 3px;border-radius:2px;margin-left:3px;vertical-align:middle;">PROTOCOL</span>'
+                : '';
+            const price    = (!isProto && t.labour_price > 0)
+                ? `<span style="font-size:.65rem;opacity:.7;"> ₹${t.labour_price}</span>` : '';
+            const flagIcon = (!isProto && t.customer_flagged) ? '⚠️ ' : '';
             return `<span style="background:${bg};border:1px solid ${border};color:${color};padding:3px 9px;border-radius:12px;font-size:.72rem;font-weight:700;white-space:nowrap;">
-                ${t.customer_flagged ? '⚠️ ' : ''}${t.name_hi}
-                ${t.labour_price > 0 ? `<span style="font-size:.65rem;opacity:.7;">₹${t.labour_price}</span>` : ''}
+                ${flagIcon}${t.name_hi}${badge}${price}
             </span>`;
         }).join('');
 
-        // Show flagged banner if any
+        /* Flagged banner */
         if (flagged.length > 0) {
             flaggedBanner.style.display = 'block';
             flaggedList.innerHTML = ' ' + flagged.map(t => `<strong>${t.name_hi}</strong>`).join(', ');
-            flaggedActions.innerHTML = flagged.map(t => `
-                <button onclick="addFlaggedNote('${t.id}','${t.name_hi.replace(/'/g,"\\'")}')"
-                    class="btn-action info input-lockable" style="padding:3px 10px;font-size:.72rem;">
-                    📝 Add Note: ${t.name_hi}
-                </button>`).join('');
+            flaggedActions.innerHTML = flagged.map(t => {
+                const safeId = t.id;
+                const safeHi = t.name_hi;
+                return `<button class="btn-action info input-lockable" style="padding:3px 10px;font-size:.72rem;"
+                    data-tagid="${safeId}" data-taghi="${safeHi.replace(/"/g,'&quot;')}"
+                    onclick="addFlaggedNote(this.dataset.tagid,this.dataset.taghi)">
+                    📝 Add Note: ${safeHi}
+                </button>`;
+            }).join('');
         } else {
             flaggedBanner.style.display = 'none';
+        }
+
+        /* Protocol suggestion bar — only on Open JCs */
+        if (protocols.length > 0 && activeJobContext?.status === 'Open') {
+            const proto = protocols[0];
+            const bar   = document.createElement('div');
+            bar.id = 'protocolSuggestionBar';
+            bar.style.cssText = 'background:#eff6ff;border:1.5px solid #93c5fd;border-radius:6px;padding:8px 12px;margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;';
+            bar.innerHTML =
+                `<span style="font-weight:700;color:#1e40af;">🔧 ${proto.name_hi}</span>` +
+                `<span style="color:#64748b;font-size:.75rem;">Add service package to billing?</span>` +
+                `<button id="protoSearchBtn" class="btn-action input-lockable" style="padding:4px 12px;font-size:.75rem;background:#1e40af;">SEARCH &amp; ADD</button>` +
+                `<button id="protoCloseBtn" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;margin-left:auto;">×</button>`;
+            const pName = proto.name_en || proto.name_hi;
+            bar.querySelector('#protoSearchBtn').addEventListener('click', () => {
+                prefillProtocolSearch(pName);
+                bar.remove();
+            });
+            bar.querySelector('#protoCloseBtn').addEventListener('click', () => bar.remove());
+            flaggedBanner.insertAdjacentElement('afterend', bar);
         }
     }
 
@@ -1457,6 +1490,16 @@
             if (error) alert('Error: ' + error.message);
             else alert(`✅ Note added for ${tagName}`);
         });
+    }
+
+    function prefillProtocolSearch(protocolName) {
+        /* Focus the parts search bar and pre-type the protocol name */
+        const el = document.getElementById('nPart');
+        if (!el) return;
+        el.value = protocolName;
+        el.focus();
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     const _tagLabels = {
       intake:'📥 Intake', pre_work:'🔍 Pre-Work', in_progress:'🔧 In Progress',
