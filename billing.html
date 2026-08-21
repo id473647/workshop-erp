@@ -188,7 +188,7 @@
         <a href="index.html" class="nav-anchor">🏠 HOME</a>
     </div>
     <div style="display:flex; gap:12px; align-items:center;">
-        <div id="btnMechPrintTop" style="display:none; gap:12px; align-items:center;">
+        <div id="btnMechPrintTop" style="display:flex; gap:12px; align-items:center;">
             <button onclick="openIntakePrintModal()" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">📋 INTAKE TICKET</button>
             <button onclick="printMechanicTicket()" style="background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.75rem;">🔧 MECHANIC TICKET</button>
         </div>
@@ -598,12 +598,6 @@
             <div class="receipt-meta" id="rowAdvSrv" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Service Adv:</span><strong id="thAdvSrv">₹0</strong></div>
             <div class="receipt-meta" id="rowPrepGrn" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Grn Prepaid:</span><strong id="thPrepGrn">₹0</strong></div>
             <div class="receipt-meta" id="rowPrepMop" style="display:flex; justify-content:space-between; color:red; display:none;"><span>Less Mop Prepaid:</span><strong id="thPrepMop">₹0</strong></div>
-            <!-- GST Breakup Section — populated by populateReceiptDocument() -->
-            <div id="gstBreakupSection" style="display:none; font-size:0.72rem; margin:4px 0;">
-                <div style="font-weight:700; text-align:center; background:#f8fafc; border-top:1px dashed black; border-bottom:1px dashed black; padding:2px 0; margin:4px 0; letter-spacing:0.5px;">GST BREAKUP (INCLUSIVE BASIS)</div>
-                <div id="gstBreakupRows"></div>
-                <div style="display:flex; justify-content:space-between; font-weight:700;"><span>Total GST Included:</span><strong id="thTotalGst">₹0</strong></div>
-            </div>
             <!-- Credit Note Section — shown only on amendment reprints with product exchanges -->
             <div id="creditNoteSection" style="display:none; font-size:0.72rem; margin:6px 0; border:2px dashed #dc2626; padding:6px; border-radius:4px; background:#fff7f7;">
                 <div style="font-weight:900; text-align:center; color:#dc2626; font-size:0.82rem; border-bottom:1px dashed #dc2626; padding-bottom:3px; margin-bottom:4px;">CREDIT NOTE</div>
@@ -613,6 +607,10 @@
             </div>
             <div class="receipt-divider"></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between; font-size:1rem; font-weight:bold;"><span>NET PAYABLE:</span><span id="thNet">₹0</span></div>
+            <!-- GST Note — simple CGST/SGST disclosure; populated by populateReceiptDocument() -->
+            <div id="gstNoteSection" style="display:none; font-size:0.68rem; color:#555; border-top:1px dashed black; margin-top:4px; padding-top:3px; text-align:center; line-height:1.6;">
+                <span id="gstNoteText"></span>
+            </div>
             <div class="receipt-meta" style="margin-top:4px; font-style:italic; font-size:0.7rem;">Words:<br><strong id="thWords">--</strong></div>
             <div class="receipt-meta" style="margin-top:2px; font-weight:bold;">Mode: <span id="thMode">--</span></div>
             <div id="thSplitRow" style="display:none; font-size:0.75rem; border-top:1px dashed black; margin-top:4px; padding-top:4px;"><div style="display:flex; justify-content:space-between;"><span>Cash Rcvd:</span><strong id="thSplitCash">₹0</strong></div><div style="display:flex; justify-content:space-between;"><span>UPI Rcvd:</span><strong id="thSplitUpi">₹0</strong></div></div>
@@ -1400,13 +1398,10 @@
 
     /* ── PHASE 11B: Render job type tags + flagged banner in billing header ── */
     function renderJobTagsHeader(jobTypeIds) {
-        const tagsDisplay    = document.getElementById('jobTagsDisplay');
-        const flaggedBanner  = document.getElementById('flaggedBanner');
-        const flaggedList    = document.getElementById('flaggedList');
+        const tagsDisplay = document.getElementById('jobTagsDisplay');
+        const flaggedBanner = document.getElementById('flaggedBanner');
+        const flaggedList = document.getElementById('flaggedList');
         const flaggedActions = document.getElementById('flaggedActions');
-
-        /* Remove any stale protocol suggestion bar from previous JC load */
-        document.getElementById('protocolSuggestionBar')?.remove();
 
         if (!jobTypeIds || jobTypeIds === '[]') {
             tagsDisplay.style.display = 'none';
@@ -1419,62 +1414,32 @@
         catch(e) { return; }
         if (!tags.length) return;
 
-        const flagged   = tags.filter(t => t.customer_flagged);
-        const protocols = tags.filter(t => t.tag_type === 'protocol');
+        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
+        const flagged = tags.filter(t => t.customer_flagged);
 
-        /* Render tag pills — protocols get blue PROTOCOL badge, flagged jobs get amber */
+        // Show tag pills
         tagsDisplay.style.display = 'flex';
         tagsDisplay.innerHTML = tags.map(t => {
-            const isProto  = t.tag_type === 'protocol';
-            const bg       = isProto ? '#dbeafe' : (t.customer_flagged ? '#fef3c7' : '#eff6ff');
-            const border   = isProto ? '#93c5fd' : (t.customer_flagged ? '#fde68a' : '#bfdbfe');
-            const color    = isProto ? '#1e40af' : (t.customer_flagged ? '#854d0e' : '#1e40af');
-            const badge    = isProto
-                ? '<span style="font-size:.58rem;background:#1e40af;color:white;padding:1px 3px;border-radius:2px;margin-left:3px;vertical-align:middle;">PROTOCOL</span>'
-                : '';
-            const price    = (!isProto && t.labour_price > 0)
-                ? `<span style="font-size:.65rem;opacity:.7;"> ₹${t.labour_price}</span>` : '';
-            const flagIcon = (!isProto && t.customer_flagged) ? '⚠️ ' : '';
+            const bg = t.customer_flagged ? '#fef3c7' : '#eff6ff';
+            const border = t.customer_flagged ? '#fde68a' : '#bfdbfe';
+            const color = t.customer_flagged ? '#854d0e' : '#1e40af';
             return `<span style="background:${bg};border:1px solid ${border};color:${color};padding:3px 9px;border-radius:12px;font-size:.72rem;font-weight:700;white-space:nowrap;">
-                ${flagIcon}${t.name_hi}${badge}${price}
+                ${t.customer_flagged ? '⚠️ ' : ''}${t.name_hi}
+                ${t.labour_price > 0 ? `<span style="font-size:.65rem;opacity:.7;">₹${t.labour_price}</span>` : ''}
             </span>`;
         }).join('');
 
-        /* Flagged banner */
+        // Show flagged banner if any
         if (flagged.length > 0) {
             flaggedBanner.style.display = 'block';
             flaggedList.innerHTML = ' ' + flagged.map(t => `<strong>${t.name_hi}</strong>`).join(', ');
-            flaggedActions.innerHTML = flagged.map(t => {
-                const safeId = t.id;
-                const safeHi = t.name_hi;
-                return `<button class="btn-action info input-lockable" style="padding:3px 10px;font-size:.72rem;"
-                    data-tagid="${safeId}" data-taghi="${safeHi.replace(/"/g,'&quot;')}"
-                    onclick="addFlaggedNote(this.dataset.tagid,this.dataset.taghi)">
-                    📝 Add Note: ${safeHi}
-                </button>`;
-            }).join('');
+            flaggedActions.innerHTML = flagged.map(t => `
+                <button onclick="addFlaggedNote('${t.id}','${t.name_hi.replace(/'/g,"\\'")}')"
+                    class="btn-action info input-lockable" style="padding:3px 10px;font-size:.72rem;">
+                    📝 Add Note: ${t.name_hi}
+                </button>`).join('');
         } else {
             flaggedBanner.style.display = 'none';
-        }
-
-        /* Protocol suggestion bar — only on Open JCs */
-        if (protocols.length > 0 && activeJobContext?.status === 'Open') {
-            const proto = protocols[0];
-            const bar   = document.createElement('div');
-            bar.id = 'protocolSuggestionBar';
-            bar.style.cssText = 'background:#eff6ff;border:1.5px solid #93c5fd;border-radius:6px;padding:8px 12px;margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;';
-            bar.innerHTML =
-                `<span style="font-weight:700;color:#1e40af;">🔧 ${proto.name_hi}</span>` +
-                `<span style="color:#64748b;font-size:.75rem;">Add service package to billing?</span>` +
-                `<button id="protoSearchBtn" class="btn-action input-lockable" style="padding:4px 12px;font-size:.75rem;background:#1e40af;">SEARCH &amp; ADD</button>` +
-                `<button id="protoCloseBtn" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1.1rem;margin-left:auto;">×</button>`;
-            const pName = proto.name_en || proto.name_hi;
-            bar.querySelector('#protoSearchBtn').addEventListener('click', () => {
-                prefillProtocolSearch(pName);
-                bar.remove();
-            });
-            bar.querySelector('#protoCloseBtn').addEventListener('click', () => bar.remove());
-            flaggedBanner.insertAdjacentElement('afterend', bar);
         }
     }
 
@@ -1490,16 +1455,6 @@
             if (error) alert('Error: ' + error.message);
             else alert(`✅ Note added for ${tagName}`);
         });
-    }
-
-    function prefillProtocolSearch(protocolName) {
-        /* Focus the parts search bar and pre-type the protocol name */
-        const el = document.getElementById('nPart');
-        if (!el) return;
-        el.value = protocolName;
-        el.focus();
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     const _tagLabels = {
       intake:'📥 Intake', pre_work:'🔍 Pre-Work', in_progress:'🔧 In Progress',
@@ -2142,12 +2097,23 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
 
     async function showHistoricalInvoice() {
         if(!activeJobContext) return;
-        /* Fetch amendment audit records and any logged refunds for this JC */
-        const [{ data: amendments }, { data: refunds }] = await Promise.all([
-            supabaseClient.from('jc_amendments').select('*').eq('job_card_id', targetJobId).order('created_at', {ascending: false}),
-            supabaseClient.from('customer_refunds').select('*').eq('job_card_id', targetJobId).order('created_at', {ascending: false})
-        ]);
-        populateReceiptDocument(activeJobContext.payment_mode, activeJobContext.total_invoice_value, activeJobContext, amendments || [], refunds || []);
+        /* Fetch amendment audit records and any refunds for this JC.
+           Wrapped in try-catch: if jc_amendments or customer_refunds tables
+           don't exist yet (RLS / table not created), we still show the invoice. */
+        let amendments = [], refunds = [];
+        try {
+            const [ar, rr] = await Promise.all([
+                supabaseClient.from('jc_amendments').select('*')
+                    .eq('job_card_id', targetJobId).order('created_at', {ascending: false}),
+                supabaseClient.from('customer_refunds').select('*')
+                    .eq('job_card_id', targetJobId).order('created_at', {ascending: false})
+            ]);
+            amendments = ar?.data || [];
+            refunds    = rr?.data || [];
+        } catch(e) {
+            console.warn('Amendment/refund fetch skipped:', e.message);
+        }
+        populateReceiptDocument(activeJobContext.payment_mode, activeJobContext.total_invoice_value, activeJobContext, amendments, refunds);
     }
 
     /*
@@ -3011,54 +2977,27 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const dRef = document.getElementById('rowReferralDisc');
         if (referralDiscountActive && referralDiscountAmount > 0 && dRef) { dRef.style.display = 'flex'; document.getElementById('thReferralCode').innerText = activeJobContext.referral_code || '--'; document.getElementById('thReferralAmt').innerText = `-₹${referralDiscountAmount}`; } else if (dRef) { dRef.style.display = 'none'; }
         const pUsed = parseFloat(scopeVals.points_used) || 0; const dPts = document.getElementById('rowPointsSum'); if (pUsed > 0) { dPts.style.display = 'flex'; document.getElementById('thPointsSum').innerText = `-₹${pUsed}`; } else { dPts.style.display = 'none'; } const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const dAdvSrv = document.getElementById('rowAdvSrv'); if (advSrv > 0) { dAdvSrv.style.display = 'flex'; document.getElementById('thAdvSrv').innerText = `-₹${advSrv}`; } else { dAdvSrv.style.display = 'none'; } const dPrepGrn = document.getElementById('rowPrepGrn'); if (prepGrn > 0) { dPrepGrn.style.display = 'flex'; document.getElementById('thPrepGrn').innerText = `-₹${prepGrn}`; } else { dPrepGrn.style.display = 'none'; } const dPrepMop = document.getElementById('rowPrepMop'); if (prepMop > 0) { dPrepMop.style.display = 'flex'; document.getElementById('thPrepMop').innerText = `-₹${prepMop}`; } else { dPrepMop.style.display = 'none'; } document.getElementById('thNet').innerText = `₹${finalNet}`; document.getElementById('thWords').innerText = convertNumberToWords(finalNet); if (isSplitPayment) { document.getElementById('thMode').innerText = "Split Payment"; document.getElementById('thSplitRow').style.display = 'block'; document.getElementById('thSplitCash').innerText = `₹${splitCashVal}`; document.getElementById('thSplitUpi').innerText = `₹${splitUpiVal}`; } else { document.getElementById('thMode').innerText = paymentMode; document.getElementById('thSplitRow').style.display = 'none'; } if(scopeVals.future_advice) { document.getElementById('thFutureAdviceRow').style.display = 'block'; document.getElementById('thFutureAdviceText').innerText = scopeVals.future_advice; } else { document.getElementById('thFutureAdviceRow').style.display = 'none'; } const promoDiv = document.getElementById('receiptPromoHindi'); if(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true) promoDiv.style.display = 'none'; else promoDiv.style.display = 'block';
-        /* ══ GST BREAKUP (INCLUSIVE BASIS — standard Indian tax invoice format) ══
-           Prices in the system are treated as inclusive of GST.
-           Taxable value = price / (1 + gst_rate/100)
-           GST amount    = price - taxable_value
-           Default rate  = 18% for all items unless line.gst_percent is set.
-           Labour/Service lines use 18% GST on services (SAC code 998714). */
-        (function renderGstBreakup() {
-            const gstMap = {}; // key = "18" or product-specific %, value = {taxable, gst, label}
-            lineItemsLocalMemory.forEach(function(line) {
-                const tp = parseFloat(line.total_price) || 0;
-                if (tp <= 0) return;
-                const gstPct = parseFloat(line.gst_percent) || 18;
-                const divisor = 1 + (gstPct / 100);
-                const taxable = tp / divisor;
-                const gstAmt  = tp - taxable;
-                if (!gstMap[gstPct]) gstMap[gstPct] = { taxable: 0, gst: 0 };
-                gstMap[gstPct].taxable += taxable;
-                gstMap[gstPct].gst     += gstAmt;
-            });
-            /* Labour charges are billed by the primary entity (not a line item) — add at 18% */
-            const labourCharge = parseFloat(scopeVals.labour_charges) || 0;
-            if (labourCharge > 0) {
-                if (!gstMap[18]) gstMap[18] = { taxable: 0, gst: 0 };
-                gstMap[18].taxable += labourCharge / 1.18;
-                gstMap[18].gst     += labourCharge - (labourCharge / 1.18);
-            }
-            const keys = Object.keys(gstMap);
-            if (keys.length === 0) return; // no items — skip GST section
-            let gstRowsHTML = '';
-            let totalGstAmt = 0;
-            keys.sort((a, b) => Number(a) - Number(b)).forEach(function(pct) {
-                const v = gstMap[pct];
-                gstRowsHTML += '<div style="display:flex;justify-content:space-between;">'
-                    + '<span>Taxable @' + pct + '%:</span>'
-                    + '<span>&#8377;' + Math.round(v.taxable) + '</span></div>'
-                    + '<div style="display:flex;justify-content:space-between;">'
-                    + '<span>GST @' + pct + '%:</span>'
-                    + '<span>&#8377;' + Math.round(v.gst) + '</span></div>';
-                totalGstAmt += v.gst;
-            });
-            const gstSection = document.getElementById('gstBreakupSection');
-            const gstRowsEl  = document.getElementById('gstBreakupRows');
-            const gstTotalEl = document.getElementById('thTotalGst');
-            if (gstSection && gstRowsEl && gstTotalEl) {
-                gstRowsEl.innerHTML = gstRowsHTML;
-                gstTotalEl.innerText = '&#8377;' + Math.round(totalGstAmt);
-                gstSection.style.display = 'block';
-            }
+        /* ══ GST NOTE (simple CGST + SGST disclosure — Indian B2C invoice format) ══
+           All prices in the system are inclusive of GST.
+           We back-calculate from NET PAYABLE:
+             Total GST = finalNet × 18 / 118   (standard 18% rate)
+             CGST 9%   = Total GST / 2
+             SGST 9%   = Total GST / 2
+           This note is a disclosure line — it does NOT change the NET PAYABLE. */
+        (function renderGstNote() {
+            const noteSection = document.getElementById('gstNoteSection');
+            const noteText    = document.getElementById('gstNoteText');
+            if (!noteSection || !noteText) return;
+            const net = parseFloat(finalNet) || 0;
+            if (net <= 0) { noteSection.style.display = 'none'; return; }
+            const totalGst = net * 18 / 118;
+            const cgst     = totalGst / 2;
+            const sgst     = totalGst / 2;
+            noteText.innerHTML =
+                'Total inclusive of 18% GST (where applicable)<br>'
+                + 'CGST @9%: ₹' + cgst.toFixed(2)
+                + ' &nbsp;|&nbsp; SGST @9%: ₹' + sgst.toFixed(2);
+            noteSection.style.display = 'block';
         })();
         /* ══ CREDIT NOTE (shown on amendment reprints when product exchange occurred) ══
            A credit note is generated when:
