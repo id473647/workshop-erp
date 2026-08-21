@@ -175,8 +175,8 @@
         </div>
 
         <div class="field-group" style="margin-bottom: 20px;">
-            <label id="problemLabel">Problem Mentioned by Customer <span style="color:var(--danger);">*</span> <span id="problemOptional" style="display:none;font-weight:400;color:#64748b;font-size:.75rem;">(optional — tags already describe the job)</span></label>
-            <textarea id="jcProblem" rows="3" placeholder="e.g. Engine noise, oil leak, regular service..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea>
+            <label id="problemLabel">Additional Notes <span id="problemOptional" style="font-weight:400;color:#64748b;font-size:.75rem;">(optional — tags already describe the job)</span></label>
+            <textarea id="jcProblem" rows="2" placeholder="Any extra detail the customer mentioned..." oninput="this.value=(this.value||'').toUpperCase(); checkRepeatComplaint()"></textarea>
         </div>
         <div id="warrantFlagBox" style="display:none; margin-top:8px; background:#fef2f2; border:2px solid var(--danger); padding:12px; border-radius:6px; color:#b91c1c; font-weight:700; font-size:0.9rem;">
             ⚠️ POSSIBLE WARRANTY ISSUE — This vehicle had a similar complaint recently.
@@ -333,8 +333,8 @@
     async function loadJobTypesCache() {
         if (globalJobTypes.length) return;
         const { data } = await supabaseClient.from('job_types')
-            .select('id,name_hi,name_en,category,labour_price,min_price,max_price,keywords')
-            .eq('status','active').order('category').order('name_hi');
+            .select('id,name_hi,name_en,category,labour_price,min_price,max_price,keywords,tag_type')
+            .eq('status','active').order('tag_type').order('category').order('name_hi');
         globalJobTypes = data || [];
     }
 
@@ -342,31 +342,67 @@
         const drop = document.getElementById('jobTagDrop');
         if (!q || q.trim().length < 2) { drop.style.display = 'none'; return; }
         const qL = q.trim().toLowerCase();
-        const results = globalJobTypes.filter(jt => {
-            const already = selectedJobTypes.find(s => s.id === jt.id);
-            if (already) return false;
-            return (jt.name_hi||'').includes(q.trim()) ||
+        const qH = q.trim();
+
+        const allMatches = globalJobTypes.filter(jt => {
+            if (selectedJobTypes.find(s => s.id === jt.id)) return false;
+            return (jt.name_hi||'').includes(qH) ||
                    (jt.name_en||'').toLowerCase().includes(qL) ||
                    (jt.keywords||'').toLowerCase().includes(qL);
-        }).slice(0, 10);
+        });
 
-        if (!results.length) { drop.innerHTML='<div style="padding:10px 14px;font-size:.82rem;color:#94a3b8;">No match — tag not found</div>'; drop.style.display='block'; return; }
+        const protocols = allMatches.filter(jt => jt.tag_type === 'protocol');
+        const jobs      = allMatches.filter(jt => jt.tag_type !== 'protocol').slice(0, 8);
+
+        if (!protocols.length && !jobs.length) {
+            drop.innerHTML = '<div style="padding:10px 14px;font-size:.82rem;color:#94a3b8;">No match — tag not found</div>';
+            drop.style.display = 'block'; return;
+        }
 
         const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
-        drop.innerHTML = results.map(jt => `<div
-            onclick="addJobTag('${jt.id}','${jt.name_hi.replace(/'/g,"\\'")}','${(jt.name_en||'').replace(/'/g,"\\'")}','${jt.category}',${jt.labour_price||0},${jt.min_price||0},${jt.max_price||0})"
-            style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.85rem;"
-            onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
-            <span style="font-weight:700;">${jt.name_hi}</span>
-            <span style="font-size:.75rem;color:#64748b;margin-left:6px;">${jt.name_en||''}</span>
-            <span style="float:right;font-size:.72rem;background:#e0f2fe;color:${catColor[jt.category]||'#64748b'};padding:1px 6px;border-radius:4px;">${jt.category}</span>
-        </div>`).join('');
+
+        const renderOption = (jt) => {
+            const isProtocol = jt.tag_type === 'protocol';
+            const badge = isProtocol
+                ? '<span style="background:#1e40af;color:white;font-size:.62rem;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:5px;">PROTOCOL</span>'
+                : '';
+            const priceNote = isProtocol
+                ? '<span style="float:right;font-size:.72rem;color:#0369a1;">Rate by vehicle</span>'
+                : (jt.min_price > 0 ? `<span style="float:right;font-size:.72rem;color:#64748b;">₹${jt.min_price}${jt.max_price>jt.min_price?'–'+jt.max_price:''}</span>` : '');
+            const safe_id   = jt.id;
+            const safe_hi   = jt.name_hi.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const safe_en   = (jt.name_en||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const safe_type = jt.tag_type || 'job';
+            return `<div onclick="addJobTag('${safe_id}','${safe_hi}','${safe_en}','${jt.category}',${jt.labour_price||0},${jt.min_price||0},${jt.max_price||0},'${safe_type}')"
+                style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:.85rem;"
+                onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background='white'">
+                <span style="font-weight:700;">${jt.name_hi}</span>${badge}
+                <span style="font-size:.75rem;color:#64748b;margin-left:6px;">${jt.name_en||''}</span>
+                ${priceNote}
+            </div>`;
+        };
+
+        let html = '';
+        if (protocols.length) {
+            html += '<div style="padding:5px 14px;font-size:.68rem;font-weight:700;color:#1e40af;text-transform:uppercase;background:#eff6ff;letter-spacing:.04em;">Service Protocols</div>';
+            html += protocols.map(renderOption).join('');
+        }
+        if (jobs.length) {
+            html += '<div style="padding:5px 14px;font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;background:#f8fafc;letter-spacing:.04em;">Individual Job Tags</div>';
+            html += jobs.map(renderOption).join('');
+        }
+        drop.innerHTML = html;
         drop.style.display = 'block';
     }
 
-    function addJobTag(id, nameHi, nameEn, category, price, minP, maxP) {
+    function addJobTag(id, nameHi, nameEn, category, price, minP, maxP, tagType) {
         if (selectedJobTypes.find(s => s.id === id)) return;
-        selectedJobTypes.push({ id, name_hi: nameHi, name_en: nameEn, category, labour_price: price, min_price: minP, max_price: maxP, customer_flagged: false });
+        selectedJobTypes.push({
+            id, name_hi: nameHi, name_en: nameEn, category,
+            labour_price: price, min_price: minP, max_price: maxP,
+            customer_flagged: false,
+            tag_type: tagType || 'job'
+        });
         document.getElementById('jobTagInput').value = '';
         document.getElementById('jobTagDrop').style.display = 'none';
         renderJobTagPills();
@@ -387,20 +423,30 @@
 
     function renderJobTagPills() {
         const container = document.getElementById('jobTagPills');
-        const catColor = {MECHANICAL:'#0369a1',ELECTRICAL:'#7c3aed',BODY:'#b45309',TYRES:'#166534',GENERAL:'#64748b'};
         container.innerHTML = selectedJobTypes.map(t => {
-            const bgColor = t.customer_flagged ? '#fef3c7' : '#eff6ff';
-            const borderColor = t.customer_flagged ? '#fde68a' : '#bfdbfe';
-            const textColor = t.customer_flagged ? '#854d0e' : '#1e40af';
-            /* Phase 11C: show price range hint on pill */
-            const hasPrice = (t.min_price > 0 || t.max_price > 0);
-            const priceHint = hasPrice
-                ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.min_price}${t.max_price > t.min_price ? '–' + t.max_price : ''}</span>`
-                : (t.labour_price > 0 ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.labour_price}</span>` : '');
+            const isProtocol = t.tag_type === 'protocol';
+            /* Protocols: blue. Flagged jobs: amber. Normal jobs: light blue */
+            const bgColor     = isProtocol ? '#dbeafe' : (t.customer_flagged ? '#fef3c7' : '#eff6ff');
+            const borderColor = isProtocol ? '#93c5fd' : (t.customer_flagged ? '#fde68a' : '#bfdbfe');
+            const textColor   = isProtocol ? '#1e40af' : (t.customer_flagged ? '#854d0e' : '#1e40af');
+            /* Protocol badge */
+            const protoBadge  = isProtocol
+                ? '<span style="font-size:.6rem;background:#1e40af;color:white;padding:1px 4px;border-radius:2px;margin-left:3px;vertical-align:middle;">PROTOCOL</span>'
+                : '';
+            /* Price hint — not shown for protocols (vehicle-dependent) */
+            const priceHint = !isProtocol && (t.min_price > 0 || t.max_price > 0)
+                ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.min_price}${t.max_price > t.min_price ? '–'+t.max_price : ''}</span>`
+                : (!isProtocol && t.labour_price > 0
+                    ? `<span style="font-size:.65rem;opacity:.7;margin-left:3px;">₹${t.labour_price}</span>`
+                    : '');
+            /* Flag button — only on job tags, not protocols */
+            const flagBtn = !isProtocol
+                ? `<button onclick="toggleFlagged('${t.id}')" title="Customer specifically flagged this issue"
+                    style="border:none;background:none;cursor:pointer;font-size:.85rem;padding:0 2px;color:${t.customer_flagged?'#b45309':'#94a3b8'};">⚠️</button>`
+                : '';
             return `<div style="display:inline-flex;align-items:center;gap:4px;background:${bgColor};border:1.5px solid ${borderColor};color:${textColor};padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:700;white-space:nowrap;">
-                ${t.name_hi}${priceHint}
-                <button onclick="toggleFlagged('${t.id}')" title="Toggle: Customer specifically flagged this issue"
-                    style="border:none;background:none;cursor:pointer;font-size:.85rem;padding:0 2px;color:${t.customer_flagged?'#b45309':'#94a3b8'};">⚠️</button>
+                ${t.name_hi}${protoBadge}${priceHint}
+                ${flagBtn}
                 <button onclick="removeJobTag('${t.id}')"
                     style="border:none;background:none;cursor:pointer;font-size:.9rem;color:#94a3b8;padding:0 2px;line-height:1;">×</button>
             </div>`;
@@ -408,8 +454,7 @@
     }
 
     function updateProblemOptional() {
-        const hasTag = selectedJobTypes.length > 0;
-        document.getElementById('problemOptional').style.display = hasTag ? 'inline' : 'none';
+        /* Additional Notes is always optional — no label change needed */
     }
 
     async function initializeIntake() {
@@ -688,6 +733,17 @@
         const hasTagsProblem = selectedJobTypes.length > 0 || problem.length > 0;
         if (!name || !hasTagsProblem) return alert("Customer Name and at least one Job Type Tag or Problem Description required.");
 
+        /* Build problem_mentioned from tags + additional notes (auto-generated, structured) */
+        const tagText = selectedJobTypes.map(t => {
+            let s = t.name_hi.toUpperCase();
+            if (t.tag_type === 'protocol') s = '[' + (t.name_en||t.name_hi).toUpperCase() + ']';
+            else if (t.customer_flagged) s += ' (FLAGGED BY CUSTOMER)';
+            return s;
+        }).join(', ');
+        const finalProblem = tagText
+            ? (problem ? tagText + ' | ' + problem : tagText)
+            : problem;
+
         const btn = document.getElementById('btnCreateJc');
         btn.innerText = "PROCESSING..."; btn.disabled = true;
 
@@ -731,7 +787,7 @@
         const { data: jc, error: jcErr } = await supabaseClient.from('job_cards').insert({
             customer_mobile  : mobile,
             vehicle_id       : finalVehicleId,
-            problem_mentioned: problem,
+            problem_mentioned: finalProblem,
             estimate_given          : estimate || null,
             expected_delivery_date  : document.getElementById('jcExpectedDate').value || null,  /* PHASE 4b */
             mech_id          : document.getElementById('intakePrimaryMech').value || null,
