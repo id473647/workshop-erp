@@ -516,6 +516,7 @@ async function loadEodSummary(){
 
   const container=document.getElementById('eodContent');
   container.innerHTML='<div style="text-align:center;padding:20px;">Compiling EOD...</div>';
+  try {
 
   // Determine entity for expense and credit_payment filtering
   // admin sees Workshop (service) view; each role sees only its own entity
@@ -718,6 +719,10 @@ async function loadEodSummary(){
       <div class="jc-detail-box" style="display:inline-block;margin-top:8px;">
         Cash in Counter = ${fmt(grossCash)} − ${fmt(expCash)} + Transfer ${fmt(transferIn)} = <b>${fmt(cashInCounter)}</b>
       </div>`;
+  }
+  } catch(eodErr) {
+    console.error('EOD compile error:', eodErr);
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#b91c1c;"><b>⚠️ EOD failed to load</b><br><span style="font-size:0.8rem;">' + (eodErr && eodErr.message ? eodErr.message : String(eodErr)) + '</span><br><span style="font-size:0.72rem;color:#64748b;margin-top:6px;display:block;">Screenshot this message and share it — it shows exactly what failed.</span></div>';
   }
   loadExistingLogNote();
 }
