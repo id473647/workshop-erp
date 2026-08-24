@@ -60,6 +60,25 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 .pay-inp{width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;font-weight:700;}
 .source-panel{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-top:16px;}
 .settings-panel{background:#fff7ed;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:14px;}
+.cal-header{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px;}
+.cal-month-label{font-size:1.1rem;font-weight:700;color:var(--primary);min-width:170px;text-align:center;}
+.cal-dow-row,.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.cal-dow-row{margin-bottom:4px;}
+.cal-dow{text-align:center;font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;padding-bottom:2px;}
+.cal-cell{border:1px solid var(--border);border-radius:8px;min-height:60px;padding:6px;display:flex;flex-direction:column;gap:3px;background:#fff;}
+.cal-cell.cal-pad{opacity:.32;background:#f8fafc;}
+.cal-cell.has-data{cursor:pointer;transition:box-shadow .12s,border-color .12s;}
+.cal-cell.has-data:hover{border-color:var(--info);box-shadow:0 0 0 2px rgba(41,128,185,.15);}
+.cal-daynum{font-size:.76rem;font-weight:700;color:#1e293b;}
+.cal-status{font-size:.76rem;font-weight:700;line-height:1.15;}
+.cal-cell.cal-paid{background:#f0fdf4;border-color:#bbf7d0;}
+.cal-cell.cal-paid .cal-status{color:#166534;}
+.cal-cell.cal-unpaid{background:#fef2f2;border-color:#fecaca;}
+.cal-cell.cal-unpaid .cal-status{color:#991b1b;}
+.cal-cell.cal-holiday{background:#fff7ed;border-color:#fed7aa;}
+.cal-cell.cal-holiday .cal-daynum,.cal-cell.cal-holiday .cal-status{color:#c2410c;}
+.cal-cell.cal-selected{outline:2px solid var(--info);outline-offset:-1px;}
+@media(max-width:600px){.cal-cell{min-height:48px;padding:4px;}.cal-status{font-size:.66rem;}}
 @media print{.no-print{display:none!important;}body{background:white;}.sticky-nav,.btn-action,.btn-header{display:none!important;}}
 </style>
 </head>
@@ -139,13 +158,19 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
   </div>
   <div id="panel-payouts" class="page-panel">
     <div class="card-panel">
-      <div class="block-title">💰 Commission Payouts — Day-First Model</div>
-      <p style="font-size:.85rem;color:#64748b;margin-top:0;">Select earning date → admin pays from Green CIH and/or Workshop CIH.</p>
-      <div class="date-nav">
-        <div class="field-group" style="flex:1;max-width:200px;"><label>EARNING DATE</label><input type="date" id="payDate" style="width:100%;"></div>
-        <button class="btn-action btn-info" onclick="loadPayoutEarnings()" style="padding:9px 18px;align-self:flex-end;width:auto;">LOAD</button>
+      <div class="block-title">💰 Commission Payouts — Calendar</div>
+      <p style="font-size:.85rem;color:#64748b;margin-top:0;">✅ Green tick = fully paid &nbsp;|&nbsp; Red ₹ = still owed &nbsp;|&nbsp; Orange = workshop holiday. Click any day with data to pay.</p>
+      <div class="cal-header">
+        <button class="btn-action btn-info" style="padding:6px 14px;width:auto;" onclick="shiftCalMonth(-1)">‹</button>
+        <div class="cal-month-label" id="calMonthLabel">—</div>
+        <button class="btn-action btn-info" style="padding:6px 14px;width:auto;" onclick="shiftCalMonth(1)">›</button>
       </div>
-      <div id="payoutsContent"><p style="text-align:center;color:#94a3b8;padding:20px;">Select an earning date and click LOAD.</p></div>
+      <div class="cal-dow-row" id="calDowRow"></div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="card-panel" id="payoutsDetailCard" style="display:none;">
+      <div class="block-title" id="payoutsDetailTitle">Payout Details</div>
+      <div id="payoutsContent"></div>
       <div id="paySourcePanel" style="display:none;">
         <div class="source-panel">
           <div style="font-size:.85rem;font-weight:700;color:#166534;margin-bottom:12px;">PAYMENT SOURCE SPLIT</div>
@@ -514,11 +539,87 @@ async function declareHoliday(){
 }
 
 // ── COMMISSION PAYOUTS TAB ────────────────────────────────────────────────
-let mechCache={};let payDateLoaded='';
-async function loadMechCache(){if(Object.keys(mechCache).length)return;const{data}=await sb.from('mechanics').select('id,name,commission_rate').eq('is_active',true);(data||[]).forEach(m=>mechCache[m.id]=m);}
-function initPayoutsTab(){document.getElementById('payDate').value=new Date().toISOString().split('T')[0];}
-async function loadPayoutEarnings(){
-  const date=document.getElementById('payDate').value;if(!date){alert('Select a date.');return;}
+let mechCache={};let payDateLoaded='';let calViewYear=null,calViewMonth=null,calSelectedDate=null;
+async function loadMechCache(){if(Object.keys(mechCache).length)return;const{data}=await sb.from('mechanics').select('id,name,commission_rate,staff_role').eq('is_active',true).eq('staff_role','Mechanic');(data||[]).forEach(m=>mechCache[m.id]=m);}
+
+// ── CALENDAR ─────────────────────────────────────────────────────────────
+const CAL_DOW=['Mo','Tu','We','Th','Fr','Sa','Su'];
+const CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function initPayoutsTab(){
+  if(calViewYear===null){const t=new Date();calViewYear=t.getFullYear();calViewMonth=t.getMonth();}
+  document.getElementById('calDowRow').innerHTML=CAL_DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  renderCalendar();
+}
+function shiftCalMonth(delta){
+  calViewMonth+=delta;
+  if(calViewMonth<0){calViewMonth=11;calViewYear--;}
+  if(calViewMonth>11){calViewMonth=0;calViewYear++;}
+  renderCalendar();
+}
+function pad2(n){return String(n).padStart(2,'0');}
+async function renderCalendar(){
+  await loadMechCache();
+  const y=calViewYear,m=calViewMonth;
+  document.getElementById('calMonthLabel').innerText=`${CAL_MONTHS[m]} ${y}`;
+  const firstOfMonth=new Date(y,m,1);
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const daysInPrevMonth=new Date(y,m,0).getDate();
+  // Monday-first offset: JS getDay() is 0=Sun..6=Sat → convert to 0=Mon..6=Sun
+  const leadOffset=(firstOfMonth.getDay()+6)%7;
+  const monthStart=`${y}-${pad2(m+1)}-01`;
+  const monthEnd=`${y}-${pad2(m+1)}-${pad2(daysInMonth)}`;
+  const mechIds=Object.keys(mechCache);
+  const[{data:ledger},{data:paid},{data:holidays}]=await Promise.all([
+    mechIds.length?sb.from('staff_ledger').select('mechanic_id,log_date,commission_amount').eq('entry_type','Labour Credit').in('mechanic_id',mechIds).gte('log_date',monthStart).lte('log_date',monthEnd):Promise.resolve({data:[]}),
+    sb.from('mechanic_payouts').select('amount,earning_date').gte('earning_date',monthStart).lte('earning_date',monthEnd),
+    sb.from('workshop_holidays').select('holiday_date,holiday_name').gte('holiday_date',monthStart).lte('holiday_date',monthEnd)
+  ]);
+  const earnByDate={};(ledger||[]).forEach(r=>{earnByDate[r.log_date]=(earnByDate[r.log_date]||0)+parseFloat(r.commission_amount||0);});
+  const paidByDate={};(paid||[]).forEach(r=>{paidByDate[r.earning_date]=(paidByDate[r.earning_date]||0)+parseFloat(r.amount||0);});
+  const holidayByDate={};(holidays||[]).forEach(r=>{holidayByDate[r.holiday_date]=r.holiday_name;});
+
+  let html='';
+  for(let i=leadOffset;i>0;i--){
+    html+=`<div class="cal-cell cal-pad"><div class="cal-daynum">${daysInPrevMonth-i+1}</div></div>`;
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${y}-${pad2(m+1)}-${pad2(d)}`;
+    const holidayName=holidayByDate[dateStr];
+    const earned=earnByDate[dateStr]||0;
+    const paidAmt=paidByDate[dateStr]||0;
+    const outstanding=Math.max(0,Math.round(earned)-Math.round(paidAmt));
+    let cls='cal-cell',status='',clickable=false;
+    if(holidayName){
+      cls+=' cal-holiday';
+      status=`🏖️ ${holidayName}`;
+      if(earned>0.01) clickable=true; // holiday can still carry earnings (e.g. duty staff) — allow pay-in
+    }else if(earned>0.01){
+      clickable=true;
+      if(outstanding<=0){cls+=' cal-paid';status='✅ PAID';}
+      else{cls+=' cal-unpaid';status=`₹${outstanding}`;}
+    }
+    if(clickable) cls+=' has-data';
+    if(dateStr===calSelectedDate) cls+=' cal-selected';
+    html+=`<div class="${cls}" ${clickable?`onclick="selectCalDay('${dateStr}')"`:''}><div class="cal-daynum">${d}</div><div class="cal-status">${status}</div></div>`;
+  }
+  const totalCells=leadOffset+daysInMonth;
+  const trail=(7-(totalCells%7))%7;
+  for(let d=1;d<=trail;d++){
+    html+=`<div class="cal-cell cal-pad"><div class="cal-daynum">${d}</div></div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+}
+async function selectCalDay(dateStr){
+  calSelectedDate=dateStr;
+  renderCalendar();
+  document.getElementById('payoutsDetailCard').style.display='block';
+  const nice=new Date(dateStr+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',weekday:'short'});
+  document.getElementById('payoutsDetailTitle').innerText=`Payout Details — ${nice}`;
+  await loadPayoutEarnings(dateStr);
+  document.getElementById('payoutsDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function loadPayoutEarnings(date){
+  if(!date){alert('Select a date.');return;}
   payDateLoaded=date;await loadMechCache();
   const content=document.getElementById('payoutsContent');content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:12px;">Loading...</p>';
   // Phase 8: read pre-computed commission from staff_ledger instead of calculating from job_cards
@@ -578,7 +679,8 @@ async function confirmPayout(){
   if(service>0)expRows.push({expense_category:'Labour Payments',warehouse_type:'service',amount:service,note,recorded_by:sessionRole,expense_date:now});
   if(expRows.length){const{error:ee}=await sb.from('workshop_expenses').insert(expRows);if(ee){alert('Payouts saved but expense record failed: '+ee.message);return;}}
   printPayoutReceipt(payRows,date,green,service);
-  loadPayoutEarnings();
+  loadPayoutEarnings(date);
+  renderCalendar();
 }
 function printPayoutReceipt(payRows,earningDate,green,service){
   const now=new Date();const total=(green+service).toFixed(0);
@@ -609,8 +711,9 @@ if(!['admin','service'].includes(sessionRole)){
     const paydate=new URLSearchParams(window.location.search).get('paydate');
     if(paydate){
       switchPageTab('payouts');
-      document.getElementById('payDate').value=paydate;
-      loadPayoutEarnings();
+      const pd=new Date(paydate+'T12:00:00');
+      calViewYear=pd.getFullYear();calViewMonth=pd.getMonth();
+      await selectCalDay(paydate);
     }
   });
 }
