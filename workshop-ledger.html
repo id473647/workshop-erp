@@ -329,7 +329,7 @@ function dashOrFmt(n){n=parseFloat(n)||0; return n===0?'<span class="dash">—</
 function jcRef(id){return 'JC-'+id.split('-')[0].toUpperCase();}
 
 async function prefetchStaticData(){
-  const {data:mechs}=await supabaseClient.from('mechanics').select('id,name,commission_rate').eq('is_active',true);
+  const {data:mechs}=await supabaseClient.from('mechanics').select('id,name,commission_rate,staff_role').eq('is_active',true);
   mechanicsCache=mechs||[];
   const {data:cats}=await supabaseClient.from('expense_categories').select('*').order('sort_order');
   categoryCache=cats||[];
@@ -924,7 +924,7 @@ async function loadMechEarnings(){
   const container=document.getElementById('mechCrossTabContent');
   if(!container) return;
   container.innerHTML='<div style="text-align:center;padding:20px;color:#94a3b8;">Loading...</div>';
-  const mechs=(mechanicsCache||[]).sort((a,b)=>a.name.localeCompare(b.name));
+  const mechs=(mechanicsCache||[]).filter(m=>m.staff_role==='Mechanic').sort((a,b)=>a.name.localeCompare(b.name));
   if(!mechs.length){container.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px;">No active mechanics found.</div>';return;}
 
   // Build commission rate lookup
@@ -943,7 +943,7 @@ async function loadMechEarnings(){
   // Reading commission_amount from staff_ledger — pre-computed, rate-snapped, single source of truth.
   const[ledgerRes,payRes]=await Promise.all([
     supabaseClient.from('staff_ledger')
-      .select('mechanic_id,log_date,commission_amount')
+      .select('mechanic_id,log_date,commission_amount,amount')
       .eq('entry_type','Labour Credit')
       .gte('log_date',from40)
       .lte('log_date',today),
@@ -955,11 +955,15 @@ async function loadMechEarnings(){
   ]);
 
   // Build earnMap: date → { mechId: commission_amount } from staff_ledger
+  // Build labourMap: date → { mechId: raw labour amount } — display-only, not used in payout totals
   const earnMap={};
+  const labourMap={};
   (ledgerRes.data||[]).forEach(row=>{
     if(!row.log_date||!row.mechanic_id) return;
     if(!earnMap[row.log_date]) earnMap[row.log_date]={};
     earnMap[row.log_date][row.mechanic_id]=(earnMap[row.log_date][row.mechanic_id]||0)+parseFloat(row.commission_amount||0);
+    if(!labourMap[row.log_date]) labourMap[row.log_date]={};
+    labourMap[row.log_date][row.mechanic_id]=(labourMap[row.log_date][row.mechanic_id]||0)+parseFloat(row.amount||0);
   });
 
   // Build payouts: earning_date → { totalPaid, latestPaidDate }
@@ -1010,9 +1014,20 @@ async function loadMechEarnings(){
     const paidDateDisplay=pi.latestPaidDate?new Date(pi.latestPaidDate+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'—';
     const paidDateLabel=paidDateDisplay+(paid>0.01&&balance>0.01?' (Part.)':'');
 
+    const dayLabour=labourMap[date]||{};
     const mechCells=mechs.map(m=>{
       const e=dayEarns[m.id]||0; colTotals[m.id]+=e;
-      return`<td style="text-align:right;padding:6px 8px;font-size:.8rem;${e>0.01?'font-weight:700;color:var(--primary);':'color:#cbd5e1;'}">${e>0.01?Math.round(e):'—'}</td>`;
+      const l=dayLabour[m.id]||0;
+      const hasRate=(parseFloat(m.commission_rate)||0)>0;
+      let cellText,active;
+      if(hasRate){
+        active=e>0.01;
+        cellText=active?`${Math.round(e)}(${Math.round(l)})`:'—';
+      }else{
+        active=l>0.01;
+        cellText=active?`0(${Math.round(l)})`:'-';
+      }
+      return`<td style="text-align:right;padding:6px 8px;font-size:.8rem;${active?'font-weight:700;color:var(--primary);':'color:#cbd5e1;'}">${cellText}</td>`;
     }).join('');
 
     const payBtn=balance>0.01?`<button onclick="window.open('mechanic-admin.html?paydate=${date}','_blank')" style="background:var(--success);color:white;border:none;padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:700;cursor:pointer;">PAY</button>`:`<span style="font-size:.85rem;">${statusIcon}</span>`;
