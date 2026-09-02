@@ -233,7 +233,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
         </div>
 
         <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:8px;" id="tabHintText">
-            Showing job cards opened today. Amber rows = open &gt;24h. Red rows = open &gt;3 days.
+            All open job cards not yet marked ready for delivery. Amber rows = open &gt;24h. Red rows = open &gt;3 days. Pick a date above to see only that day's active JCs.
         </div>
 
         <div class="table-wrapper">
@@ -615,7 +615,7 @@ async function triggerDashboardDataAggregators() {
 
 /* ── Tab switcher ── */
 const tabHints = {
-    TodayActive:    'Job cards opened today. 🟡 Amber = open >24h   🔴 Red = open >3 days.',
+    TodayActive:    'All open job cards not yet marked ready for delivery. 🟡 Amber = open >24h   🔴 Red = open >3 days. Pick a date above to see only that day\'s active JCs.',
     Overdue:        'Open job cards older than 24 hours — needs follow-up.',
     ReadyDelivery:  'Vehicles marked ready for delivery. Days waiting and parking charges shown.',
     Historical:     'Closed job cards — search by mobile for full history. ⚠️ RAISE COMPLAINT appears for JCs within 31 days.'
@@ -633,7 +633,6 @@ async function queryMasterJobRegisters() {
     const queryVal   = (document.getElementById('sQuery').value || '').trim().toLowerCase();
     const dateVal    = document.getElementById('sDate').value;
     const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00';
-    const yesterday  = new Date(Date.now() - 24*60*60*1000).toISOString();
     const tbody      = document.getElementById('masterJobsTableBody');
     tbody.innerHTML  = `<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">Loading…</td></tr>`;
 
@@ -642,9 +641,18 @@ async function queryMasterJobRegisters() {
             .select('*,vehicles(reg_number,make_model,color)');
 
         if (currentListCategory === 'TodayActive') {
-            q = q.eq('status','Open').gte('created_at', todayStart).order('created_at',{ascending:false});
+            /* CHANGE (user request): was gte('created_at', todayStart) — restricted this tab to
+               only JCs opened today, so anything still open from an earlier day disappeared from
+               here (it only showed under Overdue). Now shows every open JC that is not yet marked
+               ready for delivery, regardless of when it was opened. The date filter below still
+               narrows this to a specific day's active JCs when one is picked. */
+            q = q.eq('status','Open').is('delivery_ready_at', null).order('created_at',{ascending:false});
         } else if (currentListCategory === 'Overdue') {
-            q = q.eq('status','Open').lt('created_at', yesterday).order('created_at',{ascending:true});
+            /* FIX: was lt('created_at', yesterday) — a rolling 24h cutoff that used a DIFFERENT
+               reference point than TodayActive's calendar-day cutoff (todayStart). Any JC opened
+               earlier "today" than the rolling 24h mark but still before midnight fell into neither
+               tab and vanished from the dashboard. Both tabs now split on the same todayStart line. */
+            q = q.eq('status','Open').lt('created_at', todayStart).order('created_at',{ascending:true});
         } else if (currentListCategory === 'ReadyDelivery') {
             q = q.eq('status','Open').not('delivery_ready_at','is',null).order('delivery_ready_at',{ascending:true});
         } else if (currentListCategory === 'Historical') {
