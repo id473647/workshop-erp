@@ -50,6 +50,19 @@
             <tbody id="techTable"></tbody>
         </table>
     </div>
+
+    <div class="section" style="border-bottom:none;">
+        <h3 style="margin-bottom:5px;">🤖 AI Invoice Scan Provider</h3>
+        <small style="color:#666;">Controls which AI reads purchase invoice photos on the Purchase Manager GRN tab. Switching here takes effect immediately — no code change needed, as long as that provider's key is already set up on the server.</small>
+        <div class="grid" style="grid-template-columns: 1fr; margin-top:10px;">
+            <select id="aiProviderSelect">
+                <option value="gemini">Google Gemini (currently free-tier — recommended for testing)</option>
+                <option value="claude">Anthropic Claude (paid, per-scan cost — recommended once live)</option>
+            </select>
+        </div>
+        <button class="btn btn-save" style="background:#8e44ad;" onclick="saveAiProvider()">Save AI Provider</button>
+        <div id="aiProviderStatus" style="font-size:0.8rem; color:#666; margin-top:8px;"></div>
+    </div>
 </div>
 
 <script>
@@ -93,7 +106,21 @@
         loadDirectory();
     }
 
+    async function loadAiProviderSetting() {
+        const { data } = await supabaseClient.from('system_settings').select('value').eq('key', 'ai_scan_provider').maybeSingle();
+        document.getElementById('aiProviderSelect').value = data?.value || 'gemini';
+    }
+
+    async function saveAiProvider() {
+        const val = document.getElementById('aiProviderSelect').value;
+        const { error } = await supabaseClient.from('system_settings').upsert({
+            key: 'ai_scan_provider', value: val, updated_at: new Date().toISOString(), updated_by: localStorage.getItem('ERP_ACTIVE_ROLE') || 'admin'
+        });
+        document.getElementById('aiProviderStatus').innerText = error ? 'Error saving: ' + error.message : `Saved — invoice scanning now uses ${val === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}.`;
+    }
+
     loadDirectory();
+    loadAiProviderSetting();
 </script>
 </body>
 </html>
