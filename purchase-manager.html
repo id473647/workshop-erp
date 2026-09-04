@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <style>
         :root {
             --primary: #2c3e50; --success: #27ae60; --moped: #3498db; --service: #f39c12;
@@ -82,15 +83,20 @@
         <div id="tab-grn" class="tab-content active">
 
             <div style="background:#f8fafc;border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:15px;">
-                <strong>📄 Invoice Capture (optional)</strong><br>
-                <button class="btn btn-info" style="margin-top:8px;" onclick="document.getElementById('grnCameraInput').click()">📷 Take Photo</button>
-                <button class="btn btn-info" style="margin-top:8px;" onclick="document.getElementById('grnFileInput').click()">📁 Upload PDF / Image</button>
-                <input type="file" id="grnCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceFile(this.files[0])">
-                <input type="file" id="grnFileInput" accept="image/*,.pdf" style="display:none" onchange="handleInvoiceFile(this.files[0])">
-                <button class="btn btn-info" id="btnRescan" style="display:none; margin-top:8px;" onclick="scanInvoiceWithAI(lastCapturedFile)">🔄 Re-scan with AI</button>
+                <strong>📄 Invoice Capture (optional — supports multi-page invoices, up to 10 pages)</strong><br>
+                <button class="btn btn-info" id="btnTakePhoto" style="margin-top:8px;" onclick="document.getElementById('grnCameraInput').click()">📷 Take Photo</button>
+                <button class="btn btn-info" style="margin-top:8px;" onclick="document.getElementById('grnFileInput').click()">📁 Upload PDF / Photos (gallery or PC)</button>
+                <input type="file" id="grnCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCapturedPage(this.files[0]); this.value='';">
+                <input type="file" id="grnFileInput" accept="image/*,.pdf" multiple style="display:none" onchange="handleGalleryFiles(this.files); this.value='';">
+                <button class="btn btn-info" id="btnRescan" style="display:none; margin-top:8px;" onclick="scanInvoiceWithAI(finalizedScanFile)">🔄 Re-scan with AI</button>
+                <div id="pendingPagesStrip" style="display:none; margin-top:8px;"></div>
+                <div id="pendingPagesActions" style="display:none; margin-top:8px;">
+                    <button class="btn btn-info" id="btnAddPage" onclick="document.getElementById('grnCameraInput').click()">+ Add Another Page</button>
+                    <button class="btn btn-success" onclick="finalizeAndScan()">✅ Done — Combine &amp; Scan (<span id="pendingPageCount">0</span> pages)</button>
+                </div>
                 <span id="grnPhotoStatus" style="font-size:0.8rem;color:#888;margin-left:10px;"></span>
                 <input type="hidden" id="grnInvoicePhotoUrl">
-                <div class="audit-note">Re-scan reuses the same photo already saved — it does not upload a new copy, so you can retry as many times as needed without filling up storage.</div>
+                <div class="audit-note">A single photo scans right away. Take a second photo (or pick several from your gallery/PC at once) and they're combined into one PDF before scanning — so a 3-8 page invoice is read as one document. Re-scan reuses what was already uploaded — it never uploads a new copy, so you can retry as many times as needed without filling up storage.</div>
             </div>
 
             <div style="display:flex; gap:15px; flex-wrap:wrap;">
@@ -325,7 +331,9 @@
         const SCAN_FN_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co/functions/v1/hyper-worker";
         const APP_SHARED_SECRET = "shagunprabhgunavinashmunna.20111986";
         let lastScanResult = null;
-        let lastCapturedFile = null; // kept in memory so "Re-scan" can retry without re-uploading
+        let finalizedScanFile = null; // the single file actually sent for scanning — a raw photo, an uploaded PDF, or a combined multi-page PDF — kept so "Re-scan" never re-uploads
+        let pendingPages = []; // photos queued to be combined into one multi-page PDF before scanning
+        const MAX_INVOICE_PAGES = 10;
         let scanTimerInterval = null;
 
         const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
@@ -486,9 +494,115 @@
             return data.publicUrl;
         }
 
-        async function handleInvoiceFile(file) {
+        // ===== Multi-page invoice capture =====
+        // A single camera photo scans immediately, same as before. A second photo (or a
+        // multi-select from the gallery/PC) queues pages instead, which get combined into one
+        // PDF before scanning — so a 3-8 page invoice is read by the AI as a single document.
+        function handleCapturedPage(file) {
             if(!file) return;
-            lastCapturedFile = file; // kept for "Re-scan" — the AI call never needs a re-upload after this
+            if(pendingPages.length === 0) {
+                // First photo — behave exactly like before: scan right away, no extra tap needed.
+                pendingPages.push(file);
+                finalizeAndScan();
+                return;
+            }
+            if(pendingPages.length >= MAX_INVOICE_PAGES) { alert(`Maximum ${MAX_INVOICE_PAGES} pages per invoice reached.`); return; }
+            pendingPages.push(file);
+            renderPendingPages();
+        }
+
+        async function handleGalleryFiles(fileList) {
+            const files = Array.from(fileList || []);
+            if(!files.length) return;
+
+            // A single PDF selected alone is already a complete multi-page document — use as-is.
+            if(files.length === 1 && files[0].type === 'application/pdf') {
+                pendingPages = [];
+                renderPendingPages();
+                await processFinalFile(files[0]);
+                return;
+            }
+            if(files.some(f => f.type === 'application/pdf')) {
+                alert('For multiple files, please select photos only — a PDF already contains all of its own pages, so upload it by itself instead.');
+                return;
+            }
+            if(pendingPages.length + files.length > MAX_INVOICE_PAGES) {
+                alert(`Maximum ${MAX_INVOICE_PAGES} pages per invoice. You already have ${pendingPages.length} queued — only ${MAX_INVOICE_PAGES - pendingPages.length} more can be added.`);
+                return;
+            }
+            pendingPages.push(...files);
+            renderPendingPages();
+            // A direct multi-file gallery/PC selection already means "these are all my pages" — no extra "Done" tap needed.
+            if(files.length > 1 || pendingPages.length > 1) await finalizeAndScan();
+        }
+
+        function renderPendingPages() {
+            const strip = document.getElementById('pendingPagesStrip');
+            const actions = document.getElementById('pendingPagesActions');
+            if(!pendingPages.length) { strip.style.display = 'none'; actions.style.display = 'none'; return; }
+            strip.style.display = 'block';
+            actions.style.display = 'block';
+            document.getElementById('pendingPageCount').innerText = pendingPages.length;
+            strip.innerHTML = pendingPages.map((f, i) => `<span style="display:inline-block; background:#eee; border-radius:4px; padding:4px 8px; margin:2px; font-size:0.75rem;">Page ${i+1}: ${(f.name||'photo').substring(0,20)} <a href="#" onclick="removePendingPage(${i}); return false;" style="color:var(--danger); font-weight:bold;">✕</a></span>`).join('');
+            document.getElementById('btnAddPage').style.display = pendingPages.length >= MAX_INVOICE_PAGES ? 'none' : 'inline-block';
+        }
+
+        function removePendingPage(i) {
+            pendingPages.splice(i, 1);
+            renderPendingPages();
+        }
+
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function getImageDims(dataUrl) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                img.src = dataUrl;
+            });
+        }
+
+        // Combines the queued page photos into one multi-page PDF, in the order captured/selected —
+        // each photo is shrunk first (same resize used for the AI call) so the combined file stays
+        // a reasonable size on mobile data.
+        async function combinePagesToPdf(files) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const pageW = 210, pageH = 297, margin = 5;
+            const maxW = pageW - margin * 2, maxH = pageH - margin * 2;
+
+            for(let i = 0; i < files.length; i++) {
+                const resized = await resizeImageForAI(files[i]);
+                const dataUrl = await fileToDataUrl(resized);
+                const { width: pxW, height: pxH } = await getImageDims(dataUrl);
+                const scale = Math.min(maxW / pxW, maxH / pxH);
+                const w = pxW * scale, h = pxH * scale;
+                const x = margin + (maxW - w) / 2, y = margin + (maxH - h) / 2;
+                if(i > 0) doc.addPage();
+                doc.addImage(dataUrl, 'JPEG', x, y, w, h);
+            }
+            const blob = doc.output('blob');
+            return new File([blob], `invoice-combined-${Date.now()}.pdf`, { type: 'application/pdf' });
+        }
+
+        async function finalizeAndScan() {
+            if(!pendingPages.length) return;
+            document.getElementById('grnPhotoStatus').innerText = pendingPages.length > 1 ? `Combining ${pendingPages.length} pages into one PDF...` : 'Preparing...';
+            const fileToUse = pendingPages.length === 1 ? pendingPages[0] : await combinePagesToPdf(pendingPages);
+            pendingPages = [];
+            renderPendingPages();
+            await processFinalFile(fileToUse);
+        }
+
+        async function processFinalFile(file) {
+            finalizedScanFile = file; // "Re-scan" reuses exactly this — never re-uploads or re-combines
             document.getElementById('grnPhotoStatus').innerText = 'Uploading...';
             const url = await uploadToStorage(file, 'invoices');
             if(!url) { document.getElementById('grnPhotoStatus').innerText = ''; return; }
@@ -509,7 +623,8 @@
         // Shrinks a copy of the photo before sending it to the AI (speeds up the upload + read
         // considerably on mobile data — a full-resolution phone photo is often 3-4MB and doesn't
         // help text reading). The ORIGINAL full-quality file is still what's saved to storage in
-        // handleInvoiceFile/uploadToStorage — this resized copy is only used for the AI call.
+        // processFinalFile/uploadToStorage — this resized copy is only used for the AI call (and,
+        // for multi-page invoices, for building the combined PDF in combinePagesToPdf below).
         function resizeImageForAI(file) {
             return new Promise((resolve) => {
                 if(!file.type || !file.type.startsWith('image/')) { resolve(file); return; } // leave PDFs untouched
