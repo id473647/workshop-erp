@@ -148,6 +148,8 @@
                 <div class="form-group"><label>Other — Note (required if Other &gt; 0)</label><input type="text" id="lcOtherNote" class="form-control" placeholder="Describe the 'Other' cost"></div>
                 <div style="font-weight:bold; margin:10px 0;">Total Additional Cost: ₹<span id="lcTotal">0.00</span> &nbsp;|&nbsp; Landed Cost %: <span id="lcPct">0.00</span>% &nbsp;|&nbsp; Of which payable to vendor: ₹<span id="lcPayableTotal">0.00</span></div>
                 <div class="audit-note">Tick "On vendor invoice" for any cost the vendor is actually billing you (e.g. packaging is usually on the invoice; a transporter's freight bill usually isn't). Only the ticked amounts get added to what you owe this vendor — all costs, ticked or not, still count toward the MAC calculation above.</div>
+                <div id="grnGstSummary" style="font-weight:bold; margin:10px 0; color:#7c3aed;">Total GST (Type A/B only): ₹<span id="grnGstTotal">0.00</span> &nbsp;|&nbsp; Estimated Vendor Payable (incl. GST + payable landed costs): ₹<span id="grnVendorPayablePreview">0.00</span></div>
+                <div class="audit-note">For Type A/B purchases, GST is added to what you owe the vendor, to the ledger, AND is folded into the MAC/cost below (your business treats purchase-side GST as a real cost). The exact GST% and amount are still saved on every line item separately, so you always have the input GST figure on record for your own filing. For Type C (All-Inclusive), GST is already inside the price you typed, so nothing is added twice.</div>
                 <table id="macPreviewTable" style="display:none;">
                     <thead><tr><th>Product</th><th>GRN Rate (₹)</th><th>Calculated MAC (₹)</th><th>Final MAC (₹, editable)</th></tr></thead>
                     <tbody id="macPreviewBody"></tbody>
@@ -826,17 +828,28 @@
                 const id = row.id.split('-')[1];
                 const mrpLabel = document.getElementById(`gMrpLabel-${id}`);
                 const discGroup = document.getElementById(`gDiscGroup-${id}`);
+                const gstGroup = document.getElementById(`gGstGroup-${id}`);
+                const gstInput = document.getElementById(`gGst-${id}`);
                 if(type === 'type_a') {
                     mrpLabel.innerText = 'MRP (₹)';
                     discGroup.style.display = '';
+                    gstGroup.style.display = '';
+                    gstInput.disabled = false;
                 } else if(type === 'type_b') {
                     mrpLabel.innerText = 'Net Rate (₹)';
                     discGroup.style.display = 'none';
                     document.getElementById(`gDisc-${id}`).value = 0;
+                    gstGroup.style.display = '';
+                    gstInput.disabled = false;
                 } else {
                     mrpLabel.innerText = 'All-Incl Price (₹)';
                     discGroup.style.display = 'none';
                     document.getElementById(`gDisc-${id}`).value = 0;
+                    // Type C is All-Inclusive / No ITC — GST is already inside the price you typed,
+                    // so the field is hidden here rather than asking for it twice.
+                    gstGroup.style.display = 'none';
+                    gstInput.value = 0;
+                    gstInput.disabled = true;
                 }
                 calcGrnRow(id);
             });
@@ -876,6 +889,7 @@
                     <div><label>Qty</label><input type="number" id="gQty-${id}" class="form-control" value="1" min="1" oninput="calcGrnRow(${id})"></div>
                     <div><label id="gMrpLabel-${id}">MRP (₹)</label><input type="number" id="gMrp-${id}" class="form-control mrp-field" oninput="calcGrnRow(${id})"></div>
                     <div id="gDiscGroup-${id}"><label>Trade Disc %</label><input type="number" id="gDisc-${id}" class="form-control" value="0" oninput="calcGrnRow(${id})"></div>
+                    <div id="gGstGroup-${id}"><label>GST %</label><input type="number" id="gGst-${id}" class="form-control" placeholder="e.g. 18" oninput="calcGrnRow(${id})"></div>
                     <div><label>Cost (₹)</label><input type="number" id="gCost-${id}" class="form-control" readonly></div>
                     <div><label>Retail (₹)</label><input type="number" id="gRet-${id}" class="form-control"></div>
                     <div style="grid-column: span 2;"><label>Barcode</label><div style="display:flex;gap:5px;"><input type="text" id="gBar-${id}" class="form-control"><button class="btn btn-info" onclick="scanBarcode('gBar-${id}')">📷</button></div></div>
@@ -898,7 +912,7 @@
             let res = globalCatalogCache.filter(p => (p.item_name+' '+(p.brand||'')).toLowerCase().includes(val)).slice(0, 10);
             list.innerHTML = '';
             res.forEach(p => {
-                list.innerHTML += `<div class="autocomplete-item" onmousedown="selectGrnProduct(${id}, '${p.id}', '${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.trade_discount_percent||0}, ${p.retail_price||p.default_price||0}, ${p.current_stock||0}, ${p.mac||0}, ${p.track_stock})">
+                list.innerHTML += `<div class="autocomplete-item" onmousedown="selectGrnProduct(${id}, '${p.id}', '${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.trade_discount_percent||0}, ${p.retail_price||p.default_price||0}, ${p.current_stock||0}, ${p.mac||0}, ${p.track_stock}, ${(p.gst_percent!=null && !isNaN(parseFloat(p.gst_percent)))?parseFloat(p.gst_percent):'null'})">
                     ${p.item_name} <span style="color:#888;">${p.brand||''}</span> (MRP: ₹${p.mrp||0})
                 </div>`;
             });
@@ -906,7 +920,7 @@
             list.style.display = 'block';
         }
 
-        function selectGrnProduct(id, pid, name, brand, mrp, disc, ret, stock, mac, track) {
+        function selectGrnProduct(id, pid, name, brand, mrp, disc, ret, stock, mac, track, gst) {
             document.getElementById(`gProd-${id}`).value = name;
             document.getElementById(`gBrand-${id}`).value = brand;
             document.getElementById(`gMrp-${id}`).value = mrp;
@@ -916,6 +930,9 @@
             document.getElementById(`gStock-${id}`).value = stock;
             document.getElementById(`gMac-${id}`).value = mac;
             document.getElementById(`gTrack-${id}`).value = track;
+            // Pre-fill GST% from this product's last-saved rate (if any) — still editable per line,
+            // since the vendor's rate on THIS invoice is what actually matters for the ledger.
+            document.getElementById(`gGst-${id}`).value = (gst !== null && gst !== undefined) ? gst : '';
             document.getElementById(`gAuto-${id}`).style.display = 'none';
             calcGrnRow(id);
         }
@@ -927,6 +944,7 @@
             document.getElementById(`gTrack-${id}`).value = 'true';
             document.getElementById(`gStock-${id}`).value = '0';
             document.getElementById(`gMac-${id}`).value = '0';
+            document.getElementById(`gGst-${id}`).value = '';
         }
 
         function calcGrnRow(id) {
@@ -967,6 +985,27 @@
             document.getElementById('lcPct').innerText = pct.toFixed(2);
             document.getElementById('lcPayableTotal').innerText = payableLc.toFixed(2);
 
+            // GST is owed to the vendor and goes into the ledger AND into MAC/cost for Type A/B —
+            // per your business's GST handling, purchase-side GST is treated as a real cost here
+            // (this shop does not net it against a matching output-GST sale at MAC-calc time; input
+            // GST is still tracked separately per line for your own records/filing). Type C has GST
+            // baked into the price already, so its rows are forced to 0% above and contribute
+            // nothing extra here — it's already inside "cost".
+            const invType = document.getElementById('grnInvoiceType').value;
+            let gstTotal = 0;
+            if(invType !== 'type_c') {
+                document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                    const rid = row.id.split('-')[1];
+                    const rQty = parseFloat(document.getElementById(`gQty-${rid}`).value)||0;
+                    const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
+                    const rGstEl = document.getElementById(`gGst-${rid}`);
+                    const rGst = rGstEl ? (parseFloat(rGstEl.value)||0) : 0;
+                    gstTotal += rQty * rCost * (rGst/100);
+                });
+            }
+            document.getElementById('grnGstTotal').innerText = gstTotal.toFixed(2);
+            document.getElementById('grnVendorPayablePreview').innerText = (subtotal + payableLc + gstTotal).toFixed(2);
+
             const rows = document.querySelectorAll('[id^="grnRow-"]');
             const tbl = document.getElementById('macPreviewTable');
             const body = document.getElementById('macPreviewBody');
@@ -977,7 +1016,10 @@
                 const id = row.id.split('-')[1];
                 const name = document.getElementById(`gProd-${id}`).value || '(unnamed)';
                 const cost = parseFloat(document.getElementById(`gCost-${id}`).value)||0;
-                const calcMac = cost * (1 + pct/100);
+                const rGstEl2 = document.getElementById(`gGst-${id}`);
+                const rGst2 = rGstEl2 ? (parseFloat(rGstEl2.value)||0) : 0;
+                const costInclGst = cost * (1 + rGst2/100);
+                const calcMac = costInclGst * (1 + pct/100);
                 const overrideVal = finalMacOverrides.hasOwnProperty(id) ? finalMacOverrides[id] : calcMac.toFixed(2);
                 body.insertAdjacentHTML('beforeend', `<tr>
                     <td>${name}</td>
@@ -1018,6 +1060,21 @@
             const lotCode = buildLotCode() || `vendor-${Date.now()}`;
             lastLotCode = lotCode;
 
+            // Type A / Type B are ITC-claimable — GST must be recorded so the vendor ledger is
+            // accurate. Rather than silently treating a blank field as 0% (which would quietly
+            // under-record what you owe the vendor), require it to be explicitly set — 0% is a
+            // valid, real GST slab (exempt items), so that's always an honest choice to make.
+            if(invoiceType !== 'type_c') {
+                for(const row of document.querySelectorAll('[id^="grnRow-"]')) {
+                    const rid = row.id.split('-')[1];
+                    const gEl = document.getElementById(`gGst-${rid}`);
+                    if(gEl && gEl.value.trim() === '') {
+                        const pname = document.getElementById(`gProd-${rid}`).value || '(unnamed row)';
+                        return alert(`Please set GST % for "${pname}" (enter 0 if this item is GST-exempt).`);
+                    }
+                }
+            }
+
             const lcVals = {
                 packaging: parseFloat(document.getElementById('lcPackaging').value)||0,
                 freight_hamali: parseFloat(document.getElementById('lcFreight').value)||0,
@@ -1032,12 +1089,27 @@
                      + (document.getElementById('lcFreightPayable').checked ? lcVals.freight_hamali : 0)
                      + (document.getElementById('lcLabelsPayable').checked ? lcVals.labels : 0)
                      + (document.getElementById('lcOtherPayable').checked ? lcVals.other : 0);
-            const vendorPayable = subtotal + payableLc; // damage_shortfall never included — never payable to vendor
+
+            // GST for Type A/B: owed to the vendor (added to vendorPayable + ledger) but kept OUT
+            // of MAC/cost — it's a claimable Input Tax Credit, not a real cost of the goods. For
+            // Type C the price already includes GST, so every row's GST% is forced to 0 above and
+            // this naturally comes out to 0.
+            let totalGst = 0;
+            document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                const rid = row.id.split('-')[1];
+                const rQty = parseInt(document.getElementById(`gQty-${rid}`).value)||0;
+                const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
+                const rGst = parseFloat(document.getElementById(`gGst-${rid}`).value)||0;
+                totalGst += rQty * rCost * (rGst/100);
+            });
+
+            const vendorPayable = subtotal + payableLc + totalGst; // damage_shortfall never included — never payable to vendor
 
             const { data: inv, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
                 vendor_id: pId, invoice_number: invoiceNo, invoice_date: invDate, total_bill_amount: vendorPayable,
                 status: 'Completed', recorded_by: sessionRole, invoice_type: invoiceType, warehouse_type: wh,
                 landed_cost_total: lcTotal, landed_cost_pct: landedPct, grand_total: grandTotal, lot_code: lotCode,
+                total_gst: totalGst,
                 invoice_photo_url: document.getElementById('grnInvoicePhotoUrl').value || null,
                 confirmed_by: sessionRole, confirmed_at: new Date().toISOString()
             }).select().single();
@@ -1056,8 +1128,14 @@
                 const ret = parseFloat(document.getElementById(`gRet-${id}`).value)||0;
                 const bar = document.getElementById(`gBar-${id}`).value;
                 const track = document.getElementById(`gTrack-${id}`).value !== 'false';
+                const gstPct = parseFloat(document.getElementById(`gGst-${id}`).value)||0;
+                const gstAmt = qty * cost * (gstPct/100);
 
-                const calcMac = cost * (1 + landedPct/100);
+                // MAC includes GST for every invoice type — Type A/B fold in this line's own GST%
+                // before applying the landed-cost %; Type C's GST% is always 0 here since it's
+                // already inside "cost", so this is a no-op for Type C (no double-counting).
+                const costInclGst = cost * (1 + gstPct/100);
+                const calcMac = costInclGst * (1 + landedPct/100);
                 const finalMacInput = document.getElementById(`gFinalMac-${id}`);
                 const finalMac = finalMacInput ? (parseFloat(finalMacInput.value)||calcMac) : calcMac;
                 const macEdited = Math.abs(finalMac - calcMac) > 0.005;
@@ -1065,7 +1143,7 @@
                 if(pid === 'NEW') {
                     const {data:np} = await supabaseClient.from('product_master').insert({
                         item_name: name, brand: brand, scope: 'generic', track_stock: track, catalog_status: 'live',
-                        mrp: mrp, cost_price: cost, trade_discount_percent: disc, retail_price: ret, current_stock: 0, barcode_id: bar, warehouse_type: wh
+                        mrp: mrp, cost_price: cost, trade_discount_percent: disc, retail_price: ret, current_stock: 0, barcode_id: bar, warehouse_type: wh, gst_percent: gstPct
                     }).select().single();
                     pid = np.id;
                 }
@@ -1077,13 +1155,13 @@
                     purchase_invoice_id: inv.id, product_master_id: pid, item_name: name, brand: brand,
                     qty: qty, unit_cost: cost, total_cost: qty*cost, mrp: mrp, trade_discount_percent: disc, retail_price_set: ret, barcode_id: bar, warehouse_type: wh,
                     calculated_mac: calcMac, final_mac: finalMac, mac_edited: macEdited, mac_edited_by: macEdited ? sessionRole : null,
-                    old_stock: oStock, old_mac: oMac, lot_code: lotCode
+                    old_stock: oStock, old_mac: oMac, lot_code: lotCode, gst_percent: gstPct, gst_amount: gstAmt
                 });
 
                 if(track && pid !== 'NEW') {
                     const nMac = ((oStock*oMac) + (qty*finalMac)) / (oStock+qty);
                     await supabaseClient.from('product_master').update({
-                        current_stock: oStock+qty, mac: nMac, mrp: mrp, cost_price: cost, retail_price: ret, barcode_id: bar||null
+                        current_stock: oStock+qty, mac: nMac, mrp: mrp, cost_price: cost, retail_price: ret, barcode_id: bar||null, gst_percent: gstPct
                     }).eq('id', pid);
                 }
             }
