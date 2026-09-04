@@ -64,6 +64,10 @@
         </div>
     </div>
 
+    <div id="aiScanStatusBar" style="display:none; position:sticky; top:48px; z-index:99; background:var(--purple); color:white; padding:8px 15px; font-size:0.85rem; text-align:center;">
+        🤖 Communicating with AI to read the invoice… <span id="aiScanElapsed">0s</span> elapsed. You can switch between this page's own tabs (GRN, Ledger, History...) while this finishes — just don't tap Home/Back or refresh, or the scan will be lost.
+    </div>
+
     <div class="wrapper">
         <h2>Purchase Manager</h2>
 
@@ -83,8 +87,10 @@
                 <button class="btn btn-info" style="margin-top:8px;" onclick="document.getElementById('grnFileInput').click()">📁 Upload PDF / Image</button>
                 <input type="file" id="grnCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleInvoiceFile(this.files[0])">
                 <input type="file" id="grnFileInput" accept="image/*,.pdf" style="display:none" onchange="handleInvoiceFile(this.files[0])">
+                <button class="btn btn-info" id="btnRescan" style="display:none; margin-top:8px;" onclick="scanInvoiceWithAI(lastCapturedFile)">🔄 Re-scan with AI</button>
                 <span id="grnPhotoStatus" style="font-size:0.8rem;color:#888;margin-left:10px;"></span>
                 <input type="hidden" id="grnInvoicePhotoUrl">
+                <div class="audit-note">Re-scan reuses the same photo already saved — it does not upload a new copy, so you can retry as many times as needed without filling up storage.</div>
             </div>
 
             <div style="display:flex; gap:15px; flex-wrap:wrap;">
@@ -281,7 +287,8 @@
             <p class="audit-note">✓ / ✗ shows what matched automatically. Nothing is saved to the database yet — check this carefully, especially any "✗ new product" line, then either apply it to the form below and correct it there, or discard and fill manually.</p>
             <table style="font-size:0.8rem;">
                 <tbody>
-                    <tr><th>Vendor</th><td id="srVendor"></td></tr>
+                    <tr><th>Vendor (as read)</th><td id="srVendor"></td></tr>
+                    <tr><th>Select Vendor</th><td><select id="srVendorSelect" class="form-control" onchange="handleSrVendorSelectChange()"></select></td></tr>
                     <tr><th>GSTIN</th><td id="srGstin"></td></tr>
                     <tr><th>Invoice #</th><td id="srInvNo"></td></tr>
                     <tr><th>Invoice Date</th><td id="srInvDate"></td></tr>
@@ -318,6 +325,8 @@
         const SCAN_FN_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co/functions/v1/hyper-worker";
         const APP_SHARED_SECRET = "shagunprabhgunavinashmunna.20111986";
         let lastScanResult = null;
+        let lastCapturedFile = null; // kept in memory so "Re-scan" can retry without re-uploading
+        let scanTimerInterval = null;
 
         const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
         let globalCatalogCache = [];
@@ -370,6 +379,15 @@
 
         function openPartyModal() { document.getElementById('modalParty').style.display='flex'; }
 
+        // Used when "+ Create New Vendor (from scan)" is chosen on the AI scan review screen —
+        // pre-fills the SAME create-party form/flow as the regular "+ Create New Party" link,
+        // just with whatever the AI read, so staff review/correct instead of retyping from scratch.
+        function openPartyModalPrefilled(name, gstin) {
+            document.getElementById('nPName').value = (name || '').toUpperCase();
+            document.getElementById('nPGst').value = gstin || '';
+            document.getElementById('modalParty').style.display = 'flex';
+        }
+
         async function saveNewParty() {
             const payload = {
                 party_name: document.getElementById('nPName').value.trim().toUpperCase(),
@@ -401,6 +419,11 @@
             document.getElementById('modalParty').style.display='none';
             await fetchParties();
             selectGrnVendor(pId);
+            // If this was created from the AI scan review screen, reflect the new vendor there too.
+            const srSel = document.getElementById('srVendorSelect');
+            if(srSel && document.getElementById('modalScanReview').style.display === 'flex') {
+                populateSrVendorSelect(pId);
+            }
         }
 
         // ===== FEATURE A: vendor alias search =====
@@ -465,11 +488,12 @@
 
         async function handleInvoiceFile(file) {
             if(!file) return;
+            lastCapturedFile = file; // kept for "Re-scan" — the AI call never needs a re-upload after this
             document.getElementById('grnPhotoStatus').innerText = 'Uploading...';
             const url = await uploadToStorage(file, 'invoices');
             if(!url) { document.getElementById('grnPhotoStatus').innerText = ''; return; }
             document.getElementById('grnInvoicePhotoUrl').value = url;
-            document.getElementById('grnPhotoStatus').innerText = 'Photo attached ✓ — reading with AI...';
+            document.getElementById('btnRescan').style.display = 'inline-block';
             await scanInvoiceWithAI(file);
         }
 
@@ -482,12 +506,64 @@
             });
         }
 
+        // Shrinks a copy of the photo before sending it to the AI (speeds up the upload + read
+        // considerably on mobile data — a full-resolution phone photo is often 3-4MB and doesn't
+        // help text reading). The ORIGINAL full-quality file is still what's saved to storage in
+        // handleInvoiceFile/uploadToStorage — this resized copy is only used for the AI call.
+        function resizeImageForAI(file) {
+            return new Promise((resolve) => {
+                if(!file.type || !file.type.startsWith('image/')) { resolve(file); return; } // leave PDFs untouched
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const MAX_DIM = 1600;
+                        let { width, height } = img;
+                        if(width <= MAX_DIM && height <= MAX_DIM) { resolve(file); return; }
+                        const scale = MAX_DIM / Math.max(width, height);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(width * scale);
+                        canvas.height = Math.round(height * scale);
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        canvas.toBlob((blob) => {
+                            resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file);
+                        }, 'image/jpeg', 0.8);
+                    };
+                    img.onerror = () => resolve(file);
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve(file);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function startScanTimer() {
+            const bar = document.getElementById('aiScanStatusBar');
+            const elapsedEl = document.getElementById('aiScanElapsed');
+            let seconds = 0;
+            elapsedEl.innerText = '0s';
+            bar.style.display = 'block';
+            scanTimerInterval = setInterval(() => {
+                seconds++;
+                elapsedEl.innerText = seconds + 's';
+            }, 1000);
+        }
+
+        function stopScanTimer() {
+            clearInterval(scanTimerInterval);
+            document.getElementById('aiScanStatusBar').style.display = 'none';
+        }
+
         // ===== FEATURE B: AI invoice scanning (calls the scan-invoice Edge Function) =====
         async function scanInvoiceWithAI(file) {
+            if(!file) { alert('No photo available to (re-)scan — take or upload one first.'); return; }
             const statusEl = document.getElementById('grnPhotoStatus');
+            statusEl.innerText = 'Reading with AI...';
+            startScanTimer();
             try {
-                const base64Data = await fileToBase64(file);
-                const mediaType = file.type || 'image/jpeg';
+                const scanFile = await resizeImageForAI(file);
+                const base64Data = await fileToBase64(scanFile);
+                const mediaType = scanFile.type || 'image/jpeg';
 
                 const res = await fetch(SCAN_FN_URL, {
                     method: 'POST',
@@ -500,8 +576,8 @@
                 try { parsed = JSON.parse(raw); } catch(e) { parsed = null; }
 
                 if(!res.ok || !parsed || parsed.error) {
-                    statusEl.innerText = 'Photo attached ✓ (AI read failed — fill manually)';
-                    alert('AI could not read this invoice: ' + (parsed?.error || raw || 'Unknown error') + '\n\nThe photo is still saved — you can fill the form manually, same as if scanning were off.');
+                    statusEl.innerText = 'Photo attached ✓ (AI read failed — fill manually, or Re-scan)';
+                    alert('AI could not read this invoice: ' + (parsed?.error || raw || 'Unknown error') + '\n\nThe photo is still saved — you can fill the form manually, or try Re-scan.');
                     return;
                 }
 
@@ -509,9 +585,11 @@
                 lastScanResult = parsed;
                 openScanReviewModal(parsed);
             } catch(e) {
-                statusEl.innerText = 'Photo attached ✓ (AI read failed — fill manually)';
+                statusEl.innerText = 'Photo attached ✓ (AI read failed — fill manually, or Re-scan)';
                 console.error(e);
-                alert('Could not reach the AI scan service. The photo is still saved — fill the form manually. (' + e.message + ')');
+                alert('Could not reach the AI scan service. The photo is still saved — fill the form manually, or try Re-scan. (' + e.message + ')');
+            } finally {
+                stopScanTimer();
             }
         }
 
@@ -533,9 +611,32 @@
             return globalCatalogCache.find(p => d.includes(p.item_name.toLowerCase()) || p.item_name.toLowerCase().includes(d));
         }
 
+        // Populates the vendor dropdown on the scan review screen with every real vendor
+        // (so a misspelled/misread OCR name can't create a duplicate — staff picks the real
+        // one), plus a "+ Create New Vendor" option at the end for genuinely new vendors.
+        function populateSrVendorSelect(selectedId) {
+            const sel = document.getElementById('srVendorSelect');
+            let opts = '<option value="">-- Not yet selected --</option>';
+            partiesCache.forEach(p => {
+                const label = p.trading_name ? `${p.trading_name} — ${p.party_name}` : p.party_name;
+                opts += `<option value="${p.id}">${label}</option>`;
+            });
+            opts += '<option value="__CREATE_NEW__">+ Create New Vendor (from scan)</option>';
+            sel.innerHTML = opts;
+            sel.value = selectedId || '';
+        }
+
+        function handleSrVendorSelectChange() {
+            const sel = document.getElementById('srVendorSelect');
+            if(sel.value === '__CREATE_NEW__') {
+                openPartyModalPrefilled(lastScanResult?.vendor_name, lastScanResult?.gstin);
+            }
+        }
+
         function openScanReviewModal(parsed) {
             const matchedParty = fuzzyFindParty(parsed.vendor_name, parsed.gstin);
-            document.getElementById('srVendor').innerText = (parsed.vendor_name || '(not read)') + (matchedParty ? ` — ✓ matched to ${matchedParty.party_name}` : ' — ✗ no vendor match, select manually after applying');
+            document.getElementById('srVendor').innerText = parsed.vendor_name || '(not read)';
+            populateSrVendorSelect(matchedParty ? matchedParty.id : '');
             document.getElementById('srGstin').innerText = parsed.gstin || '(not read)';
             document.getElementById('srInvNo').innerText = parsed.invoice_no || '(not read)';
             document.getElementById('srInvDate').innerText = parsed.invoice_date || '(not read)';
@@ -561,8 +662,12 @@
             const parsed = lastScanResult;
             if(!parsed) return;
 
-            const matchedParty = fuzzyFindParty(parsed.vendor_name, parsed.gstin);
-            if(matchedParty) selectGrnVendor(matchedParty.id);
+            const vendorSelectVal = document.getElementById('srVendorSelect').value;
+            if(!vendorSelectVal || vendorSelectVal === '__CREATE_NEW__') {
+                alert('Please select a vendor from the list (or use "+ Create New Vendor") before applying.');
+                return;
+            }
+            selectGrnVendor(vendorSelectVal);
 
             if(parsed.invoice_no) document.getElementById('grnInvoiceNo').value = parsed.invoice_no;
             if(parsed.invoice_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.invoice_date)) document.getElementById('grnDate').value = parsed.invoice_date;
