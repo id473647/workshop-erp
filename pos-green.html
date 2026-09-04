@@ -111,6 +111,9 @@
             body.print-ping-mode * { visibility: hidden; }
             body.print-ping-mode #renderPingReceiptTarget, body.print-ping-mode #renderPingReceiptTarget * { visibility: visible; }
             body.print-ping-mode #renderPingReceiptTarget { position: absolute; left: 0; top: 0; border: none; margin: 0; }
+            body.print-pos-taxinvoice * { visibility: hidden; }
+            body.print-pos-taxinvoice #renderTaxInvoiceTarget, body.print-pos-taxinvoice #renderTaxInvoiceTarget * { visibility: visible; }
+            body.print-pos-taxinvoice #renderTaxInvoiceTarget { position: absolute; left: 0; top: 0; width: 100%; max-width: 148mm; padding: 8mm; border: none; margin: 0; }
         }
     </style>
 </head>
@@ -146,6 +149,10 @@
                     <span id="accountCategoryDisplay" class="tier-tag" style="display:none;"></span>
                 </div>
                 <div id="terminalTagsWrapper"></div>
+            </div>
+            <div class="field-group">
+                <label>Customer GSTIN (only for B2B trader sales — leave blank for normal retail)</label>
+                <input type="text" id="posCustGstin" placeholder="e.g. 23ABCDE1234F1Z5" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
             </div>
         </div>
         <div id="creditAlertBox" class="credit-alert" onclick="window.open('utility-router.html?crm=' + evaluatedPhoneContext, '_blank')">
@@ -441,6 +448,42 @@
             <div id="posExpiryWarning" style="display:none;font-size:0.7rem;color:#b45309;font-weight:700;text-align:center;margin-top:6px;padding:4px;background:#fef3c7;border-radius:4px;"></div>
             <div class="receipt-footer">Computer Generated Document.<br>Thank You for shopping with us!</div>
         </div>
+        <div id="renderTaxInvoiceTarget" class="receipt-container a5-mode" style="display:none;">
+            <div class="receipt-header">
+                <div class="receipt-logo-container">
+                    <img src="logo-main.jpg" onerror="this.style.display='none'">
+                    <img src="logo-green.png" onerror="this.style.display='none'">
+                </div>
+                <div id="tiShopName" class="receipt-shop-title">Green Scooter Center</div>
+                <div class="receipt-meta">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</div>
+                <div class="receipt-meta">GSTIN: <strong id="tiOwnGstin">--</strong></div>
+            </div>
+            <div style="text-align:center;font-weight:800;font-size:0.9rem;letter-spacing:1px;border:1px solid black;padding:3px;margin:6px 0;">TAX INVOICE</div>
+            <div class="receipt-meta" style="display:flex;justify-content:space-between;">
+                <div>Invoice: <strong id="tiBillNo">--</strong></div><div>Date: <span id="tiDate">--</span></div>
+            </div>
+            <div class="receipt-divider"></div>
+            <div class="receipt-meta">Buyer: <strong id="tiCustName">--</strong></div>
+            <div class="receipt-meta">Mobile: <span id="tiCustMobile">--</span></div>
+            <div class="receipt-meta">Buyer GSTIN: <strong id="tiCustGstin">--</strong></div>
+            <div class="receipt-divider"></div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.68rem;margin:4px 0;">
+                <thead><tr style="border-bottom:1px solid black;">
+                    <th style="text-align:left;padding:2px;">Item</th><th style="text-align:right;padding:2px;">Qty</th>
+                    <th style="text-align:right;padding:2px;">Taxable (₹)</th><th style="text-align:right;padding:2px;">CGST</th>
+                    <th style="text-align:right;padding:2px;">SGST</th><th style="text-align:right;padding:2px;">Total (₹)</th>
+                </tr></thead>
+                <tbody id="tiItemsBody"></tbody>
+            </table>
+            <div class="receipt-divider"></div>
+            <div class="receipt-meta" style="display:flex;justify-content:space-between;"><span>Total Taxable Value:</span><strong id="tiTaxable">₹0</strong></div>
+            <div class="receipt-meta" style="display:flex;justify-content:space-between;"><span>Total CGST:</span><strong id="tiCgst">₹0</strong></div>
+            <div class="receipt-meta" style="display:flex;justify-content:space-between;"><span>Total SGST:</span><strong id="tiSgst">₹0</strong></div>
+            <div class="receipt-divider"></div>
+            <div class="receipt-meta" style="display:flex;justify-content:space-between;font-size:1rem;font-weight:bold;"><span>GRAND TOTAL:</span><span id="tiGrandTotal">₹0</span></div>
+            <div class="receipt-meta" style="margin-top:4px;font-style:italic;font-size:0.7rem;">Amount in words:<br><strong id="tiWords">--</strong></div>
+            <div class="receipt-footer">This is a computer-generated Tax Invoice.<br>Subject to Ganj Betul jurisdiction.</div>
+        </div>
         <div id="settlementModifierInterface" style="display:none;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;">
             <div style="font-size:0.75rem;font-weight:bold;color:var(--primary);margin-bottom:8px;">📋 OUTSTANDING BALANCE</div>
             <div id="settlementBreakdown"></div>
@@ -456,6 +499,9 @@
             <button class="btn-ui-action" style="background:#0ea5e9;color:white;" onclick="savePosReceiptAsJpg()">📥 JPG</button>
             <button class="btn-ui-action" style="background:#25d366;color:white;" onclick="dispatchWhatsAppImageReceipt()">💬 WA</button>
             <button id="btnEditDraftModal" class="btn-ui-action" style="background:var(--warning);color:white;display:none;" onclick="loadDraftForEditing()">✏️ EDIT</button>
+        </div>
+        <div id="btnTaxInvoiceRow" style="display:none;margin-top:8px;">
+            <button class="btn-ui-action" style="background:#7c3aed;color:white;width:100%;" onclick="executeTaxInvoicePrint()">🧾 PRINT TAX INVOICE (B2B — CGST/SGST)</button>
         </div>
     </div>
 </div>
@@ -839,7 +885,7 @@
         results.forEach(p => {
             const stk = p.track_stock===false?`<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>`:`<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`;
             const mrpTag = p.mrp>0?`<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>`:'';
-            list.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx},'${p.item_name.replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}',${p.mrp||p.default_price||0},${p.default_price||0},'${p.id||''}',${p.mac||0},'${p.category||'Spare'}',${p.volume_per_unit||0})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;align-items:center;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`;
+            list.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx},'${p.item_name.replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}',${p.mrp||p.default_price||0},${p.default_price||0},'${p.id||''}',${p.mac||0},'${p.category||'Spare'}',${p.volume_per_unit||0},${p.gst_percent!=null?p.gst_percent:18})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;align-items:center;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`;
         });
         list.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onmousedown="flagNewItemForReview(${targetIdx},'${inputRef.value.trim().replace(/'/g,"\\'")}')">➕ Add as Unverified</div>`;
         list.style.display = 'block';
@@ -852,7 +898,7 @@
     function checkOtherVolume(sel,idx) { const row=document.querySelector(`.inline-item-row[data-index="${idx}"]`); if(!row)return; row.querySelector('.i-vol-other').style.display=sel.value==='Other'?'block':'none'; }
 
     /* ── CHANGE 5: Cursor focuses Brand field after autocomplete selection ── */
-    function applySelectedCatalogItem(targetIdx, nameStr, brandStr, mrpVal, defaultRate, pid, macVal, category, volPerUnit) {
+    function applySelectedCatalogItem(targetIdx, nameStr, brandStr, mrpVal, defaultRate, pid, macVal, category, volPerUnit, gstPct) {
         const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`); if(!rowNode)return;
         rowNode.querySelector('.i-name').value = nameStr;
         rowNode.querySelector('.i-brand').value = brandStr;
@@ -860,6 +906,9 @@
         rowNode.querySelector('.i-mrp').value = mrpVal;
         const catSel = rowNode.querySelector('.i-cat'); if(catSel) catSel.value = category==='Lube'?'Lube':'Spare';
         rowNode._pid=pid; rowNode._pmac=macVal; rowNode._pmrp=mrpVal; rowNode._pendingItemUnverified=false; rowNode._pendingVolume=volPerUnit;
+        // Used only if this sale turns out to be B2B (customer GSTIN entered) — a proper Tax
+        // Invoice needs each line's own GST% to split its price into Base + CGST + SGST.
+        rowNode._pgst = (gstPct !== undefined && gstPct !== null) ? gstPct : 18;
         const qtyInput = rowNode.querySelector('.i-qty'); qtyInput.placeholder='Pcs'; qtyInput.min='1';
         if(category==='Lube'&&volPerUnit>0){const vs=rowNode.querySelector('.i-vol');if(vs)vs.style.display='none';const vo=rowNode.querySelector('.i-vol-other');if(vo)vo.style.display='none';let tag=rowNode.querySelector('.vol-tag');if(!tag){tag=document.createElement('span');tag.className='vol-tag';tag.style.cssText='font-size:0.7rem;color:var(--info);font-weight:bold;position:absolute;right:10px;top:-15px;';qtyInput.parentElement.style.position='relative';qtyInput.parentElement.appendChild(tag);}tag.innerText=`🧴 Each: ${volPerUnit}ml`;}
         document.getElementById(`autolist-${targetIdx}`).style.display='none';
@@ -994,10 +1043,13 @@
         const mappedName = document.getElementById('terminalName').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE')||'green';
         const cashierId = document.getElementById('posCashierSelect').value||null;
+        // Optional — only filled in for a B2B trader sale. Leaving it blank keeps this a normal
+        // B2C retail sale exactly as before; nothing else about the sale changes either way.
+        const custGstin = (document.getElementById('posCustGstin')?.value || '').trim().toUpperCase() || null;
 
         /* ── If updating existing draft ── */
         if (statusTarget === 'Open' && activeDraftRecordId) {
-            await supabaseClient.from('counter_sales').update({ customer_mobile: evaluatedPhoneContext||null, customer_name: enforceTitleCaseNomenclature(mappedName), total_amount: finalNet, payment_mode: 'Pending', cash_amount: 0, upi_amount: 0, credit_amount: 0, status: 'Open', source_role: activeRole, sold_by_id: cashierId||null }).eq('id', activeDraftRecordId);
+            await supabaseClient.from('counter_sales').update({ customer_mobile: evaluatedPhoneContext||null, customer_name: enforceTitleCaseNomenclature(mappedName), total_amount: finalNet, payment_mode: 'Pending', cash_amount: 0, upi_amount: 0, credit_amount: 0, status: 'Open', source_role: activeRole, sold_by_id: cashierId||null, customer_gstin: custGstin }).eq('id', activeDraftRecordId);
             await supabaseClient.from('counter_sale_items').delete().eq('sale_id', activeDraftRecordId);
             await buildAndInsertItems(activeDraftRecordId); alert('Draft Updated.'); activeDraftRecordId=null; window.location.reload(); return;
         }
@@ -1008,11 +1060,19 @@
             cash_amount: statusTarget==='Closed'?c:0, upi_amount: statusTarget==='Closed'?u:0, credit_amount: statusTarget==='Closed'?cr:0,
             points_used: statusTarget==='Closed'?loyaltyRedeemed:0,
             status: statusTarget, source_role: activeRole, sold_by_id: cashierId||null,
-            closed_at: statusTarget==='Closed'?new Date().toISOString():null
+            closed_at: statusTarget==='Closed'?new Date().toISOString():null,
+            customer_gstin: custGstin
         }).select().single();
         if (error) return alert("Error: " + error.message);
         if (finalRecord) {
-            await buildAndInsertItems(finalRecord.id);
+            const gstTotals = await buildAndInsertItems(finalRecord.id);
+            // A Tax Invoice needs the invoice-level Base/CGST/SGST split saved too, not just per
+            // line — only worth writing when this was actually a B2B sale (GSTIN entered).
+            if (custGstin) {
+                await supabaseClient.from('counter_sales').update({
+                    total_taxable_value: gstTotals.taxable, total_cgst: gstTotals.cgst, total_sgst: gstTotals.sgst
+                }).eq('id', finalRecord.id);
+            }
 
             if (statusTarget === 'Closed') {
                 /* CHANGE 6 removed: no separate credit_payments insert needed for Credit mode —
@@ -1044,6 +1104,9 @@
 
     async function buildAndInsertItems(saleId) {
         const rows = document.querySelectorAll('.inline-item-row'); const promises = [];
+        // Totalled here regardless of whether this turns out to be a B2B sale — cheap to compute,
+        // and only actually used (for the Tax Invoice) when a Customer GSTIN was entered.
+        let gstTotals = { taxable: 0, cgst: 0, sgst: 0 };
         for (const row of rows) {
             const rawSpec = row.querySelector('.i-name').value.trim();
             const rawBrand = row.querySelector('.i-brand').value.trim()||'STANDARD';
@@ -1057,14 +1120,23 @@
             if (rawSpec && r > 0) {
                 const clean = enforceTitleCaseNomenclature(rawSpec); const brand = rawBrand.toUpperCase();
                 const rawTotal = q*r; const net = rawTotal-(rawTotal*(d/100));
+                // net is GST-INCLUSIVE (this is what the customer actually pays for this line).
+                // Extract the base/CGST/SGST from it — same "reverse from inclusive price" math
+                // used for every B2B tax invoice: Base = Total / (1 + GST%/100).
+                const gstPct = (row._pgst!=null) ? row._pgst : 18;
+                const lineTaxable = net / (1 + gstPct/100);
+                const lineGstAmt = net - lineTaxable;
+                const lineCgst = lineGstAmt/2, lineSgst = lineGstAmt/2;
+                gstTotals.taxable += lineTaxable; gstTotals.cgst += lineCgst; gstTotals.sgst += lineSgst;
                 if (row._pendingItemUnverified) { const ud={item_name:clean,brand,warehouse_type:'Green',default_price:r,mrp,catalog_status:'unverified',category:typeVal}; if(isLube&&volumeML>0)ud.volume_per_unit=volumeML; await supabaseClient.from('product_master').upsert(ud,{onConflict:'item_name,brand',ignoreDuplicates:false}); }
                 else { supabaseClient.from('product_master').upsert({item_name:clean,brand,warehouse_type:'Green',default_price:r,category:typeVal},{onConflict:'item_name,brand'}).then(); }
-                promises.push(supabaseClient.from('counter_sale_items').insert({ sale_id:saleId, item_name:`${clean} (${brand})`, qty:q, unit_price:r, total_price:net, mrp_at_billing:mrp, mac_at_billing:row._pmac||0, product_master_id:row._pid||null, unit_metric:isLube?'ML':'Pcs', volume_ml:isLube?volumeML:null }));
+                promises.push(supabaseClient.from('counter_sale_items').insert({ sale_id:saleId, item_name:`${clean} (${brand})`, qty:q, unit_price:r, total_price:net, mrp_at_billing:mrp, mac_at_billing:row._pmac||0, product_master_id:row._pid||null, unit_metric:isLube?'ML':'Pcs', volume_ml:isLube?volumeML:null, gst_percent:gstPct, taxable_value:lineTaxable, cgst_amount:lineCgst, sgst_amount:lineSgst }));
             }
         }
         const results = await Promise.allSettled(promises);
         const failed = results.filter(r => r.status==='rejected');
         if (failed.length > 0) alert(`${failed.length} item(s) failed to save. Please contact admin.`);
+        return gstTotals;
     }
 
     /* ══════════════════════════════════════════════════
@@ -1143,6 +1215,25 @@
                 if(cred>0){document.getElementById('thCreditLine').style.display='flex';document.getElementById('thCreditAmt').innerText=`₹${cred}`;}else{document.getElementById('thCreditLine').style.display='none';}
             } else { bd.style.display='none'; }
             document.getElementById('btnEditDraftModal').style.display = record.status==='Open'?'block':'none';
+            // Tax Invoice (B2B) — only relevant when a Customer GSTIN was entered on this sale.
+            if (record.customer_gstin) {
+                document.getElementById('btnTaxInvoiceRow').style.display = 'block';
+                document.getElementById('tiShopName').innerText = isWsSrc?'My Care Service Center':'Green Scooter Center';
+                document.getElementById('tiOwnGstin').innerText = isWsSrc?'23ANAPB4613K1ZJ':'23BCVPB4126J1ZM';
+                document.getElementById('tiBillNo').innerText = `POS-${record.id.split('-')[0].toUpperCase()}`;
+                document.getElementById('tiDate').innerText = ds.toLocaleDateString('en-IN');
+                document.getElementById('tiCustName').innerText = record.customer_name || 'Walk-in';
+                document.getElementById('tiCustMobile').innerText = record.customer_mobile || '--';
+                document.getElementById('tiCustGstin').innerText = record.customer_gstin;
+                const tax = parseFloat(record.total_taxable_value)||0, cg = parseFloat(record.total_cgst)||0, sg = parseFloat(record.total_sgst)||0;
+                document.getElementById('tiTaxable').innerText = `₹${tax.toFixed(2)}`;
+                document.getElementById('tiCgst').innerText = `₹${cg.toFixed(2)}`;
+                document.getElementById('tiSgst').innerText = `₹${sg.toFixed(2)}`;
+                document.getElementById('tiGrandTotal').innerText = `₹${record.total_amount}`;
+                document.getElementById('tiWords').innerText = convertNumberToWords(record.total_amount);
+            } else {
+                document.getElementById('btnTaxInvoiceRow').style.display = 'none';
+            }
             await refreshInspectionLineItems();
             /* Show settle interface only if bill has genuine remaining credit — checked inside setupSettleInterface */
             await setupSettleInterface(record);
@@ -1159,9 +1250,20 @@
     async function refreshInspectionLineItems() {
         const { data: lines } = await supabaseClient.from('counter_sale_items').select('*').eq('sale_id', targetInspectionRecordId);
         const container = document.getElementById('thStackedItemsContainer'); container.innerHTML='';
+        const tiBody = document.getElementById('tiItemsBody'); if(tiBody) tiBody.innerHTML='';
         let gross=0; let totalMrp=0; let totalAct=0;
         if(lines&&lines.length>0) {
             lines.forEach(line => {
+                if (tiBody) {
+                    let tName=line.item_name||'Item';
+                    tiBody.innerHTML += `<tr style="border-bottom:1px dotted #ccc;">
+                        <td style="padding:2px;">${tName}</td><td style="text-align:right;padding:2px;">${line.qty}</td>
+                        <td style="text-align:right;padding:2px;">${(parseFloat(line.taxable_value)||0).toFixed(2)}</td>
+                        <td style="text-align:right;padding:2px;">${(parseFloat(line.cgst_amount)||0).toFixed(2)}</td>
+                        <td style="text-align:right;padding:2px;">${(parseFloat(line.sgst_amount)||0).toFixed(2)}</td>
+                        <td style="text-align:right;padding:2px;">${(parseFloat(line.total_price)||0).toFixed(2)}</td>
+                    </tr>`;
+                }
                 const tp=parseFloat(line.total_price)||0; gross+=tp;
                 const mrpSnap=parseFloat(line.mrp_at_billing)||0;
                 if(mrpSnap>0)totalMrp+=mrpSnap*(parseFloat(line.qty)||1); totalAct+=tp;
@@ -1480,6 +1582,7 @@
     function closeInspectionModal() { document.getElementById('modalInspectInvoice').style.display='none'; if(posCheckoutCompleted)window.location.reload(); }
     function triggerPosPrintSelection() { document.getElementById('modalPosPrintChoice').style.display='flex'; }
     function executePosReceipt(mode) { document.getElementById('modalPosPrintChoice').style.display='none'; document.body.className=''; document.body.classList.add('print-pos-receipt'); const c=document.getElementById('renderThermalReceiptTarget'); if(mode==='a5')c.classList.add('a5-mode');else c.classList.remove('a5-mode'); setTimeout(()=>{window.print();document.body.className='';c.classList.remove('a5-mode');},200); }
+    function executeTaxInvoicePrint() { document.body.className=''; document.body.classList.add('print-pos-taxinvoice'); setTimeout(()=>{window.print();document.body.className='';},200); }
     function savePosReceiptAsJpg() { const t=document.getElementById('renderThermalReceiptTarget'); const ob=t.style.border; t.style.border='none'; html2canvas(t,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(canvas=>{t.style.border=ob;canvas.toBlob(blob=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`Invoice_POS_${(targetInspectionRecordId||'X').split('-')[0].toUpperCase()}.jpg`;a.click();URL.revokeObjectURL(u);},'image/jpeg',0.95);}); }
     function dispatchWhatsAppImageReceipt() { const t=document.getElementById('renderThermalReceiptTarget'); const ob=t.style.border; t.style.border='none'; html2canvas(t,{scale:2,useCORS:true,backgroundColor:'#ffffff'}).then(canvas=>{t.style.border=ob;canvas.toBlob(blob=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=`Receipt_${targetInspectionRecordId?.split('-')[0]?.toUpperCase()}.jpg`;a.click();URL.revokeObjectURL(u);},'image/jpeg',0.95);}); }
     /* printPaymentReceipt: renamed from printPingReceipt — handles all paper trail receipts */
@@ -1499,7 +1602,7 @@
             row.querySelector('.i-qty').value=item.qty; row.querySelector('.i-rate').value=item.unit_price; row.querySelector('.i-mrp').value=item.mrp_at_billing||item.unit_price;
             const isLubeRow=item.volume_ml>0||item.unit_metric==='ML'; row.querySelector('.i-cat').value=isLubeRow?'Lube':'Spare';
             if(isLubeRow&&item.volume_ml>0){row._pendingVolume=item.volume_ml;toggleVolumeDropdown(row.querySelector('.i-cat'),rowSequenceIndex-1);}
-            row._pid=item.product_master_id;
+            row._pid=item.product_master_id; row._pgst=item.gst_percent!=null?item.gst_percent:18;
         });
         compileDynamicInvoicerSums(); transitionFlowPanels('transactionInvoicerFlow');
     }
