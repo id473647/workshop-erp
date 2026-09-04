@@ -611,15 +611,6 @@
             await scanInvoiceWithAI(file);
         }
 
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]); // strip the data: prefix
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-
         // Shrinks a copy of the photo before sending it to the AI (speeds up the upload + read
         // considerably on mobile data — a full-resolution phone photo is often 3-4MB and doesn't
         // help text reading). The ORIGINAL full-quality file is still what's saved to storage in
@@ -670,20 +661,31 @@
         }
 
         // ===== FEATURE B: AI invoice scanning (calls the scan-invoice Edge Function) =====
+        // NOTE: the file is sent as a storageUrl, not as base64 text embedded in the request body.
+        // Supabase Edge Functions get a hard 256MB memory / 2-second CPU budget on every plan
+        // (not raised by upgrading) — parsing a large base64 string inline burns that CPU budget
+        // fast, especially for multi-page invoices, and was producing WORKER_RESOURCE_LIMIT
+        // errors. Fetching a file over the network doesn't count against that CPU budget, so the
+        // function instead downloads the (small, resized) file itself once given its URL.
         async function scanInvoiceWithAI(file) {
             if(!file) { alert('No photo available to (re-)scan — take or upload one first.'); return; }
             const statusEl = document.getElementById('grnPhotoStatus');
             statusEl.innerText = 'Reading with AI...';
             startScanTimer();
+            let tempPath = null;
             try {
                 const scanFile = await resizeImageForAI(file);
-                const base64Data = await fileToBase64(scanFile);
                 const mediaType = scanFile.type || 'image/jpeg';
+                const ext = mediaType === 'application/pdf' ? 'pdf' : 'jpg';
+                tempPath = `ai-temp/${Date.now()}.${ext}`;
+                const { error: tmpUpErr } = await supabaseClient.storage.from('purchase-invoices').upload(tempPath, scanFile);
+                if(tmpUpErr) throw new Error('Could not prepare file for AI: ' + tmpUpErr.message);
+                const { data: pubData } = supabaseClient.storage.from('purchase-invoices').getPublicUrl(tempPath);
 
                 const res = await fetch(SCAN_FN_URL, {
                     method: 'POST',
                     headers: { 'content-type': 'application/json', 'x-app-secret': APP_SHARED_SECRET, 'Authorization': 'Bearer ' + SB_KEY },
-                    body: JSON.stringify({ base64Data, mediaType })
+                    body: JSON.stringify({ storageUrl: pubData.publicUrl, mediaType })
                 });
                 const providerUsed = res.headers.get('x-ai-provider-used') || '';
                 const raw = await res.text();
@@ -705,6 +707,7 @@
                 alert('Could not reach the AI scan service. The photo is still saved — fill the form manually, or try Re-scan. (' + e.message + ')');
             } finally {
                 stopScanTimer();
+                if(tempPath) supabaseClient.storage.from('purchase-invoices').remove([tempPath]).catch(() => {}); // best-effort cleanup, never blocks the user on failure
             }
         }
 
