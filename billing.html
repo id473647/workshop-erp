@@ -162,6 +162,28 @@
             body.print-landscape #multiEntityReceiptTarget { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; width: 148mm; }
             body.print-landscape .me-summary { grid-column: 1 / -1; }
 
+            /* Sub-Phase 11B.46 (5 Sep 2026): A6 auto-print modes — replaces print-landscape above
+               (kept in the CSS only so nothing else that might reference it breaks; no button
+               triggers it any more). print-a6single = one invoice, paginated across true A6
+               portrait sheets (one entity, e.g. Green or My Care alone). print-a6combo = a
+               combined My Care + Moped invoice, paginated into A6-sized zones and laid two per
+               physical A5 sheet turned sideways (landscape), with a dashed cut line down the
+               middle; an odd last zone is left blank per the user's confirmed choice. */
+            body.print-a6single #a6PrintTarget, body.print-a6single #a6PrintTarget *,
+            body.print-a6combo #a6PrintTarget, body.print-a6combo #a6PrintTarget * { visibility: visible; }
+            body.print-a6single #a6PrintTarget, body.print-a6combo #a6PrintTarget { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+            body.print-a6single #renderThermalReceiptTarget, body.print-a6single #multiEntityReceiptTarget,
+            body.print-a6combo #renderThermalReceiptTarget, body.print-a6combo #multiEntityReceiptTarget { display: none !important; }
+
+            .a6-single-sheet { width: 105mm; min-height: 148mm; box-sizing: border-box; padding: 4mm; page-break-after: always; font-family: 'Courier New', monospace; font-size: 0.72rem; }
+            .a6-single-sheet:last-child { page-break-after: auto; }
+            .a6-combo-sheet { display: flex; width: 210mm; height: 148mm; box-sizing: border-box; page-break-after: always; }
+            .a6-combo-sheet:last-child { page-break-after: auto; }
+            .a6-combo-zone { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; font-family: 'Courier New', monospace; font-size: 0.68rem; }
+            .a6-combo-zone-left { border-right: 1px dashed #000; }
+            .a6-contd-note { text-align: center; font-weight: 700; font-size: 0.65rem; border-bottom: 1px dashed #000; padding-bottom: 2px; margin-bottom: 2px; }
+            .a6-more-note { text-align: center; font-size: 0.62rem; margin-top: 4px; }
+
             /* ── CHANGE 4: Collection receipt print ── */
             body.print-collection-thermal #collectionReceiptTarget, body.print-collection-thermal #collectionReceiptTarget * { visibility: visible; }
             body.print-collection-thermal #collectionReceiptTarget { position: absolute; left: 0; top: 0; width: 300px; max-width: 300px; padding: 0; border: none; margin: 0; }
@@ -176,6 +198,31 @@
             body.print-mechanic #mechanic-print-ticket { display: block !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000; background: #fff; margin: 0; padding: 0; border: none; }
             /* A5 size and narrow margins are injected dynamically via JS */
             .a5-page { position: relative; box-sizing: border-box; width: 100%; }
+
+            /* Urgent fix (5 Sep 2026): duplicate/blank extra pages on every receipt print (job-card
+               invoice, collection receipt, mechanic ticket — everything except the intake ticket,
+               which already used the correct technique below).
+               Root cause: "body * { visibility: hidden; }" above hides the whole underlying app UI
+               (nav + the entire .container — job card details, tables, forms, everything) but does
+               NOT remove it from layout — visibility:hidden still reserves its full height. Since
+               that underlying UI is very tall, the print engine computes a multi-page job just to
+               cover it, and the actual receipt — being position:absolute, anchored to the page
+               rather than to a fixed point in the flow — gets stamped again on every one of those
+               extra (otherwise blank) pages. That's the second/duplicate page seen in testing.
+               Fix: also collapse the underlying UI's box entirely (display:none, not just
+               invisible) for every print mode, so there's nothing left to paginate around. The
+               intake ticket print never had this bug because it already used this same collapsing
+               technique (see body.print-intake rule near the top of this file) instead of relying
+               on visibility alone. */
+            body.print-receipt > .sticky-nav, body.print-receipt > .container,
+            body.print-multi > .sticky-nav, body.print-multi > .container,
+            body.print-landscape > .sticky-nav, body.print-landscape > .container,
+            body.print-collection-thermal > .sticky-nav, body.print-collection-thermal > .container,
+            body.print-collection-a5 > .sticky-nav, body.print-collection-a5 > .container,
+            body.print-mechanic > .sticky-nav, body.print-mechanic > .container,
+            body.print-a6single > .sticky-nav, body.print-a6single > .container,
+            body.print-a6combo > .sticky-nav, body.print-a6combo > .container
+            { display: none !important; }
         }
     </style>
 </head>
@@ -557,8 +604,12 @@
         <h3 style="margin-top:0; color:var(--primary);">Select Print Format</h3>
         <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
             <button class="btn-action btn-success" onclick="executePrint('thermal')">🖨️ THERMAL (3-Inch / Narrow)</button>
-            <button class="btn-action btn-info" onclick="executePrint('a5')">📄 A5 / A6 (Portrait Invoice)</button>
-            <button class="btn-action btn-purple" id="btnLandscapePrint" style="display:none;" onclick="executePrint('landscape')">📄 A5 Landscape (Side-by-Side Split)</button>
+            <!-- Sub-Phase 11B.46 (5 Sep 2026): replaces the old "A5 / A6 (Portrait Invoice)" and
+                 "A5 Landscape (Side-by-Side Split)" buttons per the user's decision to fold both
+                 into one auto-deciding option. One-time item-count/entity check decides A6 portrait
+                 (single entity) vs A5-landscape two-A6-zone split (My Care + Moped combined) —
+                 no more manual paper-size choice for staff. -->
+            <button class="btn-action btn-info" onclick="executeInvoicePrint()">🖨️ PRINT INVOICE (Auto A6 / A5)</button>
             <button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPrintChoice').style.display='none'">CANCEL</button>
         </div>
     </div>
@@ -571,7 +622,13 @@
             <button onclick="window.location.href='index.html'" style="border:none; background:none; font-size:1.2rem; font-weight:700; cursor:pointer;">×</button>
         </div>
         <div id="multiEntityReceiptTarget" style="display:none; width:100%;"></div>
+        <!-- Sub-Phase 11B.46: hidden, print-only container. Populated fresh at print time by
+             executeInvoicePrint() from the already-rendered receipt above — never shown on screen. -->
+        <div id="a6PrintTarget" style="display:none;"></div>
         <div id="renderThermalReceiptTarget" class="receipt-container">
+            <!-- Sub-Phase 11B.46: wrapped in thHeaderBlock so the A6 print pagination can clone this
+                 exact header onto every continuation page. No visual change — same elements, same order. -->
+            <div id="thHeaderBlock">
             <div class="receipt-header">
                 <div class="receipt-logo-container"><img src="logo-main.jpg" onerror="this.style.display='none'"><img src="logo-green.png" onerror="this.style.display='none'"></div>
                 <div id="thermalShopName" class="receipt-shop-title">My Care Service Center</div>
@@ -586,7 +643,11 @@
             <div class="receipt-divider"></div>
             <div class="receipt-meta" style="margin-top:2px;">Problem: <strong id="thProblem">--</strong></div>
             <div style="font-weight:bold; font-size:0.7rem; border-bottom:1px solid black; padding-bottom:2px; margin-bottom:4px; margin-top:6px; text-transform:uppercase;">ITEMS & SERVICES</div>
+            </div>
             <div id="thStackedItemsContainer"></div>
+            <!-- Sub-Phase 11B.46: everything from here to the end of the receipt is wrapped in
+                 thFooterBlock so the A6 print pagination can place it only on the final printed page. -->
+            <div id="thFooterBlock">
             <div class="receipt-divider"></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between;"><span>Total Spares:</span><strong id="thPartsSum">₹0</strong></div>
             <div class="receipt-meta" style="display:flex; justify-content:space-between;" id="thPartsDiscRow"><span>Auto Spares Disc:</span><strong id="thPartsDiscSum" style="color:var(--success);">₹0</strong></div>
@@ -620,6 +681,7 @@
             <div class="receipt-meta" id="thFutureAdviceRow" style="display:none; margin-top:8px; padding-top:6px; border-top:1px dashed black; color:var(--danger); font-weight:bold;">Future Advice / सुझाव:<br><span id="thFutureAdviceText" style="font-weight:normal; color:black; display:block; margin-top:2px; line-height:1.4;"></span></div>
             <div id="receiptPromoHindi" style="font-size:0.75rem; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin-top:10px; margin-bottom:6px; text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div>
             <div class="receipt-footer" id="receiptFooterDynamicText">Computer Generated Document.<br>Thank You.</div>
+            </div>
         </div>
         <div class="action-strip-bar no-print">
             <button class="btn-ui-action" style="background:#64748b; color:white; font-weight:700;" onclick="window.location.href='index.html'">↩️ RETURN</button>
@@ -3102,7 +3164,119 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         })();
         document.getElementById('modalReceipt').style.display = 'flex'; }
 
-    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHTML = hasMyCare ? `<div class="me-section"><div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div></div>` : ''; const mopedHTML = `<div class="me-section"><div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>${buildLineHTML(mopedLines)}<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + summaryHTML + savingsHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; document.getElementById('btnLandscapePrint').style.display = 'block'; }
+    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHeaderHTML = `<div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const myCareItemsHTML = `${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}`; const myCareFooterHTML = `<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div>`; /* Sub-Phase 11B.46: wrapper ids let the A6 print pagination find and re-chunk this content; on-screen HTML is unchanged, just wrapped */ const myCareHTML = hasMyCare ? `<div class="me-section" id="meSectionMyCare"><div id="meHeaderMyCare">${myCareHeaderHTML}</div><div id="meItemsMyCare">${myCareItemsHTML}</div><div id="meFooterMyCare">${myCareFooterHTML}</div></div>` : ''; const mopedHeaderHTML = `<div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const mopedItemsHTML = `${buildLineHTML(mopedLines)}`; const mopedFooterHTML = `<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div>`; const mopedHTML = `<div class="me-section" id="meSectionMoped"><div id="meHeaderMoped">${mopedHeaderHTML}</div><div id="meItemsMoped">${mopedItemsHTML}</div><div id="meFooterMoped">${mopedFooterHTML}</div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; const meSummaryBlockHTML = `<div id="meSummaryBlock">${summaryHTML}${savingsHTML}</div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + meSummaryBlockHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; /* Sub-Phase 11B.46: old btnLandscapePrint element removed, replaced by the single auto-deciding PRINT INVOICE button */ }
+
+    /* ═══════════ Sub-Phase 11B.46 (5 Sep 2026): A6 / A5-combo auto-print ═══════════
+       Reads the ALREADY-RENDERED receipt (single-entity #renderThermalReceiptTarget, or
+       combined #multiEntityReceiptTarget) so every number on the printed page is guaranteed
+       identical to what the on-screen modal already showed — this code never recomputes any
+       amount, it only re-flows the existing item rows into A6-sized pages. On-screen previews
+       (populateReceiptDocument / renderMultiEntityReceipt) are completely untouched. */
+    const A6_ITEMS_PER_PAGE = 15;
+    // Combo zones (one entity's invoice inside half of an A5-landscape sheet) have a fixed
+    // 148mm height with overflow:hidden as a last-resort safety net — unlike a single-entity
+    // A6 sheet, a combo zone cannot grow taller without colliding with its neighbour. Using a
+    // lower per-page count here than the single-entity default gives real safety margin against
+    // this being an estimate that hasn't been physically test-printed yet (see 11B.46 notes).
+    const A6_ITEMS_PER_PAGE_COMBO = 12;
+
+    function a6ChunkArray(arr, size) {
+        const out = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        if (out.length === 0) out.push([]);
+        return out;
+    }
+    function a6StripIds(html) { return html.replace(/\sid="[^"]*"/g, ''); }
+
+    function buildSingleEntityA6Pages() {
+        const headerHTML = a6StripIds(document.getElementById('thHeaderBlock').innerHTML);
+        const footerHTML = a6StripIds(document.getElementById('thFooterBlock').innerHTML);
+        const itemNodes = Array.from(document.getElementById('thStackedItemsContainer').children);
+        const chunks = a6ChunkArray(itemNodes, A6_ITEMS_PER_PAGE);
+        return chunks.map((chunk, i) => {
+            const isLast = i === chunks.length - 1;
+            const contdNote = i > 0 ? `<div class="a6-contd-note">--- CONTINUED: PAGE ${i+1} OF ${chunks.length} ---</div>` : '';
+            const moreNote = !isLast ? `<div class="a6-more-note">--- Contd. on next page ---</div>` : '';
+            const itemsHTML = chunk.map(n => n.outerHTML).join('');
+            return `${headerHTML}${contdNote}${itemsHTML}${moreNote}${isLast ? footerHTML : ''}`;
+        });
+    }
+
+    function buildEntityA6Pages(headerElId, itemsElId, footerElId) {
+        const headerHTML = a6StripIds(document.getElementById(headerElId).innerHTML);
+        const footerHTML = a6StripIds(document.getElementById(footerElId).innerHTML);
+        const itemNodes = Array.from(document.getElementById(itemsElId).children);
+        const chunks = a6ChunkArray(itemNodes, A6_ITEMS_PER_PAGE_COMBO);
+        return chunks.map((chunk, i) => {
+            const isLast = i === chunks.length - 1;
+            const contdNote = i > 0 ? `<div class="a6-contd-note">--- CONTINUED: PAGE ${i+1} OF ${chunks.length} ---</div>` : '';
+            const moreNote = !isLast ? `<div class="a6-more-note">--- Contd. on next page ---</div>` : '';
+            const itemsHTML = chunk.map(n => n.outerHTML).join('');
+            return `${headerHTML}${contdNote}${itemsHTML}${moreNote}${isLast ? footerHTML : ''}`;
+        });
+    }
+
+    function buildComboA6Pages() {
+        let pages = [];
+        if (document.getElementById('meSectionMyCare')) {
+            pages = pages.concat(buildEntityA6Pages('meHeaderMyCare', 'meItemsMyCare', 'meFooterMyCare'));
+        }
+        pages = pages.concat(buildEntityA6Pages('meHeaderMoped', 'meItemsMoped', 'meFooterMoped'));
+        // Combined payment summary always gets its own final zone, never split across entities.
+        const summaryHTML = a6StripIds(document.getElementById('meSummaryBlock').outerHTML);
+        pages.push(summaryHTML);
+        return pages;
+    }
+
+    function executeInvoicePrint() {
+        const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none';
+        const target = document.getElementById('a6PrintTarget');
+        let paperMsg;
+
+        if (isMulti) {
+            const pages = buildComboA6Pages();
+            const sheets = a6ChunkArray(pages, 2);
+            target.innerHTML = sheets.map(pair => {
+                const zoneLeft = pair[0] || '';
+                const zoneRight = pair[1] || '';
+                return `<div class="a6-combo-sheet"><div class="a6-combo-zone a6-combo-zone-left">${zoneLeft}</div><div class="a6-combo-zone a6-combo-zone-right">${zoneRight}</div></div>`;
+            }).join('');
+            let invoiceA6StyleEl = document.getElementById('invoiceA6PageStyle');
+            if (!invoiceA6StyleEl) { invoiceA6StyleEl = document.createElement('style'); invoiceA6StyleEl.id = 'invoiceA6PageStyle'; document.head.appendChild(invoiceA6StyleEl); }
+            invoiceA6StyleEl.innerHTML = '@page { size: A5 landscape; margin: 0; }';
+            paperMsg = `This invoice combines My Care + Moped billing.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheets.length} sheet(s) will print, each with two A6-sized invoices side by side and a dashed cut line down the middle.`;
+            document.body.className = '';
+            document.body.classList.add('print-a6combo');
+            alert(paperMsg);
+            setTimeout(() => {
+                window.onafterprint = function () {
+                    document.body.className = '';
+                    if (invoiceA6StyleEl) invoiceA6StyleEl.innerHTML = '';
+                    window.onafterprint = null;
+                };
+                window.print();
+            }, 400);
+        } else {
+            const pages = buildSingleEntityA6Pages();
+            target.innerHTML = pages.map(p => `<div class="a6-single-sheet">${p}</div>`).join('');
+            let invoiceA6StyleEl = document.getElementById('invoiceA6PageStyle');
+            if (!invoiceA6StyleEl) { invoiceA6StyleEl = document.createElement('style'); invoiceA6StyleEl.id = 'invoiceA6PageStyle'; document.head.appendChild(invoiceA6StyleEl); }
+            invoiceA6StyleEl.innerHTML = '@page { size: A6 portrait; margin: 0; }';
+            paperMsg = `Load A6 paper in the printer.\n${pages.length} page(s) will print.`;
+            document.body.className = '';
+            document.body.classList.add('print-a6single');
+            alert(paperMsg);
+            setTimeout(() => {
+                window.onafterprint = function () {
+                    document.body.className = '';
+                    if (invoiceA6StyleEl) invoiceA6StyleEl.innerHTML = '';
+                    window.onafterprint = null;
+                };
+                window.print();
+            }, 400);
+        }
+        document.getElementById('modalPrintChoice').style.display = 'none';
+    }
 
     function dispatchWhatsAppImageReceipt() { const layoutTarget = document.getElementById('multiEntityReceiptTarget').style.display === 'block' ? document.getElementById('multiEntityReceiptTarget') : document.getElementById('renderThermalReceiptTarget'); const origBorder = layoutTarget.style.border; layoutTarget.style.border = 'none'; loadHtml2Canvas().then(() => { html2canvas(layoutTarget, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => { layoutTarget.style.border = origBorder; canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Invoice_JC_${targetJobId.split('-')[0].toUpperCase()}.jpg`; a.click(); URL.revokeObjectURL(url); }, 'image/jpeg', 0.95); }); }); }
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
