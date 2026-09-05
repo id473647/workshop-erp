@@ -148,8 +148,21 @@
                 <div class="form-group"><label>Other — Note (required if Other &gt; 0)</label><input type="text" id="lcOtherNote" class="form-control" placeholder="Describe the 'Other' cost"></div>
                 <div style="font-weight:bold; margin:10px 0;">Total Additional Cost: ₹<span id="lcTotal">0.00</span> &nbsp;|&nbsp; Landed Cost %: <span id="lcPct">0.00</span>% &nbsp;|&nbsp; Of which payable to vendor: ₹<span id="lcPayableTotal">0.00</span></div>
                 <div class="audit-note">Tick "On vendor invoice" for any cost the vendor is actually billing you (e.g. packaging is usually on the invoice; a transporter's freight bill usually isn't). Only the ticked amounts get added to what you owe this vendor — all costs, ticked or not, still count toward the MAC calculation above.</div>
-                <div id="grnGstSummary" style="font-weight:bold; margin:10px 0; color:#7c3aed;">Total GST (Type A/B only): ₹<span id="grnGstTotal">0.00</span> &nbsp;|&nbsp; Estimated Vendor Payable (incl. GST + payable landed costs): ₹<span id="grnVendorPayablePreview">0.00</span></div>
-                <div class="audit-note">For Type A/B purchases, GST is added to what you owe the vendor, to the ledger, AND is folded into the MAC/cost below (your business treats purchase-side GST as a real cost). The exact GST% and amount are still saved on every line item separately, so you always have the input GST figure on record for your own filing. For Type C (All-Inclusive), GST is already inside the price you typed, so nothing is added twice.</div>
+                <div id="grnGstSection" style="display:flex; gap:15px; flex-wrap:wrap; margin:10px 0; align-items:flex-start;">
+                    <div id="grnTaxSummaryBox" style="display:none; flex:1; min-width:280px; border:1px solid var(--border); border-radius:6px; padding:10px; background:#faf5ff;">
+                        <div style="font-weight:bold; color:#7c3aed; margin-bottom:6px;">Tax Summary (by slab)</div>
+                        <table style="width:100%; font-size:0.8rem;">
+                            <thead><tr><th>Slab</th><th>Taxable (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th></tr></thead>
+                            <tbody id="grnTaxSummaryBody"></tbody>
+                        </table>
+                        <div id="grnInterstateNote" style="font-size:0.7rem; color:#888; margin-top:6px;"></div>
+                    </div>
+                    <div style="flex:1; min-width:280px;">
+                        <div id="grnGstSummary" style="font-weight:bold; color:#7c3aed;">Total GST (Type A/B only): ₹<span id="grnGstTotal">0.00</span></div>
+                        <div style="font-weight:bold; margin-top:4px;">Estimated Vendor Payable (incl. GST + payable landed costs): ₹<span id="grnVendorPayablePreview">0.00</span></div>
+                        <div class="audit-note" style="margin-top:6px;">For Type A/B purchases, GST is added to what you owe the vendor, to the ledger, AND is folded into the MAC/cost below (your business treats purchase-side GST as a real cost). The exact GST% and amount are still saved on every line item separately, so you always have the input GST figure on record for your own filing. For Type C (All-Inclusive), GST is already inside the price you typed, so nothing is added twice.</div>
+                    </div>
+                </div>
                 <table id="macPreviewTable" style="display:none;">
                     <thead><tr><th>Product</th><th>GRN Rate (₹)</th><th>Calculated MAC (₹)</th><th>Final MAC (₹, editable)</th></tr></thead>
                     <tbody id="macPreviewBody"></tbody>
@@ -460,6 +473,7 @@
             document.getElementById('grnVendorAuto').style.display = 'none';
             await fetchPartyBalance();
             updateLotCodePreview();
+            updateLandedCosts(); // vendor's GSTIN decides CGST/SGST vs IGST in the Tax Summary box
         }
 
         async function fetchPartyBalance() {
@@ -968,6 +982,64 @@
             updateLandedCosts();
         }
 
+        // A GSTIN's first two digits are the state code. Your own registrations are Madhya
+        // Pradesh (23) — any vendor whose GSTIN doesn't start with 23 is an inter-state purchase,
+        // which uses IGST instead of splitting CGST+SGST. Returns null if there's no GSTIN on
+        // file yet (party not fully set up), so callers can fall back sensibly.
+        function isInterStateGstin(gstin) {
+            if(!gstin || gstin.trim().length < 2) return null;
+            return gstin.trim().substring(0,2) !== '23';
+        }
+
+        // Groups every GRN line by its GST% and works out the CGST/SGST or IGST for each slab —
+        // this is the standard "rate-wise tax summary" every real GST purchase voucher shows,
+        // and it's what actually needs to reconcile against the vendor's paper invoice.
+        function buildGrnTaxSummary(subtotal) {
+            const box = document.getElementById('grnTaxSummaryBox');
+            const body = document.getElementById('grnTaxSummaryBody');
+            const noteEl = document.getElementById('grnInterstateNote');
+            const invType = document.getElementById('grnInvoiceType').value;
+            const pId = document.getElementById('grnParty').value;
+            const party = partiesCache.find(p => p.id === pId);
+            const interState = party ? isInterStateGstin(party.gstin) : null;
+
+            if(invType === 'type_c' || !pId) { box.style.display = 'none'; return; }
+
+            const bySlab = {};
+            document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                const rid = row.id.split('-')[1];
+                const rQty = parseFloat(document.getElementById(`gQty-${rid}`).value)||0;
+                const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
+                const rGstEl = document.getElementById(`gGst-${rid}`);
+                const rGst = rGstEl && rGstEl.value.trim() !== '' ? (parseFloat(rGstEl.value)||0) : null;
+                if(rGst === null || rQty <= 0) return;
+                const taxable = rQty * rCost;
+                if(!bySlab[rGst]) bySlab[rGst] = 0;
+                bySlab[rGst] += taxable;
+            });
+
+            const slabs = Object.keys(bySlab).map(Number).sort((a,b)=>a-b);
+            if(!slabs.length) { box.style.display = 'none'; return; }
+            box.style.display = 'block';
+            body.innerHTML = '';
+            slabs.forEach(slab => {
+                const taxable = bySlab[slab];
+                const taxAmt = taxable * (slab/100);
+                const igst = interState === true ? taxAmt : 0;
+                const cgst = interState !== true ? taxAmt/2 : 0;
+                const sgst = interState !== true ? taxAmt/2 : 0;
+                body.insertAdjacentHTML('beforeend', `<tr>
+                    <td>${slab}%</td><td>₹${taxable.toFixed(2)}</td>
+                    <td>${interState === true ? '—' : '₹'+cgst.toFixed(2)}</td>
+                    <td>${interState === true ? '—' : '₹'+sgst.toFixed(2)}</td>
+                    <td>${interState === true ? '₹'+igst.toFixed(2) : '—'}</td>
+                </tr>`);
+            });
+            noteEl.innerText = interState === null
+                ? '⚠ This vendor has no GSTIN on file — showing as intra-state (CGST+SGST) by default. Add their GSTIN in Party details for an accurate IGST check.'
+                : (interState ? 'Inter-state vendor (GSTIN not starting with 23) — IGST applies.' : 'Intra-state vendor (Madhya Pradesh, GSTIN starts with 23) — CGST+SGST applies.');
+        }
+
         // ===== FEATURE C: landed cost + MAC preview =====
         function updateLandedCosts() {
             const subtotal = parseFloat(document.getElementById('grnTotal').innerText) || 0;
@@ -1005,6 +1077,7 @@
             }
             document.getElementById('grnGstTotal').innerText = gstTotal.toFixed(2);
             document.getElementById('grnVendorPayablePreview').innerText = (subtotal + payableLc + gstTotal).toFixed(2);
+            buildGrnTaxSummary(subtotal);
 
             const rows = document.querySelectorAll('[id^="grnRow-"]');
             const tbl = document.getElementById('macPreviewTable');
@@ -1090,17 +1163,24 @@
                      + (document.getElementById('lcLabelsPayable').checked ? lcVals.labels : 0)
                      + (document.getElementById('lcOtherPayable').checked ? lcVals.other : 0);
 
-            // GST for Type A/B: owed to the vendor (added to vendorPayable + ledger) but kept OUT
-            // of MAC/cost — it's a claimable Input Tax Credit, not a real cost of the goods. For
-            // Type C the price already includes GST, so every row's GST% is forced to 0 above and
-            // this naturally comes out to 0.
-            let totalGst = 0;
+            // GST for Type A/B: owed to the vendor (added to vendorPayable + ledger) AND folded
+            // into MAC/cost (your business treats it as a real cost — see the note above the Tax
+            // Summary box). For Type C the price already includes GST, so every row's GST% is
+            // forced to 0 above and this naturally comes out to 0.
+            // Also split by slab into CGST/SGST or IGST, same rule as the on-screen Tax Summary
+            // box: this vendor's GSTIN decides which applies, for the GST register report later.
+            const partyForGst = partiesCache.find(p => p.id === pId);
+            const interStateGrn = isInterStateGstin(partyForGst?.gstin); // null = no GSTIN on file, treated as intra-state
+            let totalGst = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0;
             document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
                 const rid = row.id.split('-')[1];
                 const rQty = parseInt(document.getElementById(`gQty-${rid}`).value)||0;
                 const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
                 const rGst = parseFloat(document.getElementById(`gGst-${rid}`).value)||0;
-                totalGst += rQty * rCost * (rGst/100);
+                const rTax = rQty * rCost * (rGst/100);
+                totalGst += rTax;
+                if(interStateGrn === true) totalIgst += rTax;
+                else { totalCgst += rTax/2; totalSgst += rTax/2; }
             });
 
             const vendorPayable = subtotal + payableLc + totalGst; // damage_shortfall never included — never payable to vendor
@@ -1109,7 +1189,7 @@
                 vendor_id: pId, invoice_number: invoiceNo, invoice_date: invDate, total_bill_amount: vendorPayable,
                 status: 'Completed', recorded_by: sessionRole, invoice_type: invoiceType, warehouse_type: wh,
                 landed_cost_total: lcTotal, landed_cost_pct: landedPct, grand_total: grandTotal, lot_code: lotCode,
-                total_gst: totalGst,
+                total_gst: totalGst, total_cgst: totalCgst, total_sgst: totalSgst, total_igst: totalIgst,
                 invoice_photo_url: document.getElementById('grnInvoicePhotoUrl').value || null,
                 confirmed_by: sessionRole, confirmed_at: new Date().toISOString()
             }).select().single();
