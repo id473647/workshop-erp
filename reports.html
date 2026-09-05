@@ -85,6 +85,9 @@
             <button class="tab-btn" onclick="switchTab('tabProductComplaints',this)" id="btnTabPC">🔩 Product Complaints</button>
             <button class="tab-btn" onclick="switchTab('tabServiceComplaints',this)" id="btnTabSC">🔧 Service Complaints</button>
             <button class="tab-btn" onclick="switchTab('tabDefectiveStock',this)" id="btnTabDS">📦 Defective Stock</button>
+            <!-- Sub-Phase 11D.32: GST Purchase/Sales Registers -->
+            <button class="tab-btn" onclick="switchTab('tabGstPurchase',this)" id="btnTabGstPurchase">🧾 GST Purchase Register</button>
+            <button class="tab-btn" onclick="switchTab('tabGstSales',this)" id="btnTabGstSales">🧾 GST Sales Register</button>
         </div>
 
         <div id="tabAnalytics" class="view-panel active">
@@ -223,6 +226,54 @@
                 <table class="data-table" id="tbDS">
                     <thead><tr><th>Date Logged</th><th>Item Name</th><th>Brand</th><th>Qty</th><th>Original Cost (₹)</th><th>Complaint JC</th><th>Defect Note</th><th>Status</th><th>Vendor Claim Ref</th></tr></thead>
                     <tbody id="dsBody"><tr><td colspan="9" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── Sub-Phase 11D.32: GST PURCHASE REGISTER ─────────────────────── -->
+        <div id="tabGstPurchase" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>Start Date</label><input type="date" id="gpStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="gpEnd"></div>
+                <div class="field-group"><label>GST Entity</label><select id="gpEntity"></select></div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runGstPurchaseRegister()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbGstPurchase','GST_Purchase_Register')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PDF</button>
+                </div>
+            </div>
+            <div style="font-size:0.8rem;color:#64748b;margin-bottom:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid var(--border);">
+                Only Type A and Type B purchases are shown (these carry claimable GST). Type C (All-Inclusive, No ITC) purchases are excluded, same as they're excluded from MAC's separate GST tracking. "Taxable Value" is each invoice's pre-GST subtotal.
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbGstPurchase">
+                    <thead><tr><th>Date</th><th>Invoice No</th><th>Lot Code</th><th>Vendor</th><th>Vendor GSTIN</th><th>Entity</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total Tax (₹)</th><th>Total Bill Amt (₹)</th></tr></thead>
+                    <tbody id="gpBody"><tr><td colspan="12" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                    <tfoot id="gpFoot" style="background:#e2e8f0;font-weight:900;"></tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── Sub-Phase 11D.32: GST SALES REGISTER ────────────────────────── -->
+        <div id="tabGstSales" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>Start Date</label><input type="date" id="gsStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="gsEnd"></div>
+                <div class="field-group"><label>GST Entity</label><select id="gsEntity"></select></div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runGstSalesRegister()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbGstSales','GST_Sales_Register')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PDF</button>
+                </div>
+            </div>
+            <div style="font-size:0.8rem;color:#64748b;margin-bottom:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid var(--border);">
+                Covers pos-green.html POS sales (always Green Scooter Center) and billing.html workshop job-card sales (Green-warehouse parts + labour + lathe/welding lines → My Care Services; Moped-warehouse parts → Moped House). GSTIN column is only filled for B2B sales (a Customer GSTIN was entered) — B2C rows still carry their own tax split, just no GSTIN. IGST is not yet computed on the sale side (Sub-Phase 11D.31, planned alongside the POS redesign) — shown as 0 for now.
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbGstSales">
+                    <thead><tr><th>Date</th><th>Bill No</th><th>Source</th><th>Entity</th><th>Customer</th><th>GSTIN</th><th>Type</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total (₹)</th></tr></thead>
+                    <tbody id="gsBody"><tr><td colspan="12" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
+                    <tfoot id="gsFoot" style="background:#e2e8f0;font-weight:900;"></tfoot>
                 </table>
             </div>
         </div>
@@ -409,6 +460,152 @@
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('lsStart').value = today; document.getElementById('lsEnd').value = today;
         document.getElementById('lcStart').value = today; document.getElementById('lcEnd').value = today;
+
+        // Sub-Phase 11D.32: GST Purchase/Sales Registers — entity dropdown + tab visibility per role.
+        // Green Spare Manager (role 'green') handles purchasing and reporting for BOTH of Green's
+        // entities (Green Scooter Center + My Care Services); Moped only ever sees its own single
+        // entity; Admin sees everything. Service has no purchase rights and no report access here.
+        const gpEntitySel = document.getElementById('gpEntity');
+        const gsEntitySel = document.getElementById('gsEntity');
+        if (activeRole === 'admin') {
+            const opts = '<option value="all">All Entities</option><option value="green_scooter_center">Green Scooter Center</option><option value="my_care_service_center">My Care Services</option><option value="moped_house">Moped House</option>';
+            gpEntitySel.innerHTML = opts; gsEntitySel.innerHTML = opts;
+        } else if (activeRole === 'green') {
+            const opts = '<option value="green_both">All (Green Scooter Center + My Care Services)</option><option value="green_scooter_center">Green Scooter Center</option><option value="my_care_service_center">My Care Services</option>';
+            gpEntitySel.innerHTML = opts; gsEntitySel.innerHTML = opts;
+        } else if (activeRole === 'moped') {
+            const opts = '<option value="moped_house">Moped House</option>';
+            gpEntitySel.innerHTML = opts; gsEntitySel.innerHTML = opts;
+        } else {
+            // service / guest — not given purchase rights, and no dedicated sales channel of its
+            // own (its workshop sales are already covered under Green's My Care Services report).
+            document.getElementById('btnTabGstPurchase').style.display = 'none';
+            document.getElementById('btnTabGstSales').style.display = 'none';
+        }
+        document.getElementById('gpStart').value = today; document.getElementById('gpEnd').value = today;
+        document.getElementById('gsStart').value = today; document.getElementById('gsEnd').value = today;
+    }
+
+    // Maps a stored gst_entity / source_role combination to its display label.
+    function gstEntityLabel(key) {
+        return { green_scooter_center: 'Green Scooter Center', my_care_service_center: 'My Care Services', moped_house: 'Moped House' }[key] || key;
+    }
+
+    // ==========================================
+    // Sub-Phase 11D.32: GST PURCHASE REGISTER
+    // ==========================================
+    async function runGstPurchaseRegister() {
+        const start = document.getElementById('gpStart').value;
+        const end = document.getElementById('gpEnd').value;
+        const entityFlt = document.getElementById('gpEntity').value;
+        document.getElementById('gpBody').innerHTML = '<tr><td colspan="12" style="text-align:center;">Fetching purchase invoices...</td></tr>';
+
+        let q = supabaseClient.from('purchase_invoices')
+            .select('*, parties(party_name, trading_name, gstin)')
+            .in('invoice_type', ['type_a', 'type_b'])
+            .gte('invoice_date', start).lte('invoice_date', end)
+            .order('invoice_date', { ascending: true });
+
+        // Role-based scope, independent of whatever the dropdown currently shows (defence in depth —
+        // a green login can never pull Moped's purchase data even by tampering with the select).
+        if (activeRole === 'green') q = q.in('gst_entity', ['green_scooter_center', 'my_care_service_center']);
+        else if (activeRole === 'moped') q = q.eq('gst_entity', 'moped_house');
+
+        if (entityFlt && entityFlt !== 'all' && entityFlt !== 'green_both') q = q.eq('gst_entity', entityFlt);
+
+        const { data, error } = await q;
+        if (error) { document.getElementById('gpBody').innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--danger);">Error: ${error.message}</td></tr>`; return; }
+
+        let html = '', tTax = 0, tCgst = 0, tSgst = 0, tIgst = 0, tGst = 0, tBill = 0;
+        (data || []).forEach(inv => {
+            const p = inv.parties || {};
+            const taxable = (parseFloat(inv.grand_total) || 0) - (parseFloat(inv.landed_cost_total) || 0);
+            const cgst = parseFloat(inv.total_cgst) || 0, sgst = parseFloat(inv.total_sgst) || 0, igst = parseFloat(inv.total_igst) || 0, gst = parseFloat(inv.total_gst) || 0, bill = parseFloat(inv.total_bill_amount) || 0;
+            tTax += taxable; tCgst += cgst; tSgst += sgst; tIgst += igst; tGst += gst; tBill += bill;
+            html += `<tr><td>${inv.invoice_date || ''}</td><td>${inv.invoice_number || ''}</td><td>${inv.lot_code || ''}</td>
+                <td>${p.trading_name ? p.party_name + ' (' + p.trading_name + ')' : (p.party_name || '')}</td><td>${p.gstin || '—'}</td>
+                <td>${gstEntityLabel(inv.gst_entity)}</td><td>${taxable.toFixed(2)}</td><td>${cgst.toFixed(2)}</td><td>${sgst.toFixed(2)}</td><td>${igst.toFixed(2)}</td><td>${gst.toFixed(2)}</td><td>${bill.toFixed(2)}</td></tr>`;
+        });
+        if (!html) html = '<tr><td colspan="12" style="text-align:center;">No Type A/B purchases in this range.</td></tr>';
+        document.getElementById('gpBody').innerHTML = html;
+        document.getElementById('gpFoot').innerHTML = `<tr><td colspan="6">GRAND TOTAL</td><td>${tTax.toFixed(2)}</td><td>${tCgst.toFixed(2)}</td><td>${tSgst.toFixed(2)}</td><td>${tIgst.toFixed(2)}</td><td>${tGst.toFixed(2)}</td><td>${tBill.toFixed(2)}</td></tr>`;
+    }
+
+    // ==========================================
+    // Sub-Phase 11D.32: GST SALES REGISTER
+    // ==========================================
+    async function runGstSalesRegister() {
+        const start = document.getElementById('gsStart').value;
+        const end = document.getElementById('gsEnd').value;
+        const entityFlt = document.getElementById('gsEntity').value;
+        document.getElementById('gsBody').innerHTML = '<tr><td colspan="12" style="text-align:center;">Fetching sales...</td></tr>';
+
+        const wantGreenPos = entityFlt === 'all' || entityFlt === 'green_both' || entityFlt === 'green_scooter_center';
+        const wantMyCare = entityFlt === 'all' || entityFlt === 'green_both' || entityFlt === 'my_care_service_center';
+        const wantMoped = entityFlt === 'all' || entityFlt === 'moped_house';
+        const canSeeGreenSide = activeRole === 'admin' || activeRole === 'green';
+        const canSeeMoped = activeRole === 'admin' || activeRole === 'moped';
+
+        let rows = [];
+
+        // ── pos-green.html POS sales: always Green Scooter Center, source_role tells Green vs Moped counter ──
+        if (canSeeGreenSide && wantGreenPos) {
+            const { data: posSales } = await supabaseClient.from('counter_sales').select('id, closed_at, customer_name, customer_gstin, total_amount, counter_sale_items(taxable_value, cgst_amount, sgst_amount)')
+                .eq('status', 'Closed').eq('source_role', 'green')
+                .gte('closed_at', start + 'T00:00:00').lte('closed_at', end + 'T23:59:59');
+            (posSales || []).forEach(s => {
+                let taxable = 0, cgst = 0, sgst = 0;
+                (s.counter_sale_items || []).forEach(li => { taxable += parseFloat(li.taxable_value) || 0; cgst += parseFloat(li.cgst_amount) || 0; sgst += parseFloat(li.sgst_amount) || 0; });
+                rows.push({ date: s.closed_at, bill: 'POS-' + s.id.split('-')[0].toUpperCase(), source: 'POS (Green)', entity: 'green_scooter_center', customer: s.customer_name || 'Walk-in', gstin: s.customer_gstin || '', type: s.customer_gstin ? 'B2B' : 'B2C', taxable, cgst, sgst, igst: 0, total: parseFloat(s.total_amount) || 0 });
+            });
+        }
+        // ── pos-green.html Moped-counter POS sales: Moped House ──
+        if (canSeeMoped && wantMoped) {
+            const { data: mopedPos } = await supabaseClient.from('counter_sales').select('id, closed_at, customer_name, customer_gstin, total_amount, counter_sale_items(taxable_value, cgst_amount, sgst_amount)')
+                .eq('status', 'Closed').eq('source_role', 'moped')
+                .gte('closed_at', start + 'T00:00:00').lte('closed_at', end + 'T23:59:59');
+            (mopedPos || []).forEach(s => {
+                let taxable = 0, cgst = 0, sgst = 0;
+                (s.counter_sale_items || []).forEach(li => { taxable += parseFloat(li.taxable_value) || 0; cgst += parseFloat(li.cgst_amount) || 0; sgst += parseFloat(li.sgst_amount) || 0; });
+                rows.push({ date: s.closed_at, bill: 'POS-' + s.id.split('-')[0].toUpperCase(), source: 'POS (Moped)', entity: 'moped_house', customer: s.customer_name || 'Walk-in', gstin: s.customer_gstin || '', type: s.customer_gstin ? 'B2B' : 'B2C', taxable, cgst, sgst, igst: 0, total: parseFloat(s.total_amount) || 0 });
+            });
+        }
+        // ── billing.html workshop job-card sales: Green/Service-warehouse lines + labour -> My Care; Moped-warehouse lines -> Moped House ──
+        if ((canSeeGreenSide && wantMyCare) || (canSeeMoped && wantMoped)) {
+            const { data: jobCards } = await supabaseClient.from('job_cards').select('id, closed_at, customer_mobile, labour_charges, job_card_items(item_name, total_price, gst_percent, warehouse_type)')
+                .eq('status', 'Closed')
+                .gte('closed_at', start + 'T00:00:00').lte('closed_at', end + 'T23:59:59');
+            (jobCards || []).forEach(jc => {
+                let myCareTaxable = 0, myCareTax = 0, mopedTaxable = 0, mopedTax = 0;
+                (jc.job_card_items || []).forEach(li => {
+                    const gstPct = parseFloat(li.gst_percent) || 18;
+                    const gross = parseFloat(li.total_price) || 0;
+                    const base = gross / (1 + gstPct / 100);
+                    const tax = gross - base;
+                    if (li.warehouse_type === 'Moped') { mopedTaxable += base; mopedTax += tax; }
+                    else { myCareTaxable += base; myCareTax += tax; } // Green or Service tagged
+                });
+                const labour = parseFloat(jc.labour_charges) || 0;
+                if (labour > 0) { const base = labour / 1.18; myCareTaxable += base; myCareTax += (labour - base); } // labour/service always My Care, flat 18% (no per-line GST% stored for this field)
+                if (canSeeGreenSide && wantMyCare && (myCareTaxable > 0 || myCareTax > 0)) {
+                    rows.push({ date: jc.closed_at, bill: 'JC-' + jc.id.split('-')[0].toUpperCase(), source: 'Workshop', entity: 'my_care_service_center', customer: jc.customer_mobile || '', gstin: '', type: 'B2C', taxable: myCareTaxable, cgst: myCareTax / 2, sgst: myCareTax / 2, igst: 0, total: myCareTaxable + myCareTax });
+                }
+                if (canSeeMoped && wantMoped && mopedTaxable > 0) {
+                    rows.push({ date: jc.closed_at, bill: 'JC-' + jc.id.split('-')[0].toUpperCase(), source: 'Workshop', entity: 'moped_house', customer: jc.customer_mobile || '', gstin: '', type: 'B2C', taxable: mopedTaxable, cgst: mopedTax / 2, sgst: mopedTax / 2, igst: 0, total: mopedTaxable + mopedTax });
+                }
+            });
+        }
+
+        rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+        let html = '', tTax = 0, tCgst = 0, tSgst = 0, tIgst = 0, tTotal = 0;
+        rows.forEach(r => {
+            tTax += r.taxable; tCgst += r.cgst; tSgst += r.sgst; tIgst += r.igst; tTotal += r.total;
+            html += `<tr><td>${r.date ? new Date(r.date).toLocaleDateString('en-IN') : ''}</td><td>${r.bill}</td><td>${r.source}</td><td>${gstEntityLabel(r.entity)}</td>
+                <td>${r.customer}</td><td>${r.gstin || '—'}</td><td>${r.type}</td><td>${r.taxable.toFixed(2)}</td><td>${r.cgst.toFixed(2)}</td><td>${r.sgst.toFixed(2)}</td><td>${r.igst.toFixed(2)}</td><td>${r.total.toFixed(2)}</td></tr>`;
+        });
+        if (!html) html = '<tr><td colspan="12" style="text-align:center;">No sales in this range.</td></tr>';
+        document.getElementById('gsBody').innerHTML = html;
+        document.getElementById('gsFoot').innerHTML = `<tr><td colspan="7">GRAND TOTAL</td><td>${tTax.toFixed(2)}</td><td>${tCgst.toFixed(2)}</td><td>${tSgst.toFixed(2)}</td><td>${tIgst.toFixed(2)}</td><td>${tTotal.toFixed(2)}</td></tr>`;
     }
 
     // ==========================================
