@@ -60,6 +60,15 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 /* Print */
 #printArea{display:none;}
 @media print{body *{visibility:hidden;}#printArea,#printArea *{visibility:visible;}#printArea{position:absolute;left:0;top:0;width:100%;display:flex;flex-wrap:wrap;gap:10px;}}
+/* Fix (5 Sep 2026): .overlay-modal / .modal-card were used on 3 modals (Add Product, Product
+   Photo, Import Preview) but never defined in this file — dark-mode.css only carries dark-theme
+   COLOR overrides for them, assuming a base rule exists elsewhere. Without it, the JS still
+   correctly toggled display:flex/none, but with no positioning at all the modal rendered as a
+   plain block shoved into the normal page flow instead of a centered overlay — exactly the
+   broken layout seen in the "Add New Product" panel. Matches the same overlay pattern already
+   used in purchase-manager.html (.modal-overlay/.modal there), just under this file's own names. */
+.overlay-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:200;overflow-y:auto;padding:20px;box-sizing:border-box;}
+.modal-card{background:white;padding:20px;border-radius:10px;width:100%;box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -923,7 +932,11 @@ async function loadCatalog(){
   const catWh = whSel.value;
   const smartFilter = document.getElementById('catSmartFilter')?.value || '';
 
-  let q=sb.from('product_master').select('id,item_name,brand,scope,track_stock,mrp,retail_price,barcode_id,hsn_code,mac,cost_price,current_stock,warehouse_type,photo_url,primary_vendor_id,gst_percent').eq('catalog_status','live').order('item_name').limit(200);
+  // Fix (5 Sep 2026): this used to name specific columns — if even one of them doesn't match
+  // the live schema (e.g. hsn_code), Supabase silently rejects the WHOLE query and every product
+  // vanishes from this screen, exactly like the billing.html product-search bug fixed earlier as
+  // 11B.44. Switched to select('*') so a missing/renamed column can never blank the whole catalog.
+  let q=sb.from('product_master').select('*').eq('catalog_status','live').order('item_name').limit(200);
   const search=document.getElementById('catSearch').value.trim();
   const scope=document.getElementById('catScope').value;
   if(search) q=q.ilike('item_name',`%${search}%`);
