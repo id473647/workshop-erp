@@ -184,7 +184,18 @@
             </div>
 
             <div style="border-top: 2px solid var(--border); padding-top: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <h3 style="margin:0;">Invoice Subtotal: ₹<span id="grnTotal">0.00</span></h3>
+                <!-- Fix (5 Sep 2026, same 11D.29 sub-phase): the pre-GST subtotal was still the
+                     biggest, most prominent number on this screen even after the Tax Summary box
+                     was added above — visually it still looked like "the total", which was the
+                     exact problem the redesign was meant to fix. The figure that should reconcile
+                     against the vendor's paper invoice (GST-inclusive) is now the prominent one;
+                     the pre-GST subtotal (still needed for the MAC calculation above) is now the
+                     small secondary line. #grnTotal itself is unchanged — other code still reads
+                     its value as the pre-GST subtotal. -->
+                <div>
+                    <div style="font-size:0.75rem; color:#64748b;">Subtotal (before GST): ₹<span id="grnTotal">0.00</span></div>
+                    <h3 style="margin:2px 0 0 0;">Final Payable to Vendor (incl. GST): ₹<span id="grnFinalPayableFooter">0.00</span></h3>
+                </div>
                 <div>
                     <button class="btn btn-success" onclick="commitGRN()">Commit GRN</button>
                     <button class="btn btn-info" id="btnPrintLabels" style="display:none;" onclick="printReceivedLabels()">🏷️ Print Labels</button>
@@ -385,6 +396,14 @@
         // its own single entity; Service still has no purchase access at all, unchanged.
         if(sessionRole !== 'green' && sessionRole !== 'admin') {
             document.getElementById('grnEntityGroup').style.display = 'none';
+        }
+        // Fix (5 Sep 2026): the Party Ledger and Record Payment entity filters were showing all
+        // three buckets to everyone — Moped could flip over and see a vendor's Green/My Care
+        // balance, which was never intended. Moped now only ever sees its own entity here; Green
+        // and Admin are unaffected (Green needs both its entities, Admin needs everything).
+        if(sessionRole === 'moped') {
+            document.getElementById('ledgerFilter').innerHTML = '<option value="moped">Moped House</option>';
+            document.getElementById('payWh').innerHTML = '<option value="moped">Moped House</option>';
         }
         // Ledger-bucket key ('green'/'service'/'moped' — the existing party_ledger/party_payments
         // partition, unchanged) -> the GST entity it represents, for purchase_invoices.gst_entity
@@ -1117,6 +1136,7 @@
             }
             document.getElementById('grnGstTotal').innerText = gstTotal.toFixed(2);
             document.getElementById('grnVendorPayablePreview').innerText = (subtotal + payableLc + gstTotal).toFixed(2);
+            document.getElementById('grnFinalPayableFooter').innerText = (subtotal + payableLc + gstTotal).toFixed(2); // same figure, mirrored to the prominent footer heading near Commit GRN
             buildGrnTaxSummary(subtotal);
 
             const rows = document.querySelectorAll('[id^="grnRow-"]');
