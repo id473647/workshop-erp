@@ -842,16 +842,21 @@ async function writeOffDefective(itemId){
 
 // ── TAB 1: UNVERIFIED QUEUE ────────────────────────────────────────────────
 async function loadUnverified(){
-  const{data}=await sb.from('product_master').select('*').eq('catalog_status','unverified').order('created_at',{ascending:false});
+  // Fix (7 Sep 2026, 11A.27): this queue now also lists products that are already LIVE in the
+  // catalog but still awaiting admin approval (pending_admin_approval:true) — Green/MyCare
+  // additions — alongside the older fully-hidden 'unverified' items created on-the-fly during
+  // billing. Same review list, two different origins, labelled separately below.
+  const{data}=await sb.from('product_master').select('*').or('catalog_status.eq.unverified,pending_admin_approval.eq.true').order('created_at',{ascending:false});
   document.getElementById('unvCount').innerText=data?data.length:0;
   const container=document.getElementById('unverifiedList');
   if(!data||data.length===0){container.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No products pending approval. ✅</p>';return;}
   container.innerHTML='';
   data.forEach(p=>{
+    const isHidden=p.catalog_status==='unverified';
     container.innerHTML+=`
     <div class="unverified-card">
       <div style="font-size:.78rem;color:#92400e;font-weight:700;margin-bottom:8px;">
-        📦 Created during billing — ${new Date(p.created_at).toLocaleDateString('en-IN')}
+        ${isHidden?'📦 Created during billing — hidden until approved':'🟢 Live in catalog — added by Green/MyCare, awaiting admin approval'} — ${new Date(p.created_at).toLocaleDateString('en-IN')}
       </div>
       <div class="unv-grid">
         <div class="field-group" style="grid-column:span 2;"><label>Item Name</label>
@@ -892,7 +897,7 @@ async function loadUnverified(){
         </div>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn-action" onclick="approveProduct('${p.id}')">✅ APPROVE & GO LIVE</button>
+        <button class="btn-action" onclick="approveProduct('${p.id}')">${isHidden?'✅ APPROVE & GO LIVE':'✅ APPROVE'}</button>
         <button class="btn-action danger" onclick="deleteProduct('${p.id}',false)">🗑️ DELETE</button>
       </div>
     </div>`;
@@ -909,7 +914,8 @@ async function approveProduct(id){
     cost_price:parseFloat(document.getElementById(`u-cost-${id}`).value)||0,
     retail_price:parseFloat(document.getElementById(`u-ret-${id}`).value)||0,
     barcode_id:document.getElementById(`u-bar-${id}`).value.trim(),
-    catalog_status:'live'
+    catalog_status:'live',
+    pending_admin_approval:false
   };
   if(!payload.item_name){alert('Item name is required.');return;}
   const{error}=await sb.from('product_master').update(payload).eq('id',id);
@@ -945,7 +951,10 @@ async function loadCatalog(){
   if(smartFilter==='no_qr') q=q.is('barcode_id',null);
   if(smartFilter==='low_stock') q=q.lt('current_stock',4).eq('track_stock',true);
   if(smartFilter==='recent') q=q.order('created_at',{ascending:false});
-  const{data}=await q;
+  const{data,error}=await q;
+  // Fix (7 Sep 2026, 11A.27): a real query failure (e.g. a filter naming a column that doesn't
+  // exist yet) used to look identical to "no products" — now it's shown as an actual error.
+  if(error){ document.querySelector('#catTable tbody').innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--danger);padding:16px;">Catalog load error: ${error.message}</td></tr>`; return; }
   // Build name cache for Add Product autocomplete
   if(data) { catalogCache=data; _catalogNameCache=[...new Set(data.map(p=>p.item_name).filter(Boolean))].sort(); }
   const tbody=document.querySelector('#catTable tbody'); tbody.innerHTML='';
@@ -964,6 +973,7 @@ async function loadCatalog(){
       <td>
         <strong style="cursor:pointer;" onclick="viewProductPhoto('${p.id}','${(p.item_name||'').replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}','${p.photo_url||''}','${p.primary_vendor_id||''}')" title="Click to view details">${p.item_name}</strong>
         <span style="display:inline-block;background:${whBadgeColor};color:white;font-size:.6rem;padding:1px 5px;border-radius:3px;margin-left:5px;font-weight:700;">${(p.warehouse_type||'').toUpperCase()}</span>
+        ${p.pending_admin_approval?'<span style="display:inline-block;background:#f59e0b;color:white;font-size:.6rem;padding:1px 5px;border-radius:3px;margin-left:3px;font-weight:700;" title="Visible and sellable, awaiting admin approval">⏳ PENDING APPROVAL</span>':''}
         <br><span style="font-size:.72rem;color:#94a3b8;">${p.barcode_id?'🏷 '+p.barcode_id:''}</span>
       </td>
       <td>${p.brand||'—'}</td>
@@ -1264,8 +1274,17 @@ async function saveNewProduct(){
     primary_vendor_id :document.getElementById('apVendorId').value||null,
     mrp,retail_price  :sell,cost_price:mac,mac,
     gst_percent       :document.getElementById('apGstPct').value,
-    catalog_status    :(editId||sessionRole==='admin'||sessionRole==='moped')?'live':'unverified'
+    // Fix (7 Sep 2026, part of 11A.27): products added here now go LIVE immediately for every
+    // role — Green/MyCare products used to sit hidden as catalog_status:'unverified' until an
+    // admin opened the Unverified Queue, which is why zero-stock Green additions (and anything
+    // restocked later under the same item name) never showed up in Full Catalog. They still get
+    // flagged for admin review via pending_admin_approval below — only the *visibility* changed.
+    catalog_status    :'live'
   };
+  // Moped and Admin additions never need review. A fresh Green/MyCare addition does (edits to an
+  // already-approved product do not re-trigger review — pending_admin_approval is simply omitted
+  // from the update payload so its current value is left untouched).
+  if(!editId) payload.pending_admin_approval = (sessionRole==='admin'||sessionRole==='moped') ? false : true;
 
   let savedId=editId;
   if(editId){
