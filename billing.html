@@ -174,6 +174,27 @@
             body.print-a6single #a6PrintTarget, body.print-a6combo #a6PrintTarget { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
             body.print-a6single #renderThermalReceiptTarget, body.print-a6single #multiEntityReceiptTarget,
             body.print-a6combo #renderThermalReceiptTarget, body.print-a6combo #multiEntityReceiptTarget { display: none !important; }
+            /* 11B.46c-fix5 (8 Sep 2026): fix4 (flex/page-break wrapper split) did NOT resolve the
+               "Total: 1 page" bug on real test prints. Real root cause found: #a6PrintTarget sits
+               INSIDE #modalReceipt (the on-screen receipt popup), which has `position: fixed`
+               (from .overlay-modal), and its own child .modal-card has `overflow-y: auto;
+               max-height: 90vh` (so the popup scrolls on screen instead of growing forever).
+               #a6PrintTarget's `position: absolute` above makes it look for the nearest
+               positioned ancestor to measure "top:0; left:0" against — that's #modalReceipt
+               (position:fixed). In paged/print media, Chromium does NOT fragment content that
+               sits inside a fixed-position box across multiple physical pages — a fixed box is
+               treated as a single repeating overlay, not part of the normal page flow that can
+               split. That is why the DOM could correctly hold 2 full `.a6-combo-sheet` divs
+               (confirmed via the domSheetDivs debug count) while the printed/PDF output always
+               showed only 1 page, no matter what the content or CSS of the sheets themselves was.
+               Fix: while printing an A6/A5 invoice, take #modalReceipt and .modal-card OUT of
+               fixed positioning and OUT of their scrolling/height-capped box so #a6PrintTarget's
+               containing block becomes the page itself (which Chromium can paginate normally).
+               This only applies while body has the print-a6single/print-a6combo class, so the
+               on-screen popup (scrolling, fixed overlay) is completely unchanged for normal use —
+               no interface or functionality change outside of what was broken. */
+            body.print-a6single #modalReceipt, body.print-a6combo #modalReceipt { position: static !important; display: block !important; background: none !important; padding: 0 !important; }
+            body.print-a6single #modalReceipt .modal-card, body.print-a6combo #modalReceipt .modal-card { position: static !important; overflow: visible !important; max-height: none !important; height: auto !important; display: block !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; border-radius: 0 !important; max-width: none !important; }
 
             /* 11B.46b: height is now a hard 148mm with overflow:hidden (was min-height, which let
                content grow past the physical page and get cut mid-item by the browser's own print
@@ -3376,61 +3397,80 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             return { pages: [pageHtml(itemHtmlArr, { contd: false, more: false, final: true })], lastPageLeftoverPx: leftover, isMultiPage: false, debug: makeDebug({ case: 1, singlePageBudget, perPageCounts: [itemHtmlArr.length] }) };
         }
 
-        // Case 2: more than one page needed. Find the true last page FIRST, by filling
-        // backward from the end of the item list against the real final-page budget (which
-        // always includes a CONTINUED note once there's more than one page, and the real
-        // footer).
+        // Case 2: more than one page needed.
         //
-        // 11B.46c-fix2 (8 Sep 2026, from real debug numbers off the HP LaserJet 1020 test):
-        // header+footer alone can be TALLER than one whole A6-height zone with zero items in it
-        // (observed: header 254px + footer 329px = 583px against a 545px budget — already 38px
-        // over before a single item is added). Forcing "at least one item" onto that page in
-        // that situation, as the previous build did, silently overflowed the zone; the
-        // `overflow:hidden` CSS safety net then clipped the bottom of it — which is why the
-        // footer looked like it had vanished. Fix: only guarantee at least one item on the last
-        // page when there is genuinely SOME room left after header+footer (rawFinalRoomPx > 0).
-        // When header+footer alone already fill the page, the last page becomes a dedicated
-        // header+footer page with ZERO items, and every item is pushed onto the earlier pages
-        // instead — exactly what the user asked for ("the footer shall be printed on page 2,
-        // and the space that frees up shall be used to print more items" on the pages before it).
-        const rawFinalRoomPx = budget - headerPx - contdNotePx - footerPx;
+        // 11B.46c-fix6 (8 Sep 2026): the previous build decided the FINAL page's items FIRST, by
+        // filling backward from the end of the whole item list, and only THEN packed everything
+        // before it forward. That pre-committed a fixed number of items to the last page before
+        // the forward-pack even knew how the earlier pages would lay out — which could strand a
+        // leading/middle page well under-filled even when it visibly had room for more. A real
+        // test print showed exactly this: page 1 held only 6 items when 7 would fit, and page 2
+        // had a lot of empty space before "Contd. on next page" while the invoice still needed a
+        // 3rd page for the footer.
+        //
+        // New approach ("forward-pack, then trim the tail"): forward-pack EVERY item greedily
+        // first, using the same generous per-page budget throughout (only the small "Contd. on
+        // next page" note reserved — never the taller real footer, since the footer never prints
+        // on these pages). This alone maximizes how many items land on every page. Only the very
+        // LAST of those provisional pages might still be too full once its moreNote is swapped
+        // for the taller real footer — if so, the minimum number of items are peeled off ITS tail
+        // onto a genuinely new final page (the same backward-fill idea as before, but now scoped
+        // to only that one page's worth of items, never the whole invoice), so no earlier page
+        // ever loses density it didn't need to give up.
+        const groupsIdx = [];
+        {
+            let g = [], gPx = 0;
+            for (let i = 0; i < itemHtmlArr.length; i++) {
+                const isFirstPage = groupsIdx.length === 0;
+                const pageBudget = Math.max(0, budget - headerPx - moreNotePx - (isFirstPage ? 0 : contdNotePx));
+                if (g.length > 0 && gPx + itemPx[i] > pageBudget) {
+                    groupsIdx.push(g);
+                    g = []; gPx = 0;
+                }
+                g.push(i);
+                gPx += itemPx[i];
+            }
+            if (g.length > 0) groupsIdx.push(g);
+            if (groupsIdx.length === 0) groupsIdx.push([]);
+        }
+
+        // 11B.46c-fix2 (8 Sep 2026, kept): header+footer alone can be TALLER than one whole
+        // A6-height zone with zero items in it. Only guarantee at least one item survives on the
+        // final page when there is genuinely SOME room left after header+footer
+        // (rawFinalRoomPx > 0) — otherwise the final page becomes a dedicated header+footer page
+        // with ZERO items, and everything is pushed onto the earlier (moreNote-budget) pages.
+        const lastGroup = groupsIdx[groupsIdx.length - 1];
+        const lastGroupIsOnlyPage = groupsIdx.length === 1;
+        const rawFinalRoomPx = budget - headerPx - (lastGroupIsOnlyPage ? 0 : contdNotePx) - footerPx;
         const finalPageBudget = Math.max(0, rawFinalRoomPx);
-        let splitIndex = itemHtmlArr.length;
+        let sfxStart = lastGroup.length;
         let tailPx = 0;
         if (rawFinalRoomPx > 0) {
-            for (let i = itemHtmlArr.length - 1; i >= 0; i--) {
-                if (tailPx > 0 && tailPx + itemPx[i] > finalPageBudget) break;
-                tailPx += itemPx[i];
-                splitIndex = i;
+            for (let i = lastGroup.length - 1; i >= 0; i--) {
+                if (tailPx > 0 && tailPx + itemPx[lastGroup[i]] > finalPageBudget) break;
+                tailPx += itemPx[lastGroup[i]];
+                sfxStart = i;
             }
         }
-        // else: header+footer alone already fill (or overflow) the zone — the last page carries
-        // no items at all (splitIndex stays at itemHtmlArr.length, tailPx stays 0).
-        const finalItems = itemHtmlArr.slice(splitIndex);
-        const leadingItems = itemHtmlArr.slice(0, splitIndex);
-        const leadingItemPx = itemPx.slice(0, splitIndex);
+        const suffixIdx = lastGroup.slice(sfxStart);
+        const prefixIdx = lastGroup.slice(0, sfxStart);
+        if (prefixIdx.length > 0) {
+            groupsIdx[groupsIdx.length - 1] = prefixIdx; // shrinks — stays an ordinary (moreNote) page
+            groupsIdx.push(suffixIdx);                    // new dedicated final (footer) page
+        } else {
+            groupsIdx[groupsIdx.length - 1] = suffixIdx;   // the whole provisional last page IS the final page
+        }
 
-        // Pack everything BEFORE the last page forward, page by page, reserving only the small
-        // moreNote (never the footer, since the footer never actually prints on these pages).
         const pages = [];
         const perPageCounts = [];
-        let group = [];
-        let groupPx = 0;
-        for (let i = 0; i < leadingItems.length; i++) {
-            const isFirstPage = pages.length === 0;
-            const pageBudget = Math.max(0, budget - headerPx - moreNotePx - (isFirstPage ? 0 : contdNotePx));
-            if (group.length > 0 && groupPx + leadingItemPx[i] > pageBudget) {
-                pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false }));
-                perPageCounts.push(group.length);
-                group = []; groupPx = 0;
-            }
-            group.push(leadingItems[i]);
-            groupPx += leadingItemPx[i];
+        for (let p = 0; p < groupsIdx.length; p++) {
+            const isFirst = p === 0;
+            const isFinal = p === groupsIdx.length - 1;
+            const items = groupsIdx[p].map(idx => itemHtmlArr[idx]);
+            pages.push(pageHtml(items, { contd: !isFirst, more: !isFinal, final: isFinal }));
+            perPageCounts.push(items.length);
         }
-        if (group.length > 0) { pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false })); perPageCounts.push(group.length); }
-        pages.push(pageHtml(finalItems, { contd: pages.length > 0, more: false, final: true }));
-        perPageCounts.push(finalItems.length);
-
+        const splitIndex = itemHtmlArr.length - suffixIdx.length; // kept for debug parity — index where the final page's items begin
         const lastPageLeftoverPx = Math.max(0, finalPageBudget - tailPx);
         return { pages, lastPageLeftoverPx, isMultiPage: pages.length > 1, debug: makeDebug({ case: 2, finalPageBudget, splitIndex, perPageCounts }) };
     }
