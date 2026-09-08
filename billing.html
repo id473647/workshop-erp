@@ -3302,27 +3302,49 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
        Header and footer content itself is NEVER trimmed or varied — same full logo, GSTIN,
        address, GST breakdown, savings line, promo line and "computer generated invoice" line
        on every page/zone in every scenario, per the standardised-invoice requirement. */
+    // 11B.46c-fix3 (8 Sep 2026): the header and footer blocks being paginated here
+    // (thHeaderBlock/thFooterBlock, meHeader*/meFooter*) were originally sized and laid out for
+    // the 80mm thermal roll printer, which has no fixed page HEIGHT at all — a receipt just
+    // prints as long as it needs to. The A6/A5 print engine reuses that exact same header/footer
+    // content unchanged (correctly, since it must never diverge from what the customer sees on
+    // screen and on the thermal copy), but an A6 zone has a hard 148mm height thermal paper never
+    // had. Real debug numbers off the HP LaserJet 1020 showed header+footer ALONE (254px+329px)
+    // already exceeding the ~545px page budget before a single item or note was added — that's a
+    // genuine content-vs-page-size mismatch, not a pagination bug. Fix (user's choice): scale
+    // ONLY the header and footer block down with CSS `zoom` — never the item lines, never the
+    // thermal print, never the on-screen receipt or WhatsApp image, all of which are built from
+    // separate unscaled copies of this same source content. `zoom` (not a wrapper font-size,
+    // which would not affect the many rem-based sizes already baked into this content) shrinks
+    // the whole header/footer block proportionally — text, spacing, and all — in one step.
+    const A6_HF_SCALE = 0.8;
+    function a6ScaleHF(html) { return html ? `<div style="zoom:${A6_HF_SCALE};">${html}</div>` : html; }
+
     function a6PaginateEntity(logoHTML, headerHTML, itemHtmlArr, footerHTML, sheetClass) {
         const pageHeightPx = a6PageHeightPx();
         const budget = pageHeightPx - A6_SAFETY_MARGIN_PX;
         const contdNoteHTML = `<div class="a6-contd-note">--- CONTINUED ---</div>`;
         const moreNoteHTML = `<div class="a6-more-note">--- Contd. on next page ---</div>`;
+        const scaledLogoHeaderHTML = a6ScaleHF(logoHTML + headerHTML);
+        const scaledFooterHTML = a6ScaleHF(footerHTML);
 
-        // Fixed blocks — each measured exactly once.
-        const headerPx = a6MeasureHeightPx(logoHTML + headerHTML, sheetClass);
-        const footerPx = a6MeasureHeightPx(footerHTML, sheetClass);
+        // Fixed blocks — each measured exactly once, and measured on the EXACT same (scaled)
+        // HTML that pageHtml() below actually renders, so the numbers used to decide can never
+        // drift from what gets printed.
+        const headerPx = a6MeasureHeightPx(scaledLogoHeaderHTML, sheetClass);
+        const footerPx = a6MeasureHeightPx(scaledFooterHTML, sheetClass);
         const contdNotePx = a6MeasureHeightPx(contdNoteHTML, sheetClass);
         const moreNotePx = a6MeasureHeightPx(moreNoteHTML, sheetClass);
 
         // Every item's own real height — measured once each, not re-derived from a growing page.
+        // Items are NOT scaled — only header/footer text shrinks, per the user's choice.
         const itemPx = itemHtmlArr.map(h => a6MeasureHeightPx(h, sheetClass));
         const totalItemsPx = itemPx.reduce((s, p) => s + p, 0);
 
         function pageHtml(items, opts) {
             const contdNote = opts.contd ? contdNoteHTML : '';
             const moreNote = opts.more ? moreNoteHTML : '';
-            const footer = opts.final ? footerHTML : '';
-            return `${logoHTML}${headerHTML}${contdNote}${items.join('')}${moreNote}${footer}`;
+            const footer = opts.final ? scaledFooterHTML : '';
+            return `${scaledLogoHeaderHTML}${contdNote}${items.join('')}${moreNote}${footer}`;
         }
 
         // 11B.46c-debug (8 Sep 2026): a real test print showed items+footer disappearing in a
@@ -3346,17 +3368,33 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // Case 2: more than one page needed. Find the true last page FIRST, by filling
         // backward from the end of the item list against the real final-page budget (which
         // always includes a CONTINUED note once there's more than one page, and the real
-        // footer). Always keeps at least one item on the last page even if a single item alone
-        // would overflow it (graceful degradation for an oversized item, never an infinite/empty
-        // page).
-        const finalPageBudget = Math.max(0, budget - headerPx - contdNotePx - footerPx);
+        // footer).
+        //
+        // 11B.46c-fix2 (8 Sep 2026, from real debug numbers off the HP LaserJet 1020 test):
+        // header+footer alone can be TALLER than one whole A6-height zone with zero items in it
+        // (observed: header 254px + footer 329px = 583px against a 545px budget — already 38px
+        // over before a single item is added). Forcing "at least one item" onto that page in
+        // that situation, as the previous build did, silently overflowed the zone; the
+        // `overflow:hidden` CSS safety net then clipped the bottom of it — which is why the
+        // footer looked like it had vanished. Fix: only guarantee at least one item on the last
+        // page when there is genuinely SOME room left after header+footer (rawFinalRoomPx > 0).
+        // When header+footer alone already fill the page, the last page becomes a dedicated
+        // header+footer page with ZERO items, and every item is pushed onto the earlier pages
+        // instead — exactly what the user asked for ("the footer shall be printed on page 2,
+        // and the space that frees up shall be used to print more items" on the pages before it).
+        const rawFinalRoomPx = budget - headerPx - contdNotePx - footerPx;
+        const finalPageBudget = Math.max(0, rawFinalRoomPx);
         let splitIndex = itemHtmlArr.length;
         let tailPx = 0;
-        for (let i = itemHtmlArr.length - 1; i >= 0; i--) {
-            if (tailPx > 0 && tailPx + itemPx[i] > finalPageBudget) break;
-            tailPx += itemPx[i];
-            splitIndex = i;
+        if (rawFinalRoomPx > 0) {
+            for (let i = itemHtmlArr.length - 1; i >= 0; i--) {
+                if (tailPx > 0 && tailPx + itemPx[i] > finalPageBudget) break;
+                tailPx += itemPx[i];
+                splitIndex = i;
+            }
         }
+        // else: header+footer alone already fill (or overflow) the zone — the last page carries
+        // no items at all (splitIndex stays at itemHtmlArr.length, tailPx stays 0).
         const finalItems = itemHtmlArr.slice(splitIndex);
         const leadingItems = itemHtmlArr.slice(0, splitIndex);
         const leadingItemPx = itemPx.slice(0, splitIndex);
