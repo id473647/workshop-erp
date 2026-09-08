@@ -179,10 +179,21 @@
                content grow past the physical page and get cut mid-item by the browser's own print
                pagination). Pages are now measured to fit before being assigned here, so this is a
                safety net, not the primary control. */
-            .a6-single-sheet { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; page-break-after: always; font-family: 'Courier New', monospace; font-size: 0.72rem; }
-            .a6-single-sheet:last-child { page-break-after: auto; }
-            .a6-combo-sheet { display: flex; width: 210mm; height: 148mm; box-sizing: border-box; page-break-after: always; }
-            .a6-combo-sheet:last-child { page-break-after: auto; }
+            .a6-single-sheet { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; page-break-after: always; break-after: page; font-family: 'Courier New', monospace; font-size: 0.72rem; }
+            .a6-single-sheet:last-child { page-break-after: auto; break-after: auto; }
+            /* 11B.46c-fix4 (8 Sep 2026): real print testing showed only 1 physical sheet coming
+               out even when the DOM correctly held 2 `.a6-combo-sheet` divs (confirmed via a
+               debug DOM count) — Chromium's print engine does not reliably honor
+               page-break-after on an element that is ALSO `display:flex`, which is exactly what
+               .a6-combo-sheet was (flex, to lay its two zones side by side, AND carrying the
+               break directive). Fix: the break directive now lives on a plain block-level
+               wrapper (.a6-combo-sheet-wrap) around each flex sheet, so the flex layout and the
+               page-break instruction are never on the same element. Both the legacy
+               `page-break-after` and the modern `break-after` properties are set together for
+               the widest browser/print-driver compatibility. */
+            .a6-combo-sheet-wrap { page-break-after: always; break-after: page; }
+            .a6-combo-sheet-wrap:last-child { page-break-after: auto; break-after: auto; }
+            .a6-combo-sheet { display: flex; width: 210mm; height: 148mm; box-sizing: border-box; }
             .a6-combo-zone { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; font-family: 'Courier New', monospace; font-size: 0.68rem; }
             .a6-combo-zone-left { border-right: 1px dashed #000; }
             .a6-contd-note { text-align: center; font-weight: 700; font-size: 0.65rem; border-bottom: 1px dashed #000; padding-bottom: 2px; margin-bottom: 2px; }
@@ -3457,7 +3468,10 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     }
 
     function a6RenderSheetsHTML(sheetPairs) {
-        return sheetPairs.map(pair => `<div class="a6-combo-sheet"><div class="a6-combo-zone a6-combo-zone-left">${pair[0] || ''}</div><div class="a6-combo-zone a6-combo-zone-right">${pair[1] || ''}</div></div>`).join('');
+        // 11B.46c-fix4: the page-break-after directive now lives on the outer .a6-combo-sheet-wrap
+        // (a plain block div), never on the inner .a6-combo-sheet (which stays display:flex to
+        // lay its two zones side by side) — see the CSS comment above for why the two were split.
+        return sheetPairs.map(pair => `<div class="a6-combo-sheet-wrap"><div class="a6-combo-sheet"><div class="a6-combo-zone a6-combo-zone-left">${pair[0] || ''}</div><div class="a6-combo-zone a6-combo-zone-right">${pair[1] || ''}</div></div></div>`).join('');
     }
 
     // Builds the full A5-sheet HTML for a My Care + Moped invoice, and decides where (if
