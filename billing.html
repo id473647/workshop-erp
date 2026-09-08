@@ -3562,10 +3562,15 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
                 const sheetCount = pack.sheets.length;
                 paperMsg = `This invoice needs more than one A6 page.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheetCount} sheet(s) will print, two A6-sized pages per sheet with a dashed cut line — cut and stack them in order.`;
             }
-            // 11B.46c-debug: temporary — remove once the content-dropping bug is confirmed fixed.
+            // 11B.46c-debug (extended): the alert-computed sheet count keeps saying 2, but the
+            // real Chrome print dialog keeps saying "Total: 1 sheet of paper" — this line checks
+            // whether the DOM actually received 2 `.a6-combo-sheet` divs (a real JS/DOM bug) or
+            // whether they're both there and something about print CSS/paper size is merging or
+            // dropping the second one at print time (a print-engine issue, not a code one).
             if (single.debug) {
                 const d = single.debug;
-                paperMsg += `\n\n[Debug] items:${d.itemCount} case:${d.case} pages:${single.pages.length} perPage:${JSON.stringify(d.perPageCounts)} header:${Math.round(d.headerPx)}px footer:${Math.round(d.footerPx)}px budget:${Math.round(d.budget)}px sheetClass:${d.sheetClass}`;
+                const sheetDivsInDom = target.querySelectorAll('.a6-combo-sheet, .a6-single-sheet').length;
+                paperMsg += `\n\n[Debug] items:${d.itemCount} case:${d.case} pages:${single.pages.length} perPage:${JSON.stringify(d.perPageCounts)} header:${Math.round(d.headerPx)}px footer:${Math.round(d.footerPx)}px budget:${Math.round(d.budget)}px sheetClass:${d.sheetClass} domSheetDivs:${sheetDivsInDom} targetHtmlLen:${target.innerHTML.length}`;
             }
         }
 
