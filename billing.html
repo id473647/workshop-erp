@@ -3325,12 +3325,22 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             return `${logoHTML}${headerHTML}${contdNote}${items.join('')}${moreNote}${footer}`;
         }
 
+        // 11B.46c-debug (8 Sep 2026): a real test print showed items+footer disappearing in a
+        // way the packing logic itself could not reproduce under any measured-height scenario
+        // tried by hand — so rather than guess a third time, every result now carries the raw
+        // measured numbers that actually decided it. This is surfaced in the pre-print alert
+        // (see executeInvoicePrint) so the next real test print reports real browser numbers
+        // instead of another guess. Safe to remove once the real cause is confirmed and fixed.
+        function makeDebug(extra) {
+            return Object.assign({ sheetClass, headerPx, footerPx, contdNotePx, moreNotePx, budget, itemCount: itemHtmlArr.length, totalItemsPx }, extra);
+        }
+
         // Case 1: everything genuinely fits on one page — no CONTINUED note, no moreNote, just
         // header + items + the real footer.
         const singlePageBudget = Math.max(0, budget - headerPx - footerPx);
         if (itemHtmlArr.length === 0 || totalItemsPx <= singlePageBudget) {
             const leftover = Math.max(0, singlePageBudget - totalItemsPx);
-            return { pages: [pageHtml(itemHtmlArr, { contd: false, more: false, final: true })], lastPageLeftoverPx: leftover, isMultiPage: false };
+            return { pages: [pageHtml(itemHtmlArr, { contd: false, more: false, final: true })], lastPageLeftoverPx: leftover, isMultiPage: false, debug: makeDebug({ case: 1, singlePageBudget, perPageCounts: [itemHtmlArr.length] }) };
         }
 
         // Case 2: more than one page needed. Find the true last page FIRST, by filling
@@ -3354,6 +3364,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // Pack everything BEFORE the last page forward, page by page, reserving only the small
         // moreNote (never the footer, since the footer never actually prints on these pages).
         const pages = [];
+        const perPageCounts = [];
         let group = [];
         let groupPx = 0;
         for (let i = 0; i < leadingItems.length; i++) {
@@ -3361,16 +3372,18 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             const pageBudget = Math.max(0, budget - headerPx - moreNotePx - (isFirstPage ? 0 : contdNotePx));
             if (group.length > 0 && groupPx + leadingItemPx[i] > pageBudget) {
                 pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false }));
+                perPageCounts.push(group.length);
                 group = []; groupPx = 0;
             }
             group.push(leadingItems[i]);
             groupPx += leadingItemPx[i];
         }
-        if (group.length > 0) pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false }));
+        if (group.length > 0) { pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false })); perPageCounts.push(group.length); }
         pages.push(pageHtml(finalItems, { contd: pages.length > 0, more: false, final: true }));
+        perPageCounts.push(finalItems.length);
 
         const lastPageLeftoverPx = Math.max(0, finalPageBudget - tailPx);
-        return { pages, lastPageLeftoverPx, isMultiPage: pages.length > 1 };
+        return { pages, lastPageLeftoverPx, isMultiPage: pages.length > 1, debug: makeDebug({ case: 2, finalPageBudget, splitIndex, perPageCounts }) };
     }
 
     function a6BuildSingleEntityResult() {
@@ -3379,13 +3392,13 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const itemHtmlArr = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => n.outerHTML);
         // First try as one true A6 sheet, measured at that sheet's own (slightly larger) font.
         let result = a6PaginateEntity('', headerHTML, itemHtmlArr, footerHTML, 'a6-single-sheet');
-        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet' };
+        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet', debug: result.debug };
         // Doesn't fit on one page — re-measure at the combo-zone's smaller font, since overflow
         // prints via the same 2-per-A5-sheet packing the combo invoice uses (keeps the measured
         // class and the actually-rendered class always in sync — never guess with one and print
         // with the other).
         result = a6PaginateEntity('', headerHTML, itemHtmlArr, footerHTML, 'a6-combo-zone');
-        return { pages: result.pages, sheetClass: 'a6-combo-zone' };
+        return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: result.debug };
     }
 
     // Small logo strip sized to fit inside a combo zone (105mm wide) — the on-screen receipt's
@@ -3510,6 +3523,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
                 isSingleA6 = false;
                 const sheetCount = pack.sheets.length;
                 paperMsg = `This invoice needs more than one A6 page.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheetCount} sheet(s) will print, two A6-sized pages per sheet with a dashed cut line — cut and stack them in order.`;
+            }
+            // 11B.46c-debug: temporary — remove once the content-dropping bug is confirmed fixed.
+            if (single.debug) {
+                const d = single.debug;
+                paperMsg += `\n\n[Debug] items:${d.itemCount} case:${d.case} pages:${single.pages.length} perPage:${JSON.stringify(d.perPageCounts)} header:${Math.round(d.headerPx)}px footer:${Math.round(d.footerPx)}px budget:${Math.round(d.budget)}px sheetClass:${d.sheetClass}`;
             }
         }
 
