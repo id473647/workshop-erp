@@ -1128,8 +1128,9 @@
                 const lineGstAmt = net - lineTaxable;
                 const lineCgst = lineGstAmt/2, lineSgst = lineGstAmt/2;
                 gstTotals.taxable += lineTaxable; gstTotals.cgst += lineCgst; gstTotals.sgst += lineSgst;
-                if (row._pendingItemUnverified) { const ud={item_name:clean,brand,warehouse_type:'Green',default_price:r,mrp,catalog_status:'unverified',category:typeVal}; if(isLube&&volumeML>0)ud.volume_per_unit=volumeML; await supabaseClient.from('product_master').upsert(ud,{onConflict:'item_name,brand',ignoreDuplicates:false}); }
-                else { supabaseClient.from('product_master').upsert({item_name:clean,brand,warehouse_type:'Green',default_price:r,category:typeVal},{onConflict:'item_name,brand'}).then(); }
+                /* Fix (7 Sep 2026, 11A.27 continued): warehouse_type lowercased to 'green' to match the exact-match filter used everywhere else (product-master-console.html, purchase-manager.html) — this file's own search already lowercases before comparing so it was unaffected, but Full Catalog wasn't. catalog_status now 'live' with pending_admin_approval:true instead of fully hidden 'unverified', matching the same live-with-approval-badge pattern as product-master-console.html's Add Product. */
+                if (row._pendingItemUnverified) { const ud={item_name:clean,brand,warehouse_type:'green',default_price:r,mrp,catalog_status:'live',pending_admin_approval:true,category:typeVal}; if(isLube&&volumeML>0)ud.volume_per_unit=volumeML; await supabaseClient.from('product_master').upsert(ud,{onConflict:'item_name,brand',ignoreDuplicates:false}); }
+                else { supabaseClient.from('product_master').upsert({item_name:clean,brand,warehouse_type:'green',default_price:r,category:typeVal,catalog_status:'live',pending_admin_approval:true},{onConflict:'item_name,brand'}).then(); }
                 promises.push(supabaseClient.from('counter_sale_items').insert({ sale_id:saleId, item_name:`${clean} (${brand})`, qty:q, unit_price:r, total_price:net, mrp_at_billing:mrp, mac_at_billing:row._pmac||0, product_master_id:row._pid||null, unit_metric:isLube?'ML':'Pcs', volume_ml:isLube?volumeML:null, gst_percent:gstPct, taxable_value:lineTaxable, cgst_amount:lineCgst, sgst_amount:lineSgst }));
             }
         }
