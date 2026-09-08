@@ -3228,57 +3228,79 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         return h;
     }
 
-    // Paginates one entity's items by REAL measured height. logoHTML+headerHTML repeat on every
-    // page. footerHTML only appears on the final page. If extraBlockHTML is given (the combined
-    // payment summary), it's appended to the final page ONLY if it actually fits within the
-    // remaining measured space — otherwise the caller gets extraIncluded:false and must give it
-    // its own page. sheetClass picks which print CSS (single vs combo width/font) to measure against.
-    function a6BuildPages(logoHTML, headerHTML, itemHtmlArr, footerHTML, extraBlockHTML, sheetClass) {
-        const budget = a6PageHeightPx() - A6_SAFETY_MARGIN_PX;
-        const pages = [];
-        let current = [];
-        function pageHtml(items, isFinal, contdIndex, includeExtra) {
-            const contdNote = contdIndex > 0 ? `<div class="a6-contd-note">--- CONTINUED ---</div>` : '';
-            const moreNote = !isFinal ? `<div class="a6-more-note">--- Contd. on next page ---</div>` : '';
-            const footer = isFinal ? footerHTML : '';
-            const extra = (isFinal && includeExtra) ? extraBlockHTML : '';
-            return `${logoHTML}${headerHTML}${contdNote}${items.join('')}${moreNote}${footer}${extra}`;
-        }
+    /* ═══════════ 11B.46c (8 Sep 2026) — fixed-header/fixed-footer arithmetic pagination ═══════════
+       Replaces 11B.46b's iterative "grow the candidate page and remeasure the whole thing"
+       approach (which produced a genuine small-invoice duplicate-sheet bug that could not be
+       conclusively root-caused by re-reading the code). This engine instead:
+         1. Measures the logo+header block ONCE, the footer block ONCE, and the tiny
+            "CONTINUED" / "Contd. on next page" notes ONCE each — never re-measured per item.
+         2. Measures every individual item's own real height ONCE each (no repeated
+            concatenated-HTML remeasurement).
+         3. Reserves the TALLER of {footer, "Contd. on next page" note} as the fixed bottom
+            allowance on EVERY page (not just the last one) — so swapping the small moreNote
+            for the taller real footer on the final page can never push that page over budget.
+            This is the structural guard against the 11B.46b duplication bug: no page's fit
+            decision is ever revised after the fact.
+         4. Packs items into pages by straight arithmetic addition against that fixed budget.
+       Header and footer content itself is NEVER trimmed or varied — same full logo, GSTIN,
+       address, GST breakdown, savings line, promo line and "computer generated invoice" line
+       on every page/zone in every scenario, per the standardised-invoice requirement. */
+    function a6PaginateEntity(logoHTML, headerHTML, itemHtmlArr, footerHTML, sheetClass) {
+        const pageHeightPx = a6PageHeightPx();
+        const budget = pageHeightPx - A6_SAFETY_MARGIN_PX;
+        const contdNoteHTML = `<div class="a6-contd-note">--- CONTINUED ---</div>`;
+        const moreNoteHTML = `<div class="a6-more-note">--- Contd. on next page ---</div>`;
+
+        // Fixed blocks — each measured exactly once.
+        const headerPx = a6MeasureHeightPx(logoHTML + headerHTML, sheetClass);
+        const footerPx = a6MeasureHeightPx(footerHTML, sheetClass);
+        const contdNotePx = a6MeasureHeightPx(contdNoteHTML, sheetClass);
+        const moreNotePx = a6MeasureHeightPx(moreNoteHTML, sheetClass);
+        const reservedBottomPx = Math.max(footerPx, moreNotePx);
+        const perPageItemsBudget = Math.max(0, budget - headerPx - contdNotePx - reservedBottomPx);
+
+        // Every item's own real height — measured once each, not re-derived from a growing page.
+        const itemPx = itemHtmlArr.map(h => a6MeasureHeightPx(h, sheetClass));
+
+        const groups = []; // [{ items:[html...], px:number }]
+        let group = { items: [], px: 0 };
         for (let i = 0; i < itemHtmlArr.length; i++) {
-            const candidate = current.concat([itemHtmlArr[i]]);
-            const isLastItem = i === itemHtmlArr.length - 1;
-            const testHtml = pageHtml(candidate, isLastItem, pages.length, false);
-            const fits = a6MeasureHeightPx(testHtml, sheetClass) <= budget;
-            if (!fits && current.length > 0) {
-                // close the current page WITHOUT this item, then start a fresh page with it
-                pages.push(pageHtml(current, false, pages.length, false));
-                current = [itemHtmlArr[i]];
-            } else {
-                current = candidate;
+            if (group.items.length > 0 && group.px + itemPx[i] > perPageItemsBudget) {
+                groups.push(group);
+                group = { items: [], px: 0 };
             }
+            group.items.push(itemHtmlArr[i]);
+            group.px += itemPx[i];
         }
-        // Does the extra block (combined summary) fit appended to the final page?
-        let includeExtra = false;
-        if (extraBlockHTML) {
-            const testHtml = pageHtml(current, true, pages.length, true);
-            includeExtra = a6MeasureHeightPx(testHtml, sheetClass) <= budget;
-        }
-        pages.push(pageHtml(current, true, pages.length, includeExtra));
-        return { pages, extraIncluded: includeExtra };
+        groups.push(group); // always at least one group (covers a blank/zero-item invoice too)
+
+        const pages = groups.map((g, idx) => {
+            const isFinal = idx === groups.length - 1;
+            const contdNote = idx > 0 ? contdNoteHTML : '';
+            const moreNote = !isFinal ? moreNoteHTML : '';
+            const footer = isFinal ? footerHTML : '';
+            return `${logoHTML}${headerHTML}${contdNote}${g.items.join('')}${moreNote}${footer}`;
+        });
+
+        const lastGroup = groups[groups.length - 1];
+        const lastPageLeftoverPx = budget - headerPx - (groups.length > 1 ? contdNotePx : 0) - footerPx - lastGroup.px;
+
+        return { pages, lastPageLeftoverPx: Math.max(0, lastPageLeftoverPx), isMultiPage: pages.length > 1 };
     }
 
-    function buildSingleEntityA6Pages() {
+    function a6BuildSingleEntityResult() {
         const headerHTML = a6StripIds(document.getElementById('thHeaderBlock').innerHTML);
         const footerHTML = a6StripIds(document.getElementById('thFooterBlock').innerHTML);
         const itemHtmlArr = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => n.outerHTML);
         // First try as one true A6 sheet, measured at that sheet's own (slightly larger) font.
-        const singleTry = a6BuildPages('', headerHTML, itemHtmlArr, footerHTML, '', 'a6-single-sheet');
-        if (singleTry.pages.length === 1) return singleTry.pages; // fits on one A6 sheet as-is
+        let result = a6PaginateEntity('', headerHTML, itemHtmlArr, footerHTML, 'a6-single-sheet');
+        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet' };
         // Doesn't fit on one page — re-measure at the combo-zone's smaller font, since overflow
         // prints via the same 2-per-A5-sheet packing the combo invoice uses (keeps the measured
         // class and the actually-rendered class always in sync — never guess with one and print
         // with the other).
-        return a6BuildPages('', headerHTML, itemHtmlArr, footerHTML, '', 'a6-combo-zone').pages;
+        result = a6PaginateEntity('', headerHTML, itemHtmlArr, footerHTML, 'a6-combo-zone');
+        return { pages: result.pages, sheetClass: 'a6-combo-zone' };
     }
 
     // Small logo strip sized to fit inside a combo zone (105mm wide) — the on-screen receipt's
@@ -3286,73 +3308,128 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // separate, print-only fragment so each entity's zone carries its own logo, per the fix.
     const A6_ZONE_LOGO_HTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:18px;filter:grayscale(100%);margin-right:4px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:18px;filter:grayscale(100%);vertical-align:middle;"></div>`;
 
-    function buildComboA6Pages() {
+    // Chunks one entity's own pages 2-per-A5-sheet and reports where that entity's LAST content
+    // zone sits (left or right of its last sheet) and whether that last sheet's other zone was
+    // left physically blank (odd page count) — both needed by the unified combined-total rule.
+    function a6PackEntityToSheets(pages) {
+        const sheets = [];
+        for (let i = 0; i < pages.length; i += 2) sheets.push([pages[i], pages[i + 1] || null]);
+        const lastSheetIndex = sheets.length - 1;
+        const lastZoneSide = (pages.length % 2 === 1) ? 'left' : 'right';
+        const hasBlankZone = pages.length % 2 === 1 && sheets.length > 0;
+        return { sheets, lastSheetIndex, lastZoneSide, hasBlankZone };
+    }
+
+    function a6RenderSheetsHTML(sheetPairs) {
+        return sheetPairs.map(pair => `<div class="a6-combo-sheet"><div class="a6-combo-zone a6-combo-zone-left">${pair[0] || ''}</div><div class="a6-combo-zone a6-combo-zone-right">${pair[1] || ''}</div></div>`).join('');
+    }
+
+    // Builds the full A5-sheet HTML for a My Care + Moped invoice, and decides where (if
+    // anywhere) the combined "My Care + Moped" total block prints, per the single unified rule
+    // agreed with the user: (1) a completely blank zone first, (2) failing that, genuine
+    // leftover room on either entity's own last content zone (Moped checked first, then My
+    // Care, matching the original scenario-3 wording), (3) otherwise skip it entirely — a
+    // combined total NEVER causes a new sheet to be printed.
+    function a6BuildComboResult() {
         const hasMyCare = !!document.getElementById('meSectionMyCare');
         const summaryHTML = a6StripIds(document.getElementById('meSummaryBlock').outerHTML);
+        const summaryPx = a6MeasureHeightPx(summaryHTML, 'a6-combo-zone');
+        const blankZoneCapacityPx = a6PageHeightPx() - A6_SAFETY_MARGIN_PX;
 
-        const mopedHeaderHTML = a6StripIds(document.getElementById('meHeaderMoped').innerHTML);
-        const mopedFooterHTML = a6StripIds(document.getElementById('meFooterMoped').innerHTML);
-        const mopedItems = Array.from(document.getElementById('meItemsMoped').children).map(n => n.outerHTML);
-
-        let myCarePages = [];
-        let mopedResult;
+        let myCareResult = null;
         if (hasMyCare) {
             const myCareHeaderHTML = a6StripIds(document.getElementById('meHeaderMyCare').innerHTML);
             const myCareFooterHTML = a6StripIds(document.getElementById('meFooterMyCare').innerHTML);
             const myCareItems = Array.from(document.getElementById('meItemsMyCare').children).map(n => n.outerHTML);
-            // Try the combined summary on My Care's last page first (it's listed first on screen).
-            const myCareResult = a6BuildPages(A6_ZONE_LOGO_HTML, myCareHeaderHTML, myCareItems, myCareFooterHTML, summaryHTML, 'a6-combo-zone');
-            myCarePages = myCareResult.pages;
-            if (myCareResult.extraIncluded) {
-                mopedResult = a6BuildPages(A6_ZONE_LOGO_HTML, mopedHeaderHTML, mopedItems, mopedFooterHTML, '', 'a6-combo-zone');
-                return myCarePages.concat(mopedResult.pages);
-            }
+            myCareResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, myCareHeaderHTML, myCareItems, myCareFooterHTML, 'a6-combo-zone');
         }
-        // Summary didn't fit on My Care's page (or there's no My Care portion) — try Moped's last page.
-        mopedResult = a6BuildPages(A6_ZONE_LOGO_HTML, mopedHeaderHTML, mopedItems, mopedFooterHTML, summaryHTML, 'a6-combo-zone');
-        if (mopedResult.extraIncluded) return myCarePages.concat(mopedResult.pages);
-        // Neither had room — summary gets its own final zone.
-        return myCarePages.concat(mopedResult.pages).concat([`${A6_ZONE_LOGO_HTML}${summaryHTML}`]);
-    }
+        const mopedHeaderHTML = a6StripIds(document.getElementById('meHeaderMoped').innerHTML);
+        const mopedFooterHTML = a6StripIds(document.getElementById('meFooterMoped').innerHTML);
+        const mopedItems = Array.from(document.getElementById('meItemsMoped').children).map(n => n.outerHTML);
+        const mopedResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, mopedHeaderHTML, mopedItems, mopedFooterHTML, 'a6-combo-zone');
 
-    function a6ChunkArray(arr, size) {
-        const out = [];
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-        if (out.length === 0) out.push([]);
-        return out;
-    }
+        let sheetsHtml = '';
+        let totalPlaced = false;
 
-    // Packs a flat list of page-HTML strings 2-per-A5-landscape-sheet, used both when a
-    // single-entity invoice overflows one A6 page and for the My Care + Moped combo — same
-    // physical format either way. Odd page count leaves the last sheet's right zone blank.
-    function a6PackSheetsHTML(pages) {
-        const sheets = a6ChunkArray(pages, 2);
-        return sheets.map(pair => `<div class="a6-combo-sheet"><div class="a6-combo-zone a6-combo-zone-left">${pair[0] || ''}</div><div class="a6-combo-zone a6-combo-zone-right">${pair[1] || ''}</div></div>`).join('');
+        if (hasMyCare && !myCareResult.isMultiPage && !mopedResult.isMultiPage) {
+            // Scenario 3: both fit — one shared A5 sheet, My Care left zone / Moped right zone.
+            let myCareZoneHtml = myCareResult.pages[0];
+            let mopedZoneHtml = mopedResult.pages[0];
+            if (summaryPx <= mopedResult.lastPageLeftoverPx) {
+                mopedZoneHtml += summaryHTML;
+                totalPlaced = true;
+            } else if (summaryPx <= myCareResult.lastPageLeftoverPx) {
+                myCareZoneHtml += summaryHTML;
+                totalPlaced = true;
+            }
+            sheetsHtml = a6RenderSheetsHTML([[myCareZoneHtml, mopedZoneHtml]]);
+        } else {
+            // Scenario 2/4: the moment either side needs more than one page, the two entities
+            // never share a sheet again — each is packed onto its own independent A5 sheet-set.
+            const myCarePack = hasMyCare ? a6PackEntityToSheets(myCareResult.pages) : null;
+            const mopedPack = a6PackEntityToSheets(mopedResult.pages);
+
+            if (mopedPack.hasBlankZone && summaryPx <= blankZoneCapacityPx) {
+                mopedPack.sheets[mopedPack.lastSheetIndex][1] = summaryHTML;
+                totalPlaced = true;
+            } else if (myCarePack && myCarePack.hasBlankZone && summaryPx <= blankZoneCapacityPx) {
+                myCarePack.sheets[myCarePack.lastSheetIndex][1] = summaryHTML;
+                totalPlaced = true;
+            } else if (summaryPx <= mopedResult.lastPageLeftoverPx) {
+                const side = mopedPack.lastZoneSide === 'left' ? 0 : 1;
+                mopedPack.sheets[mopedPack.lastSheetIndex][side] += summaryHTML;
+                totalPlaced = true;
+            } else if (myCareResult && summaryPx <= myCareResult.lastPageLeftoverPx) {
+                const side = myCarePack.lastZoneSide === 'left' ? 0 : 1;
+                myCarePack.sheets[myCarePack.lastSheetIndex][side] += summaryHTML;
+                totalPlaced = true;
+            }
+            // else: no room anywhere — skip the combined total; never print an extra sheet for it.
+
+            sheetsHtml = (myCarePack ? a6RenderSheetsHTML(myCarePack.sheets) : '') + a6RenderSheetsHTML(mopedPack.sheets);
+        }
+
+        const sheetCount = (hasMyCare && !myCareResult.isMultiPage && !mopedResult.isMultiPage)
+            ? 1
+            : (hasMyCare ? Math.ceil(myCareResult.pages.length / 2) : 0) + Math.ceil(mopedResult.pages.length / 2);
+
+        return { sheetsHtml, sheetCount, totalPlaced };
     }
 
     function executeInvoicePrint() {
         const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none';
         const target = document.getElementById('a6PrintTarget');
-        const pages = isMulti ? buildComboA6Pages() : buildSingleEntityA6Pages();
 
         let invoiceA6StyleEl = document.getElementById('invoiceA6PageStyle');
         if (!invoiceA6StyleEl) { invoiceA6StyleEl = document.createElement('style'); invoiceA6StyleEl.id = 'invoiceA6PageStyle'; document.head.appendChild(invoiceA6StyleEl); }
 
-        let paperMsg;
-        if (pages.length === 1 && !isMulti) {
-            target.innerHTML = `<div class="a6-single-sheet">${pages[0]}</div>`;
-            invoiceA6StyleEl.innerHTML = '@page { size: A6 portrait; margin: 0; }';
-            paperMsg = `Load A6 paper in the printer.\n1 page will print.`;
-        } else {
-            target.innerHTML = a6PackSheetsHTML(pages);
+        let paperMsg, isSingleA6;
+        if (isMulti) {
+            const combo = a6BuildComboResult();
+            target.innerHTML = combo.sheetsHtml;
             invoiceA6StyleEl.innerHTML = '@page { size: A5 landscape; margin: 0; }';
-            const sheetCount = Math.ceil(pages.length / 2);
-            paperMsg = isMulti
-                ? `This invoice combines My Care + Moped billing.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheetCount} sheet(s) will print, each with two A6-sized invoices side by side and a dashed cut line down the middle.`
-                : `This invoice needs more than one A6 page.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheetCount} sheet(s) will print, two A6-sized pages per sheet with a dashed cut line — cut and stack them in order.`;
+            isSingleA6 = false;
+            paperMsg = `This invoice combines My Care + Moped billing.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${combo.sheetCount} sheet(s) will print, each with two A6-sized invoices side by side and a dashed cut line down the middle.`
+                + (combo.totalPlaced ? '' : '\n\nNote: the combined My Care + Moped total did not fit on the printed sheets and has been left out — it still prints on the thermal receipt.');
+        } else {
+            const single = a6BuildSingleEntityResult();
+            if (single.pages.length === 1) {
+                target.innerHTML = `<div class="a6-single-sheet">${single.pages[0]}</div>`;
+                invoiceA6StyleEl.innerHTML = '@page { size: A6 portrait; margin: 0; }';
+                isSingleA6 = true;
+                paperMsg = `Load A6 paper in the printer.\n1 page will print.`;
+            } else {
+                const pack = a6PackEntityToSheets(single.pages);
+                target.innerHTML = a6RenderSheetsHTML(pack.sheets);
+                invoiceA6StyleEl.innerHTML = '@page { size: A5 landscape; margin: 0; }';
+                isSingleA6 = false;
+                const sheetCount = pack.sheets.length;
+                paperMsg = `This invoice needs more than one A6 page.\n\nLoad A5 paper (landscape / sideways feed) in the printer.\n${sheetCount} sheet(s) will print, two A6-sized pages per sheet with a dashed cut line — cut and stack them in order.`;
+            }
         }
+
         document.body.className = '';
-        document.body.classList.add(pages.length === 1 && !isMulti ? 'print-a6single' : 'print-a6combo');
+        document.body.classList.add(isSingleA6 ? 'print-a6single' : 'print-a6combo');
         alert(paperMsg);
         setTimeout(() => {
             window.onafterprint = function () {
