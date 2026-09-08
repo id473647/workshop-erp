@@ -947,7 +947,12 @@ async function loadCatalog(){
   const scope=document.getElementById('catScope').value;
   if(search) q=q.ilike('item_name',`%${search}%`);
   if(scope) q=q.eq('scope',scope);
-  if(catWh) q=q.eq('warehouse_type',catWh);
+  // Fix (8 Sep 2026, 11A.27 Part 3b): case-insensitive match — some products were created via
+  // billing.html/pos-green.html with capitalized 'Green'/'Moped'/'Service' instead of the
+  // lowercase this dropdown uses; ilike (no wildcards = exact match, just case-insensitive)
+  // means Full Catalog finds a product regardless of which casing it was originally saved with,
+  // without depending on every existing row having been normalized first.
+  if(catWh) q=q.ilike('warehouse_type',catWh);
   if(smartFilter==='no_qr') q=q.is('barcode_id',null);
   if(smartFilter==='low_stock') q=q.lt('current_stock',4).eq('track_stock',true);
   if(smartFilter==='recent') q=q.order('created_at',{ascending:false});
