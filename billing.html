@@ -3168,7 +3168,55 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         })();
         document.getElementById('modalReceipt').style.display = 'flex'; }
 
-    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHeaderHTML = `<div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const myCareItemsHTML = `${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}`; const myCareFooterHTML = `<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div>`; /* Sub-Phase 11B.46: wrapper ids let the A6 print pagination find and re-chunk this content; on-screen HTML is unchanged, just wrapped */ const myCareHTML = hasMyCare ? `<div class="me-section" id="meSectionMyCare"><div id="meHeaderMyCare">${myCareHeaderHTML}</div><div id="meItemsMyCare">${myCareItemsHTML}</div><div id="meFooterMyCare">${myCareFooterHTML}</div></div>` : ''; const mopedHeaderHTML = `<div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const mopedItemsHTML = `${buildLineHTML(mopedLines)}`; const mopedFooterHTML = `<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div>`; const mopedHTML = `<div class="me-section" id="meSectionMoped"><div id="meHeaderMoped">${mopedHeaderHTML}</div><div id="meItemsMoped">${mopedItemsHTML}</div><div id="meFooterMoped">${mopedFooterHTML}</div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; const meSummaryBlockHTML = `<div id="meSummaryBlock">${summaryHTML}${savingsHTML}</div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + meSummaryBlockHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; /* Sub-Phase 11B.46: old btnLandscapePrint element removed, replaced by the single auto-deciding PRINT INVOICE button */ }
+    // Sub-Phase 11B.46-followup (8 Sep 2026): per-entity GST breakdown for the My Care +
+    // Moped combo receipt, same disclosure-only concept as the single-entity renderGstNote()
+    // above — grouped by GST slab from that entity's OWN line items, with the invoice's total
+    // discount (global/referral/points/advance, whatever made finalNet < gross) allocated
+    // proportionally between the two entities by their gross-subtotal share so the two
+    // per-entity notes always add back up to the real finalNet. Disclosure only — never
+    // changes any payable amount actually charged.
+    function buildEntityGstNoteHTML(lines, entityNet) {
+        const slabs = {};
+        lines.forEach(function(ln) {
+            const tp = parseFloat(ln.total_price) || 0;
+            if (tp <= 0) return;
+            const pct = parseFloat(ln.gst_percent) || 18;
+            slabs[pct] = (slabs[pct] || 0) + tp;
+        });
+        const rates = Object.keys(slabs).map(Number).sort(function(a,b){ return a-b; });
+        if (rates.length === 0 || entityNet <= 0) return '';
+        const totalGross = rates.reduce(function(s,r){ return s + slabs[r]; }, 0);
+        const totalDiscount = Math.max(0, Math.round((totalGross - entityNet) * 100) / 100);
+        const disc18 = Math.min(slabs[18] || 0, totalDiscount);
+        const noteLines = [];
+        rates.forEach(function(r) {
+            const amt = r === 18 ? Math.max(0, (slabs[r] || 0) - disc18) : (slabs[r] || 0);
+            if (amt <= 0) return;
+            const taxable = amt * r / (100 + r);
+            const half = r / 2;
+            noteLines.push(half + '% CGST: ₹' + (taxable/2).toFixed(2) + ' &nbsp;|&nbsp; ' + half + '% SGST: ₹' + (taxable/2).toFixed(2));
+        });
+        if (!noteLines.length) return '';
+        return `<div style="font-size:0.65rem;color:#555;border-top:1px dashed black;margin-top:4px;padding-top:3px;text-align:center;line-height:1.7;">Prices inclusive of applicable GST<br>${noteLines.join('<br>')}</div>`;
+    }
+
+    function renderMultiEntityReceipt(payMode, finalNet, sv, mopedAmt, greenAmt, labourAmt) { const hasMyCare = greenAmt>0 || labourAmt>0; const myCareSub = greenAmt + labourAmt; const greenLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Green'); const mopedLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Moped'); const serviceLines = lineItemsLocalMemory.filter(l=>l.warehouse_type==='Service'); const jcRef = `JC-${targetJobId.split('-')[0].toUpperCase()}`; const dateStr = new Date(activeJobContext.closed_at||new Date()).toLocaleDateString('en-IN'); const timeStr = new Date(activeJobContext.closed_at||new Date()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); const custInfo = `${activeJobContext.customer_mobile||''} | ${activeCustomerName}`; const vehInfo = `${activeJobContext.vehicles?.reg_number||''} (${activeJobContext.vehicles?.make_model||''})`; function buildLineHTML(lines) { return lines.map(l=>{ const nm = l.item_name; const tp=parseFloat(l.total_price); const mrpSnap=parseFloat(l.mrp_at_billing)||0; const rate=l.unit_metric==='ML'?parseFloat(l.unit_price):(tp/l.qty); const mrpLine = (mrpSnap>0&&rate<mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP:₹${mrpSnap}</div>` : ''; return `<div style="border-bottom:1px dotted #ccc;padding:1px 0;margin-bottom:1px;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;"><strong>${nm}</strong><strong>₹${tp}</strong></div><div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#444;"><span>Qty:${l.qty} ${l.unit_metric||''}</span><span>₹${Number.isInteger(rate)?rate:rate.toFixed(2)}/unit</span></div>${mrpLine}</div>`; }).join(''); } const myCareHeaderHTML = `<div class="me-header"><strong>My Care Service Center</strong><br><span class="me-gst">GSTIN: 23ANAPB4613K1ZJ</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425002214, 8989171751</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const myCareItemsHTML = `${buildLineHTML(greenLines)}${serviceLines.map(l=>`<div style="font-size:0.72rem;padding:1px 0;"><strong>[${l.item_name.startsWith('[LATHE]') ? 'Lathe' : 'Service'}] ${l.item_name.replace('[LATHE]', '').trim()}</strong> ₹${l.total_price}</div>`).join('')}${labourAmt>0?`<div style="font-size:0.72rem;display:flex;justify-content:space-between;"><span>Variable Labour</span><strong>₹${labourAmt}</strong></div>`:''}`;
+        /* Sub-Phase 11B.46-followup: proportionally allocate the invoice's total discount between
+           entities (by gross-subtotal share) so each entity's own GST note reconciles to real
+           money, then build a standardised footer — total line, GST breakdown, loyalty-aware
+           promo line, computer-generated line — identical in structure to the single-entity
+           thermal footer, repeated on BOTH entities per the "same headers and footers everywhere"
+           requirement (each zone can be cut apart and handed to a different department). */
+        const grossBothEntities = myCareSub + mopedAmt;
+        const totalDiscountBothEntities = Math.max(0, Math.round((grossBothEntities - parseFloat(finalNet)) * 100) / 100);
+        const myCareNetForGst = grossBothEntities > 0 ? Math.max(0, myCareSub - totalDiscountBothEntities * (myCareSub / grossBothEntities)) : 0;
+        const mopedNetForGst = grossBothEntities > 0 ? Math.max(0, mopedAmt - totalDiscountBothEntities * (mopedAmt / grossBothEntities)) : 0;
+        const myCareGstNoteHTML = hasMyCare ? buildEntityGstNoteHTML(greenLines.concat(serviceLines), myCareNetForGst) : '';
+        const mopedGstNoteHTML = buildEntityGstNoteHTML(mopedLines, mopedNetForGst);
+        const isLoyaltyMemberForPromo = !!(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true);
+        const comboPromoLineHTML = isLoyaltyMemberForPromo ? '' : `<div style="font-size:0.7rem;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-top:8px;margin-bottom:5px;text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div>`;
+        const comboComputerGeneratedLineHTML = `<div style="font-size:0.65rem;text-align:center;margin-top:5px;">Computer Generated Document.<br>Thank You.</div>`;
+        const myCareFooterHTML = `<div class="me-divider"></div><div class="me-total">My Care Payable: <strong>₹${myCareSub}</strong></div>${myCareGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; /* Sub-Phase 11B.46: wrapper ids let the A6 print pagination find and re-chunk this content; on-screen HTML is unchanged, just wrapped */ const myCareHTML = hasMyCare ? `<div class="me-section" id="meSectionMyCare"><div id="meHeaderMyCare">${myCareHeaderHTML}</div><div id="meItemsMyCare">${myCareItemsHTML}</div><div id="meFooterMyCare">${myCareFooterHTML}</div></div>` : ''; const mopedHeaderHTML = `<div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const mopedItemsHTML = `${buildLineHTML(mopedLines)}`; const mopedFooterHTML = `<div class="me-divider"></div><div class="me-total">Moped Payable: <strong>₹${mopedAmt}</strong></div>${mopedGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; const mopedHTML = `<div class="me-section" id="meSectionMoped"><div id="meHeaderMoped">${mopedHeaderHTML}</div><div id="meItemsMoped">${mopedItemsHTML}</div><div id="meFooterMoped">${mopedFooterHTML}</div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; const meSummaryBlockHTML = `<div id="meSummaryBlock">${summaryHTML}${savingsHTML}</div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + meSummaryBlockHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; /* Sub-Phase 11B.46: old btnLandscapePrint element removed, replaced by the single auto-deciding PRINT INVOICE button */ }
 
     /* ═══════════ Sub-Phase 11B.46 (5 Sep 2026, rebuilt 8 Sep 2026 as 11B.46b) ═══════════
        A6 / A5-combo auto-print. Reads the ALREADY-RENDERED receipt (single-entity
@@ -3231,17 +3279,26 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     /* ═══════════ 11B.46c (8 Sep 2026) — fixed-header/fixed-footer arithmetic pagination ═══════════
        Replaces 11B.46b's iterative "grow the candidate page and remeasure the whole thing"
        approach (which produced a genuine small-invoice duplicate-sheet bug that could not be
-       conclusively root-caused by re-reading the code). This engine instead:
-         1. Measures the logo+header block ONCE, the footer block ONCE, and the tiny
-            "CONTINUED" / "Contd. on next page" notes ONCE each — never re-measured per item.
-         2. Measures every individual item's own real height ONCE each (no repeated
-            concatenated-HTML remeasurement).
-         3. Reserves the TALLER of {footer, "Contd. on next page" note} as the fixed bottom
-            allowance on EVERY page (not just the last one) — so swapping the small moreNote
-            for the taller real footer on the final page can never push that page over budget.
-            This is the structural guard against the 11B.46b duplication bug: no page's fit
-            decision is ever revised after the fact.
-         4. Packs items into pages by straight arithmetic addition against that fixed budget.
+       conclusively root-caused by re-reading the code). This engine measures the logo+header
+       block ONCE, the footer block ONCE, the tiny "CONTINUED"/"Contd. on next page" notes ONCE
+       each, and every individual item's own real height ONCE each — never a repeated
+       concatenated-HTML remeasurement.
+
+       11B.46c-fix (8 Sep 2026): the first version of this engine reserved the TALLER of
+       {footer, moreNote} as the bottom allowance on EVERY page, not just the true last one.
+       That guaranteed the final page could never overflow, but real test printing showed the
+       real bug it caused: the full footer (GST breakdown + savings + promo paragraph + words +
+       mode) is many times taller than the tiny "Contd. on next page" note, so reserving it on
+       every page left room for only ~1 item per page even on invoices that should easily fit
+       2-3 pages' worth on one — a 9-item invoice was printing one item per A6 zone.
+       Fix: figure out exactly which items land on the true LAST page first (by filling
+       backward from the end of the item list against the real final-page budget, which
+       reserves the footer), then pack everything BEFORE that point forward across as many
+       earlier pages as needed, each of which only reserves the small moreNote — never the
+       footer, because the footer never actually prints there. Every page's reservation now
+       matches exactly what will really appear on it, decided once in a single forward+backward
+       pass, never revised afterwards — so this keeps the same guarantee as before (the final
+       page can never overflow) without wasting space on every page before it.
        Header and footer content itself is NEVER trimmed or varied — same full logo, GSTIN,
        address, GST breakdown, savings line, promo line and "computer generated invoice" line
        on every page/zone in every scenario, per the standardised-invoice requirement. */
@@ -3256,36 +3313,64 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const footerPx = a6MeasureHeightPx(footerHTML, sheetClass);
         const contdNotePx = a6MeasureHeightPx(contdNoteHTML, sheetClass);
         const moreNotePx = a6MeasureHeightPx(moreNoteHTML, sheetClass);
-        const reservedBottomPx = Math.max(footerPx, moreNotePx);
-        const perPageItemsBudget = Math.max(0, budget - headerPx - contdNotePx - reservedBottomPx);
 
         // Every item's own real height — measured once each, not re-derived from a growing page.
         const itemPx = itemHtmlArr.map(h => a6MeasureHeightPx(h, sheetClass));
+        const totalItemsPx = itemPx.reduce((s, p) => s + p, 0);
 
-        const groups = []; // [{ items:[html...], px:number }]
-        let group = { items: [], px: 0 };
-        for (let i = 0; i < itemHtmlArr.length; i++) {
-            if (group.items.length > 0 && group.px + itemPx[i] > perPageItemsBudget) {
-                groups.push(group);
-                group = { items: [], px: 0 };
-            }
-            group.items.push(itemHtmlArr[i]);
-            group.px += itemPx[i];
+        function pageHtml(items, opts) {
+            const contdNote = opts.contd ? contdNoteHTML : '';
+            const moreNote = opts.more ? moreNoteHTML : '';
+            const footer = opts.final ? footerHTML : '';
+            return `${logoHTML}${headerHTML}${contdNote}${items.join('')}${moreNote}${footer}`;
         }
-        groups.push(group); // always at least one group (covers a blank/zero-item invoice too)
 
-        const pages = groups.map((g, idx) => {
-            const isFinal = idx === groups.length - 1;
-            const contdNote = idx > 0 ? contdNoteHTML : '';
-            const moreNote = !isFinal ? moreNoteHTML : '';
-            const footer = isFinal ? footerHTML : '';
-            return `${logoHTML}${headerHTML}${contdNote}${g.items.join('')}${moreNote}${footer}`;
-        });
+        // Case 1: everything genuinely fits on one page — no CONTINUED note, no moreNote, just
+        // header + items + the real footer.
+        const singlePageBudget = Math.max(0, budget - headerPx - footerPx);
+        if (itemHtmlArr.length === 0 || totalItemsPx <= singlePageBudget) {
+            const leftover = Math.max(0, singlePageBudget - totalItemsPx);
+            return { pages: [pageHtml(itemHtmlArr, { contd: false, more: false, final: true })], lastPageLeftoverPx: leftover, isMultiPage: false };
+        }
 
-        const lastGroup = groups[groups.length - 1];
-        const lastPageLeftoverPx = budget - headerPx - (groups.length > 1 ? contdNotePx : 0) - footerPx - lastGroup.px;
+        // Case 2: more than one page needed. Find the true last page FIRST, by filling
+        // backward from the end of the item list against the real final-page budget (which
+        // always includes a CONTINUED note once there's more than one page, and the real
+        // footer). Always keeps at least one item on the last page even if a single item alone
+        // would overflow it (graceful degradation for an oversized item, never an infinite/empty
+        // page).
+        const finalPageBudget = Math.max(0, budget - headerPx - contdNotePx - footerPx);
+        let splitIndex = itemHtmlArr.length;
+        let tailPx = 0;
+        for (let i = itemHtmlArr.length - 1; i >= 0; i--) {
+            if (tailPx > 0 && tailPx + itemPx[i] > finalPageBudget) break;
+            tailPx += itemPx[i];
+            splitIndex = i;
+        }
+        const finalItems = itemHtmlArr.slice(splitIndex);
+        const leadingItems = itemHtmlArr.slice(0, splitIndex);
+        const leadingItemPx = itemPx.slice(0, splitIndex);
 
-        return { pages, lastPageLeftoverPx: Math.max(0, lastPageLeftoverPx), isMultiPage: pages.length > 1 };
+        // Pack everything BEFORE the last page forward, page by page, reserving only the small
+        // moreNote (never the footer, since the footer never actually prints on these pages).
+        const pages = [];
+        let group = [];
+        let groupPx = 0;
+        for (let i = 0; i < leadingItems.length; i++) {
+            const isFirstPage = pages.length === 0;
+            const pageBudget = Math.max(0, budget - headerPx - moreNotePx - (isFirstPage ? 0 : contdNotePx));
+            if (group.length > 0 && groupPx + leadingItemPx[i] > pageBudget) {
+                pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false }));
+                group = []; groupPx = 0;
+            }
+            group.push(leadingItems[i]);
+            groupPx += leadingItemPx[i];
+        }
+        if (group.length > 0) pages.push(pageHtml(group, { contd: pages.length > 0, more: true, final: false }));
+        pages.push(pageHtml(finalItems, { contd: pages.length > 0, more: false, final: true }));
+
+        const lastPageLeftoverPx = Math.max(0, finalPageBudget - tailPx);
+        return { pages, lastPageLeftoverPx, isMultiPage: pages.length > 1 };
     }
 
     function a6BuildSingleEntityResult() {
