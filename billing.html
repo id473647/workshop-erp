@@ -200,7 +200,7 @@
                content grow past the physical page and get cut mid-item by the browser's own print
                pagination). Pages are now measured to fit before being assigned here, so this is a
                safety net, not the primary control. */
-            .a6-single-sheet { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; page-break-after: always; break-after: page; font-family: 'Courier New', monospace; font-size: 0.72rem; }
+            .a6-single-sheet { width: 105mm; height: 148mm; box-sizing: border-box; padding: 2.5mm; overflow: hidden; page-break-after: always; break-after: page; font-family: 'Courier New', monospace; font-size: 0.72rem; }
             .a6-single-sheet:last-child { page-break-after: auto; break-after: auto; }
             /* 11B.46c-fix4 (8 Sep 2026): real print testing showed only 1 physical sheet coming
                out even when the DOM correctly held 2 `.a6-combo-sheet` divs (confirmed via a
@@ -215,7 +215,7 @@
             .a6-combo-sheet-wrap { page-break-after: always; break-after: page; }
             .a6-combo-sheet-wrap:last-child { page-break-after: auto; break-after: auto; }
             .a6-combo-sheet { display: flex; width: 210mm; height: 148mm; box-sizing: border-box; }
-            .a6-combo-zone { width: 105mm; height: 148mm; box-sizing: border-box; padding: 4mm; overflow: hidden; font-family: 'Courier New', monospace; font-size: 0.68rem; }
+            .a6-combo-zone { width: 105mm; height: 148mm; box-sizing: border-box; padding: 2.5mm; overflow: hidden; font-family: 'Courier New', monospace; font-size: 0.68rem; }
             .a6-combo-zone-left { border-right: 1px dashed #000; }
             .a6-contd-note { text-align: center; font-weight: 700; font-size: 0.65rem; border-bottom: 1px dashed #000; padding-bottom: 2px; margin-bottom: 2px; }
             .a6-more-note { text-align: center; font-size: 0.62rem; margin-top: 4px; }
@@ -3351,6 +3351,40 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     const A6_HF_SCALE = 0.8;
     function a6ScaleHF(html) { return html ? `<div style="zoom:${A6_HF_SCALE};">${html}</div>` : html; }
 
+    // 11B.46c-fix7 (8 Sep 2026, per the user's explicit choice on a real 9-item invoice needing
+    // 3 pages/2 sheets when they wanted it in 2 pages/1 sheet): item rows on the A6/A5 print
+    // pages are further compacted — WITHOUT touching the on-screen receipt at all — by (1)
+    // merging the small "MRP: ₹x" line into the Qty/Rate/GST line directly above it, when one is
+    // present, instead of giving it its own line, and (2) shrinking the whole item block a bit
+    // via the same zoom technique already used for the header/footer (A6_HF_SCALE). This runs on
+    // a throwaway COPY of each item's HTML built fresh only for the print pages —
+    // thStackedItemsContainer / meItemsMyCare / meItemsMoped (the ones the on-screen receipt and
+    // thermal print use) are never touched, so nothing changes on screen or on the thermal roll.
+    const A6_ITEM_SCALE = 0.82;
+    function a6CompactItemHTML(outerHtml) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = outerHtml;
+        const root = wrap.firstElementChild;
+        if (root && root.children.length >= 2) {
+            const kids = Array.from(root.children);
+            const last = kids[kids.length - 1];
+            const lastText = (last.textContent || '').trim();
+            if (/MRP/i.test(lastText)) {
+                const prev = kids[kids.length - 2];
+                // Append into the line's LAST existing element (not as a new sibling of it) —
+                // some of these lines are `display:flex; justify-content:space-between` with two
+                // columns (Qty on the left, Rate on the right); adding a bare new sibling there
+                // would become a third flex column and break that layout. Tagging the MRP text
+                // onto the end of the rightmost existing column keeps the same 1- or 2-column
+                // look, just with a bit more text in it.
+                const appendTarget = (prev.children.length > 0) ? prev.children[prev.children.length - 1] : prev;
+                appendTarget.insertAdjacentHTML('beforeend', ` <span style="color:#7c3aed;">| ${lastText}</span>`);
+                last.remove();
+            }
+        }
+        return `<div style="zoom:${A6_ITEM_SCALE};">${wrap.innerHTML}</div>`;
+    }
+
     function a6PaginateEntity(logoHTML, headerHTML, itemHtmlArr, footerHTML, sheetClass) {
         const pageHeightPx = a6PageHeightPx();
         const budget = pageHeightPx - A6_SAFETY_MARGIN_PX;
@@ -3478,7 +3512,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     function a6BuildSingleEntityResult() {
         const headerHTML = a6StripIds(document.getElementById('thHeaderBlock').innerHTML);
         const footerHTML = a6StripIds(document.getElementById('thFooterBlock').innerHTML);
-        const itemHtmlArr = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => n.outerHTML);
+        const itemHtmlArr = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => a6CompactItemHTML(n.outerHTML));
         // First try as one true A6 sheet, measured at that sheet's own (slightly larger) font.
         let result = a6PaginateEntity('', headerHTML, itemHtmlArr, footerHTML, 'a6-single-sheet');
         if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet', debug: result.debug };
@@ -3530,12 +3564,12 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         if (hasMyCare) {
             const myCareHeaderHTML = a6StripIds(document.getElementById('meHeaderMyCare').innerHTML);
             const myCareFooterHTML = a6StripIds(document.getElementById('meFooterMyCare').innerHTML);
-            const myCareItems = Array.from(document.getElementById('meItemsMyCare').children).map(n => n.outerHTML);
+            const myCareItems = Array.from(document.getElementById('meItemsMyCare').children).map(n => a6CompactItemHTML(n.outerHTML));
             myCareResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, myCareHeaderHTML, myCareItems, myCareFooterHTML, 'a6-combo-zone');
         }
         const mopedHeaderHTML = a6StripIds(document.getElementById('meHeaderMoped').innerHTML);
         const mopedFooterHTML = a6StripIds(document.getElementById('meFooterMoped').innerHTML);
-        const mopedItems = Array.from(document.getElementById('meItemsMoped').children).map(n => n.outerHTML);
+        const mopedItems = Array.from(document.getElementById('meItemsMoped').children).map(n => a6CompactItemHTML(n.outerHTML));
         const mopedResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, mopedHeaderHTML, mopedItems, mopedFooterHTML, 'a6-combo-zone');
 
         let sheetsHtml = '';
