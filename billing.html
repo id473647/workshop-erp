@@ -3496,16 +3496,23 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // width — Moped's invoice never carries a logo, standalone or sharing an A5 sheet with My
     // Care, per the user's explicit rule.
     function a6BuildPrintHeader(opts) {
-        const logoImg = (src) => `<img src="${src}" onerror="this.style.display='none'" style="height:26px;filter:grayscale(100%);">`;
+        // 11B.46c-fix14 (9 Sep 2026, per explicit user request after fix13 was confirmed working):
+        // logos enlarged from 26px to 42px tall (flex column widened from 30px to 48px to match).
+        // Safe to do without shrinking item capacity: the logo column sits inside a row whose
+        // height is actually dictated by the 4-line name/GSTIN/phone/address text block next to
+        // it (align-items:center vertically centers the shorter logo within that taller row), and
+        // that text block is comfortably taller than even this larger 42px logo — so the row's
+        // total measured height, and therefore the per-invoice item budget, is unchanged.
+        const logoImg = (src) => `<img src="${src}" onerror="this.style.display='none'" style="height:42px;filter:grayscale(100%);">`;
         const nameBlockInner = `<div style="font-size:0.95rem;font-weight:bold;margin:1px 0;">${opts.name}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">GSTIN: ${opts.gstin}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">PH: ${opts.phone}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">${opts.address}</div>`;
         const headerRow = opts.logo
             ? `<div style="display:flex;align-items:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
-                + `<div style="flex:0 0 30px;">${logoImg('logo-main.jpg')}</div>`
+                + `<div style="flex:0 0 48px;">${logoImg('logo-main.jpg')}</div>`
                 + `<div style="flex:1;text-align:center;">${nameBlockInner}</div>`
-                + `<div style="flex:0 0 30px;text-align:right;">${logoImg('logo-green.png')}</div>`
+                + `<div style="flex:0 0 48px;text-align:right;">${logoImg('logo-green.png')}</div>`
                 + `</div>`
             : `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">${nameBlockInner}</div>`;
         const problemLine = opts.problem ? `<div class="receipt-meta" style="margin-top:1px;">Problem: <strong>${opts.problem}</strong></div>` : '';
