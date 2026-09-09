@@ -3544,20 +3544,35 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // per the user's explicit "not above and below" / "name at left" feedback), and the My
         // Care logo is dropped from the header entirely (it now prints as a large background
         // watermark behind the items/footer instead — see a6PaginateEntity's watermarkImgHTML).
-        // Only the Green Scooter logo remains in the header, on the right, sized bigger (50px,
-        // was 42px shared between two logos) since there is no longer a second logo competing for
-        // width. Still safe for item capacity: this single logo sits in a row whose height is set
-        // by the 4-line text block beside it (align-items:center), which stays taller than even a
-        // 50px logo — so the row's measured height, and the per-invoice item budget, is unchanged.
-        const greenLogo = `<img src="logo-green.png" onerror="this.style.display='none'" style="height:50px;filter:grayscale(100%);">`;
-        const nameBlockInner = `<div style="font-size:0.95rem;font-weight:bold;margin:1px 0;">${opts.name}</div>`
+        // Only the Green Scooter logo remains in the header, on the right.
+        //
+        // 11B.46c-fix17 (9 Sep 2026, per the user's explicit request + a 2-option mockup, "Option
+        // B" chosen): shop name enlarged 0.95rem->1.15rem and made extra-bold (font-weight 900,
+        // was "bold"/700) so it reads at least as prominent as an item name on the printed page.
+        // Logo enlarged 50px->58px and the row layout changed from `justify-content` stretching
+        // the name to fill all remaining width (pushing the logo flush to the row's far right
+        // edge) to a left-clustered row — name block sized to its own content, logo immediately
+        // after it with a small fixed gap — so the logo now sits close to the name instead of out
+        // at the row's far edge. This also happens to move the logo further from the physical
+        // right edge of the page, which is a welcome side effect given the real print testing
+        // that was happening the same day (see the fix16 padding note above) — though the logo
+        // was never the direct cause of that edge-cutting (fix16's own digital reproduction,
+        // using this exact real invoice content, proved this file's own layout leaves a full,
+        // uncut margin on every side; the right-edge clipping was traced to the physical
+        // print/paper setup, not this HTML). Row height is still set by whichever of the (now
+        // taller, bigger-font) 4-line text block or the (now bigger) logo is tallest — measured
+        // fresh from the actual final header HTML every time, so the per-invoice item budget
+        // automatically and correctly accounts for the header being a little taller now; no
+        // pagination code itself was touched.
+        const greenLogo = `<img src="logo-green.png" onerror="this.style.display='none'" style="height:58px;filter:grayscale(100%);">`;
+        const nameBlockInner = `<div style="font-size:1.15rem;font-weight:900;margin:1px 0;">${opts.name}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">GSTIN: ${opts.gstin}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">PH: ${opts.phone}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">${opts.address}</div>`;
         const headerRow = opts.logo
-            ? `<div style="display:flex;align-items:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
-                + `<div style="flex:1;text-align:left;">${nameBlockInner}</div>`
-                + `<div style="flex:0 0 auto;text-align:right;padding-left:4px;">${greenLogo}</div>`
+            ? `<div style="display:flex;align-items:center;justify-content:flex-start;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
+                + `<div style="flex:0 1 auto;text-align:left;">${nameBlockInner}</div>`
+                + `<div style="flex:0 0 auto;margin-left:10px;">${greenLogo}</div>`
                 + `</div>`
             : `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">${nameBlockInner}</div>`;
         const problemLine = opts.problem ? `<div class="receipt-meta" style="margin-top:1px;">Problem: <strong>${opts.problem}</strong></div>` : '';
