@@ -246,6 +246,21 @@
                zones, same as every rule above — no on-screen effect. */
             .a6-single-sheet, .a6-combo-zone { padding-top: 5mm !important; }
 
+            /* 11B.46c-fix15 (9 Sep 2026, per the user's explicit request + approved mockup): a
+               real test print showed the Green logo's own image overflowing its header column
+               (see the fix for that in a6BuildPrintHeader/logo width below) pushing right up to,
+               and past, the physical edge of the second A6 zone on the sheet — the printer's own
+               unprintable margin then clipped it. On top of fixing the logo overflow itself, the
+               user asked for extra breathing room on both sides so nothing (logo, item text,
+               amounts) ever sits flush against the edge again. Left/right padding widened from
+               2.5mm to 4mm — this does NOT affect the per-page item budget: a6ZonePaddingPx()
+               only ever measures an empty zone's TOP+BOTTOM padding contribution to height (via
+               scrollHeight), so a change to LEFT/RIGHT padding alone is invisible to that
+               calculation. It does slightly narrow the available line width, which can shift where
+               a long item name wraps — but since every item's height is measured live against
+               this exact class after the change, the pagination numbers stay self-consistent. */
+            .a6-single-sheet, .a6-combo-zone { padding-left: 4mm !important; padding-right: 4mm !important; }
+
             /* 11B.46c-fix10 (8 Sep 2026, per the user's explicit request): the combined "My Care +
                Moped" total block (.me-summary — bordered box shown after both entities' own
                footers, when it fits) was visually much heavier than the rest of a compact A6
@@ -3496,23 +3511,27 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // width — Moped's invoice never carries a logo, standalone or sharing an A5 sheet with My
     // Care, per the user's explicit rule.
     function a6BuildPrintHeader(opts) {
-        // 11B.46c-fix14 (9 Sep 2026, per explicit user request after fix13 was confirmed working):
-        // logos enlarged from 26px to 42px tall (flex column widened from 30px to 48px to match).
-        // Safe to do without shrinking item capacity: the logo column sits inside a row whose
-        // height is actually dictated by the 4-line name/GSTIN/phone/address text block next to
-        // it (align-items:center vertically centers the shorter logo within that taller row), and
-        // that text block is comfortably taller than even this larger 42px logo — so the row's
-        // total measured height, and therefore the per-invoice item budget, is unchanged.
-        const logoImg = (src) => `<img src="${src}" onerror="this.style.display='none'" style="height:42px;filter:grayscale(100%);">`;
+        // 11B.46c-fix15 (9 Sep 2026, per approved PDF mockup, reviewed and corrected over 2 rounds
+        // before any code was written): header rebuilt from stacked-logo/centered-text to a plain
+        // left/right split — name/GSTIN/phone/address now sit LEFT (left-aligned, matching the
+        // approved mockup exactly; an earlier draft centered everything right instead, corrected
+        // per the user's explicit "not above and below" / "name at left" feedback), and the My
+        // Care logo is dropped from the header entirely (it now prints as a large background
+        // watermark behind the items/footer instead — see a6PaginateEntity's watermarkImgHTML).
+        // Only the Green Scooter logo remains in the header, on the right, sized bigger (50px,
+        // was 42px shared between two logos) since there is no longer a second logo competing for
+        // width. Still safe for item capacity: this single logo sits in a row whose height is set
+        // by the 4-line text block beside it (align-items:center), which stays taller than even a
+        // 50px logo — so the row's measured height, and the per-invoice item budget, is unchanged.
+        const greenLogo = `<img src="logo-green.png" onerror="this.style.display='none'" style="height:50px;filter:grayscale(100%);">`;
         const nameBlockInner = `<div style="font-size:0.95rem;font-weight:bold;margin:1px 0;">${opts.name}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">GSTIN: ${opts.gstin}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">PH: ${opts.phone}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">${opts.address}</div>`;
         const headerRow = opts.logo
             ? `<div style="display:flex;align-items:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
-                + `<div style="flex:0 0 48px;">${logoImg('logo-main.jpg')}</div>`
-                + `<div style="flex:1;text-align:center;">${nameBlockInner}</div>`
-                + `<div style="flex:0 0 48px;text-align:right;">${logoImg('logo-green.png')}</div>`
+                + `<div style="flex:1;text-align:left;">${nameBlockInner}</div>`
+                + `<div style="flex:0 0 auto;text-align:right;padding-left:4px;">${greenLogo}</div>`
                 + `</div>`
             : `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">${nameBlockInner}</div>`;
         const problemLine = opts.problem ? `<div class="receipt-meta" style="margin-top:1px;">Problem: <strong>${opts.problem}</strong></div>` : '';
@@ -3522,6 +3541,31 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             + `<div class="receipt-meta" style="margin-top:1px;">Vehicle: <strong>${opts.vehicle}</strong></div>`
             + problemLine
             + `<div style="font-weight:bold;font-size:0.6rem;border-bottom:1px solid #000;padding-bottom:1px;margin-bottom:2px;margin-top:3px;text-transform:uppercase;text-align:center;">ITEMS & SERVICES</div>`;
+    }
+
+    // 11B.46c-fix15: the My Care logo watermark shown behind items+NET PAYABLE, per the approved
+    // mockup. Only used for My Care zones (opts.logo:true call sites) — Moped never gets it, same
+    // standing "no logos for Moped" rule already applied to the header logo. Positioned absolute,
+    // vertically centered within whatever wraps it (see A6_WATERMARK_WRAP_OPEN/CLOSE below) via
+    // the top:0;bottom:0;margin:auto trick verified in the approved mockup PDF.
+    const A6_WATERMARK_IMG_HTML = `<img src="logo-main.jpg" onerror="this.style.display='none'" style="position:absolute;left:50%;top:0;bottom:0;margin:auto;transform:translateX(-50%);width:70mm;max-width:90%;opacity:0.16;filter:grayscale(60%);z-index:0;pointer-events:none;">`;
+
+    // Splits an already-built footer's HTML at the NET PAYABLE line (marked by the a6f-nettotal
+    // class), returning { top, bottom }: `top` (through NET PAYABLE inclusive) is what the
+    // watermark wraps around; `bottom` (GST note / amount-in-words / promo / computer-generated)
+    // prints below the watermark, exactly matching the approved mockup where the mark starts at
+    // the items list and stops at NET PAYABLE. Pure split for DISPLAY purposes only — a6Paginate-
+    // Entity still measures top+bottom TOGETHER as one combined footer height for its budget math,
+    // so this never changes how many items fit per page, only how the final page's footer renders.
+    function a6SplitFooterAtNetPayable(footerHTML) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = footerHTML;
+        const kids = Array.from(wrap.children);
+        const splitAt = kids.findIndex(el => el.classList && el.classList.contains('a6f-nettotal'));
+        if (splitAt === -1) return { top: footerHTML, bottom: '' };
+        const top = kids.slice(0, splitAt + 1).map(el => el.outerHTML).join('');
+        const bottom = kids.slice(splitAt + 1).map(el => el.outerHTML).join('');
+        return { top, bottom };
     }
 
     // Reads Bill No / Date+Time / Client / Vehicle straight off the already-rendered combo header
@@ -3642,7 +3686,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         return wrap.innerHTML;
     }
 
-    function a6PaginateEntity(logoHTML, headerHTML, itemHtmlArr, footerHTML, sheetClass) {
+    function a6PaginateEntity(watermarkImgHTML, headerHTML, itemHtmlArr, footerParts, sheetClass) {
         const pageHeightPx = a6PageHeightPx();
         // 11B.46c-fix8: the zone's own top+bottom padding is paid exactly ONCE per physical page
         // — subtract it here, from the page height, instead of leaving it to be (redundantly)
@@ -3651,8 +3695,15 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const budget = pageHeightPx - zonePaddingPx - A6_SAFETY_MARGIN_PX;
         const contdNoteHTML = `<div class="a6-contd-note">--- CONTINUED ---</div>`;
         const moreNoteHTML = `<div class="a6-more-note">--- Contd. on next page ---</div>`;
-        const scaledLogoHeaderHTML = a6ScaleHF(logoHTML + headerHTML);
-        const scaledFooterHTML = a6ScaleHF(footerHTML);
+        const scaledLogoHeaderHTML = a6ScaleHF(headerHTML);
+        // 11B.46c-fix15: footerParts is always { top, bottom } (split at NET PAYABLE by
+        // a6SplitFooterAtNetPayable — see call sites). `top` is what the watermark wraps around
+        // (items + NET PAYABLE, per the approved mockup); `bottom` (GST note onward) always prints
+        // below it, watermark or not. Measured TOGETHER as one combined footerPx, exactly as
+        // before the split, so this never changes the per-page item budget — only how the final
+        // page's footer is split across the (optional) watermark wrapper at render time.
+        const scaledFooterTopHTML = a6ScaleHF(footerParts.top);
+        const scaledFooterBottomHTML = a6ScaleHF(footerParts.bottom);
 
         // Fixed blocks — each measured exactly once, and measured on the EXACT same (scaled)
         // HTML that pageHtml() below actually renders, so the numbers used to decide can never
@@ -3661,7 +3712,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // computed (padding subtracted once, not once per block).
         const measureContentPx = (html) => Math.max(0, a6MeasureHeightPx(html, sheetClass) - zonePaddingPx);
         const headerPx = measureContentPx(scaledLogoHeaderHTML);
-        const footerPx = measureContentPx(scaledFooterHTML);
+        const footerPx = measureContentPx(scaledFooterTopHTML + scaledFooterBottomHTML);
         const contdNotePx = measureContentPx(contdNoteHTML);
         const moreNotePx = measureContentPx(moreNoteHTML);
 
@@ -3674,8 +3725,18 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         function pageHtml(items, opts) {
             const contdNote = opts.contd ? contdNoteHTML : '';
             const moreNote = opts.more ? moreNoteHTML : '';
-            const footer = opts.final ? scaledFooterHTML : '';
-            return `${scaledLogoHeaderHTML}${contdNote}${items.join('')}${moreNote}${footer}`;
+            const footerTop = opts.final ? scaledFooterTopHTML : '';
+            const footerBottom = opts.final ? scaledFooterBottomHTML : '';
+            // 11B.46c-fix15: the My Care watermark wraps items through NET PAYABLE (footerTop) on
+            // every page that carries items — non-final pages end at moreNote, the final page ends
+            // at footerTop (NET PAYABLE) — matching the approved mockup. footerBottom (GST note /
+            // words / promo / computer-generated) always sits below it, unwrapped, watermark or
+            // not, so a Moped zone (watermarkImgHTML === '') renders byte-identical to before.
+            const bodyInner = `${items.join('')}${moreNote}${footerTop}`;
+            const body = watermarkImgHTML
+                ? `<div style="position:relative;">${watermarkImgHTML}<div style="position:relative;z-index:1;">${bodyInner}</div></div>`
+                : bodyInner;
+            return `${scaledLogoHeaderHTML}${contdNote}${body}${footerBottom}`;
         }
 
         // 11B.46c-debug (8 Sep 2026): a real test print showed items+footer disappearing in a
@@ -3830,15 +3891,16 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             logo: true
         });
         const footerHTML = a6BuildPrintFooter(document.getElementById('thFooterBlock').innerHTML);
+        const footerParts = a6SplitFooterAtNetPayable(footerHTML);
         const rawItems = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => n.outerHTML);
         // Tier 1: standard full-size single A6 sheet — the exact same rendering every invoice has
         // always used. Nothing is shrunk or merged here.
-        let result = a6PaginateEntity('', headerHTML, rawItems, footerHTML, 'a6-single-sheet');
+        let result = a6PaginateEntity(A6_WATERMARK_IMG_HTML, headerHTML, rawItems, footerParts, 'a6-single-sheet');
         if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet', debug: Object.assign({ tier: 1 }, result.debug) };
         // Tier 2: doesn't fit on one page — re-measure at the combo-zone's smaller font, since
         // overflow prints via the same 2-per-A5-sheet packing the combo invoice uses (keeps the
         // measured class and the actually-rendered class always in sync).
-        result = a6PaginateEntity('', headerHTML, rawItems, footerHTML, 'a6-combo-zone');
+        result = a6PaginateEntity(A6_WATERMARK_IMG_HTML, headerHTML, rawItems, footerParts, 'a6-combo-zone');
         if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: Object.assign({ tier: 2 }, result.debug) };
         // 11B.46c-fix8 (8 Sep 2026): fix7's item compaction (MRP merged into the line above, 18%
         // smaller) was being applied to EVERY invoice, including ones that already fit fine —
@@ -3848,15 +3910,18 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // the overwhelming majority of invoices — is completely unaffected and prints exactly as
         // it always has.
         const compactItems = rawItems.map(h => a6CompactItemHTML(h));
-        result = a6PaginateEntity('', headerHTML, compactItems, footerHTML, 'a6-combo-zone');
+        result = a6PaginateEntity(A6_WATERMARK_IMG_HTML, headerHTML, compactItems, footerParts, 'a6-combo-zone');
         return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: Object.assign({ tier: 3 }, result.debug) };
     }
 
     // 11B.46c-fix11: the per-zone logo used to be a separate fragment (A6_ZONE_LOGO_HTML)
     // concatenated in front of the header text. It's now built INTO a6BuildPrintHeader's own
     // left/right layout instead (see opts.logo), so each entity's zone still carries its own
-    // logo at print time exactly as before — just laid out differently. Nothing is passed as a
-    // separate logoHTML argument to a6PaginateEntity any more (both call sites below now pass '').
+    // logo at print time exactly as before — just laid out differently.
+    // 11B.46c-fix15: a6PaginateEntity's first argument is now the (optional) My Care watermark
+    // image markup instead of the old, long-unused per-zone header logo fragment — see
+    // A6_WATERMARK_IMG_HTML above. Moped's call sites pass '' (no watermark), matching the
+    // existing "no logos for Moped" rule already applied to its header.
 
     // Chunks one entity's own pages 2-per-A5-sheet and reports where that entity's LAST content
     // zone sits (left or right of its last sheet) and whether that last sheet's other zone was
@@ -3905,11 +3970,12 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
                 problem: null, logo: true
             });
             myCareFooterHTML = a6BuildPrintFooter(document.getElementById('meFooterMyCare').innerHTML);
+            const myCareFooterParts = a6SplitFooterAtNetPayable(myCareFooterHTML);
             myCareRawItems = Array.from(document.getElementById('meItemsMyCare').children).map(n => n.outerHTML);
-            myCareResult = a6PaginateEntity('', myCareHeaderHTML, myCareRawItems, myCareFooterHTML, 'a6-combo-zone');
+            myCareResult = a6PaginateEntity(A6_WATERMARK_IMG_HTML, myCareHeaderHTML, myCareRawItems, myCareFooterParts, 'a6-combo-zone');
             if (myCareResult.isMultiPage) {
                 const myCareCompactItems = myCareRawItems.map(h => a6CompactItemHTML(h));
-                myCareResult = a6PaginateEntity('', myCareHeaderHTML, myCareCompactItems, myCareFooterHTML, 'a6-combo-zone');
+                myCareResult = a6PaginateEntity(A6_WATERMARK_IMG_HTML, myCareHeaderHTML, myCareCompactItems, myCareFooterParts, 'a6-combo-zone');
             }
         }
         const mopedHeaderEl = document.getElementById('meHeaderMoped');
@@ -3924,11 +3990,12 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // fix9: Moped's print copy drops the Hindi offer line, keeping GST breakdown +
         // computer-generated line — the on-screen Moped footer (#meFooterMoped) is unaffected.
         const mopedFooterHTML = a6StripIds(a6StripMopedPromoLine(a6CompactFooterHTML(document.getElementById('meFooterMoped').innerHTML)));
+        const mopedFooterParts = a6SplitFooterAtNetPayable(mopedFooterHTML);
         const mopedRawItems = Array.from(document.getElementById('meItemsMoped').children).map(n => n.outerHTML);
-        let mopedResult = a6PaginateEntity('', mopedHeaderHTML, mopedRawItems, mopedFooterHTML, 'a6-combo-zone');
+        let mopedResult = a6PaginateEntity('', mopedHeaderHTML, mopedRawItems, mopedFooterParts, 'a6-combo-zone');
         if (mopedResult.isMultiPage) {
             const mopedCompactItems = mopedRawItems.map(h => a6CompactItemHTML(h));
-            mopedResult = a6PaginateEntity('', mopedHeaderHTML, mopedCompactItems, mopedFooterHTML, 'a6-combo-zone');
+            mopedResult = a6PaginateEntity('', mopedHeaderHTML, mopedCompactItems, mopedFooterParts, 'a6-combo-zone');
         }
 
         let sheetsHtml = '';
