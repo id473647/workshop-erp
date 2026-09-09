@@ -523,8 +523,8 @@ async function loadEodSummary(){
   // admin sees Workshop (service) view; each role sees only its own entity
   const eodEntity=(activeRole==='admin')?'service':activeRole;
 
-  const [jobsRes,expRes,credPaysRes,refundsRes]=await Promise.all([
-    supabaseClient.from('job_cards').select('id,cash_amount,upi_amount,credit_amount,advance_service,prepaid_green,prepaid_moped,green_total,moped_total,labour_charges,lathe_welding,status,closed_at')
+  const [jobsRes,expRes,credPaysRes,refundsRes,openAdvRes]=await Promise.all([
+    supabaseClient.from('job_cards').select('id,cash_amount,upi_amount,credit_amount,advance_service,advance_service_mode,prepaid_green,prepaid_moped,green_total,moped_total,labour_charges,lathe_welding,status,closed_at')
       .gte('closed_at',activeDate+'T00:00:00').lte('closed_at',activeDate+'T23:59:59').eq('status','Closed'),
     supabaseClient.from('workshop_expenses').select('*')
       .gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59')
@@ -536,11 +536,23 @@ async function loadEodSummary(){
       .eq('refund_status','paid')
       .eq('refund_source',eodEntity)
       .gte('refunded_at',activeDate+'T00:00:00')
-      .lte('refunded_at',activeDate+'T23:59:59')
+      .lte('refunded_at',activeDate+'T23:59:59'),
+    // 11B.47 (9 Sep 2026): a Workshop Advance can be collected (Cash or UPI) against a job card
+    // that is still OPEN — the customer's money changes hands that day regardless of whether the
+    // job itself gets closed/billed the same day. The main jobsRes query above only ever sees
+    // CLOSED job cards, so that money was previously invisible to this report entirely (not even
+    // shown as excluded) until the job was eventually closed, on whatever later date that happened
+    // to be. Queried separately, keyed by the advance's own payment timestamp (not the job's
+    // eventual closed_at), so each rupee is counted on the one date it was actually collected —
+    // never double-counted on a later day once the job closes.
+    supabaseClient.from('job_cards').select('id,advance_service,advance_service_mode,advance_service_paid_at,green_total,moped_total,labour_charges,lathe_welding,status')
+      .neq('status','Closed').gt('advance_service',0)
+      .gte('advance_service_paid_at',activeDate+'T00:00:00').lte('advance_service_paid_at',activeDate+'T23:59:59')
   ]);
 
   const jobs=jobsRes.data||[], exp=expRes.data||[], credPays=credPaysRes.data||[];
   const custRefundTotal=(refundsRes.data||[]).reduce((s,r)=>s+(parseFloat(r.refund_amount)||0),0);
+  const openAdvJobs=openAdvRes.data||[];
 
   /* STEP 5: Check if any JC from this date was amended AFTER it was closed
      If the EOD was locked and a JC was subsequently amended, admin needs to know. */
@@ -553,13 +565,22 @@ async function loadEodSummary(){
       .order('amended_at',{ascending:false});
     eodAmendments=amends||[];
   }
+  // 11B.47: advance_service was previously folded into Cash IN unconditionally, regardless of
+  // advance_service_mode — a UPI-paid workshop advance was silently misclassified as cash. Split
+  // by mode instead, same as every other collection bucket (JC cash/upi, old-credit cash/upi)
+  // already does. advTotal itself (closed-jobs-only) is kept as-is — it still feeds the Billing-
+  // vs-Collections crosscheck below exactly as before, since T (billing) is only ever computed
+  // from closed jobs.
+  let advCashClosed=0, advUpiClosed=0;
   jobs.forEach(j=>{
     grnNet+=parseFloat(j.green_total)||0; mopNet+=parseFloat(j.moped_total)||0;
     labNet+=parseFloat(j.labour_charges)||0; latheNet+=parseFloat(j.lathe_welding)||0;
     cash+=parseFloat(j.cash_amount)||0; upi+=parseFloat(j.upi_amount)||0;
     credit+=parseFloat(j.credit_amount)||0;
     pgTotal+=parseFloat(j.prepaid_green)||0; pmTotal+=parseFloat(j.prepaid_moped)||0;
-    advTotal+=parseFloat(j.advance_service)||0;
+    const advAmt=parseFloat(j.advance_service)||0;
+    advTotal+=advAmt;
+    if((j.advance_service_mode||'').toLowerCase().includes('upi')) advUpiClosed+=advAmt; else advCashClosed+=advAmt;
   });
   const T=grnNet+mopNet+labNet+latheNet;
 
@@ -575,8 +596,19 @@ async function loadEodSummary(){
     expByCat[e.expense_category]=(expByCat[e.expense_category]||0)+amt;
   });
 
-  const cashIn=cash+advTotal+ocCash;
-  const upiIn=upi+ouUpi;
+  // 11B.47: advance collected today against still-OPEN job cards — real money received today,
+  // counted into today's Cash/UPI IN even though the job's own billing isn't final yet. Kept
+  // OUT of advTotal/crosscheck (that stays Closed-JCs-only, unchanged) and surfaced as its own
+  // clearly-labelled note so nothing about where today's totals came from is hidden.
+  let openAdvCash=0, openAdvUpi=0;
+  openAdvJobs.forEach(j=>{
+    const advAmt=parseFloat(j.advance_service)||0;
+    if((j.advance_service_mode||'').toLowerCase().includes('upi')) openAdvUpi+=advAmt; else openAdvCash+=advAmt;
+  });
+  const openAdvTotal=openAdvCash+openAdvUpi;
+
+  const cashIn=cash+advCashClosed+openAdvCash+ocCash;
+  const upiIn=upi+ouUpi+advUpiClosed+openAdvUpi;
   const cashInHand=cashIn-expCash-tpg-tpm-custRefundTotal;
   window._systemCIH=cashInHand;
 
@@ -607,8 +639,14 @@ async function loadEodSummary(){
     entity:eodEntity, date:activeDate, preparedBy:activeRole,
     grnNet, mopNet, labNet, latheNet, T,
     creditIssued:credit,
-    cashIn_jc:cash, cashIn_adv:advTotal, cashIn_oc:ocCash,
+    // 11B.47: cashIn_adv is the CASH-only slice of advance actually folded into cashIn above
+    // (closed-JC cash-mode advance + open-JC cash-mode advance) — previously this held the
+    // blind advTotal (cash+UPI mixed together), which made the printed "Cash Collections" box's
+    // own sub-lines (JC Cash + Workshop Adv. + Old Credit) silently overstate cash whenever any
+    // advance had actually been paid by UPI. upiIn_adv is the matching UPI-only slice.
+    cashIn_jc:cash, cashIn_adv:advCashClosed+openAdvCash, cashIn_oc:ocCash, upiIn_adv:advUpiClosed+openAdvUpi,
     totalCashIn:cashIn, totalUpiIn:upiIn,
+    openAdvTotal, openAdvCash, openAdvUpi, openAdvCount:openAdvJobs.length,
     expCash, expByCat, labourPay, tpg, tpm,
     custRefundTotal,
     cashInHand, systemCIH:cashInHand,
@@ -623,6 +661,20 @@ async function loadEodSummary(){
     const ccCls=diff<=1?'cc-ok':diff<=100?'cc-warn':'cc-bad';
     const ccIcon=diff<=1?'✅ BALANCED':diff<=100?'🟡 MINOR DIFF':'🔴 CHECK REQUIRED';
     const ccText=`CROSSCHECK: Billing ${fmt(ccLeft)} = Cash+UPI+Credit+Prepaid+Advance ${fmt(ccRight)}  ${ccIcon}  (Diff: ${fmt(diff)})`;
+
+    // 11B.47 (9 Sep 2026): note disclosing advance money collected today against still-OPEN job
+    // cards — that money IS included in Workshop Cash IN / Workshop UPI IN above (real money
+    // received today), but is deliberately NOT part of Total Billing (T) or the crosscheck above
+    // (that stays Closed-JCs-only, since T can't be final until the job itself closes). Without
+    // this note, that inclusion would look unexplained next to a crosscheck that doesn't include it.
+    const openAdvNote = openAdvJobs.length > 0
+      ? `<div class="jc-detail-box" style="background:#eff6ff;border:1px solid #93c5fd;margin-top:10px;">
+          ℹ️ <b>${fmt(openAdvTotal)}</b> advance collected today from ${openAdvJobs.length} still-OPEN job card${openAdvJobs.length>1?'s':''}
+          (Cash: ${fmt(openAdvCash)}, UPI: ${fmt(openAdvUpi)}) — <b>included</b> in Workshop Cash IN / UPI IN above,
+          but <b>not yet</b> in Total Billing (T) or the crosscheck (job not yet closed):
+          ${openAdvJobs.map(j=>`${jcRef(j.id)} (${fmt(parseFloat(j.advance_service)||0)} ${(j.advance_service_mode||'Cash')})`).join(', ')}
+        </div>`
+      : '';
 
     // Amendment warning banner — shown above EOD when any JC from this date was amended post-closure
   const amendBanner = eodAmendments.length > 0
@@ -659,6 +711,7 @@ async function loadEodSummary(){
         <div class="jc-detail-box">Old Credit UPI (ou): <b>${fmt(ouUpi)}</b></div>
       </div>
       <div class="${ccCls} crosscheck-line" style="margin-top:10px;">${ccText}</div>
+      ${openAdvNote}
       <h4 style="margin:14px 0 8px;">Expenses</h4>
       <div class="table-wrapper"><table><thead><tr><th>Category</th><th>Amount</th></tr></thead><tbody>
         ${Object.keys(expByCat).length?Object.keys(expByCat).map(k=>`<tr><td>${k}</td><td>${fmt(expByCat[k])}</td></tr>`).join(''):'<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No expenses</td></tr>'}
