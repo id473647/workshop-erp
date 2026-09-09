@@ -3678,7 +3678,14 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // (see executeInvoicePrint) so the next real test print reports real browser numbers
         // instead of another guess. Safe to remove once the real cause is confirmed and fixed.
         function makeDebug(extra) {
-            return Object.assign({ sheetClass, headerPx, footerPx, contdNotePx, moreNotePx, budget, itemCount: itemHtmlArr.length, totalItemsPx }, extra);
+            // 11B.46c-fix11-debug (9 Sep 2026): the aggregate numbers alone (header/footer/budget/
+            // perPage) couldn't explain a real test print's perPage:[1,8] result — page 1 (the
+            // MOST generous per-page budget, since it's the only page that never subtracts
+            // contdNotePx) ending up with FEWER items than page 2 is not something the forward-
+            // pack-then-trim algorithm can produce unless one specific item is measuring far
+            // taller than the rest. Surfacing every item's own measured px here (not just the
+            // total) turns that from a guess into something visible in the very next test print.
+            return Object.assign({ sheetClass, headerPx, footerPx, contdNotePx, moreNotePx, budget, itemCount: itemHtmlArr.length, totalItemsPx, itemPxList: itemPx.map(p => Math.round(p)) }, extra);
         }
 
         // Case 1: everything genuinely fits on one page — no CONTINUED note, no moreNote, just
@@ -3789,12 +3796,12 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // Tier 1: standard full-size single A6 sheet — the exact same rendering every invoice has
         // always used. Nothing is shrunk or merged here.
         let result = a6PaginateEntity('', headerHTML, rawItems, footerHTML, 'a6-single-sheet');
-        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet', debug: result.debug };
+        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-single-sheet', debug: Object.assign({ tier: 1 }, result.debug) };
         // Tier 2: doesn't fit on one page — re-measure at the combo-zone's smaller font, since
         // overflow prints via the same 2-per-A5-sheet packing the combo invoice uses (keeps the
         // measured class and the actually-rendered class always in sync).
         result = a6PaginateEntity('', headerHTML, rawItems, footerHTML, 'a6-combo-zone');
-        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: result.debug };
+        if (!result.isMultiPage) return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: Object.assign({ tier: 2 }, result.debug) };
         // 11B.46c-fix8 (8 Sep 2026): fix7's item compaction (MRP merged into the line above, 18%
         // smaller) was being applied to EVERY invoice, including ones that already fit fine —
         // changing the standard look of invoices that never needed to change. Fixed: compaction
@@ -3804,7 +3811,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // it always has.
         const compactItems = rawItems.map(h => a6CompactItemHTML(h));
         result = a6PaginateEntity('', headerHTML, compactItems, footerHTML, 'a6-combo-zone');
-        return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: result.debug };
+        return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: Object.assign({ tier: 3 }, result.debug) };
     }
 
     // 11B.46c-fix11: the per-zone logo used to be a separate fragment (A6_ZONE_LOGO_HTML)
@@ -3972,7 +3979,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             if (single.debug) {
                 const d = single.debug;
                 const sheetDivsInDom = target.querySelectorAll('.a6-combo-sheet, .a6-single-sheet').length;
-                paperMsg += `\n\n[Debug] items:${d.itemCount} case:${d.case} pages:${single.pages.length} perPage:${JSON.stringify(d.perPageCounts)} header:${Math.round(d.headerPx)}px footer:${Math.round(d.footerPx)}px budget:${Math.round(d.budget)}px sheetClass:${d.sheetClass} domSheetDivs:${sheetDivsInDom} targetHtmlLen:${target.innerHTML.length}`;
+                paperMsg += `\n\n[Debug] tier:${d.tier} items:${d.itemCount} case:${d.case} pages:${single.pages.length} perPage:${JSON.stringify(d.perPageCounts)} header:${Math.round(d.headerPx)}px footer:${Math.round(d.footerPx)}px moreNote:${Math.round(d.moreNotePx)}px contdNote:${Math.round(d.contdNotePx)}px budget:${Math.round(d.budget)}px sheetClass:${d.sheetClass} domSheetDivs:${sheetDivsInDom} targetHtmlLen:${target.innerHTML.length}\n[Debug] itemPx:${JSON.stringify(d.itemPxList)}`;
             }
         }
 
