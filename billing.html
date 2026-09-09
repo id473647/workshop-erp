@@ -238,6 +238,14 @@
             .a6-single-sheet .a6f-promo, .a6-combo-zone .a6f-promo { padding: 2px 0 !important; margin-top: 3px !important; margin-bottom: 2px !important; }
             .a6-single-sheet .a6f-computer, .a6-combo-zone .a6f-computer { margin-top: 2px !important; padding-top: 2px !important; }
 
+            /* 11B.46c-fix11 (9 Sep 2026, per the user's explicit request after reviewing an
+               approved jpg/pdf mockup over 2 rounds): a small amount of extra top padding before
+               the header content, for paper-feed clearance at the very top of each printed A6/A5
+               zone — affordable now that the Hindi offer line lower down is one line shorter
+               (dropped its "ऑफर:" label, see a6BuildPrintFooter). Scoped to only the print-time
+               zones, same as every rule above — no on-screen effect. */
+            .a6-single-sheet, .a6-combo-zone { padding-top: 5mm !important; }
+
             /* 11B.46c-fix10 (8 Sep 2026, per the user's explicit request): the combined "My Care +
                Moped" total block (.me-summary — bordered box shown after both entities' own
                footers, when it fits) was visually much heavier than the rest of a compact A6
@@ -3285,7 +3293,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const isLoyaltyMemberForPromo = !!(activeCustomerProfile && activeCustomerProfile.is_loyalty_member === true);
         const comboPromoLineHTML = isLoyaltyMemberForPromo ? '' : `<div class="a6f-promo" style="font-size:0.7rem;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:5px 0;margin-top:8px;margin-bottom:5px;text-align:center;"><b>ऑफर:</b> क्या आप जानते हैं? मात्र ₹10 में हमारे लॉयल्टी प्रोग्राम से जुड़ें और अपनी छठी सर्विस बिल्कुल मुफ्त पाएं!</div>`;
         const comboComputerGeneratedLineHTML = `<div class="a6f-computer" style="font-size:0.65rem;text-align:center;margin-top:5px;">Computer Generated Document.<br>Thank You.</div>`;
-        const myCareFooterHTML = `<div class="me-divider"></div><div class="me-total a6f-nettotal">My Care Payable: <strong>₹${myCareSub}</strong></div>${myCareGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; /* Sub-Phase 11B.46: wrapper ids let the A6 print pagination find and re-chunk this content; on-screen HTML is unchanged, just wrapped */ const myCareHTML = hasMyCare ? `<div class="me-section" id="meSectionMyCare"><div id="meHeaderMyCare">${myCareHeaderHTML}</div><div id="meItemsMyCare">${myCareItemsHTML}</div><div id="meFooterMyCare">${myCareFooterHTML}</div></div>` : ''; const mopedHeaderHTML = `<div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const mopedItemsHTML = `${buildLineHTML(mopedLines)}`; const mopedFooterHTML = `<div class="me-divider"></div><div class="me-total a6f-nettotal">Moped Payable: <strong>₹${mopedAmt}</strong></div>${mopedGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; const mopedHTML = `<div class="me-section" id="meSectionMoped"><div id="meHeaderMoped">${mopedHeaderHTML}</div><div id="meItemsMoped">${mopedItemsHTML}</div><div id="meFooterMoped">${mopedFooterHTML}</div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div class="a6f-summary-title" style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row a6f-summary-total" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; const meSummaryBlockHTML = `<div id="meSummaryBlock">${summaryHTML}${savingsHTML}</div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + meSummaryBlockHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; /* Sub-Phase 11B.46: old btnLandscapePrint element removed, replaced by the single auto-deciding PRINT INVOICE button */ }
+        const myCareFooterHTML = `<div class="me-divider"></div><div class="me-total a6f-nettotal">My Care Payable: <strong>₹${myCareSub}</strong></div>${myCareGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; /* Sub-Phase 11B.46: wrapper ids let the A6 print pagination find and re-chunk this content; on-screen HTML is unchanged, just wrapped */ const myCareHTML = hasMyCare ? `<div class="me-section" id="meSectionMyCare"><div id="meHeaderMyCare">${myCareHeaderHTML}</div><div id="meItemsMyCare">${myCareItemsHTML}</div><div id="meFooterMyCare">${myCareFooterHTML}</div></div>` : ''; const mopedHeaderHTML = `<div class="me-header"><strong>Moped House</strong><br><span class="me-gst">GSTIN: 23AALPB2424J1Z4</span><br><span class="me-addr">Gurudwara Road, Ganj Betul | PH: 9425304314, 9425002214</span></div><div class="me-meta"><span>Bill: ${jcRef}</span><span>${dateStr} ${timeStr}</span></div><div class="me-meta">Client: ${custInfo}</div><div class="me-meta">Vehicle: ${vehInfo}</div><div class="me-divider"></div>`; const mopedItemsHTML = `${buildLineHTML(mopedLines)}`; const mopedFooterHTML = `<div class="me-divider"></div><div class="me-total a6f-nettotal">Moped Payable: <strong>₹${mopedAmt}</strong></div>${mopedGstNoteHTML}${comboPromoLineHTML}${comboComputerGeneratedLineHTML}`; const mopedHTML = `<div class="me-section" id="meSectionMoped"><div id="meHeaderMoped">${mopedHeaderHTML}</div><div id="meItemsMoped">${mopedItemsHTML}</div><div id="meFooterMoped">${mopedFooterHTML}</div></div>`; let totalMrpValue = 0; lineItemsLocalMemory.forEach(l => { const m = parseFloat(l.mrp_at_billing)||0; if (m > 0) totalMrpValue += m * (parseFloat(l.qty)||1); }); const pUsed = parseFloat(sv.points_used) || 0; const advSrv = parseFloat(sv.advance_service) || 0; const prepGrn = parseFloat(sv.prepaid_green) || 0; const prepMop = parseFloat(sv.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const pointsRowHTML = pUsed > 0 ? `<div class="me-sum-row" style="color:#0369a1;"><span>Points Used</span><strong>-₹${pUsed}</strong></div>` : ''; const advSrvRowHTML = advSrv > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance</span><strong>-₹${advSrv}</strong></div>` : ''; const prepGrnRowHTML = prepGrn > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit</span><strong>-₹${prepGrn}</strong></div>` : ''; const prepMopRowHTML = prepMop > 0 ? `<div class="me-sum-row" style="color:#dc2626;"><span>Less Advance Deposit Earlier</span><strong>-₹${prepMop}</strong></div>` : ''; const savingsHTML = (totalMrpValue > 0 && totalSavings > 0) ? `<div style="border-top:1px dashed #000;margin-top:5px;padding-top:4px;"><div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div></div>` : ''; /* P3: Referral discount for summary */ const refDiscHTML = (referralDiscountActive && referralDiscountAmount > 0) ? `<div class=\"me-sum-row\" style=\"color:#15803d;\"><span>Referral Discount (${activeJobContext.referral_code})</span><strong>-₹${referralDiscountAmount}</strong></div>` : ''; const summaryHTML = `<div class="me-summary"><div class="a6f-summary-title" style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">PAYMENT SUMMARY</div>${hasMyCare?`<div class="me-sum-row"><span>My Care Service Center</span><strong>₹${myCareSub}</strong></div>`:''}<div class="me-sum-row"><span>Moped House</span><strong>₹${mopedAmt}</strong></div>${refDiscHTML}${pointsRowHTML}${advSrvRowHTML}${prepGrnRowHTML}${prepMopRowHTML}<div style="border-top:1px solid #000;margin:4px 0;"></div><div class="me-sum-row a6f-summary-total" style="font-size:1rem;"><strong>TOTAL PAYABLE</strong><strong>₹${finalNet}</strong></div><div class="a6f-summary-words" style="font-size:0.75rem;margin-top:4px;">${finalNet} Only</div><div class="a6f-summary-mode" style="font-weight:700;margin-top:4px;">Mode: ${payMode}</div></div>`; /* P3: Combined logo block at top of multi-entity receipt */ const logoHTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:6px;margin-bottom:8px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);margin-right:6px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:28px;filter:grayscale(100%);vertical-align:middle;"></div>`; const meSummaryBlockHTML = `<div id="meSummaryBlock">${summaryHTML}${savingsHTML}</div>`; document.getElementById('multiEntityReceiptTarget').innerHTML = logoHTML + myCareHTML + mopedHTML + meSummaryBlockHTML; document.getElementById('modalReceipt').style.display = 'flex'; document.getElementById('renderThermalReceiptTarget').style.display = 'none'; document.getElementById('multiEntityReceiptTarget').style.display = 'block'; /* Sub-Phase 11B.46: old btnLandscapePrint element removed, replaced by the single auto-deciding PRINT INVOICE button */ }
 
     /* ═══════════ Sub-Phase 11B.46 (5 Sep 2026, rebuilt 8 Sep 2026 as 11B.46b) ═══════════
        A6 / A5-combo auto-print. Reads the ALREADY-RENDERED receipt (single-entity
@@ -3451,13 +3459,179 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // the GST breakdown and the "Computer Generated Document" line. This runs on a throwaway
     // print-only COPY of Moped's footer HTML — the on-screen combo popup (`#meFooterMoped`) is
     // untouched, so My Care and Moped still look identical to each other on screen. The logo was
-    // already print-only (never appeared on screen at all — see A6_ZONE_LOGO_HTML). The offer
+    // already print-only (never appeared on screen at all — built by a6BuildPrintHeader). The offer
     // line is found and removed by its `a6f-promo` marker class, added purely for this purpose.
     function a6StripMopedPromoLine(html) {
         const wrap = document.createElement('div');
         wrap.innerHTML = html;
         const promo = wrap.querySelector('.a6f-promo');
         if (promo) promo.remove();
+        return wrap.innerHTML;
+    }
+
+    // 11B.46c-fix11 (9 Sep 2026, per the user's explicit approval of a jpg/pdf mockup reviewed
+    // and corrected over 2 rounds): denser A6/A5 print header + footer layout. Exactly like
+    // a6CompactItemHTML/a6StripMopedPromoLine above, everything here builds a throwaway PRINT-ONLY
+    // copy — the on-screen receipt popup, thermal roll print, and WhatsApp image are built from
+    // separate, untouched copies of the same source content and are completely unaffected.
+    //
+    // Static per-entity facts the print header needs (name/GSTIN/phone/address) — these are the
+    // exact same values already hardcoded in thHeaderBlock (single-entity, static HTML) and in
+    // renderMultiEntityReceipt's myCareHeaderHTML/mopedHeaderHTML (combo, on-screen). Kept here
+    // only so the print builder below has clean values; not a new source of truth.
+    const A6_ENTITY_MYCARE = { name: 'My Care Service Center', gstin: '23ANAPB4613K1ZJ', phone: '9425002214, 8989171751', address: 'Gurudwara Road, Ganj Betul' };
+    const A6_ENTITY_MOPED  = { name: 'Moped House', gstin: '23AALPB2424J1Z4', phone: '9425304314, 9425002214', address: 'Gurudwara Road, Ganj Betul' };
+
+    // The Hindi offer line's print-only wording — per the user's explicit choice on the approved
+    // mockup: more benefit-forward than the on-screen version, and (per this round's request)
+    // without the leading "ऑफर:" label, which read as redundant once the line is this specific.
+    const A6_PROMO_TEXT = 'सिर्फ ₹10 दें और हमारे लॉयल्टी प्रोग्राम से जुड़कर अपनी अगली (छठी) सर्विस बिल्कुल मुफ्त पाएं!';
+
+    // Builds the consolidated print-only header: logo(s) left+right of a centered 4-line block
+    // (Name / GSTIN / Phone / Address, each its own line — bigger logos now that they're not
+    // competing with the text block for the same centered column), Bill No + Date + Time merged
+    // onto one line, Client/Vehicle/Problem each kept on their OWN separate line (an earlier draft
+    // merged Vehicle+Problem and the user asked for that reverted), and "ITEMS & SERVICES"
+    // centered. opts.logo === false omits the logo(s) entirely and centers the text block full
+    // width — Moped's invoice never carries a logo, standalone or sharing an A5 sheet with My
+    // Care, per the user's explicit rule.
+    function a6BuildPrintHeader(opts) {
+        const logoImg = (src) => `<img src="${src}" onerror="this.style.display='none'" style="height:26px;filter:grayscale(100%);">`;
+        const nameBlockInner = `<div style="font-size:0.95rem;font-weight:bold;margin:1px 0;">${opts.name}</div>`
+            + `<div style="font-size:0.6rem;margin:1px 0;">GSTIN: ${opts.gstin}</div>`
+            + `<div style="font-size:0.6rem;margin:1px 0;">PH: ${opts.phone}</div>`
+            + `<div style="font-size:0.6rem;margin:1px 0;">${opts.address}</div>`;
+        const headerRow = opts.logo
+            ? `<div style="display:flex;align-items:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
+                + `<div style="flex:0 0 30px;">${logoImg('logo-main.jpg')}</div>`
+                + `<div style="flex:1;text-align:center;">${nameBlockInner}</div>`
+                + `<div style="flex:0 0 30px;text-align:right;">${logoImg('logo-green.png')}</div>`
+                + `</div>`
+            : `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">${nameBlockInner}</div>`;
+        const problemLine = opts.problem ? `<div class="receipt-meta" style="margin-top:1px;">Problem: <strong>${opts.problem}</strong></div>` : '';
+        return headerRow
+            + `<div class="receipt-meta" style="display:flex;justify-content:space-between;"><span><strong>${opts.billNo}</strong></span><span>${opts.dateTime}</span></div>`
+            + `<div class="receipt-meta" style="margin-top:1px;">Client: <strong>${opts.client}</strong></div>`
+            + `<div class="receipt-meta" style="margin-top:1px;">Vehicle: <strong>${opts.vehicle}</strong></div>`
+            + problemLine
+            + `<div style="font-weight:bold;font-size:0.6rem;border-bottom:1px solid #000;padding-bottom:1px;margin-bottom:2px;margin-top:3px;text-transform:uppercase;text-align:center;">ITEMS & SERVICES</div>`;
+    }
+
+    // Reads Bill No / Date+Time / Client / Vehicle straight off the already-rendered combo header
+    // element (`#meHeaderMyCare` / `#meHeaderMoped`) — read-only, never mutates the live DOM — so
+    // a6BuildComboResult never has to re-derive these from job-card data itself.
+    function a6ExtractComboMeta(headerEl) {
+        if (!headerEl) return { billNo: '', dateTime: '', client: '', vehicle: '' };
+        const metas = headerEl.querySelectorAll('.me-meta');
+        const billDate = metas[0];
+        const billNo = (billDate && billDate.children[0]) ? billDate.children[0].textContent.replace(/^Bill:\s*/, '') : '';
+        const dateTime = (billDate && billDate.children[1]) ? billDate.children[1].textContent : '';
+        const client = metas[1] ? metas[1].textContent.replace(/^Client:\s*/, '') : '';
+        const vehicle = metas[2] ? metas[2].textContent.replace(/^Vehicle:\s*/, '') : '';
+        return { billNo, dateTime, client, vehicle };
+    }
+
+    // Consolidates the print-only footer: Total Spares + Total Labor onto one line (single-entity
+    // only — combo per-entity footers never had these rows), the divider directly above NET
+    // PAYABLE removed (it was reading as a double rule right on top of NET PAYABLE's own border),
+    // the GST breakdown collapsed from a heading line + one line per slab into "Prices inclusive
+    // of X% CGST = ₹a & X% SGST = ₹b" (any additional rate slab, on the rare multi-slab invoice,
+    // keeps its own line below — nothing is dropped, only the repeated heading), amount-in-words +
+    // payment mode merged onto one line, "Computer Generated Document."/"Thank You." merged onto
+    // one line, and the Hindi offer line's "ऑफर:" label dropped in favour of A6_PROMO_TEXT. Every
+    // OTHER row — auto spares discount, lathe work, final discount, referral discount, points
+    // used, advance/deposit deductions, credit note, split payment, future advice — is left
+    // completely untouched; only the specific lines above are touched. Must run BEFORE a6StripIds
+    // (it targets several rows by their live element id) — see a6BuildPrintFooter below.
+    function a6CompactFooterHTML(html) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = html;
+
+        // Total Spares + Total Labor -> one line (single-entity footer only)
+        const sparesStrong = wrap.querySelector('#thPartsSum');
+        const laborStrong = wrap.querySelector('#thLaborSum');
+        const sparesRow = sparesStrong ? sparesStrong.closest('.receipt-meta') : null;
+        const laborRow = laborStrong ? laborStrong.closest('.receipt-meta') : null;
+        if (sparesRow && laborRow) {
+            const merged = document.createElement('div');
+            merged.className = 'receipt-meta';
+            merged.style.cssText = 'display:flex;justify-content:space-between;';
+            merged.innerHTML = `<span>Spares: ${sparesStrong.outerHTML}</span><span>Labor: ${laborStrong.outerHTML}</span>`;
+            sparesRow.replaceWith(merged);
+            laborRow.remove();
+        }
+
+        // Divider directly above NET PAYABLE -> removed
+        const netTotal = wrap.querySelector('.a6f-nettotal');
+        if (netTotal && netTotal.previousElementSibling) {
+            const prevCls = netTotal.previousElementSibling.classList;
+            if (prevCls.contains('receipt-divider') || prevCls.contains('me-divider')) {
+                netTotal.previousElementSibling.remove();
+            }
+        }
+
+        // GST breakdown -> one line per slab, heading folded into the first slab's line
+        const gstNote = wrap.querySelector('.a6f-gstnote');
+        if (gstNote) {
+            const target = gstNote.querySelector('#gstNoteText') || gstNote;
+            const fmt = (s) => s.replace(/CGST:/g, 'CGST =').replace(/SGST:/g, 'SGST =').replace(/\s*&nbsp;\|\&nbsp;\s*/g, ' & ');
+            const parts = target.innerHTML.split('<br>');
+            if (parts.length >= 2 && /Prices inclusive of applicable GST/i.test(parts[0])) {
+                const merged = [`Prices inclusive of ${fmt(parts[1])}`].concat(parts.slice(2).map(fmt));
+                target.innerHTML = merged.join('<br>');
+            }
+        }
+
+        // Amount in words + payment mode -> one line (single-entity footer only)
+        const wordsStrong = wrap.querySelector('#thWords');
+        const modeSpan = wrap.querySelector('#thMode');
+        const wordsRow = wordsStrong ? wordsStrong.closest('.receipt-meta') : null;
+        const modeRow = modeSpan ? modeSpan.closest('.receipt-meta') : null;
+        if (wordsRow && modeRow) {
+            const merged = document.createElement('div');
+            merged.className = 'receipt-meta';
+            merged.style.cssText = 'display:flex;justify-content:space-between;font-style:italic;';
+            merged.innerHTML = `<span>${wordsStrong.outerHTML}</span><strong style="font-style:normal;">${modeSpan.outerHTML}</strong>`;
+            wordsRow.replaceWith(merged);
+            modeRow.remove();
+        }
+
+        // "Computer Generated Document." + "Thank You." -> one line
+        const computerLine = wrap.querySelector('.a6f-computer');
+        if (computerLine) computerLine.innerHTML = computerLine.innerHTML.replace(/<br\s*\/?>/i, ' ');
+
+        // Hindi offer line: drop the "ऑफर:" label, use the fuller approved wording (Moped's copy
+        // has already had this whole line removed upstream by a6StripMopedPromoLine, so this is a
+        // no-op there)
+        const promo = wrap.querySelector('.a6f-promo');
+        if (promo) promo.innerHTML = A6_PROMO_TEXT;
+
+        return wrap.innerHTML;
+    }
+
+    // Runs the compaction above (needs live element ids intact to target rows reliably) THEN
+    // strips ids (so a repeated header/footer never puts a duplicate id on the page — footers only
+    // print once, on the final page, but this keeps the same safe habit as the header builder).
+    function a6BuildPrintFooter(rawFooterHTML) {
+        return a6StripIds(a6CompactFooterHTML(rawFooterHTML));
+    }
+
+    // Merges the combo Payment Summary's amount-in-words + payment-mode lines onto one line, same
+    // as the per-entity footers above. `.a6f-summary-words`/`.a6f-summary-mode` are new print-only
+    // marker classes (no styling of their own) added to summaryHTML in renderMultiEntityReceipt
+    // purely so this can target them — the on-screen Payment Summary is unaffected.
+    function a6CompactSummaryHTML(html) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = html;
+        const wordsEl = wrap.querySelector('.a6f-summary-words');
+        const modeEl = wrap.querySelector('.a6f-summary-mode');
+        if (wordsEl && modeEl) {
+            const merged = document.createElement('div');
+            merged.style.cssText = 'display:flex;justify-content:space-between;font-size:0.75rem;margin-top:4px;';
+            merged.innerHTML = `<span>${wordsEl.innerHTML}</span><strong>${modeEl.textContent.replace(/^Mode:\s*/, '')}</strong>`;
+            wordsEl.replaceWith(merged);
+            modeEl.remove();
+        }
         return wrap.innerHTML;
     }
 
@@ -3594,8 +3768,23 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     }
 
     function a6BuildSingleEntityResult() {
-        const headerHTML = a6StripIds(document.getElementById('thHeaderBlock').innerHTML);
-        const footerHTML = a6StripIds(document.getElementById('thFooterBlock').innerHTML);
+        // 11B.46c-fix11: header is now built fresh from the same live values thHeaderBlock itself
+        // is populated from (see a6BuildPrintHeader) instead of cloning the on-screen block —
+        // that's what lets the print-only layout (logos left/right, consolidated lines) differ
+        // from the on-screen one without ever touching thHeaderBlock itself.
+        const headerHTML = a6BuildPrintHeader({
+            name: document.getElementById('thermalShopName').innerHTML,
+            gstin: A6_ENTITY_MYCARE.gstin,
+            phone: A6_ENTITY_MYCARE.phone,
+            address: A6_ENTITY_MYCARE.address,
+            billNo: document.getElementById('thBillNo').innerText,
+            dateTime: `${document.getElementById('thDate').innerText} ${document.getElementById('thTime').innerText}`,
+            client: document.getElementById('thClientInfo').innerText,
+            vehicle: document.getElementById('thAssetInfo').innerText,
+            problem: document.getElementById('thProblem').innerText,
+            logo: true
+        });
+        const footerHTML = a6BuildPrintFooter(document.getElementById('thFooterBlock').innerHTML);
         const rawItems = Array.from(document.getElementById('thStackedItemsContainer').children).map(n => n.outerHTML);
         // Tier 1: standard full-size single A6 sheet — the exact same rendering every invoice has
         // always used. Nothing is shrunk or merged here.
@@ -3618,10 +3807,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         return { pages: result.pages, sheetClass: 'a6-combo-zone', debug: result.debug };
     }
 
-    // Small logo strip sized to fit inside a combo zone (105mm wide) — the on-screen receipt's
-    // own logoHTML is sized for a full sheet and only ever appears once at the top; this is a
-    // separate, print-only fragment so each entity's zone carries its own logo, per the fix.
-    const A6_ZONE_LOGO_HTML = `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;"><img src="logo-main.jpg" onerror="this.style.display='none'" style="height:18px;filter:grayscale(100%);margin-right:4px;vertical-align:middle;"><img src="logo-green.png" onerror="this.style.display='none'" style="height:18px;filter:grayscale(100%);vertical-align:middle;"></div>`;
+    // 11B.46c-fix11: the per-zone logo used to be a separate fragment (A6_ZONE_LOGO_HTML)
+    // concatenated in front of the header text. It's now built INTO a6BuildPrintHeader's own
+    // left/right layout instead (see opts.logo), so each entity's zone still carries its own
+    // logo at print time exactly as before — just laid out differently. Nothing is passed as a
+    // separate logoHTML argument to a6PaginateEntity any more (both call sites below now pass '').
 
     // Chunks one entity's own pages 2-per-A5-sheet and reports where that entity's LAST content
     // zone sits (left or right of its last sheet) and whether that last sheet's other zone was
@@ -3650,7 +3840,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // combined total NEVER causes a new sheet to be printed.
     function a6BuildComboResult() {
         const hasMyCare = !!document.getElementById('meSectionMyCare');
-        const summaryHTML = a6StripIds(document.getElementById('meSummaryBlock').outerHTML);
+        const summaryHTML = a6CompactSummaryHTML(a6StripIds(document.getElementById('meSummaryBlock').outerHTML));
         const summaryPx = a6MeasureHeightPx(summaryHTML, 'a6-combo-zone');
         const blankZoneCapacityPx = a6PageHeightPx() - A6_SAFETY_MARGIN_PX;
 
@@ -3662,20 +3852,33 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         let myCareResult = null;
         let myCareHeaderHTML = '', myCareFooterHTML = '', myCareRawItems = [];
         if (hasMyCare) {
-            myCareHeaderHTML = a6StripIds(document.getElementById('meHeaderMyCare').innerHTML);
-            myCareFooterHTML = a6StripIds(document.getElementById('meFooterMyCare').innerHTML);
+            const myCareHeaderEl = document.getElementById('meHeaderMyCare');
+            const myCareMeta = a6ExtractComboMeta(myCareHeaderEl);
+            myCareHeaderHTML = a6BuildPrintHeader({
+                name: A6_ENTITY_MYCARE.name, gstin: A6_ENTITY_MYCARE.gstin, phone: A6_ENTITY_MYCARE.phone, address: A6_ENTITY_MYCARE.address,
+                billNo: myCareMeta.billNo, dateTime: myCareMeta.dateTime, client: myCareMeta.client, vehicle: myCareMeta.vehicle,
+                problem: null, logo: true
+            });
+            myCareFooterHTML = a6BuildPrintFooter(document.getElementById('meFooterMyCare').innerHTML);
             myCareRawItems = Array.from(document.getElementById('meItemsMyCare').children).map(n => n.outerHTML);
-            myCareResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, myCareHeaderHTML, myCareRawItems, myCareFooterHTML, 'a6-combo-zone');
+            myCareResult = a6PaginateEntity('', myCareHeaderHTML, myCareRawItems, myCareFooterHTML, 'a6-combo-zone');
             if (myCareResult.isMultiPage) {
                 const myCareCompactItems = myCareRawItems.map(h => a6CompactItemHTML(h));
-                myCareResult = a6PaginateEntity(A6_ZONE_LOGO_HTML, myCareHeaderHTML, myCareCompactItems, myCareFooterHTML, 'a6-combo-zone');
+                myCareResult = a6PaginateEntity('', myCareHeaderHTML, myCareCompactItems, myCareFooterHTML, 'a6-combo-zone');
             }
         }
-        const mopedHeaderHTML = a6StripIds(document.getElementById('meHeaderMoped').innerHTML);
-        // fix9: Moped's print copy drops the per-zone logo (passed '' below instead of
-        // A6_ZONE_LOGO_HTML) and the Hindi offer line, keeping GST breakdown + computer-generated
-        // line — the on-screen Moped footer (#meFooterMoped) is unaffected.
-        const mopedFooterHTML = a6StripMopedPromoLine(a6StripIds(document.getElementById('meFooterMoped').innerHTML));
+        const mopedHeaderEl = document.getElementById('meHeaderMoped');
+        const mopedMeta = a6ExtractComboMeta(mopedHeaderEl);
+        // Moped never gets a logo — opts.logo:false — same rule as before (fix9), standalone or
+        // sharing an A5 sheet with My Care.
+        const mopedHeaderHTML = a6BuildPrintHeader({
+            name: A6_ENTITY_MOPED.name, gstin: A6_ENTITY_MOPED.gstin, phone: A6_ENTITY_MOPED.phone, address: A6_ENTITY_MOPED.address,
+            billNo: mopedMeta.billNo, dateTime: mopedMeta.dateTime, client: mopedMeta.client, vehicle: mopedMeta.vehicle,
+            problem: null, logo: false
+        });
+        // fix9: Moped's print copy drops the Hindi offer line, keeping GST breakdown +
+        // computer-generated line — the on-screen Moped footer (#meFooterMoped) is unaffected.
+        const mopedFooterHTML = a6StripIds(a6StripMopedPromoLine(a6CompactFooterHTML(document.getElementById('meFooterMoped').innerHTML)));
         const mopedRawItems = Array.from(document.getElementById('meItemsMoped').children).map(n => n.outerHTML);
         let mopedResult = a6PaginateEntity('', mopedHeaderHTML, mopedRawItems, mopedFooterHTML, 'a6-combo-zone');
         if (mopedResult.isMultiPage) {
