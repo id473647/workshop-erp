@@ -3744,11 +3744,27 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const finalPageBudget = Math.max(0, rawFinalRoomPx);
         let sfxStart = lastGroup.length;
         let tailPx = 0;
+        // 11B.46c-fix12 (9 Sep 2026): the old loop below greedily MAXIMIZED how many items
+        // land on the final (footer-bearing) page by walking backward and continuing to add
+        // items as long as they still fit finalPageBudget. When forward-pack produced a single
+        // monolithic group (all items fit comfortably on page 1's generous budget), this stranded
+        // nearly everything on the final page and left the earlier page almost empty (reported
+        // bug: 9 items x31px each -> perPage:[1,8] instead of the expected single/well-filled page).
+        // Fix: first check whether the WHOLE last group already fits under finalPageBudget — if so,
+        // keep it intact as the final page (no peeling at all, matches prior correct behavior for
+        // that case). Only if the whole group does NOT fit do we peel the minimum number of
+        // trailing items needed so the remainder fits, preferring to fill the earlier page(s) first.
+        const lastGroupTotalPx = lastGroup.reduce((s, idx) => s + itemPx[idx], 0);
         if (rawFinalRoomPx > 0) {
-            for (let i = lastGroup.length - 1; i >= 0; i--) {
-                if (tailPx > 0 && tailPx + itemPx[lastGroup[i]] > finalPageBudget) break;
-                tailPx += itemPx[lastGroup[i]];
-                sfxStart = i;
+            if (lastGroupTotalPx <= finalPageBudget) {
+                sfxStart = 0;
+                tailPx = lastGroupTotalPx;
+            } else {
+                for (let i = lastGroup.length - 1; i >= 0; i--) {
+                    tailPx += itemPx[lastGroup[i]];
+                    sfxStart = i;
+                    if (tailPx <= finalPageBudget) break;
+                }
             }
         }
         const suffixIdx = lastGroup.slice(sfxStart);
