@@ -3458,7 +3458,17 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // 0.8 — real test prints showed header+footer alone consuming ~84% of the page budget on ANY
     // invoice regardless of item count, so a small invoice could still need 2 pages purely because
     // of header/footer size. Text stays fully readable at 0.68, just noticeably more compact.
-    const A6_HF_SCALE = 0.68;
+    //
+    // 11B.46c-fix19 (9 Sep 2026, per the user's explicit instruction after a clear, well-lit test
+    // print confirmed genuine right-edge character clipping — not a photo artifact): every prior
+    // attempt this session widened the internal PADDING (2.5mm -> 4mm -> 6mm) while leaving text
+    // at full compact size, and digital reproductions kept proving that padding alone left a clean
+    // margin in this file's own output. The user's own diagnosis instead: shrink the whole
+    // invoice's content itself a bit (their words: "shrinking the entire invoice to 90-95% will
+    // do"), so every element — including whatever is actually consuming the printer's real
+    // unprintable margin — ends up physically smaller and further from the edge everywhere, not
+    // just where extra blank padding was added. Reduced 0.68 -> 0.62 (~91% of the previous size).
+    const A6_HF_SCALE = 0.62;
     function a6ScaleHF(html) { return html ? `<div style="zoom:${A6_HF_SCALE};">${html}</div>` : html; }
 
     // 11B.46c-fix7 (8 Sep 2026, per the user's explicit choice on a real 9-item invoice needing
@@ -3470,7 +3480,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // a throwaway COPY of each item's HTML built fresh only for the print pages —
     // thStackedItemsContainer / meItemsMyCare / meItemsMoped (the ones the on-screen receipt and
     // thermal print use) are never touched, so nothing changes on screen or on the thermal roll.
-    const A6_ITEM_SCALE = 0.82;
+    // 11B.46c-fix19 (9 Sep 2026, per the user's explicit instruction — see the matching note on
+    // A6_HF_SCALE above): reduced 0.82 -> 0.75 (~91% of the previous size), same reasoning —
+    // shrinking the item rows themselves (including their right-aligned price values) rather than
+    // only widening blank padding around them.
+    const A6_ITEM_SCALE = 0.75;
     function a6CompactItemHTML(outerHtml) {
         const wrap = document.createElement('div');
         wrap.innerHTML = outerHtml;
@@ -3569,10 +3583,17 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             + `<div style="font-size:0.6rem;margin:1px 0;">GSTIN: ${opts.gstin}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">PH: ${opts.phone}</div>`
             + `<div style="font-size:0.6rem;margin:1px 0;">${opts.address}</div>`;
+        // 11B.46c-fix20 (9 Sep 2026, per the user's explicit request): fix17's left-clustered row
+        // (name sized to its own content, logo right after it) read as the logo being
+        // "centralised" rather than clearly opposite the name — asked to put it back on the
+        // right side of the row, opposite the name, but not jammed into the row's extreme right
+        // edge. Name block back to flex:1 (stretches to fill the row, pushing the logo to the
+        // right side), logo back to flex:0 0 auto, with a modest margin-right inset (12px) so it
+        // sits near, but not flush against, the row's own right edge.
         const headerRow = opts.logo
-            ? `<div style="display:flex;align-items:center;justify-content:flex-start;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
-                + `<div style="flex:0 1 auto;text-align:left;">${nameBlockInner}</div>`
-                + `<div style="flex:0 0 auto;margin-left:10px;">${greenLogo}</div>`
+            ? `<div style="display:flex;align-items:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">`
+                + `<div style="flex:1;text-align:left;">${nameBlockInner}</div>`
+                + `<div style="flex:0 0 auto;margin-right:12px;padding-left:4px;">${greenLogo}</div>`
                 + `</div>`
             : `<div style="text-align:center;border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px;">${nameBlockInner}</div>`;
         const problemLine = opts.problem ? `<div class="receipt-meta" style="margin-top:1px;">Problem: <strong>${opts.problem}</strong></div>` : '';
@@ -3675,15 +3696,34 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         }
 
         // Amount in words + payment mode -> one line (single-entity footer only)
+        //
+        // 11B.46c-fix18 (9 Sep 2026): found while investigating the right-side print-margin
+        // report — a Split payment's mode text ("Split (Cash: ₹1000, UPI: ₹250)") is much longer
+        // than a normal mode word ("Cash"/"UPI"/"Card"), and forcing it onto the SAME line as the
+        // amount-in-words (a `justify-content:space-between` flex row) made both texts wrap
+        // mid-word into a cramped, hard-to-read 2-line mess — confirmed by rebuilding this exact
+        // real invoice's real footer text and rendering it. This is a real display defect, though
+        // separate from the actual character-clipping question still being investigated with the
+        // user (a genuinely too-long line here wraps onto a new line; it does not get cut off).
+        // Fixed defensively for any long mode text (not just this one case): when the mode text is
+        // longer than a normal single word, the two lines stack cleanly (words, then mode
+        // underneath) instead of being squeezed side by side. Short mode text (the common case —
+        // Cash/UPI/Card/etc.) is completely unaffected, still merged onto one line as before.
         const wordsStrong = wrap.querySelector('#thWords');
         const modeSpan = wrap.querySelector('#thMode');
         const wordsRow = wordsStrong ? wordsStrong.closest('.receipt-meta') : null;
         const modeRow = modeSpan ? modeSpan.closest('.receipt-meta') : null;
         if (wordsRow && modeRow) {
+            const modeText = (modeSpan.textContent || '').trim();
             const merged = document.createElement('div');
             merged.className = 'receipt-meta';
-            merged.style.cssText = 'display:flex;justify-content:space-between;font-style:italic;';
-            merged.innerHTML = `<span>${wordsStrong.outerHTML}</span><strong style="font-style:normal;">${modeSpan.outerHTML}</strong>`;
+            if (modeText.length > 14) {
+                merged.style.cssText = 'font-style:italic;';
+                merged.innerHTML = `<div>${wordsStrong.outerHTML}</div><div style="font-style:normal;font-weight:bold;margin-top:1px;">${modeSpan.outerHTML}</div>`;
+            } else {
+                merged.style.cssText = 'display:flex;justify-content:space-between;font-style:italic;';
+                merged.innerHTML = `<span>${wordsStrong.outerHTML}</span><strong style="font-style:normal;">${modeSpan.outerHTML}</strong>`;
+            }
             wordsRow.replaceWith(merged);
             modeRow.remove();
         }
