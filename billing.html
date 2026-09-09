@@ -3755,7 +3755,22 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // that case). Only if the whole group does NOT fit do we peel the minimum number of
         // trailing items needed so the remainder fits, preferring to fill the earlier page(s) first.
         const lastGroupTotalPx = lastGroup.reduce((s, idx) => s + itemPx[idx], 0);
-        if (rawFinalRoomPx > 0) {
+        // 11B.46c-fix13 (9 Sep 2026): fix12 alone still left one case unhandled — when the WHOLE
+        // invoice is a single forward-pack group (lastGroupIsOnlyPage) that narrowly fails the
+        // Case 1 single-page test (finalPageBudget === singlePageBudget in this exact case), the
+        // old peel loop still forced the minimum 1 trailing item onto the final page — stranding
+        // one lonely item next to a mostly-empty footer, while the earlier page also had room to
+        // spare. But by construction, whenever forward-pack keeps everything in ONE group, that
+        // whole group already fits comfortably under the far more generous non-final page budget
+        // (that's exactly why it was never split) — so there is never a real need to force any
+        // item onto the final page in this case. Keep the whole group on page 1 (with the small
+        // "Contd." note) and let the footer page carry zero items instead — matching the same
+        // "push everything onto the earlier page" principle fix2 already used for the more
+        // extreme case where header+footer alone overflow the page. Only the OTHER case (the
+        // trailing group came from forward-pack actually splitting the item list into 2+ groups)
+        // still uses the peel-minimum logic, since those earlier groups are already packed to
+        // their own limit and can't safely absorb more.
+        if (rawFinalRoomPx > 0 && !lastGroupIsOnlyPage) {
             if (lastGroupTotalPx <= finalPageBudget) {
                 sfxStart = 0;
                 tailPx = lastGroupTotalPx;
