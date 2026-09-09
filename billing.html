@@ -258,8 +258,34 @@
                scrollHeight), so a change to LEFT/RIGHT padding alone is invisible to that
                calculation. It does slightly narrow the available line width, which can shift where
                a long item name wraps — but since every item's height is measured live against
-               this exact class after the change, the pagination numbers stay self-consistent. */
-            .a6-single-sheet, .a6-combo-zone { padding-left: 4mm !important; padding-right: 4mm !important; }
+               this exact class after the change, the pagination numbers stay self-consistent.
+
+               11B.46c-fix16 (9 Sep 2026): the next real single-entity test print STILL showed
+               text clipped on BOTH the left and right edges, on nearly every line (header, item,
+               and footer text alike). Investigated by rendering this exact printed invoice's real
+               content, through the real production header/item/footer-building functions, at true
+               105mm A6 width with a locked-down page-margin override, and inspecting the result
+               pixel-by-pixel: every line sat with a full clean 4mm gap from the true page edge —
+               nothing in our own code lets content reach, let alone cross, the edge of the box. A
+               shared @page{margin:8mm} rule elsewhere in this stylesheet (used by the older
+               thermal/A4 print modes) was also confirmed to NOT leak into A6 printing — the A6
+               engine's own @page{margin:0} override was verified to win the cascade correctly.
+               That rules out a bug in this file as the cause of what's being seen on paper. The
+               remaining, far more likely explanation: the physical printer/paper setup itself is
+               either not printing truly to the paper's edge (a printer's own hardware
+               "unprintable margin", common on ordinary printers that aren't borderless-capable),
+               or the paper size selected in the print dialog doesn't exactly match true A6
+               (105mm x 148mm) — e.g. some printers/drivers offer a "4x6" size (101.6mm x 152.4mm)
+               that LOOKS the same but is ~3.4mm narrower, which would shave a couple of
+               millimetres off both edges exactly like this. Since software padding alone cannot
+               fully compensate for a printer that is physically unable to print that close to the
+               edge, this fix does two things: (1) widens the safety padding further, 4mm to 6mm,
+               as a no-downside extra buffer (same reasoning as fix15 — LEFT/RIGHT-only, invisible
+               to a6ZonePaddingPx()'s height-only measurement, so pagination is unaffected); (2) a
+               real diagnostic question was raised with the user (paper size / print-dialog margin
+               setting actually selected) since a genuine hardware/paper mismatch needs to be fixed
+               at the print-settings level, not papered over with CSS alone. */
+            .a6-single-sheet, .a6-combo-zone { padding-left: 6mm !important; padding-right: 6mm !important; }
 
             /* 11B.46c-fix10 (8 Sep 2026, per the user's explicit request): the combined "My Care +
                Moped" total block (.me-summary — bordered box shown after both entities' own
