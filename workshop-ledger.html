@@ -251,10 +251,13 @@ input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6
         <div class="field-group"><label>Cash / UPI</label><select id="expMode"><option>Cash</option><option>UPI</option></select></div>
         <div class="field-group" id="expEntityWrap" style="display:none;"><label>Entity</label><select id="expEntity"><option value="green">Green</option><option value="moped">Moped</option><option value="service">Service</option></select></div>
         <div class="field-group" style="grid-column:1/-1;"><label>Description</label><input type="text" id="expNote" oninput="this.value=this.value.toUpperCase()"></div>
-        <button class="btn-action" onclick="saveExpense()">💾 SAVE & PRINT TICKET</button>
+        <button id="btnSaveExpense" class="btn-action" onclick="saveExpense()">💾 SAVE & PRINT TICKET</button>
+        <button id="btnCancelExpenseEdit" class="btn-action" style="background:#e2e8f0;color:#1e293b;display:none;" onclick="cancelExpenseEdit()">CANCEL EDIT</button>
       </div>
+      <!-- Sub-Phase 11B.48: admin-visible flag for any expense edited/deleted for the date on screen -->
+      <div id="expAmendBanner"></div>
       <div class="table-wrapper">
-        <table><thead><tr><th>Category</th><th>Amount</th><th>Mode</th><th>Entity</th><th>Note</th><th>By</th></tr></thead>
+        <table><thead><tr><th>Category</th><th>Amount</th><th>Mode</th><th>Entity</th><th>Note</th><th>By</th><th>Actions</th></tr></thead>
         <tbody id="expTableBody"></tbody></table>
       </div>
     </div>
@@ -276,6 +279,10 @@ let activeDate=urlParams.get('date')||todayStr;
 let activeTab=urlParams.get('tab')||'jc-details';
 
 let jcCache=[]; let itemsCache={}; let mechanicsCache=[]; let denomCache=[]; let categoryCache=[];
+// Sub-Phase 11B.48: expense edit/delete — 'any_day' (default) lets a role fix its own entries
+// any time; admin can flip this to 'same_day' in Workshop Settings to lock it down. Admin itself
+// always bypasses this window, same as the existing EOD unlock override.
+let expenseEditScope='any_day'; let editingExpenseId=null; let expensesCache=[];
 
 // ─── TAB DEFINITIONS & ROLE ACCESS ───────────────────────────────────────────
 const TABS=[
@@ -335,6 +342,10 @@ async function prefetchStaticData(){
   categoryCache=cats||[];
   const {data:dens}=await supabaseClient.from('currency_denominations').select('*').eq('is_active',true).order('sort_order');
   denomCache=dens||[];
+  // Sub-Phase 11B.48: read the admin-controlled expense edit/delete time window (see mechanic-admin.html
+  // "Workshop Settings" panel, same key-value workshop_settings table). Missing key = default 'any_day'.
+  const {data:eScope}=await supabaseClient.from('workshop_settings').select('setting_value').eq('setting_key','expense_edit_scope').maybeSingle();
+  if(eScope&&eScope.setting_value) expenseEditScope=eScope.setting_value;
 }
 function mechName(id){const m=mechanicsCache.find(x=>x.id===id); return m?m.name:'—';}
 
@@ -1289,17 +1300,108 @@ async function loadCrossAccounts(){
 }
 
 // ─── EXPENSES TAB ─────────────────────────────────────────────────────────────
+// Sub-Phase 11B.48 (10 Sep 2026): edit/delete for a role's own wrongly-entered expenses.
+// Design, agreed with the user before building:
+//  - Any role can EDIT or DELETE only its own entries (recorded_by === activeRole); admin can
+//    edit/delete anyone's, always, with no time-window restriction (mirrors adminUnlockEod()).
+//  - The allowed time window for a NON-admin role is controlled by the admin-only
+//    'expense_edit_scope' workshop_settings key ('any_day' default, or 'same_day').
+//  - A reason is mandatory for every edit and delete, exactly like adminUnlockEod()'s reason
+//    prompt. Both actions are logged to expense_amendments BEFORE the row itself changes/goes
+//    away, capturing a full before/after snapshot — because the user explicitly chose a
+//    PERMANENT delete (not a soft/recoverable one), this log is the only surviving record of a
+//    deleted expense's original details, so it is written first and its own insert failure blocks
+//    the delete rather than the other way round.
+//  - Admin sees a visible banner/flag on this tab (and can extend to EOD later) whenever any
+//    expense for the date on screen was edited or deleted, so nothing is silently changed.
+function canEditExpense(e){
+  if(activeRole==='admin') return true;
+  if((e.recorded_by||'')!==activeRole) return false;
+  if(expenseEditScope!=='same_day') return true;
+  const created=new Date(e.created_at);
+  const now=new Date();
+  return created.getFullYear()===now.getFullYear()&&created.getMonth()===now.getMonth()&&created.getDate()===now.getDate();
+}
+
 async function loadExpenses(){
   const catSel=document.getElementById('expCategory');
   catSel.innerHTML=categoryCache.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
   document.getElementById('expEntityWrap').style.display=(activeRole==='admin')?'flex':'none';
-  const tbody=document.getElementById('expTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
+  const tbody=document.getElementById('expTableBody'); tbody.innerHTML='<tr><td colspan="7" style="text-align:center;">Loading...</td></tr>';
+  document.getElementById('expAmendBanner').innerHTML='';
   let q=supabaseClient.from('workshop_expenses').select('*').gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59').order('created_at',{ascending:false});
   if(activeRole!=='admin') q=q.eq('warehouse_type',activeRole);
   const {data,error}=await q; tbody.innerHTML='';
-  if(error){tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`;return;}
-  if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No expenses today.</td></tr>';return;}
-  data.forEach(e=>{tbody.innerHTML+=`<tr><td>${e.expense_category}</td><td>${fmt(e.amount)}</td><td>${e.payment_mode||'Cash'}</td><td>${e.warehouse_type||''}</td><td>${e.note||''}</td><td>${e.recorded_by||''}</td></tr>`;});
+  if(error){tbody.innerHTML=`<tr><td colspan="7" style="color:red;">${error.message}</td></tr>`;return;}
+  expensesCache=data||[];
+  if(expensesCache.length===0){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#94a3b8;">No expenses today.</td></tr>';}
+  else{
+    expensesCache.forEach(e=>{
+      const can=canEditExpense(e);
+      const actions=can
+        ? `<button class="btn-action" style="width:auto;padding:4px 8px;font-size:.72rem;" onclick="editExpenseForm('${e.id}')">✏️ Edit</button> `
+          +`<button class="btn-action btn-danger" style="width:auto;padding:4px 8px;font-size:.72rem;" onclick="deleteExpense('${e.id}')">🗑️ Delete</button>`
+        : '<span style="color:#94a3b8;font-size:.72rem;">—</span>';
+      tbody.innerHTML+=`<tr><td>${e.expense_category}</td><td>${fmt(e.amount)}</td><td>${e.payment_mode||'Cash'}</td><td>${e.warehouse_type||''}</td><td>${e.note||''}</td><td>${e.recorded_by||''}</td><td>${actions}</td></tr>`;
+    });
+  }
+  // Admin-visible flag: any edit/delete logged for an expense that FALLS ON the date on screen
+  // (matched on expense_date — the ORIGINAL expense's own date — not on when the edit/delete happened,
+  // so opening yesterday's ledger still surfaces an edit/delete made today against yesterday's entry).
+  if(activeRole==='admin'){
+    const {data:amends}=await supabaseClient.from('expense_amendments')
+      .select('action,amended_by,amendment_note,values_before,created_at')
+      .eq('expense_date',activeDate)
+      .order('created_at',{ascending:false});
+    if(amends&&amends.length){
+      document.getElementById('expAmendBanner').innerHTML=`<div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
+        <div style="font-weight:700;color:#854d0e;margin-bottom:6px;">⚠️ ${amends.length} expense edit/delete${amends.length>1?'s':''} logged today</div>
+        ${amends.map(a=>`<div style="font-size:.75rem;border-top:1px solid #fde68a;margin-top:6px;padding-top:4px;">
+          <strong>${(a.action||'').toUpperCase()}</strong> by ${(a.amended_by||'').toUpperCase()} —
+          ${a.values_before?.expense_category||''} ${a.values_before?fmt(a.values_before.amount):''} &nbsp;|&nbsp; Reason: ${a.amendment_note}
+        </div>`).join('')}
+      </div>`;
+    }
+  }
+}
+
+function editExpenseForm(id){
+  const e=expensesCache.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  editingExpenseId=id;
+  document.getElementById('expCategory').value=e.expense_category;
+  document.getElementById('expAmount').value=e.amount;
+  document.getElementById('expMode').value=e.payment_mode||'Cash';
+  if(document.getElementById('expEntityWrap').style.display!=='none') document.getElementById('expEntity').value=e.warehouse_type;
+  document.getElementById('expNote').value=e.note||'';
+  document.getElementById('btnSaveExpense').innerText='💾 SAVE CORRECTION';
+  document.getElementById('btnCancelExpenseEdit').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function cancelExpenseEdit(){
+  editingExpenseId=null;
+  document.getElementById('expAmount').value=''; document.getElementById('expNote').value='';
+  document.getElementById('btnSaveExpense').innerText='💾 SAVE & PRINT TICKET';
+  document.getElementById('btnCancelExpenseEdit').style.display='none';
+}
+
+async function deleteExpense(id){
+  const e=expensesCache.find(x=>String(x.id)===String(id));
+  if(!e) return;
+  if(!canEditExpense(e)) return alert('You can only delete your own entries'+(expenseEditScope==='same_day'?' (same-day only — ask admin to change this or to delete it for you).':'.'));
+  const reason=prompt('Enter reason for DELETING this expense (mandatory):\n'+e.expense_category+' — '+fmt(e.amount));
+  if(!reason||!reason.trim()){alert('Reason is required for audit trail.'); return;}
+  if(!confirm('This will PERMANENTLY delete this expense. Continue?')) return;
+  const {error:logErr}=await supabaseClient.from('expense_amendments').insert({
+    expense_id:e.id, expense_date:(e.created_at||'').slice(0,10), action:'delete', amended_by:activeRole, amendment_note:reason.trim(),
+    values_before:e, values_after:null
+  });
+  if(logErr) return alert('Could not record audit log — delete cancelled: '+logErr.message);
+  const {error}=await supabaseClient.from('workshop_expenses').delete().eq('id',e.id);
+  if(error) return alert('Error deleting: '+error.message);
+  alert('Expense deleted. Reason recorded: '+reason.trim());
+  loadExpenses();
 }
 
 async function saveExpense(){
@@ -1309,6 +1411,26 @@ async function saveExpense(){
   const entity=activeRole==='admin'?document.getElementById('expEntity').value:activeRole;
   const note=document.getElementById('expNote').value;
   if(amt<=0) return alert('Enter a valid amount.');
+
+  if(editingExpenseId){
+    const before=expensesCache.find(x=>String(x.id)===String(editingExpenseId));
+    if(!before) return alert('Could not find the original entry — please cancel and retry.');
+    if(!canEditExpense(before)) return alert('You can only edit your own entries'+(expenseEditScope==='same_day'?' (same-day only).':'.'));
+    const reason=prompt('Enter reason for EDITING this expense (mandatory):');
+    if(!reason||!reason.trim()){alert('Reason is required for audit trail.'); return;}
+    const after={expense_category:cat,amount:amt,payment_mode:mode,warehouse_type:entity,note:note};
+    const {error:logErr}=await supabaseClient.from('expense_amendments').insert({
+      expense_id:before.id, expense_date:(before.created_at||'').slice(0,10), action:'edit', amended_by:activeRole, amendment_note:reason.trim(),
+      values_before:before, values_after:after
+    });
+    if(logErr) return alert('Could not record audit log — update cancelled: '+logErr.message);
+    const {error}=await supabaseClient.from('workshop_expenses').update(after).eq('id',before.id);
+    if(error) return alert('Error updating: '+error.message);
+    alert('Expense updated. Reason recorded: '+reason.trim());
+    cancelExpenseEdit(); loadExpenses();
+    return;
+  }
+
   const payload={expense_category:cat,amount:amt,payment_mode:mode,warehouse_type:entity,note:note,recorded_by:activeRole};
   const {error}=await supabaseClient.from('workshop_expenses').insert(payload);
   if(error) return alert('Error: '+error.message);
