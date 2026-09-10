@@ -127,6 +127,9 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         <div class="field-group"><label>Latitude</label><input type="number" id="wsLat" step="0.000001"></div>
         <div class="field-group"><label>Longitude</label><input type="number" id="wsLng" step="0.000001"></div>
         <div class="field-group"><label>Radius (m)</label><input type="number" id="wsRadius"></div>
+        <!-- Sub-Phase 11B.48: how far back a role may edit/delete its own workshop-ledger expense entries.
+             Admin itself is never restricted by this setting (mirrors the EOD unlock override). -->
+        <div class="field-group"><label>Expense Edit/Delete Window</label><select id="wsExpenseScope"><option value="any_day">Any Day (Recommended)</option><option value="same_day">Same Day Only</option></select></div>
         <button class="btn-action btn-warn" onclick="saveWorkshopSettings()" style="width:auto;padding:9px 14px;">SAVE</button>
       </div>
     </div>
@@ -196,7 +199,7 @@ document.getElementById('todayLabel').innerText=new Date().toLocaleDateString('e
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
 // ── WORKSHOP DEFAULTS ────────────────────────────────────────────────────
-let wsD={shiftStart:'09:30',shiftEnd:'19:00',late:15,sunStart:'10:30',sunEnd:'16:00',lat:21.898431,lng:77.902407,radius:200};
+let wsD={shiftStart:'09:30',shiftEnd:'19:00',late:15,sunStart:'10:30',sunEnd:'16:00',lat:21.898431,lng:77.902407,radius:200,expenseScope:'any_day'};
 async function loadWsDefaults(){
   const{data}=await sb.from('workshop_settings').select('setting_key,setting_value');
   (data||[]).forEach(s=>{
@@ -208,18 +211,21 @@ async function loadWsDefaults(){
     if(s.setting_key==='workshop_lat')wsD.lat=parseFloat(s.setting_value);
     if(s.setting_key==='workshop_lng')wsD.lng=parseFloat(s.setting_value);
     if(s.setting_key==='attendance_radius_metres')wsD.radius=parseInt(s.setting_value);
+    if(s.setting_key==='expense_edit_scope')wsD.expenseScope=s.setting_value;
   });
   if(document.getElementById('wsLat')){document.getElementById('wsLat').value=wsD.lat;document.getElementById('wsLng').value=wsD.lng;document.getElementById('wsRadius').value=wsD.radius;}
+  if(document.getElementById('wsExpenseScope'))document.getElementById('wsExpenseScope').value=wsD.expenseScope;
 }
 async function saveWorkshopSettings(){
   const lat=document.getElementById('wsLat').value.trim();
   const lng=document.getElementById('wsLng').value.trim();
   const radius=document.getElementById('wsRadius').value.trim();
+  const expenseScope=document.getElementById('wsExpenseScope').value;
   if(!lat||!lng||!radius){alert('All three fields required.');return;}
   const now=new Date().toISOString();
-  for(const[k,v]of[['workshop_lat',lat],['workshop_lng',lng],['attendance_radius_metres',radius]])
+  for(const[k,v]of[['workshop_lat',lat],['workshop_lng',lng],['attendance_radius_metres',radius],['expense_edit_scope',expenseScope]])
     await sb.from('workshop_settings').upsert({setting_key:k,setting_value:v,updated_by:sessionRole,updated_at:now},{onConflict:'setting_key'});
-  Object.assign(wsD,{lat:parseFloat(lat),lng:parseFloat(lng),radius:parseInt(radius)});
+  Object.assign(wsD,{lat:parseFloat(lat),lng:parseFloat(lng),radius:parseInt(radius),expenseScope});
   alert('Settings saved.');
 }
 
