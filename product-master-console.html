@@ -390,9 +390,16 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <div>
         <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">CATEGORY</label>
         <select id="apCategory" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
-          <option value="SPARE">Spare Part</option><option value="LUBE">Lubricant</option>
-          <option value="ELECTRICAL">Electrical</option><option value="TYRE">Tyre/Tube</option>
-          <option value="ACCESSORY">Accessory</option><option value="CONSUMABLE">Consumable</option>
+          <!-- Sub-Phase 11B.49 (urgent fix, 11 Sep 2026): values MUST exactly match the database's
+               product_master_category_check constraint, confirmed via
+               `SELECT pg_get_constraintdef(...)` to be CHECK (category = ANY ('Spare','Lubricant')).
+               The previous all-caps codes (SPARE/LUBE/ELECTRICAL/TYRE/ACCESSORY/CONSUMABLE) never
+               matched this constraint, so EVERY save of a product with ANY category was silently
+               guaranteed to fail — not just Lubricant. Electrical/Tyre/Accessory/Consumable are
+               removed here rather than "corrected" to a guessed value, since the database does not
+               currently permit ANY value beyond Spare/Lubricant for this column at all — see the
+               tracker for the follow-up decision on whether to widen the database to support them. -->
+          <option value="Spare">Spare Part</option><option value="Lubricant">Lubricant</option>
         </select>
       </div>
       <div>
@@ -1054,7 +1061,7 @@ async function openAddProductModal(prefillData) {
     document.getElementById('apSaveBtn').innerText='💾 SAVE CHANGES';
     document.getElementById('apName').value=prefillData.item_name||'';
     document.getElementById('apBrand').value=prefillData.brand||'';
-    document.getElementById('apCategory').value=prefillData.category||'SPARE';
+    document.getElementById('apCategory').value=prefillData.category||'Spare';
     document.getElementById('apScope').value=prefillData.scope||'generic';
     document.getElementById('apFamily').value=prefillData.family_name||'';
     document.getElementById('apUnit').value=prefillData.unit_metric||'Pcs';
@@ -1121,7 +1128,7 @@ async function selectExistingProductName(name){
 
   // Auto-fill shared fields from first row
   const first=rows[0];
-  document.getElementById('apCategory').value=first.category||'SPARE';
+  document.getElementById('apCategory').value=first.category||'Spare';
   document.getElementById('apScope').value=first.scope||'generic';
   document.getElementById('apFamily').value=first.family_name||'';
   document.getElementById('apUnit').value=first.unit_metric||'Pcs';
