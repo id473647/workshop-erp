@@ -868,7 +868,18 @@ async function loadUnverified(){
   // Postgres boolean for a given row. Fixed by fetching all products and filtering with the exact
   // same condition Full Catalog's badge already uses, so the two screens can never disagree about
   // which products are pending, and by surfacing a real query error instead of a false "all clear".
-  const{data:rawData,error}=await sb.from('product_master').select('*').order('created_at',{ascending:false});
+  //
+  // Same-day follow-up: the error-surfacing above immediately caught a SECOND, pre-existing bug —
+  // "column product_master.created_at does not exist". This table has no timestamp column at all
+  // (confirmed against the schema — no created_at/updated_at anywhere on product_master), so both
+  // the `.order('created_at', ...)` below and the date text once shown on each card were always
+  // broken; they simply never ran before because the first bug's silent failure masked them too.
+  // Removed both rather than guess at a substitute column. NOTE for the tracker: Full Catalog's own
+  // "🕐 Added Recently" smart filter (`catSmartFilter==='recent'`) orders by this same missing
+  // column and is very likely equally broken — left untouched here since it wasn't what was
+  // reported, but flagged to the user as a related pre-existing issue needing its own decision
+  // (add a real created_at column to product_master, or remove that filter option).
+  const{data:rawData,error}=await sb.from('product_master').select('*');
   const container=document.getElementById('unverifiedList');
   if(error){
     document.getElementById('unvCount').innerText='!';
@@ -884,7 +895,7 @@ async function loadUnverified(){
     container.innerHTML+=`
     <div class="unverified-card">
       <div style="font-size:.78rem;color:#92400e;font-weight:700;margin-bottom:8px;">
-        ${isHidden?'📦 Created during billing — hidden until approved':'🟢 Live in catalog — added by Green/MyCare, awaiting admin approval'} — ${new Date(p.created_at).toLocaleDateString('en-IN')}
+        ${isHidden?'📦 Created during billing — hidden until approved':'🟢 Live in catalog — added by Green/MyCare, awaiting admin approval'}
       </div>
       <div class="unv-grid">
         <div class="field-group" style="grid-column:span 2;"><label>Item Name</label>
