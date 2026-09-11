@@ -853,10 +853,31 @@ async function loadUnverified(){
   // catalog but still awaiting admin approval (pending_admin_approval:true) — Green/MyCare
   // additions — alongside the older fully-hidden 'unverified' items created on-the-fly during
   // billing. Same review list, two different origins, labelled separately below.
-  const{data}=await sb.from('product_master').select('*').or('catalog_status.eq.unverified,pending_admin_approval.eq.true').order('created_at',{ascending:false});
-  document.getElementById('unvCount').innerText=data?data.length:0;
+  //
+  // Sub-Phase (urgent fix, 11 Sep 2026): user reported the Full Catalog tab correctly showed a
+  // "⏳ PENDING APPROVAL" tag on 2 products, while this Unverified Queue tab, and its own count
+  // badge, both said 0 — a real product sat unreviewable with no way to find or approve it. Two
+  // bugs found together: (1) this query's result was never checked for an `error` — if the
+  // combined `.or('catalog_status.eq.unverified,pending_admin_approval.eq.true')` filter failed
+  // for any reason, `data` came back undefined and the UI showed the same reassuring "No products
+  // pending approval ✅" as a genuinely empty queue, silently hiding a real failure (the exact
+  // failure mode already fixed in loadCatalog() as 11A.27, but missed here). (2) even when the
+  // query succeeds, a PostgREST `.or()` boolean-equality filter is one more thing that can silently
+  // diverge from the plain-JS truthy check Full Catalog's own badge uses at line ~988
+  // (`p.pending_admin_approval?...`) — e.g. if that column is ever anything other than a clean
+  // Postgres boolean for a given row. Fixed by fetching all products and filtering with the exact
+  // same condition Full Catalog's badge already uses, so the two screens can never disagree about
+  // which products are pending, and by surfacing a real query error instead of a false "all clear".
+  const{data:rawData,error}=await sb.from('product_master').select('*').order('created_at',{ascending:false});
   const container=document.getElementById('unverifiedList');
-  if(!data||data.length===0){container.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No products pending approval. ✅</p>';return;}
+  if(error){
+    document.getElementById('unvCount').innerText='!';
+    container.innerHTML=`<p style="text-align:center;color:var(--danger);padding:20px;">Queue load error: ${error.message}</p>`;
+    return;
+  }
+  const data=(rawData||[]).filter(p=>p.catalog_status==='unverified'||!!p.pending_admin_approval);
+  document.getElementById('unvCount').innerText=data.length;
+  if(data.length===0){container.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No products pending approval. ✅</p>';return;}
   container.innerHTML='';
   data.forEach(p=>{
     const isHidden=p.catalog_status==='unverified';
