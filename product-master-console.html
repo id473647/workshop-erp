@@ -150,6 +150,10 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
           <option value="no_qr">🆕 No QR label yet</option>
           <option value="low_stock">📉 Low Stock</option>
           <option value="recent">🕐 Added Recently</option>
+          <!-- Fix (Phase 17 / B4-follow-up, 16 Sep 2026): completes the "Deactivated" filter that
+               deactivateProduct()'s own confirm-dialog text already promised existed -- this option
+               was missing, so a deactivated product had no way to be found or brought back. -->
+          <option value="deactivated">🚫 Deactivated</option>
         </select>
         <select id="labelSize" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;">
           <option value="large">Label: Large 62×38mm</option>
@@ -987,9 +991,45 @@ async function loadUnverified(){
       <div style="display:flex;gap:8px;">
         <button class="btn-action" onclick="approveProduct('${p.id}')">${isHidden?'✅ APPROVE & GO LIVE':'✅ APPROVE'}</button>
         <button class="btn-action danger" onclick="deleteProduct('${p.id}',false)">🗑️ DELETE</button>
+        <button class="btn-action" style="background:#64748b;" onclick="deactivateProduct('${p.id}')" title="Hide this product everywhere (catalog, search, this queue) without deleting it or touching any past invoice/job card that already used it">🚫 DEACTIVATE</button>
       </div>
     </div>`;
   });
+}
+
+// Fix (Phase 17 / B4-follow-up, 16 Sep 2026): DELETE can legitimately fail now -- if this
+// product has ever actually been billed (a real job_card_items row points at one of its
+// variants), the database correctly refuses to delete it, because doing so would break that
+// past invoice/job card. DEACTIVATE is the safe alternative for that case: it hides the
+// product everywhere (Full Catalog, this queue, and Billing/POS/Purchase search) by setting
+// catalog_status:'inactive' on the product and its variants, WITHOUT deleting any row, so
+// existing invoices/job cards referencing it keep working exactly as before. A deactivated
+// product can be found again and brought back via Full Catalog's new "🚫 Deactivated" filter.
+// Shared core (no confirm dialog) so deleteProduct() below can fall back into this after its own
+// confirm, without showing a second confirm dialog on top of it.
+async function _deactivateCore(id){
+  const { error: vErr } = await sb.from('product_variants').update({catalog_status:'inactive'}).eq('parent_product_id', id);
+  if (vErr) { alert('Deactivate failed (could not update its brand/variant rows): ' + vErr.message); return false; }
+  const { error } = await sb.from('product_master').update({catalog_status:'inactive', pending_admin_approval:false}).eq('id', id);
+  if (error) { alert('Deactivate failed: ' + error.message); return false; }
+  return true;
+}
+async function deactivateProduct(id){
+  if(!confirm('Deactivate this product?\n\nIt will disappear from Full Catalog and from search/autocomplete on Billing, POS and Purchase -- but nothing is deleted, and any past invoice/job card that already used it is unaffected.\n\nYou can find it again later in Full Catalog under the "🚫 Deactivated" filter and reactivate it.')) return;
+  const ok = await _deactivateCore(id);
+  if (ok) { loadUnverified(); loadCatalog(); }
+}
+
+// Reactivates a product previously hidden via deactivateProduct() above -- brings it (and its
+// variants) back to catalog_status:'live', so it reappears in Full Catalog and in
+// Billing/POS/Purchase search again.
+async function reactivateProduct(id){
+  if(!confirm('Reactivate this product? It will reappear in Full Catalog and become searchable again on Billing, POS and Purchase.')) return;
+  const { error: vErr } = await sb.from('product_variants').update({catalog_status:'live'}).eq('parent_product_id', id);
+  if (vErr) { alert('Reactivate failed (could not update its brand/variant rows): ' + vErr.message); return; }
+  const { error } = await sb.from('product_master').update({catalog_status:'live'}).eq('id', id);
+  if (error) { alert('Reactivate failed: ' + error.message); return; }
+  loadCatalog();
 }
 
 async function approveProduct(id){
@@ -1023,6 +1063,26 @@ async function deleteProduct(id,isCatalog){
   const { data: variants, error: vFetchErr } = await sb.from('product_variants').select('id').eq('parent_product_id', id);
   if (vFetchErr) { alert('Delete failed (could not check variants): ' + vFetchErr.message); return; }
   const variantIds = (variants || []).map(v => v.id);
+
+  // Fix (Phase 17 / B4-follow-up, 16 Sep 2026): auto-detect billing history BEFORE attempting a
+  // hard delete. If any variant under this product was ever actually billed (a job_card_items row
+  // points at it), a hard delete would break that old invoice/job card's record permanently -- the
+  // database correctly rejects it with a foreign-key error ("job_card_items_variant_id_fkey"),
+  // which is what the reported crash was. Instead of surfacing that raw database error, check for
+  // this up front and automatically fall back to Deactivate (hides everywhere, deletes nothing),
+  // so the item still disappears from the queue/search and the old bill stays valid. A product
+  // with no billing history at all still gets fully, permanently deleted, unchanged from before.
+  if (variantIds.length) {
+    const { data: usedRows, error: useErr } = await sb.from('job_card_items').select('id').in('variant_id', variantIds).limit(1);
+    if (useErr) { alert('Delete failed (could not check billing history): ' + useErr.message); return; }
+    if (usedRows && usedRows.length) {
+      if (!confirm('This product has already been billed at least once, so it can\'t be permanently deleted without breaking that old invoice/job card.\n\nIt will instead be DEACTIVATED: hidden from Full Catalog and from search on Billing/POS/Purchase, but the old bill stays valid. You can bring it back later from Full Catalog\'s "🚫 Deactivated" filter.\n\nContinue?')) return;
+      const ok = await _deactivateCore(id);
+      if (ok) { isCatalog?loadCatalog():loadUnverified(); }
+      return;
+    }
+  }
+
   if (variantIds.length) {
     const { error: lotErr } = await sb.from('product_variant_lots').delete().in('variant_id', variantIds);
     if (lotErr) { alert('Delete failed (could not remove existing batches/lots first): ' + lotErr.message); return; }
@@ -1197,7 +1257,10 @@ async function _legacyLoadCatalog_unused(){
   // the live schema (e.g. hsn_code), Supabase silently rejects the WHOLE query and every product
   // vanishes from this screen, exactly like the billing.html product-search bug fixed earlier as
   // 11B.44. Switched to select('*') so a missing/renamed column can never blank the whole catalog.
-  let q=sb.from('product_master').select('*').eq('catalog_status','live').order('item_name').limit(200);
+  // Fix (Phase 17 / B4-follow-up, 16 Sep 2026): status filter is now conditional on the
+  // "🚫 Deactivated" option above, instead of always hardcoded to 'live' -- otherwise a
+  // deactivated product could never be found again to reactivate it.
+  let q=sb.from('product_master').select('*').eq('catalog_status', smartFilter==='deactivated'?'inactive':'live').order('item_name').limit(200);
   const search=document.getElementById('catSearch').value.trim();
   const scope=document.getElementById('catScope').value;
   if(search) q=q.ilike('item_name',`%${search}%`);
@@ -1246,7 +1309,9 @@ async function _legacyLoadCatalog_unused(){
       <td style="white-space:nowrap;">
         ${photoBtn}
         ${canEdit?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;margin-left:4px;background:var(--info);" onclick="editProduct('${p.id}')">EDIT</button>`:''}
-        ${canEdit?`<button class="btn-action danger" style="padding:3px 7px;font-size:.72rem;margin-left:2px;" onclick="deleteProduct('${p.id}',true)">DEL</button>`:''}
+        ${canEdit && smartFilter==='deactivated'?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;margin-left:2px;background:#16a34a;" onclick="reactivateProduct('${p.id}')">✅ REACTIVATE</button>`:''}
+        ${canEdit && smartFilter!=='deactivated'?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;margin-left:2px;background:#64748b;" onclick="deactivateProduct('${p.id}')" title="Hide this product everywhere without deleting it or touching any past invoice/job card">🚫 HIDE</button>
+        <button class="btn-action danger" style="padding:3px 7px;font-size:.72rem;margin-left:2px;" onclick="deleteProduct('${p.id}',true)">DEL</button>`:''}
       </td>
     </tr>`;
   });
