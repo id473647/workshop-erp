@@ -2904,7 +2904,22 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         // so a future problem shows up as a traceable message instead of "nothing found."
         globalCatalogCache = [];
         if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') {
-            const { data: master, error: masterErr } = await supabaseClient.from('product_master').select('*');
+            // Phase 17 / B2 (16 Sep 2026): this used to fetch EVERY warehouse's products for
+            // Green/Moped logins with no filter at all — a Moped login's search genuinely returned
+            // Green's stock, and selecting one carried that GREEN product's real database id into
+            // the job card line (a real cross-warehouse sale, not just a display issue). Fixed by
+            // scoping the fetch to the login's own warehouse_type (case-insensitive, matching the
+            // .ilike() tolerance already used elsewhere per 11A.27) plus anything tagged
+            // 'universal' (meant to be sold from any counter) or left unset (legacy rows with no
+            // warehouse_type recorded yet — shown to everyone rather than silently hidden, since
+            // hiding real stock would be worse than an occasional cross-listed legacy item; a data
+            // clean-up pass to tag these properly is a separate, future task, not done here).
+            // Admin is completely unaffected — still sees every warehouse's products, unchanged.
+            let masterQuery = supabaseClient.from('product_master').select('*');
+            if (sessionRole === 'green' || sessionRole === 'moped') {
+                masterQuery = masterQuery.or(`warehouse_type.ilike.${sessionRole},warehouse_type.ilike.universal,warehouse_type.is.null`);
+            }
+            const { data: master, error: masterErr } = await masterQuery;
             if (masterErr) console.error('prefetchCentralCatalog: product_master fetch failed —', masterErr.message);
             master?.forEach(m => globalCatalogCache.push({...m, source: 'product'}));
         }
