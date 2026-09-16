@@ -1,3 +1,4 @@
+<!-- FILE: product-master-console.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +12,13 @@
 <script src="notifications.js"></script>
 <link rel="stylesheet" href="dark-mode.css">
 <script src="dark-mode.js"></script>
+<!-- Phase 17 / F1 (16 Sep 2026): shared Add/Edit Product inline expand-in-place panel
+     (rewritten from the original 11F Stage 2 popup, which was never approved) — the
+     same file will be loaded by purchase-manager.html and billing.html/pos-green.html
+     in a follow-up delivery (F1 "other half" / F2), so every page uses one identical
+     product-creation flow instead of drifting copies of the same logic.
+     See product-entry-modal.js for what it does. -->
+<script src="product-entry-modal.js"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--purple:#8e44ad;--gold:#f59e0b;}
 *{box-sizing:border-box;}
@@ -147,13 +155,16 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
           <option value="barcode">1D Barcode</option>
         </select>
         <button class="btn-action warn" onclick="bulkPrintLabels()">🏷️ Print Selected</button>
-        <button class="btn-action" style="background:#7c3aed;" onclick="openAddProductModal()">➕ ADD PRODUCT</button>
+        <button class="btn-action" style="background:#7c3aed;" onclick="togglePmcAddProduct()">➕ ADD PRODUCT</button>
         <button class="btn-action" style="background:#15803d;" onclick="exportCatalogExcel()">📊 EXPORT</button>
         <label class="btn-action" style="background:var(--info);cursor:pointer;margin:0;">
           📥 IMPORT
           <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleImportFile(this)">
         </label>
       </div>
+      <!-- Phase 17 / F1 (16 Sep 2026): "+ ADD PRODUCT" no longer opens a popup -- it expands this
+           inline panel in place, using the rewritten product-entry-modal.js's approved interface. -->
+      <div id="pmcNewProductHost" style="display:none;"></div>
       <div class="table-wrapper">
         <table id="catTable">
           <thead><tr>
@@ -466,22 +477,30 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
         <div>
           <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">MRP *</label>
-          <input type="number" id="apMrp" placeholder="₹0" oninput="recalcMAC()"
+          <input type="number" id="apMrp" placeholder="₹0" step="0.01" oninput="recalcMAC()"
             style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
         </div>
         <div>
           <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">NET DISCOUNT %</label>
-          <input type="number" id="apDiscount" placeholder="e.g. 30" value="0" min="0" max="100" oninput="recalcMAC()"
+          <input type="number" id="apDiscount" placeholder="e.g. 30" value="0" min="0" max="100" step="0.01" oninput="recalcMAC()"
             style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
         </div>
         <div>
           <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">MAC (auto / editable)</label>
-          <input type="number" id="apMac" placeholder="₹0" oninput="macManuallyEdited=true"
+          <!-- Urgent fix, 11 Sep 2026: (1) no `step` meant the browser's native number-input
+               behavior treated whole numbers as the only valid values (most visible via the
+               spinner arrows only nudging by 1) — added step="0.01" so paise/decimal buying costs
+               can be entered same as any other money field. (2) the oninput handler only set the
+               macManuallyEdited flag and never called recalcMAC(), so the Margin shown below never
+               updated when MAC itself was typed — it only updated later if MRP/Discount/Sell Price
+               were touched afterwards. Now calls recalcMAC() immediately, same as every other
+               pricing field already does. -->
+          <input type="number" id="apMac" placeholder="₹0" step="0.01" oninput="macManuallyEdited=true;recalcMAC();"
             style="width:100%;padding:8px;border:2px solid #fde68a;border-radius:6px;box-sizing:border-box;font-weight:700;background:#fffbeb;">
         </div>
         <div>
           <label style="font-size:.72rem;color:#64748b;display:block;margin-bottom:4px;">SELLING PRICE *</label>
-          <input type="number" id="apSellPrice" placeholder="₹0" oninput="recalcMAC()"
+          <input type="number" id="apSellPrice" placeholder="₹0" step="0.01" oninput="recalcMAC()"
             style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
         </div>
         <div>
@@ -588,6 +607,15 @@ document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
 let catalogCache = []; // used by Add Product name autocomplete
+
+// Phase 11F Stage 2 (12 Sep 2026): the shared Add Product popup replaces the old
+// single-brand-locked Add Product flow (openAddProductModal) for NEW entries —
+// it correctly finds-or-creates the product, then the variant, then always adds
+// a new batch/lot, so the same product+brand+volume can be entered again later
+// at a different price without failing or overwriting the earlier entry. The
+// old modal/openAddProductModal/saveNewProduct below are left untouched and
+// still used by the existing per-row EDIT button (unaffected functionality).
+ProductEntryModal.init({ client: sb, sessionRole, onSaved: () => loadCatalog() });
 
 // Access guard — admin, moped, green only
 if(!['admin','moped','green'].includes(sessionRole)){
@@ -968,8 +996,158 @@ async function deleteProduct(id,isCatalog){
   isCatalog?loadCatalog():loadUnverified();
 }
 
-// ── TAB 2: FULL CATALOG ────────────────────────────────────────────────────
+// ── TAB 2: FULL CATALOG (Phase 11F Stage 2, 12 Sep 2026) ───────────────────
+// Disclosed interface change, agreed with the user: this now shows one
+// collapsed row per PRODUCT (grouped by name), with a ▸ toggle to expand and
+// see/edit every brand+volume VARIANT and each of its price/quantity LOTS,
+// plus a quick "+ Add Lot" button per product. This replaces the old flat
+// one-row-per-product_master-row table. Checkboxes/bulk-print/export keep
+// working exactly as before because they still operate on one row per
+// sellable lot — same data-* attributes, just grouped differently on screen.
+let _catGroupsCache = [];
+
 async function loadCatalog(){
+  const whSel0 = document.getElementById('catWarehouse');
+  if(sessionRole==='moped'){ whSel0.value='moped'; whSel0.disabled=true; }
+  else if(sessionRole==='green'){ whSel0.value='green'; whSel0.disabled=true; }
+  const catWh0 = whSel0.value;
+  const search0 = document.getElementById('catSearch').value.trim().toLowerCase();
+  const scope0 = document.getElementById('catScope').value;
+
+  // Pull every variant with its lots and its parent's shared fields in one go.
+  // product_variants -> product_master is a single, unambiguous FK
+  // (parent_product_id), so this embed needs no !hint disambiguation.
+  const{data,error}=await sb.from('product_variants')
+    .select('*, product_variant_lots(*), product_master(item_name,category,scope,family_name,unit_metric,hsn_code,warehouse_type,catalog_status,pending_admin_approval)')
+    .limit(2000);
+  const tbody=document.querySelector('#catTable tbody');
+  if(error){ tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--danger);padding:16px;">Catalog load error: ${error.message}</td></tr>`; return; }
+
+  // Group client-side by the PARENT'S NAME (not by parent id) — some products
+  // still have more than one product_master row left over from before Stage 1
+  // (each brand used to be its own row); grouping by name means they all
+  // correctly land in one card regardless of which specific row a variant's
+  // parent_product_id happens to point at.
+  const groups = new Map();
+  (data||[]).forEach(v=>{
+    const parent = v.product_master || {};
+    if(parent.catalog_status && parent.catalog_status!=='live') return; // keep Unverified Queue's own items out of here
+    if(catWh0 && (v.warehouse_type||'').toLowerCase()!==catWh0) return;
+    if(scope0 && parent.scope!==scope0) return;
+    const nameKey=(parent.item_name||'').toLowerCase();
+    if(search0 && !nameKey.includes(search0) && !(v.brand||'').toLowerCase().includes(search0)) return;
+    if(!groups.has(nameKey)) groups.set(nameKey, { parent, parentId:v.parent_product_id, variants:[] });
+    groups.get(nameKey).variants.push(v);
+  });
+  _catGroupsCache = [...groups.values()].sort((a,b)=>(a.parent.item_name||'').localeCompare(b.parent.item_name||''));
+
+  // Build name cache for the shared Add Product popup's autocomplete
+  _catalogNameCache=[...new Set(_catGroupsCache.map(g=>g.parent.item_name).filter(Boolean))].sort();
+  catalogCache=_catGroupsCache.map(g=>g.parent);
+
+  renderCatalogGroups();
+}
+
+// Phase 17 / F1 (16 Sep 2026): renderCatalogGroups() no longer builds its own per-lot detail
+// rows with prompt()-based EDIT/DEL -- clicking a product row now expands it IN PLACE using
+// ProductEntryModal.expandExisting(), the approved no-popup interface (editable product-details
+// panel + a brand/variant table where a single-lot brand is edited directly and a multi-lot
+// brand expands further, per the approved mockup). This is an intentional INTERFACE CHANGE from
+// the old prompt()-dialog edit flow and the old always-two-row-per-lot table layout -- flagged
+// here per Universal Rule 6, though it is exactly the interface the user already approved
+// ("Yep this products layout looks fine", 15 Sep 2026). The underlying data/columns shown when
+// collapsed (Item Name, variant/lot counts, MRP range, total stock, HSN) are unchanged.
+function renderCatalogGroups(){
+  const tbody=document.querySelector('#catTable tbody');
+  const canEdit=(sessionRole==='admin'||sessionRole==='moped'||sessionRole==='green');
+  tbody.innerHTML='';
+  if(_catGroupsCache.length===0){ tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:16px;">No products found.</td></tr>'; return; }
+  _catGroupsCache.forEach((g,gi)=>{
+    const p=g.parent;
+    const allLots=g.variants.flatMap(v=>(v.product_variant_lots||[]).map(l=>({...l,_variant:v})));
+    const totalStock=allLots.reduce((s,l)=>s+(l.current_qty||0),0);
+    const mrps=[...new Set(allLots.map(l=>l.mrp).filter(x=>x>0))];
+    const mrpText=mrps.length===0?'—':mrps.length===1?`₹${mrps[0]}`:`₹${Math.min(...mrps)}–₹${Math.max(...mrps)}`;
+    const whBadgeColor=(g.variants[0]?.warehouse_type||'')==='moped'?'#3498db':(g.variants[0]?.warehouse_type||'')==='green'?'#27ae60':'#94a3b8';
+    tbody.innerHTML+=`<tr style="background:#f8fafc;font-weight:700;">
+      <td></td>
+      <td colspan="4">
+        <span style="cursor:${canEdit?'pointer':'default'};" ${canEdit?`onclick="toggleCatGroup(${gi})"`:''}><span id="catChev${gi}">▸</span> ${p.item_name||'(unnamed)'}</span>
+        <span style="display:inline-block;background:${whBadgeColor};color:white;font-size:.6rem;padding:1px 5px;border-radius:3px;margin-left:5px;font-weight:700;">${g.variants.length} variant${g.variants.length!==1?'s':''}, ${allLots.length} lot${allLots.length!==1?'s':''}</span>
+      </td>
+      <td>${mrpText}</td>
+      <td style="font-weight:400;">Stock: ${totalStock}</td>
+      <td style="font-size:.78rem;">${p.hsn_code||'—'}</td>
+      <td></td>
+      <td>${canEdit?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;background:#7c3aed;" onclick="toggleCatGroup(${gi})">✏️ EDIT / ADD LOT</button>`:''}</td>
+    </tr>`;
+    // Per-lot rows are still always rendered (just as before this rewrite) so bulkPrintLabels()'s
+    // "Print Selected" checkboxes keep working exactly as they did — this row's own EDIT/DEL
+    // prompt() buttons are gone (editing now happens in the expand panel below), but the
+    // checkbox + label-relevant data attributes are unchanged, same as the old table.
+    tbody.innerHTML+=allLots.map(l=>{
+      const v=l._variant;
+      const macCell=(sessionRole==='admin')?`<td style="font-size:.78rem;color:#64748b;">${(l.mac||0)>0?'₹'+(l.mac):'—'}</td>`:'<td style="font-size:.78rem;color:#94a3b8;">—</td>';
+      return `<tr>
+        <td><input type="checkbox" class="cat-check" value="${v.id}" data-name="${p.item_name||''}" data-brand="${v.brand||''}" data-mrp="${l.mrp||0}" data-ret="${l.sell_price||0}" data-bar="${v.barcode_id||''}" data-hsn="${p.hsn_code||''}" data-mac="${l.mac||0}" data-stk="${l.current_qty||0}"></td>
+        <td style="padding-left:24px;color:#64748b;">↳ ${v.brand||'—'}${v.color?' / '+v.color:''}${v.pattern?' / '+v.pattern:''}</td>
+        <td>${v.volume_per_unit?v.volume_per_unit+' ml':'—'}</td>
+        <td><span style="font-size:.72rem;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-weight:700;">${p.scope||''}</span></td>
+        <td><span style="color:${(l.current_qty||0)>0?'#15803d':'#dc2626'};font-weight:700;">${l.current_qty||0}</span></td>
+        <td style="color:#b45309;font-weight:700;">₹${l.mrp||0}</td>
+        <td>₹${l.sell_price||0}</td>
+        ${macCell}
+        <td></td>
+      </tr>`;
+    }).join('');
+    // The expand-in-place edit panel lives in its own row, hidden until "✏️ EDIT / ADD LOT" is
+    // clicked -- ProductEntryModal fills/empties this <td> itself via expandExisting()/collapse().
+    tbody.innerHTML+=`<tr class="catGroupRow${gi}" style="display:none;"><td colspan="10" id="catExpand${gi}"></td></tr>`;
+  });
+}
+
+function toggleCatGroup(gi){
+  const row=document.querySelector(`.catGroupRow${gi}`);
+  const chev=document.getElementById(`catChev${gi}`);
+  const host=document.getElementById(`catExpand${gi}`);
+  const isOpen=row.style.display!=='none';
+  if(isOpen){
+    ProductEntryModal.collapse(host);
+    row.style.display='none';
+    chev.innerText='▸';
+  } else {
+    // Close any other row already open, so only one product is expanded at a time (keeps the
+    // table from growing unmanageably tall -- consistent with the approved mockup, which only
+    // ever shows one expanded product).
+    document.querySelectorAll('[id^="catExpand"]').forEach(el=>{ if(el!==host && el.dataset.pemInstance) ProductEntryModal.collapse(el); });
+    document.querySelectorAll('tr[class^="catGroupRow"]').forEach(r=>{ if(r!==row) r.style.display='none'; });
+    document.querySelectorAll('[id^="catChev"]').forEach(c=>{ if(c!==chev) c.innerText='▸'; });
+    row.style.display='table-row';
+    chev.innerText='▾';
+    // The product_master embed select above doesn't include its own "id" column (only the
+    // shared fields), so it's added back here from g.parentId (captured from
+    // v.parent_product_id when the groups were built in loadCatalog()).
+    const parentWithId=Object.assign({}, _catGroupsCache[gi].parent, {id:_catGroupsCache[gi].parentId});
+    ProductEntryModal.expandExisting(host, parentWithId);
+  }
+}
+
+// "+ ADD PRODUCT" toggle -- expands/collapses the inline blank-product panel above the table.
+function togglePmcAddProduct(){
+  const host=document.getElementById('pmcNewProductHost');
+  const open=host.style.display!=='none';
+  if(open){
+    ProductEntryModal.collapse(host);
+    host.style.display='none';
+  } else {
+    host.style.display='block';
+    ProductEntryModal.expandNew(host);
+  }
+}
+
+/* Legacy flat-table loadCatalog — kept below, unused, for reference only.
+   Replaced by the grouped version above per Phase 11F Stage 2. */
+async function _legacyLoadCatalog_unused(){
   // Role-based warehouse filter
   const whSel = document.getElementById('catWarehouse');
   if(sessionRole==='moped'){ whSel.value='moped'; whSel.disabled=true; }
