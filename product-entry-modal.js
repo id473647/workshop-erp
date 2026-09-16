@@ -290,9 +290,15 @@
     const macCell = !top ? '—' : (locked ? money(top.mac) : `<input type="number" value="${top.mac || ''}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','mac',this.value)" style="width:65px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
     const qtyCell = !top ? '—' : (locked ? (top.current_qty ?? top.opening_qty ?? 0) : `<input type="number" value="${top.current_qty ?? top.opening_qty ?? 0}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','current_qty',this.value)" style="width:55px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
     const delBtn = (top && !locked) ? `<button onclick="ProductEntryModal._deleteLot('${id}','${top.id}')" title="Delete this lot" style="padding:4px 7px;border:none;border-radius:5px;background:#fef2f2;color:#dc2626;font-size:.72rem;cursor:pointer;">✕</button>` : '';
+    // A brand's Volume (ml) is editable here too — not just at creation — so a product that was
+    // originally saved as a Spare Part and later corrected to Lubricant can have its existing
+    // brand's volume filled in, instead of being permanently stuck showing "—" with no way to
+    // set it (the gap reported 16 Sep 2026: switching Category to Lubricant revealed the Vol
+    // column, but the existing WUERTH row had no way to actually enter a value into it).
+    const volCell = `<input type="number" value="${v.volume_per_unit || ''}" placeholder="ml" onchange="ProductEntryModal._saveVariantVolume('${id}','${v.id}',this.value)" style="width:55px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`;
     let html = `<tr style="border-top:1px solid #f1f5f9;">
       <td style="padding:5px;font-weight:700;">${multiLot ? `<a href="#" onclick="ProductEntryModal._toggleBrandExpand('${id}','${v.id}');return false;" style="text-decoration:none;">${v._expanded ? '▼' : '▶'} </a>` : ''}${esc(v.brand)}${multiLot ? ` <span style="color:#94a3b8;font-weight:400;">(${lotCount} lots)</span>` : ''}</td>
-      ${isLube ? `<td style="padding:5px;">${v.volume_per_unit || '—'}</td>` : ''}
+      ${isLube ? `<td style="padding:5px;">${volCell}</td>` : ''}
       <td style="padding:5px;">${multiLot ? '—' : mrpCell}</td>
       <td style="padding:5px;">${multiLot ? '—' : sellCell}</td>
       <td style="padding:5px;">${multiLot ? '—' : macCell}</td>
@@ -344,6 +350,18 @@
     const payload = {};
     payload[field] = parseFloat(value) || 0;
     const { error } = await _client.from('product_variant_lots').update(payload).eq('id', lotId);
+    if (error) { alert('Save failed: ' + error.message); return; }
+    await _reloadBrands(id);
+    _onSaved({ parentId: _instances[id].parentId });
+  }
+ 
+  // Edits a brand/variant's own Volume (ml) — a variant-level field, not a per-lot one (every
+  // lot of a brand+volume shares the same volume; changing it changes it for all of that
+  // brand's existing lots too, which is correct since volume is part of what defines the
+  // variant, unlike price/stock which are per-lot). Blank clears it back to null (Spare Part).
+  async function _saveVariantVolume(id, variantId, value) {
+    const vol = value.trim() === '' ? null : (parseInt(value) || null);
+    const { error } = await _client.from('product_variants').update({ volume_per_unit: vol }).eq('id', variantId);
     if (error) { alert('Save failed: ' + error.message); return; }
     await _reloadBrands(id);
     _onSaved({ parentId: _instances[id].parentId });
@@ -504,7 +522,7 @@
  
   global.ProductEntryModal = {
     init, expandExisting, expandNew, collapse,
-    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField, _deleteLot,
+    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField, _deleteLot, _saveVariantVolume,
     _addBrandRow, _draftField, _removeDraftRow, _saveBrandRow,
     _addLot, _saveLotDraft
   };
