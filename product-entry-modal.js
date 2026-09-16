@@ -295,7 +295,11 @@
     // brand's volume filled in, instead of being permanently stuck showing "—" with no way to
     // set it (the gap reported 16 Sep 2026: switching Category to Lubricant revealed the Vol
     // column, but the existing WUERTH row had no way to actually enter a value into it).
-    const volCell = `<input type="number" value="${v.volume_per_unit || ''}" placeholder="ml" onchange="ProductEntryModal._saveVariantVolume('${id}','${v.id}',this.value)" style="width:55px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`;
+    // Updated same day, per the user's request: uses the SAME fixed-options dropdown (+ a
+    // "Custom / Loose" fallback for an exact ml that isn't one of the standard sizes) that
+    // billing.html/pos-green.html's own Pack Size selector already uses at time of sale, instead
+    // of a free-type number box — one consistent way to pick a volume everywhere in the app.
+    const volCell = _volCellHtml(id, v);
     let html = `<tr style="border-top:1px solid #f1f5f9;">
       <td style="padding:5px;font-weight:700;">${multiLot ? `<a href="#" onclick="ProductEntryModal._toggleBrandExpand('${id}','${v.id}');return false;" style="text-decoration:none;">${v._expanded ? '▼' : '▶'} </a>` : ''}${esc(v.brand)}${multiLot ? ` <span style="color:#94a3b8;font-weight:400;">(${lotCount} lots)</span>` : ''}</td>
       ${isLube ? `<td style="padding:5px;">${volCell}</td>` : ''}
@@ -312,6 +316,37 @@
       html += v._lots.map(l => _lotSubRowHtml(id, v, l, isLube)).join('');
     }
     return html;
+  }
+ 
+  // Renders the Volume (ml) picker for an existing brand row: the same fixed-options dropdown
+  // (500/650/800/900/1000/1200/2500 ML) plus a "Custom / Loose" fallback that billing.html and
+  // pos-green.html already use for Pack Size at time of sale. A value already saved that isn't
+  // one of the standard sizes (e.g. an older manual entry) still shows correctly via the Custom
+  // slot, so nothing existing silently loses its value.
+  function _volCellHtml(id, v) {
+    const cur = v.volume_per_unit ? String(v.volume_per_unit) : '';
+    const isKnown = cur && VOLUME_OPTIONS.includes(cur);
+    const isCustom = cur && !isKnown;
+    const selId = `${id}-volsel-${v.id}`;
+    const customId = `${id}-volcustom-${v.id}`;
+    return `<select id="${selId}" onchange="ProductEntryModal._onVolSelectChange('${id}','${v.id}',this.value)" style="padding:3px;border:1px solid #e2e8f0;border-radius:4px;">
+        <option value="" ${!cur ? 'selected' : ''}>—</option>
+        ${VOLUME_OPTIONS.map(o => `<option value="${o}" ${cur === o ? 'selected' : ''}>${o} ML</option>`).join('')}
+        <option value="Custom" ${isCustom ? 'selected' : ''}>⚙️ Custom / Loose</option>
+      </select><input type="number" id="${customId}" value="${isCustom ? cur : ''}" placeholder="exact ml" onchange="ProductEntryModal._saveVariantVolume('${id}','${v.id}',this.value)" style="display:${isCustom ? 'inline-block' : 'none'};width:65px;padding:3px;border:1px dashed #7c3aed;border-radius:4px;margin-left:4px;">`;
+  }
+ 
+  // Dropdown changed: a standard size (or blank) saves immediately; "Custom / Loose" instead
+  // reveals the adjoining exact-ml box and waits for that to be filled in and saved, exactly
+  // like billing.html's nPackSize/nCustomML pair.
+  function _onVolSelectChange(id, variantId, value) {
+    const customInput = document.getElementById(`${id}-volcustom-${variantId}`);
+    if (value === 'Custom') {
+      if (customInput) { customInput.style.display = 'inline-block'; customInput.focus(); }
+      return;
+    }
+    if (customInput) customInput.style.display = 'none';
+    _saveVariantVolume(id, variantId, value);
   }
  
   function _lotSubRowHtml(id, v, l, isLube) {
@@ -383,7 +418,7 @@
   function _draftBrandRowHtml(id, r, isLube) {
     return `<tr style="border-top:1px solid #f1f5f9;background:#fffbeb;">
       <td style="padding:5px;"><input type="text" placeholder="BRAND" oninput="this.value=this.value.toUpperCase();ProductEntryModal._draftField('${id}','${r.rowId}','brand',this.value)" style="width:90px;padding:4px;border:1px solid #fde68a;border-radius:4px;text-transform:uppercase;"></td>
-      ${isLube ? `<td style="padding:5px;"><select onchange="ProductEntryModal._draftField('${id}','${r.rowId}','volume',this.value)" style="padding:4px;border:1px solid #fde68a;border-radius:4px;"><option value="">—</option>${VOLUME_OPTIONS.map(v => `<option value="${v}">${v}</option>`).join('')}</select></td>` : ''}
+      ${isLube ? `<td style="padding:5px;"><select id="${id}-dvolsel-${r.rowId}" onchange="ProductEntryModal._draftVolChange('${id}','${r.rowId}',this.value)" style="padding:4px;border:1px solid #fde68a;border-radius:4px;"><option value="">—</option>${VOLUME_OPTIONS.map(v => `<option value="${v}">${v} ML</option>`).join('')}<option value="Custom">⚙️ Custom / Loose</option></select><input type="number" id="${id}-dvolcustom-${r.rowId}" placeholder="exact ml" oninput="ProductEntryModal._draftField('${id}','${r.rowId}','volume',this.value)" style="display:none;width:60px;padding:4px;border:1px dashed #7c3aed;border-radius:4px;margin-left:3px;"></td>` : ''}
       <td style="padding:5px;"><input type="number" placeholder="MRP" oninput="ProductEntryModal._draftField('${id}','${r.rowId}','mrp',this.value)" style="width:65px;padding:4px;border:1px solid #fde68a;border-radius:4px;"></td>
       <td style="padding:5px;"><input type="number" placeholder="Sell" oninput="ProductEntryModal._draftField('${id}','${r.rowId}','sell',this.value)" style="width:65px;padding:4px;border:1px solid #fde68a;border-radius:4px;"></td>
       <td style="padding:5px;"><input type="number" placeholder="MAC" oninput="ProductEntryModal._draftField('${id}','${r.rowId}','mac',this.value)" style="width:65px;padding:4px;border:1px solid #fde68a;border-radius:4px;"></td>
@@ -399,6 +434,19 @@
     const inst = _instances[id];
     const r = inst.draftBrandRows.find(x => x.rowId === rowId);
     if (r) r[field] = value;
+  }
+ 
+  // Same standard-size-or-Custom behavior as the existing-brand Vol picker (_onVolSelectChange),
+  // applied to the "+ ADD BRAND" draft row's own volume dropdown.
+  function _draftVolChange(id, rowId, value) {
+    const customInput = document.getElementById(`${id}-dvolcustom-${rowId}`);
+    if (value === 'Custom') {
+      if (customInput) { customInput.style.display = 'inline-block'; customInput.focus(); }
+      _draftField(id, rowId, 'volume', '');
+      return;
+    }
+    if (customInput) { customInput.style.display = 'none'; customInput.value = ''; }
+    _draftField(id, rowId, 'volume', value);
   }
  
   function _removeDraftRow(id, rowId) {
@@ -522,8 +570,8 @@
  
   global.ProductEntryModal = {
     init, expandExisting, expandNew, collapse,
-    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField, _deleteLot, _saveVariantVolume,
-    _addBrandRow, _draftField, _removeDraftRow, _saveBrandRow,
+    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField, _deleteLot, _saveVariantVolume, _onVolSelectChange,
+    _addBrandRow, _draftField, _removeDraftRow, _saveBrandRow, _draftVolChange,
     _addLot, _saveLotDraft
   };
 })(window);
