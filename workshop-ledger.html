@@ -598,12 +598,22 @@ async function loadEodSummary(){
   let ocCash=0,ouUpi=0;
   credPays.forEach(p=>{const amt=parseFloat(p.amount_paid)||0; if(amt>0){if((p.payment_mode||'').toLowerCase().includes('upi')) ouUpi+=amt; else ocCash+=amt;}});
 
+  // Phase 17 / B1 (16 Sep 2026): "Transfer to Green"/"Transfer to Moped" expense rows were being
+  // subtracted TWICE from Cash in Hand — once here as a normal expense (into expCash/expUpi), and
+  // again further below via tpg/tpm, which exist specifically to capture transfer amounts. Reported
+  // by the user as a real EOD figure showing e.g. "X − 2000 − 0 − 2000" for a single ₹2000 transfer.
+  // Fix: a transfer-category row is still counted into tpg/tpm (unchanged — that's the correct,
+  // single place its cash-out effect is applied) and still listed in expByCat (so it still shows in
+  // the on-screen "Expenses" breakdown table, unchanged), but it is now EXCLUDED from the general
+  // expCash/expUpi totals, so it is only ever subtracted once from Cash in Hand.
   let expCash=0,expUpi=0,tpg=0,tpm=0,labourPay=0; let expByCat={};
   exp.forEach(e=>{const amt=parseFloat(e.amount)||0;
-    if((e.payment_mode||'Cash')==='UPI') expUpi+=amt; else expCash+=amt;
-    if((e.expense_category||'').toLowerCase().includes('transfer to green')) tpg+=amt;
-    if((e.expense_category||'').toLowerCase().includes('transfer to moped')) tpm+=amt;
-    if((e.expense_category||'').toLowerCase()==='labour payments') labourPay+=amt;
+    const catLower=(e.expense_category||'').toLowerCase();
+    const isTransfer = catLower.includes('transfer to green') || catLower.includes('transfer to moped');
+    if(!isTransfer){ if((e.payment_mode||'Cash')==='UPI') expUpi+=amt; else expCash+=amt; }
+    if(catLower.includes('transfer to green')) tpg+=amt;
+    if(catLower.includes('transfer to moped')) tpm+=amt;
+    if(catLower==='labour payments') labourPay+=amt;
     expByCat[e.expense_category]=(expByCat[e.expense_category]||0)+amt;
   });
 
