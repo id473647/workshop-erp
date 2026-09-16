@@ -509,9 +509,30 @@
             document.getElementById('partyDatalist').innerHTML = list;
         }
 
+        // Phase 17 / F1 "other half" (16 Sep 2026): purchase product search is now brand+volume
+        // aware, matching the real parent -> variant -> lot structure, instead of the old flat
+        // product_master-only search that couldn't tell two brands of the same product apart and
+        // risked creating a duplicate product_master row per brand (the original bug 11F fixed).
         async function fetchCatalog() {
-            const { data } = await supabaseClient.from('product_master').select('*');
-            globalCatalogCache = data || [];
+            const { data, error } = await supabaseClient.from('product_variants')
+                .select('*, product_variant_lots(mrp,sell_price,mac,current_qty,source,created_at), product_master(item_name,category,scope,family_name,unit_metric,hsn_code,warehouse_type,gst_percent,track_stock)')
+                .limit(3000);
+            if (error) { console.error('fetchCatalog: product_variants fetch failed —', error.message); globalCatalogCache = []; return; }
+            globalCatalogCache = (data || []).map(v => {
+                const lots = (v.product_variant_lots || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                const latest = lots[0] || {};
+                const stock = lots.reduce((s, l) => s + (l.current_qty || 0), 0);
+                const p = v.product_master || {};
+                return {
+                    variant_id: v.id, parent_id: v.parent_product_id,
+                    item_name: p.item_name || '', brand: v.brand || '', volume_per_unit: v.volume_per_unit || null,
+                    mrp: latest.mrp || v.mrp || 0, ret: latest.sell_price || v.default_price || 0,
+                    stock, mac: latest.mac || v.cost_price || 0,
+                    track: p.track_stock !== false,
+                    gst: (p.gst_percent != null && !isNaN(parseFloat(p.gst_percent))) ? parseFloat(p.gst_percent) : null,
+                    barcode_id: v.barcode_id || null
+                };
+            });
         }
 
         function openPartyModal() { document.getElementById('modalParty').style.display='flex'; }
@@ -936,7 +957,12 @@
                 const id = rowIdx - 1;
                 const match = fuzzyFindProduct(item.description);
                 if(match) {
-                    selectGrnProduct(id, match.id, match.item_name, match.brand||'', item.rate||match.mrp||0, item.discount_pct||match.trade_discount_percent||0, match.retail_price||match.default_price||0, match.current_stock||0, match.mac||0, match.track_stock);
+                    // Phase 17 / F1 "other half" (16 Sep 2026): selectGrnProduct() now takes the
+                    // whole matched variant object (matching the new brand/volume-aware search
+                    // cache) rather than a long positional argument list.
+                    selectGrnProduct(id, match);
+                    if(item.rate) document.getElementById(`gMrp-${id}`).value = item.rate;
+                    if(item.discount_pct) document.getElementById(`gDisc-${id}`).value = item.discount_pct;
                 } else {
                     newGrnProduct(id, item.description || 'UNKNOWN ITEM');
                     document.getElementById(`gMrp-${id}`).value = item.rate || 0;
@@ -1024,7 +1050,8 @@
                         <input type="text" id="gProd-${id}" class="form-control" onkeyup="searchGrnProduct(${id})" placeholder="Search or Type new">
                         <div id="gAuto-${id}" class="autocomplete-list" style="display:none;"></div>
                     </div>
-                    <div><label>Brand</label><input type="text" id="gBrand-${id}" class="form-control" style="text-transform:uppercase;"></div>
+                    <div><label>Brand</label><input type="text" id="gBrand-${id}" class="form-control" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+                    <div><label>Vol (ml)</label><input type="number" id="gVol-${id}" class="form-control" placeholder="lubricant only"></div>
                     <div><label>Qty</label><input type="number" id="gQty-${id}" class="form-control" value="1" min="1" oninput="calcGrnRow(${id})"></div>
                     <div><label id="gMrpLabel-${id}">MRP (₹)</label><input type="number" id="gMrp-${id}" class="form-control mrp-field" oninput="calcGrnRow(${id})"></div>
                     <div id="gDiscGroup-${id}"><label>Trade Disc %</label><input type="number" id="gDisc-${id}" class="form-control" value="0" oninput="calcGrnRow(${id})"></div>
@@ -1035,6 +1062,7 @@
                     <div style="grid-column: span 2;"><label>Barcode</label><div style="display:flex;gap:5px;"><input type="text" id="gBar-${id}" class="form-control"><button class="btn btn-info" onclick="scanBarcode('gBar-${id}')">📷</button></div></div>
                     <div><button class="btn btn-danger" onclick="document.getElementById('grnRow-${id}').remove(); calcGrnTotal();">×</button></div>
                     <input type="hidden" id="gPid-${id}">
+                    <input type="hidden" id="gVid-${id}">
                     <input type="hidden" id="gStock-${id}">
                     <input type="hidden" id="gMac-${id}">
                     <input type="hidden" id="gTrack-${id}">
@@ -1044,6 +1072,9 @@
             applyInvoiceTypeToRows();
         }
 
+        // Phase 17 / F1 "other half" (16 Sep 2026): matches by product name + brand (+ volume, if
+        // typed), and now shows which brand/volume each result actually is, so staff can tell
+        // "Ride Pro+ 900ml" apart from "Ride Pro+ 1000ml" instead of guessing from the name alone.
         function searchGrnProduct(id) {
             const val = document.getElementById(`gProd-${id}`).value.trim().toLowerCase();
             const list = document.getElementById(`gAuto-${id}`);
@@ -1052,27 +1083,35 @@
             let res = globalCatalogCache.filter(p => (p.item_name+' '+(p.brand||'')).toLowerCase().includes(val)).slice(0, 10);
             list.innerHTML = '';
             res.forEach(p => {
-                list.innerHTML += `<div class="autocomplete-item" onmousedown="selectGrnProduct(${id}, '${p.id}', '${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||0}, ${p.trade_discount_percent||0}, ${p.retail_price||p.default_price||0}, ${p.current_stock||0}, ${p.mac||0}, ${p.track_stock}, ${(p.gst_percent!=null && !isNaN(parseFloat(p.gst_percent)))?parseFloat(p.gst_percent):'null'})">
-                    ${p.item_name} <span style="color:#888;">${p.brand||''}</span> (MRP: ₹${p.mrp||0})
+                const volLabel = p.volume_per_unit ? ` — ${p.volume_per_unit}ml` : '';
+                list.innerHTML += `<div class="autocomplete-item" onmousedown='selectGrnProduct(${id}, ${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+                    ${p.item_name} <span style="color:#888;">${p.brand||''}${volLabel}</span> (MRP: ₹${p.mrp||0}, Stock: ${p.stock||0})
                 </div>`;
             });
-            list.innerHTML += `<div class="autocomplete-item" style="color:var(--success);" onmousedown="newGrnProduct(${id}, '${val}')">➕ Create "${val}"</div>`;
+            list.innerHTML += `<div class="autocomplete-item" style="color:var(--success);" onmousedown="newGrnProduct(${id}, '${val.replace(/'/g,"\\'")}')">➕ Create "${val}" (new product or new brand — type Brand/Volume below)</div>`;
             list.style.display = 'block';
         }
 
-        function selectGrnProduct(id, pid, name, brand, mrp, disc, ret, stock, mac, track, gst) {
-            document.getElementById(`gProd-${id}`).value = name;
-            document.getElementById(`gBrand-${id}`).value = brand;
-            document.getElementById(`gMrp-${id}`).value = mrp;
-            document.getElementById(`gDisc-${id}`).value = disc;
-            document.getElementById(`gRet-${id}`).value = ret;
-            document.getElementById(`gPid-${id}`).value = pid;
-            document.getElementById(`gStock-${id}`).value = stock;
-            document.getElementById(`gMac-${id}`).value = mac;
-            document.getElementById(`gTrack-${id}`).value = track;
+        // Picking an existing search result fills in its EXACT variant (parent id + variant id) —
+        // this is only a hint for the fields below, though: commitGRN() always re-resolves parent
+        // and variant by name/brand/volume at save time, so if staff change the Brand or Volume
+        // fields afterward (e.g. to add a NEW volume of this same brand), that's still handled
+        // correctly as a new variant, never silently overwriting the one picked here.
+        function selectGrnProduct(id, p) {
+            document.getElementById(`gProd-${id}`).value = p.item_name;
+            document.getElementById(`gBrand-${id}`).value = p.brand || '';
+            document.getElementById(`gVol-${id}`).value = p.volume_per_unit || '';
+            document.getElementById(`gMrp-${id}`).value = p.mrp || '';
+            document.getElementById(`gDisc-${id}`).value = 0;
+            document.getElementById(`gRet-${id}`).value = p.ret || '';
+            document.getElementById(`gPid-${id}`).value = p.parent_id;
+            document.getElementById(`gVid-${id}`).value = p.variant_id;
+            document.getElementById(`gStock-${id}`).value = p.stock || 0;
+            document.getElementById(`gMac-${id}`).value = p.mac || 0;
+            document.getElementById(`gTrack-${id}`).value = p.track;
             // Pre-fill GST% from this product's last-saved rate (if any) — still editable per line,
             // since the vendor's rate on THIS invoice is what actually matters for the ledger.
-            document.getElementById(`gGst-${id}`).value = (gst !== null && gst !== undefined) ? gst : '';
+            document.getElementById(`gGst-${id}`).value = (p.gst !== null && p.gst !== undefined) ? p.gst : '';
             document.getElementById(`gAuto-${id}`).style.display = 'none';
             calcGrnRow(id);
         }
@@ -1081,6 +1120,7 @@
             document.getElementById(`gProd-${id}`).value = name.toUpperCase();
             document.getElementById(`gAuto-${id}`).style.display = 'none';
             document.getElementById(`gPid-${id}`).value = 'NEW';
+            document.getElementById(`gVid-${id}`).value = '';
             document.getElementById(`gTrack-${id}`).value = 'true';
             document.getElementById(`gStock-${id}`).value = '0';
             document.getElementById(`gMac-${id}`).value = '0';
@@ -1278,6 +1318,18 @@
             const otherAmt = parseFloat(document.getElementById('lcOther').value)||0;
             if(otherAmt > 0 && !document.getElementById('lcOtherNote').value.trim()) return alert('Please describe the "Other" landed cost');
 
+            // Phase 17 / F1 "other half" (16 Sep 2026): validate every row BEFORE anything is
+            // written to the database — every purchase line now needs both a product name and a
+            // brand to resolve to a real parent+variant, and checking this upfront avoids ever
+            // committing an invoice header with some lines saved and others silently skipped.
+            for(const row of document.querySelectorAll('[id^="grnRow-"]')) {
+                const rid = row.id.split('-')[1];
+                const rName = document.getElementById(`gProd-${rid}`).value.trim();
+                const rBrand = document.getElementById(`gBrand-${rid}`).value.trim();
+                if(!rName) return alert('Every line needs a Product name.');
+                if(!rBrand) return alert(`Please enter a Brand for "${rName}" — every purchase line needs a brand to match (or create) the correct product variant.`);
+            }
+
             const invoiceNo = document.getElementById('grnInvoiceNo').value || `GRN-${Date.now()}`;
             const invDate = document.getElementById('grnDate').value;
             const invoiceType = document.getElementById('grnInvoiceType').value;
@@ -1353,9 +1405,10 @@
             const rows = document.querySelectorAll('[id^="grnRow-"]');
             for(let r of rows) {
                 const id = r.id.split('-')[1];
-                let pid = document.getElementById(`gPid-${id}`).value;
-                const name = document.getElementById(`gProd-${id}`).value;
-                const brand = document.getElementById(`gBrand-${id}`).value;
+                const name = document.getElementById(`gProd-${id}`).value.trim().toUpperCase();
+                const brand = document.getElementById(`gBrand-${id}`).value.trim().toUpperCase();
+                const volEl = document.getElementById(`gVol-${id}`);
+                const vol = volEl && volEl.value ? (parseInt(volEl.value)||null) : null;
                 const qty = parseInt(document.getElementById(`gQty-${id}`).value)||0;
                 const mrp = parseFloat(document.getElementById(`gMrp-${id}`).value)||0;
                 const disc = parseFloat(document.getElementById(`gDisc-${id}`).value)||0;
@@ -1376,29 +1429,75 @@
                 const finalMac = finalMacInput ? (parseFloat(finalMacInput.value)||calcMac) : calcMac;
                 const macEdited = Math.abs(finalMac - calcMac) > 0.005;
 
-                if(pid === 'NEW') {
-                    const {data:np} = await supabaseClient.from('product_master').insert({
-                        item_name: name, brand: brand, scope: 'generic', track_stock: track, catalog_status: 'live',
-                        mrp: mrp, cost_price: cost, trade_discount_percent: disc, retail_price: ret, current_stock: 0, barcode_id: bar, warehouse_type: wh, gst_percent: gstPct
-                    }).select().single();
-                    pid = np.id;
+                // Phase 17 / F1 "other half" (16 Sep 2026): PARENT and VARIANT are always
+                // re-resolved here by name/brand/volume — never trusted blindly from whatever the
+                // autocomplete pre-filled — so it doesn't matter whether staff picked a search
+                // result, typed a name/brand from scratch, or edited the Brand/Volume after
+                // picking one: an existing match is reused, a genuinely new one is created. This
+                // is the same find-or-create rule product-entry-modal.js already uses, so the
+                // Purchase page and the Product Console page can never create two different
+                // parent rows for the same product name.
+                let pid = document.getElementById(`gPid-${id}`).value;
+                if(!pid || pid === 'NEW') {
+                    const { data: existingParent } = await supabaseClient.from('product_master').select('id').ilike('item_name', name).limit(1);
+                    if(existingParent && existingParent.length) {
+                        pid = existingParent[0].id;
+                    } else {
+                        const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({
+                            item_name: name, category: vol ? 'Lubricant' : 'Spare', scope: 'generic', track_stock: track,
+                            catalog_status: 'live', warehouse_type: wh, gst_percent: gstPct
+                        }).select('id').single();
+                        if(parentErr) return alert(`Error creating product "${name}": ${parentErr.message}`);
+                        pid = np.id;
+                    }
                 }
 
-                const oStock = parseInt(document.getElementById(`gStock-${id}`).value)||0;
-                const oMac = parseFloat(document.getElementById(`gMac-${id}`).value)||0;
+                let vid = document.getElementById(`gVid-${id}`).value;
+                let oStock = parseInt(document.getElementById(`gStock-${id}`).value)||0;
+                let oMac = parseFloat(document.getElementById(`gMac-${id}`).value)||0;
+                let vq = supabaseClient.from('product_variants').select('id,current_stock,cost_price').eq('parent_product_id', pid).ilike('brand', brand);
+                vq = vol ? vq.eq('volume_per_unit', vol) : vq.is('volume_per_unit', null);
+                const { data: existingVariant } = await vq.limit(1);
+                if(existingVariant && existingVariant.length) {
+                    vid = existingVariant[0].id;
+                    oStock = existingVariant[0].current_stock || 0;
+                    oMac = existingVariant[0].cost_price || 0;
+                } else {
+                    const { data: nv, error: variantErr } = await supabaseClient.from('product_variants').insert({
+                        parent_product_id: pid, variant_label: brand + (vol ? ` — ${vol}ml` : ''),
+                        brand, volume_per_unit: vol, barcode_id: bar || null, warehouse_type: wh,
+                        catalog_status: 'live', mrp, default_price: ret, cost_price: 0, current_stock: 0
+                    }).select('id').single();
+                    if(variantErr) return alert(`Error creating brand/variant "${brand}" for "${name}": ${variantErr.message}`);
+                    vid = nv.id;
+                    oStock = 0; oMac = 0;
+                }
 
-                await supabaseClient.from('purchase_invoice_items').insert({
+                const { data: invItem, error: itemErr } = await supabaseClient.from('purchase_invoice_items').insert({
                     purchase_invoice_id: inv.id, product_master_id: pid, item_name: name, brand: brand,
                     qty: qty, unit_cost: cost, nbp: cost, nlp: nlp, total_cost: qty*cost, mrp: mrp, trade_discount_percent: disc, retail_price_set: ret, barcode_id: bar, warehouse_type: wh,
                     calculated_mac: calcMac, final_mac: finalMac, mac_edited: macEdited, mac_edited_by: macEdited ? sessionRole : null,
                     old_stock: oStock, old_mac: oMac, lot_code: lotCode, gst_percent: gstPct, gst_amount: gstAmt
+                }).select('id').single();
+                if(itemErr) return alert(`Error saving purchase line for "${name}": ${itemErr.message}`);
+
+                // ALWAYS a new lot — a repeat purchase of the same brand+volume at a different
+                // price is a new batch, never an overwrite of the earlier one (same rule as
+                // product-entry-modal.js's "+ ADD LOT"). Linked back to this exact purchase line
+                // via source_purchase_invoice_item_id, so a purchase-sourced lot can always be
+                // traced to the voucher that created it (and correcting it means correcting that
+                // voucher, per the 🔒 note shown in the catalog panel).
+                await supabaseClient.from('product_variant_lots').insert({
+                    variant_id: vid, lot_code: lotCode, mrp, sell_price: ret, mac: finalMac,
+                    opening_qty: qty, current_qty: qty, source: 'purchase',
+                    source_purchase_invoice_item_id: invItem.id, received_date: invDate, created_by: sessionRole
                 });
 
-                if(track && pid !== 'NEW') {
-                    const nMac = ((oStock*oMac) + (qty*finalMac)) / (oStock+qty);
-                    await supabaseClient.from('product_master').update({
-                        current_stock: oStock+qty, mac: nMac, mrp: mrp, cost_price: cost, retail_price: ret, barcode_id: bar||null, gst_percent: gstPct
-                    }).eq('id', pid);
+                if(track) {
+                    await supabaseClient.from('product_variants').update({
+                        current_stock: oStock + qty, cost_price: finalMac, mrp, default_price: ret,
+                        barcode_id: bar || null
+                    }).eq('id', vid);
                 }
             }
 
