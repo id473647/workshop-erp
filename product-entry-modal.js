@@ -575,3 +575,4 @@
     _addLot, _saveLotDraft
   };
 })(window);
+ 
