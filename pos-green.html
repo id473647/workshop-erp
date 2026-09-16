@@ -969,7 +969,7 @@
         rowNode._pgst = (p.gst_percent !== undefined && p.gst_percent !== null) ? p.gst_percent : 18;
         const qtyInput = rowNode.querySelector('.i-qty'); qtyInput.placeholder='Pcs'; qtyInput.min='1';
         const volPerUnit = p.volume_per_unit || 0; const category = p.category;
-        if(category==='Lube'&&volPerUnit>0){const vs=rowNode.querySelector('.i-vol');if(vs)vs.style.display='none';const vo=rowNode.querySelector('.i-vol-other');if(vo)vo.style.display='none';let tag=rowNode.querySelector('.vol-tag');if(!tag){tag=document.createElement('span');tag.className='vol-tag';tag.style.cssText='font-size:0.7rem;color:var(--info);font-weight:bold;position:absolute;right:10px;top:-15px;';qtyInput.parentElement.style.position='relative';qtyInput.parentElement.appendChild(tag);}tag.innerText=`🧴 Each: ${volPerUnit}ml`;}
+        if((category==='Lube'||category==='Lubricant')&&volPerUnit>0){const vs=rowNode.querySelector('.i-vol');if(vs)vs.style.display='none';const vo=rowNode.querySelector('.i-vol-other');if(vo)vo.style.display='none';let tag=rowNode.querySelector('.vol-tag');if(!tag){tag=document.createElement('span');tag.className='vol-tag';tag.style.cssText='font-size:0.7rem;color:var(--info);font-weight:bold;position:absolute;right:10px;top:-15px;';qtyInput.parentElement.style.position='relative';qtyInput.parentElement.appendChild(tag);}tag.innerText=`🧴 Each: ${volPerUnit}ml`;}
         document.getElementById(`autolist-${targetIdx}`).style.display='none';
         autocompleteHighlight = -1;
         evaluateRuleDiscounts(targetIdx);
@@ -1222,7 +1222,7 @@
                 const { data: existingParent } = await supabaseClient.from('product_master').select('id').ilike('item_name', clean).limit(1);
                 if (existingParent && existingParent.length) { pid = existingParent[0].id; }
                 else {
-                    const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: clean, category: typeVal, unit_metric: isLube?'ML':'Pcs', warehouse_type: activeRoleForWrite, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
+                    const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: clean, category: (isLube ? 'Lubricant' : 'Spare'), unit_metric: isLube?'ML':'Pcs', warehouse_type: activeRoleForWrite, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
                     if (parentErr) { console.error('buildAndInsertItems: product create failed —', parentErr.message); continue; }
                     pid = np.id;
                 }
