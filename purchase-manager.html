@@ -47,9 +47,22 @@
         .info-bar { background:#f0f9ff; border:1px solid #bae6fd; border-radius:5px; padding:10px; margin-bottom:15px; font-size:0.85rem; }
         .audit-note { font-size:0.75rem; color:#888; margin-top:5px; }
         @media print {
+            /* Urgent fix (5 Sep 2026): "Print Labels" produced a blank print preview.
+               Two separate bugs, same fix pattern as the billing.html duplicate-page fix:
+               1) #print-area is hidden with an inline style="display:none" for normal screen
+                  use. This print rule tried to show it with "display: flex", but an inline
+                  style always wins over a plain stylesheet rule with the same property — so
+                  the inline display:none was still in effect at print time and the label
+                  container never actually appeared, giving a blank page no matter what was
+                  written into it. Fixed by adding !important so the print-time value wins.
+               2) "body * { visibility: hidden; }" hides the rest of the app but does not
+                  remove it from the page's layout height, so the print engine can still
+                  compute extra pages around it. Fixed by also collapsing the actual app
+                  sections (.nav-bar, #aiScanStatusBar, .wrapper) via display:none. */
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex !important; flex-wrap: wrap; gap: 10px; }
+            body > .nav-bar, body > #aiScanStatusBar, body > .wrapper { display: none !important; }
         }
     </style>
 </head>
@@ -118,9 +131,9 @@
                 <div class="form-group" style="flex:1; min-width:150px;">
                     <label>Invoice Type</label>
                     <select id="grnInvoiceType" class="form-control" onchange="applyInvoiceTypeToRows()">
-                        <option value="type_a">Type A — MRP + GST (ITC)</option>
-                        <option value="type_b">Type B — Net Rate + GST (ITC)</option>
-                        <option value="type_c" selected>Type C — All-Inclusive (No ITC)</option>
+                        <option value="type_a">Type A — GST-Item Wise (MRP + GST, ITC)</option>
+                        <option value="type_b">Type B — Price Inc-ITC (GST-incl. price, ITC)</option>
+                        <option value="type_c" selected>Type C — Price Inc-ITCZero (All-Inclusive, No ITC)</option>
                     </select>
                 </div>
                 <!-- Sub-Phase 11D.33: Green Spare Manager buys stock for two GST entities (Green
@@ -172,8 +185,14 @@
                     </div>
                     <div style="flex:1; min-width:280px;">
                         <div id="grnGstSummary" style="font-weight:bold; color:#7c3aed;">Total GST (Type A/B only): ₹<span id="grnGstTotal">0.00</span></div>
-                        <div style="font-weight:bold; margin-top:4px;">Estimated Vendor Payable (incl. GST + payable landed costs): ₹<span id="grnVendorPayablePreview">0.00</span></div>
-                        <div class="audit-note" style="margin-top:6px;">For Type A/B purchases, GST is added to what you owe the vendor, to the ledger, AND is folded into the MAC/cost below (your business treats purchase-side GST as a real cost). The exact GST% and amount are still saved on every line item separately, so you always have the input GST figure on record for your own filing. For Type C (All-Inclusive), GST is already inside the price you typed, so nothing is added twice.</div>
+                        <div style="font-weight:bold; margin-top:4px;">Estimated Vendor Payable (= sum of every line's NLP + payable landed costs): ₹<span id="grnVendorPayablePreview">0.00</span></div>
+                        <!-- Phase 17 / F1 (16 Sep 2026): Vendor Payable is now always "sum of NLP + payable
+                             landed costs" for every invoice type. NLP (Net Landed Price) already carries the
+                             correct GST treatment per type — Type A adds GST on top when computing NLP, Type B's
+                             entered price already had GST inside it, Type C has none — so there is no separate
+                             "+ GST" step here any more. (Previously Type B's GST was being added a second time
+                             on top of an already GST-inclusive price — a real double-counting bug, now fixed.) -->
+                        <div class="audit-note" style="margin-top:6px;">Type A (GST-Item Wise): you enter the MRP — GST is calculated and added on top. Type B (Price Inc-ITC): you enter a price that already includes GST — the GST amount is shown for your records but is NOT added again to what you owe the vendor. Type C (Price Inc-ITCZero): No ITC, GST is always ₹0. Every line still stores both its GST-exclusive cost (NBP) and its GST-inclusive landed price (NLP) for your own filing.</div>
                     </div>
                 </div>
                 <table id="macPreviewTable" style="display:none;">
@@ -197,8 +216,17 @@
                     <h3 style="margin:2px 0 0 0;">Final Payable to Vendor (incl. GST): ₹<span id="grnFinalPayableFooter">0.00</span></h3>
                 </div>
                 <div>
-                    <button class="btn btn-success" onclick="commitGRN()">Commit GRN</button>
+                    <!-- Urgent fix (5 Sep 2026): the Commit GRN button used to stay exactly as-is
+                         after a successful save, with nothing on screen to show the commit went
+                         through — easy to miss the confirmation alert and click Commit GRN a
+                         second time, which would insert a duplicate invoice and double the stock.
+                         Now it's replaced with a clear "Committed" state and an explicit
+                         "Start New GRN" button, so a second invoice always starts from a
+                         deliberately cleared form. -->
+                    <button class="btn btn-success" id="btnCommitGrn" onclick="commitGRN()">Commit GRN</button>
+                    <span id="grnCommittedBadge" style="display:none; color:#15803d; font-weight:700; margin-left:8px;">✅ GRN Committed — Lot: <span id="grnCommittedLotText"></span></span>
                     <button class="btn btn-info" id="btnPrintLabels" style="display:none;" onclick="printReceivedLabels()">🏷️ Print Labels</button>
+                    <button class="btn" id="btnStartNewGrn" style="display:none; background:#e2e8f0; color:#1e293b;" onclick="startNewGrn()">+ Start New GRN</button>
                 </div>
             </div>
         </div>
@@ -261,9 +289,33 @@
                 <button class="btn btn-primary" onclick="loadPurchaseHistory()">Filter</button>
             </div>
             <table id="historyTable">
-                <thead><tr><th>Date</th><th>Party</th><th>Inv#</th><th>Type</th><th>Lot Code</th><th>Warehouse</th><th>Subtotal</th><th>Landed %</th><th>Grand Total</th><th>By</th></tr></thead>
+                <thead><tr><th>Date</th><th>Party</th><th>Inv#</th><th>Type</th><th>Lot Code</th><th>Warehouse</th><th>Subtotal</th><th>Landed %</th><th>Grand Total</th><th>By</th><th>Labels</th></tr></thead>
                 <tbody></tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Sub-Phase 11D.36 (7 Sep 2026): shared quantity-entry modal for both the just-committed
+         "Print Labels" flow and the new "Reprint Labels" flow from History — per the user's
+         request, the system now always asks how many labels to print per item rather than
+         assuming one per unit purchased. -->
+    <div class="modal-overlay" id="modalLabelQty">
+        <div class="modal">
+            <h3>Print Labels</h3>
+            <p style="font-size:0.8rem; color:#64748b;">Set how many labels to print for each item (defaults to the quantity purchased — change any of these before printing).</p>
+            <div id="labelQtyRows" style="max-height:50vh; overflow-y:auto;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                <button class="btn" onclick="document.getElementById('modalLabelQty').style.display='none'">Cancel</button>
+                <!-- 7 Sep 2026: per the user's request — a way to get the QR as plain image files,
+                     for use with a thermal label printer's own software or whatever layout tool
+                     came bundled with the sticker sheets, instead of only this page's own print
+                     dialog. One PNG per distinct item (not multiplied by qty) — external label
+                     software handles repeating one image across a sheet/roll on its own; the
+                     manufacturer's barcode is not included here since that's already printed on
+                     the product from the brand, not something this app needs to generate. -->
+                <button class="btn btn-info" onclick="downloadQrImages()">💾 Download QR Images (ZIP)</button>
+                <button class="btn btn-success" onclick="confirmPrintLabels()">🏷️ Print (Barcode + QR)</button>
+            </div>
         </div>
     </div>
 
@@ -427,6 +479,11 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             event.target.classList.add('active');
+            // Urgent fix (7 Sep 2026): the History tab's Filter button called loadPurchaseHistory(),
+            // a function that was never actually defined anywhere in this file — the tab has been
+            // completely non-functional (silent console error, table always empty) since it was
+            // built. Now defined below, and also run automatically on opening this tab.
+            if(tabId === 'tab-history') loadPurchaseHistory();
         }
 
         function logout() { localStorage.removeItem('ERP_ACTIVE_ROLE'); window.location.href='login.html'; }
@@ -895,6 +952,11 @@
         }
 
         // ===== FEATURE C: invoice type toggling per row =====
+        // Phase 17 / F1 (16 Sep 2026): rewritten so all three types now match the original 3-type
+        // spec exactly. Discount% is shown for every type (Type B and Type C were wrongly hiding
+        // and zeroing it before — the spec always applies discount before anything else). Each row
+        // now also computes and displays both NBP (GST-exclusive cost) and NLP (GST-inclusive
+        // landed price) — see calcGrnRow().
         function applyInvoiceTypeToRows() {
             const type = document.getElementById('grnInvoiceType').value;
             document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
@@ -904,22 +966,25 @@
                 const gstGroup = document.getElementById(`gGstGroup-${id}`);
                 const gstInput = document.getElementById(`gGst-${id}`);
                 if(type === 'type_a') {
+                    // GST-Item Wise: NBP = MRP x (1-Disc%); NLP = NBP x (1+GST%) — GST added on top.
                     mrpLabel.innerText = 'MRP (₹)';
                     discGroup.style.display = '';
                     gstGroup.style.display = '';
                     gstInput.disabled = false;
                 } else if(type === 'type_b') {
-                    mrpLabel.innerText = 'Net Rate (₹)';
-                    discGroup.style.display = 'none';
-                    document.getElementById(`gDisc-${id}`).value = 0;
+                    // Price Inc-ITC: the entered price is already GST-inclusive. NLP = Price x
+                    // (1-Disc%) directly; NBP is back-calculated (NLP / (1+GST%)) for records only —
+                    // GST is NOT added a second time on top of vendor payable.
+                    mrpLabel.innerText = 'List Price, GST-Incl (₹)';
+                    discGroup.style.display = '';
                     gstGroup.style.display = '';
                     gstInput.disabled = false;
                 } else {
-                    mrpLabel.innerText = 'All-Incl Price (₹)';
-                    discGroup.style.display = 'none';
-                    document.getElementById(`gDisc-${id}`).value = 0;
-                    // Type C is All-Inclusive / No ITC — GST is already inside the price you typed,
-                    // so the field is hidden here rather than asking for it twice.
+                    // Price Inc-ITCZero: No ITC, GST is always 0 — but Discount% still applies to
+                    // the entered list price, per the original spec (this was wrongly hidden/forced
+                    // to 0 before, too).
+                    mrpLabel.innerText = 'All-Incl List Price, No ITC (₹)';
+                    discGroup.style.display = '';
                     gstGroup.style.display = 'none';
                     gstInput.value = 0;
                     gstInput.disabled = true;
@@ -963,7 +1028,8 @@
                     <div><label id="gMrpLabel-${id}">MRP (₹)</label><input type="number" id="gMrp-${id}" class="form-control mrp-field" oninput="calcGrnRow(${id})"></div>
                     <div id="gDiscGroup-${id}"><label>Trade Disc %</label><input type="number" id="gDisc-${id}" class="form-control" value="0" oninput="calcGrnRow(${id})"></div>
                     <div id="gGstGroup-${id}"><label>GST %</label><input type="number" id="gGst-${id}" class="form-control" placeholder="e.g. 18" oninput="calcGrnRow(${id})"></div>
-                    <div><label>Cost (₹)</label><input type="number" id="gCost-${id}" class="form-control" readonly></div>
+                    <div><label>NBP (₹)</label><input type="number" id="gCost-${id}" class="form-control" readonly title="Net Buying Price — GST-exclusive cost"></div>
+                    <div><label>NLP (₹)</label><input type="number" id="gNlp-${id}" class="form-control" readonly title="Net Landed Price — GST-inclusive cost"></div>
                     <div><label>Retail (₹)</label><input type="number" id="gRet-${id}" class="form-control"></div>
                     <div style="grid-column: span 2;"><label>Barcode</label><div style="display:flex;gap:5px;"><input type="text" id="gBar-${id}" class="form-control"><button class="btn btn-info" onclick="scanBarcode('gBar-${id}')">📷</button></div></div>
                     <div><button class="btn btn-danger" onclick="document.getElementById('grnRow-${id}').remove(); calcGrnTotal();">×</button></div>
@@ -1020,12 +1086,34 @@
             document.getElementById(`gGst-${id}`).value = '';
         }
 
+        // Phase 17 / F1 (16 Sep 2026): computes both NBP (GST-exclusive cost) and NLP (GST-inclusive
+        // landed price) per line, using the formula that matches the invoice type actually selected.
+        // NBP is what "Cost" used to mean and still drives the Tax Summary box's taxable value.
+        // NLP is new — it's what actually gets paid to the vendor (see updateLandedCosts()/commitGRN()).
         function calcGrnRow(id) {
-            const mrp = parseFloat(document.getElementById(`gMrp-${id}`).value)||0;
+            const type = document.getElementById('grnInvoiceType').value;
+            const price = parseFloat(document.getElementById(`gMrp-${id}`).value)||0;
             const disc = parseFloat(document.getElementById(`gDisc-${id}`).value)||0;
-            const cost = mrp * (1 - disc/100);
-            document.getElementById(`gCost-${id}`).value = cost.toFixed(2);
-            if(!document.getElementById(`gRet-${id}`).value) document.getElementById(`gRet-${id}`).value = mrp;
+            const gstEl = document.getElementById(`gGst-${id}`);
+            const gst = gstEl ? (parseFloat(gstEl.value)||0) : 0;
+            let nbp, nlp;
+            if(type === 'type_b') {
+                // Price Inc-ITC: entered price is already GST-inclusive.
+                nlp = price * (1 - disc/100);
+                nbp = gst > 0 ? nlp / (1 + gst/100) : nlp;
+            } else if(type === 'type_c') {
+                // Price Inc-ITCZero: No ITC, GST forced to 0 — NBP and NLP are the same figure.
+                nlp = price * (1 - disc/100);
+                nbp = nlp;
+            } else {
+                // Type A / GST-Item Wise: entered price is MRP, GST added on top of the discounted price.
+                nbp = price * (1 - disc/100);
+                nlp = nbp * (1 + gst/100);
+            }
+            document.getElementById(`gCost-${id}`).value = nbp.toFixed(2);
+            const nlpField = document.getElementById(`gNlp-${id}`);
+            if(nlpField) nlpField.value = nlp.toFixed(2);
+            if(!document.getElementById(`gRet-${id}`).value) document.getElementById(`gRet-${id}`).value = price;
             calcGrnTotal();
         }
 
@@ -1116,27 +1204,27 @@
             document.getElementById('lcPct').innerText = pct.toFixed(2);
             document.getElementById('lcPayableTotal').innerText = payableLc.toFixed(2);
 
-            // GST is owed to the vendor and goes into the ledger AND into MAC/cost for Type A/B —
-            // per your business's GST handling, purchase-side GST is treated as a real cost here
-            // (this shop does not net it against a matching output-GST sale at MAC-calc time; input
-            // GST is still tracked separately per line for your own records/filing). Type C has GST
-            // baked into the price already, so its rows are forced to 0% above and contribute
-            // nothing extra here — it's already inside "cost".
-            const invType = document.getElementById('grnInvoiceType').value;
-            let gstTotal = 0;
-            if(invType !== 'type_c') {
-                document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
-                    const rid = row.id.split('-')[1];
-                    const rQty = parseFloat(document.getElementById(`gQty-${rid}`).value)||0;
-                    const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
-                    const rGstEl = document.getElementById(`gGst-${rid}`);
-                    const rGst = rGstEl ? (parseFloat(rGstEl.value)||0) : 0;
-                    gstTotal += rQty * rCost * (rGst/100);
-                });
-            }
+            // Phase 17 / F1 (16 Sep 2026): gstTotal is now always "sum of qty x (NLP - NBP)" — this
+            // is the real GST amount for the line whether it was added on top (Type A) or was
+            // already baked into the entered price (Type B); it comes out to 0 for Type C since
+            // NLP === NBP there. Vendor Payable is now always "sum of qty x NLP + payable landed
+            // costs" for every type — no separate "+ GST" step, because NLP already carries the
+            // correct GST treatment per type. (This replaces the old formula that was double-adding
+            // GST on top of Type B's already GST-inclusive price — the actual bug being fixed here.)
+            let gstTotal = 0, nlpTotal = 0;
+            document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
+                const rid = row.id.split('-')[1];
+                const rQty = parseFloat(document.getElementById(`gQty-${rid}`).value)||0;
+                const rNbp = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
+                const rNlpEl = document.getElementById(`gNlp-${rid}`);
+                const rNlp = rNlpEl ? (parseFloat(rNlpEl.value)||0) : rNbp;
+                gstTotal += rQty * (rNlp - rNbp);
+                nlpTotal += rQty * rNlp;
+            });
+            const vendorPayable = nlpTotal + payableLc;
             document.getElementById('grnGstTotal').innerText = gstTotal.toFixed(2);
-            document.getElementById('grnVendorPayablePreview').innerText = (subtotal + payableLc + gstTotal).toFixed(2);
-            document.getElementById('grnFinalPayableFooter').innerText = (subtotal + payableLc + gstTotal).toFixed(2); // same figure, mirrored to the prominent footer heading near Commit GRN
+            document.getElementById('grnVendorPayablePreview').innerText = vendorPayable.toFixed(2);
+            document.getElementById('grnFinalPayableFooter').innerText = vendorPayable.toFixed(2); // same figure, mirrored to the prominent footer heading near Commit GRN
             buildGrnTaxSummary(subtotal);
 
             const rows = document.querySelectorAll('[id^="grnRow-"]');
@@ -1148,15 +1236,16 @@
             rows.forEach(row => {
                 const id = row.id.split('-')[1];
                 const name = document.getElementById(`gProd-${id}`).value || '(unnamed)';
-                const cost = parseFloat(document.getElementById(`gCost-${id}`).value)||0;
-                const rGstEl2 = document.getElementById(`gGst-${id}`);
-                const rGst2 = rGstEl2 ? (parseFloat(rGstEl2.value)||0) : 0;
-                const costInclGst = cost * (1 + rGst2/100);
-                const calcMac = costInclGst * (1 + pct/100);
+                const nbp = parseFloat(document.getElementById(`gCost-${id}`).value)||0;
+                const rNlpEl2 = document.getElementById(`gNlp-${id}`);
+                const nlp = rNlpEl2 ? (parseFloat(rNlpEl2.value)||0) : nbp;
+                // MAC is now based on NLP (the line's GST-inclusive landed price) x (1 + landed-cost %)
+                // — correct for every invoice type, since NLP already carries the right GST treatment.
+                const calcMac = nlp * (1 + pct/100);
                 const overrideVal = finalMacOverrides.hasOwnProperty(id) ? finalMacOverrides[id] : calcMac.toFixed(2);
                 body.insertAdjacentHTML('beforeend', `<tr>
                     <td>${name}</td>
-                    <td>₹${cost.toFixed(2)}</td>
+                    <td>₹${nlp.toFixed(2)}</td>
                     <td>₹${calcMac.toFixed(2)}</td>
                     <td><input type="number" class="form-control" id="gFinalMac-${id}" value="${overrideVal}" onchange="finalMacOverrides['${id}']=this.value"></td>
                 </tr>`);
@@ -1224,27 +1313,30 @@
                      + (document.getElementById('lcLabelsPayable').checked ? lcVals.labels : 0)
                      + (document.getElementById('lcOtherPayable').checked ? lcVals.other : 0);
 
-            // GST for Type A/B: owed to the vendor (added to vendorPayable + ledger) AND folded
-            // into MAC/cost (your business treats it as a real cost — see the note above the Tax
-            // Summary box). For Type C the price already includes GST, so every row's GST% is
-            // forced to 0 above and this naturally comes out to 0.
+            // Phase 17 / F1 (16 Sep 2026): GST amount per line is now "qty x (NLP - NBP)" — the same
+            // figure whether it was added on top (Type A) or was already inside the entered price
+            // (Type B); it's 0 for Type C. Vendor Payable is "sum of qty x NLP + payable landed
+            // costs" for every type, with no separate "+ GST" step — this replaces the old formula
+            // that double-counted GST for Type B (the bug this fix addresses).
             // Also split by slab into CGST/SGST or IGST, same rule as the on-screen Tax Summary
             // box: this vendor's GSTIN decides which applies, for the GST register report later.
             const partyForGst = partiesCache.find(p => p.id === pId);
             const interStateGrn = isInterStateGstin(partyForGst?.gstin); // null = no GSTIN on file, treated as intra-state
-            let totalGst = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0;
+            let totalGst = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0, nlpSubtotal = 0;
             document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
                 const rid = row.id.split('-')[1];
                 const rQty = parseInt(document.getElementById(`gQty-${rid}`).value)||0;
-                const rCost = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
-                const rGst = parseFloat(document.getElementById(`gGst-${rid}`).value)||0;
-                const rTax = rQty * rCost * (rGst/100);
+                const rNbp = parseFloat(document.getElementById(`gCost-${rid}`).value)||0;
+                const rNlpEl = document.getElementById(`gNlp-${rid}`);
+                const rNlp = rNlpEl ? (parseFloat(rNlpEl.value)||0) : rNbp;
+                const rTax = rQty * (rNlp - rNbp);
                 totalGst += rTax;
+                nlpSubtotal += rQty * rNlp;
                 if(interStateGrn === true) totalIgst += rTax;
                 else { totalCgst += rTax/2; totalSgst += rTax/2; }
             });
 
-            const vendorPayable = subtotal + payableLc + totalGst; // damage_shortfall never included — never payable to vendor
+            const vendorPayable = nlpSubtotal + payableLc; // damage_shortfall never included — never payable to vendor
 
             const { data: inv, error: invErr } = await supabaseClient.from('purchase_invoices').insert({
                 vendor_id: pId, invoice_number: invoiceNo, invoice_date: invDate, total_bill_amount: vendorPayable,
@@ -1271,13 +1363,14 @@
                 const bar = document.getElementById(`gBar-${id}`).value;
                 const track = document.getElementById(`gTrack-${id}`).value !== 'false';
                 const gstPct = parseFloat(document.getElementById(`gGst-${id}`).value)||0;
-                const gstAmt = qty * cost * (gstPct/100);
+                const nlpEl = document.getElementById(`gNlp-${id}`);
+                const nlp = nlpEl ? (parseFloat(nlpEl.value)||0) : cost;
+                const gstAmt = qty * (nlp - cost);
 
-                // MAC includes GST for every invoice type — Type A/B fold in this line's own GST%
-                // before applying the landed-cost %; Type C's GST% is always 0 here since it's
-                // already inside "cost", so this is a no-op for Type C (no double-counting).
-                const costInclGst = cost * (1 + gstPct/100);
-                const calcMac = costInclGst * (1 + landedPct/100);
+                // Phase 17 / F1 (16 Sep 2026): MAC is now based on NLP (this line's GST-inclusive
+                // landed price, computed correctly per invoice type in calcGrnRow()) x (1 + landed
+                // cost %) — correct for every type, no separate GST fold-in needed here any more.
+                const calcMac = nlp * (1 + landedPct/100);
                 const finalMacInput = document.getElementById(`gFinalMac-${id}`);
                 const finalMac = finalMacInput ? (parseFloat(finalMacInput.value)||calcMac) : calcMac;
                 const macEdited = Math.abs(finalMac - calcMac) > 0.005;
@@ -1295,7 +1388,7 @@
 
                 await supabaseClient.from('purchase_invoice_items').insert({
                     purchase_invoice_id: inv.id, product_master_id: pid, item_name: name, brand: brand,
-                    qty: qty, unit_cost: cost, total_cost: qty*cost, mrp: mrp, trade_discount_percent: disc, retail_price_set: ret, barcode_id: bar, warehouse_type: wh,
+                    qty: qty, unit_cost: cost, nbp: cost, nlp: nlp, total_cost: qty*cost, mrp: mrp, trade_discount_percent: disc, retail_price_set: ret, barcode_id: bar, warehouse_type: wh,
                     calculated_mac: calcMac, final_mac: finalMac, mac_edited: macEdited, mac_edited_by: macEdited ? sessionRole : null,
                     old_stock: oStock, old_mac: oMac, lot_code: lotCode, gst_percent: gstPct, gst_amount: gstAmt
                 });
@@ -1329,39 +1422,225 @@
             });
 
             alert('GRN Saved! Lot Code: ' + lotCode);
-            document.getElementById('btnPrintLabels').style.display = 'block';
+            // Urgent fix (5 Sep 2026): lock the form into a clear "Committed" state instead of
+            // silently leaving Commit GRN clickable — see comment on the button in the HTML.
+            document.getElementById('btnCommitGrn').style.display = 'none';
+            document.getElementById('grnCommittedBadge').style.display = 'inline';
+            document.getElementById('grnCommittedLotText').innerText = lotCode;
+            document.getElementById('btnPrintLabels').style.display = 'inline-block';
+            document.getElementById('btnStartNewGrn').style.display = 'inline-block';
             finalMacOverrides = {};
             await fetchCatalog();
             fetchPartyBalance();
         }
 
+        // Urgent fix (5 Sep 2026): explicit reset for a new invoice, wired to "+ Start New GRN".
+        // Deliberately does NOT run automatically after commitGRN() — Print Labels still needs
+        // the just-committed row values to be sitting in the form, so the form is only cleared
+        // once the user has said they're done with this invoice (printed labels or not).
+        function startNewGrn() {
+            document.getElementById('grnItemsContainer').innerHTML = '';
+            rowIdx = 0;
+            addGrnRow();
+
+            document.getElementById('grnParty').value = '';
+            document.getElementById('grnVendorSearchInput').value = '';
+            document.getElementById('grnBalanceDisplay').style.display = 'none';
+            document.getElementById('grnBalanceDisplay').innerHTML = '';
+
+            document.getElementById('grnInvoiceNo').value = '';
+            document.getElementById('grnDate').value = '';
+            document.getElementById('grnInvoiceType').value = 'type_c';
+            if (document.getElementById('grnGstEntity')) document.getElementById('grnGstEntity').value = 'green';
+
+            ['lcPackaging','lcFreight','lcDamage','lcLabels','lcOther'].forEach(id => document.getElementById(id).value = 0);
+            document.getElementById('lcOtherNote').value = '';
+            document.getElementById('lcPackagingPayable').checked = true;
+            document.getElementById('lcFreightPayable').checked = false;
+            document.getElementById('lcLabelsPayable').checked = false;
+            document.getElementById('lcOtherPayable').checked = false;
+
+            document.getElementById('grnTaxSummaryBox').style.display = 'none';
+            document.getElementById('grnTotal').innerText = '0.00';
+            document.getElementById('grnFinalPayableFooter').innerText = '0.00';
+            document.getElementById('grnLotCodePreview').innerText = '';
+
+            document.getElementById('btnCommitGrn').style.display = 'inline-block';
+            document.getElementById('grnCommittedBadge').style.display = 'none';
+            document.getElementById('btnPrintLabels').style.display = 'none';
+            document.getElementById('btnStartNewGrn').style.display = 'none';
+
+            lastLotCode = '';
+            applyInvoiceTypeToRows();
+        }
+
+        /* ═══════════ Sub-Phase 11D.36 (7 Sep 2026): Print Labels / Reprint Labels redesign ═══════════
+           - Always asks how many labels to print per item, instead of assuming one label per unit
+             purchased — per the user's explicit request, since that assumption breaks down for
+             bulk items (e.g. 400 units of oil would have meant 400 physical labels).
+           - Adds a QR code next to the existing barcode on every label. The barcode keeps showing
+             whatever is already in the barcode field (the vendor/manufacturer's own printed
+             barcode, when the product already has one — completely untouched); the QR is
+             generated fresh by the app, encoding the product's internal ID, for reliable
+             mobile-camera scanning in billing.html / pos-green.html. Per the user: use both side
+             by side, not one replacing the other.
+           - Fixes a pre-existing bug: JsBarcode was encoding the label's own DOM element id (e.g.
+             "lbl-3-0") as the barcode's VALUE instead of the actual product barcode — so a printed
+             barcode could never have matched anything when scanned. Now encodes the real value.
+           - Available both right after a GRN commit (reads the live, just-committed form) and any
+             time later from History → 🏷️ Reprint Labels (fetches the original invoice's items). */
+        let pendingLabelItems = [];
+
         function printReceivedLabels() {
-            const printTarget = document.getElementById('print-area');
-            printTarget.innerHTML = '';
+            pendingLabelItems = [];
             document.querySelectorAll('[id^="grnRow-"]').forEach(row => {
                 const id = row.id.split('-')[1];
-                const name = document.getElementById(`gProd-${id}`).value;
-                const qty = parseInt(document.getElementById(`gQty-${id}`).value)||0;
-                const mrp = document.getElementById(`gMrp-${id}`).value;
-                const ret = document.getElementById(`gRet-${id}`).value;
-                const bar = document.getElementById(`gBar-${id}`).value || '000000';
-                for(let i=0; i<qty; i++) {
-                    const svgId = `lbl-${id}-${i}`;
-                    printTarget.innerHTML += `<div style="width:62mm; height:38mm; border:1px solid #000; padding:2mm; box-sizing:border-box; font-family:Arial; page-break-inside:avoid;">
+                pendingLabelItems.push({
+                    name: document.getElementById(`gProd-${id}`).value,
+                    qty: parseInt(document.getElementById(`gQty-${id}`).value)||0,
+                    mrp: document.getElementById(`gMrp-${id}`).value,
+                    ret: document.getElementById(`gRet-${id}`).value,
+                    bar: document.getElementById(`gBar-${id}`).value || '',
+                    pid: document.getElementById(`gPid-${id}`).value || '',
+                    lotCode: lastLotCode || buildLotCode()
+                });
+            });
+            openLabelQtyModal();
+        }
+
+        async function openReprintLabelsModal(invoiceId) {
+            const { data: inv } = await supabaseClient.from('purchase_invoices').select('lot_code').eq('id', invoiceId).single();
+            const { data: items, error } = await supabaseClient.from('purchase_invoice_items').select('*').eq('purchase_invoice_id', invoiceId);
+            if(error || !items) { alert('Could not load items for this invoice: ' + (error?.message||'no items found')); return; }
+            pendingLabelItems = items.map(it => ({
+                name: it.item_name, qty: it.qty, mrp: it.mrp, ret: it.retail_price_set,
+                bar: it.barcode_id || '', pid: it.product_master_id || '',
+                lotCode: it.lot_code || inv?.lot_code || ''
+            }));
+            if(!pendingLabelItems.length) { alert('No line items found on this invoice.'); return; }
+            openLabelQtyModal();
+        }
+
+        function openLabelQtyModal() {
+            const rowsEl = document.getElementById('labelQtyRows');
+            rowsEl.innerHTML = pendingLabelItems.map((it, idx) => `
+                <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+                    <span style="flex:1; font-size:0.85rem;">${it.name} <span style="color:#888; font-size:0.75rem;">(MRP ₹${it.mrp||0})</span></span>
+                    <label style="font-size:0.75rem; white-space:nowrap;">Qty to print:</label>
+                    <input type="number" class="form-control" style="width:80px;" id="lblQty-${idx}" value="${it.qty}" min="0">
+                </div>
+            `).join('');
+            document.getElementById('modalLabelQty').style.display = 'flex';
+        }
+
+        async function confirmPrintLabels() {
+            if(!window.QRCode) {
+                await new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+            }
+            const printTarget = document.getElementById('print-area');
+            printTarget.innerHTML = '';
+            const labelJobs = [];
+            pendingLabelItems.forEach((it, idx) => {
+                const printQty = parseInt(document.getElementById(`lblQty-${idx}`).value) || 0;
+                const hasBar = !!it.bar;
+                // QR always encodes the product's own internal ID when known (a stable reference
+                // for mobile scanning to look up), falling back to the manufacturer barcode or a
+                // lot-based placeholder for a brand-new product that hasn't been saved with an ID yet.
+                const qrValue = (it.pid && it.pid !== 'NEW') ? it.pid : (it.bar || `${it.lotCode}-${idx}`);
+                for(let i=0; i<printQty; i++) {
+                    const svgId = `lbl-bar-${idx}-${i}`;
+                    const qrId = `lbl-qr-${idx}-${i}`;
+                    printTarget.innerHTML += `<div style="width:62mm; height:40mm; border:1px solid #000; padding:2mm; box-sizing:border-box; font-family:Arial; page-break-inside:avoid; display:flex; flex-direction:column;">
                         <div style="font-size:7pt; font-weight:bold; text-align:center;">My Care Service Center</div>
-                        <div style="font-size:6pt; margin:2px 0;">${name.substring(0,30)}</div>
-                        <div style="font-size:6pt; color:#7c3aed;">MRP: ₹${mrp} | Sell: ₹${ret}</div>
-                        <div style="font-size:6pt; color:#555;">Lot: ${lastLotCode||buildLotCode()}</div>
-                        <div style="text-align:center;"><svg id="${svgId}"></svg></div>
+                        <div style="font-size:6pt; margin:1px 0;">${(it.name||'').substring(0,30)}</div>
+                        <div style="font-size:6pt; color:#7c3aed;">MRP: ₹${it.mrp||0} | Sell: ₹${it.ret||0}</div>
+                        <div style="font-size:6pt; color:#555;">Lot: ${it.lotCode||''}</div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1px;">
+                            <svg id="${svgId}" style="${hasBar?'':'display:none;'}"></svg>
+                            ${hasBar?'':'<span style="font-size:6pt; color:#b91c1c;">No mfr. barcode</span>'}
+                            <img id="${qrId}" style="width:16mm; height:16mm; margin-left:2mm;">
+                        </div>
                     </div>`;
+                    labelJobs.push({ svgId, qrId, hasBar, barValue: it.bar, qrValue });
                 }
             });
-            setTimeout(() => {
-                document.querySelectorAll('[id^="lbl-"]').forEach(svg => {
-                    JsBarcode(`#${svg.id}`, svg.id.includes('000000')?'TEST':svg.id, {format:'CODE128', width:1.2, height:25, displayValue:true, fontSize:8, margin:0});
-                });
+            document.getElementById('modalLabelQty').style.display = 'none';
+            if(!labelJobs.length) { alert('Nothing to print — set at least one quantity above 0.'); return; }
+            setTimeout(async () => {
+                for(const job of labelJobs) {
+                    // Fixed pre-existing bug: this used to encode the label's own DOM element id
+                    // as the barcode value instead of the real product barcode — see notes above.
+                    if(job.hasBar) JsBarcode(`#${job.svgId}`, job.barValue, {format:'CODE128', width:1.1, height:22, displayValue:true, fontSize:7, margin:0});
+                    try {
+                        const qrUrl = await new Promise((res,rej)=>QRCode.toDataURL(job.qrValue, {width:120, margin:1}, (e,u)=>e?rej(e):res(u)));
+                        document.getElementById(job.qrId).src = qrUrl;
+                    } catch(e) { console.error('QR generation failed for', job.qrValue, e); }
+                }
                 window.print();
-            }, 500);
+            }, 300);
+        }
+
+        // 7 Sep 2026: exports one QR image (PNG) per distinct item as a ZIP, for use with a
+        // thermal label printer's own software or a sticker-sheet vendor's bundled layout tool,
+        // as an alternative to this page's own browser print dialog. Added alongside the Print
+        // button, not instead of it.
+        async function downloadQrImages() {
+            if(!window.QRCode) {
+                await new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+            }
+            if(!window.JSZip) {
+                await new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+            }
+            if(!pendingLabelItems.length) { alert('Nothing to export.'); return; }
+            const zip = new JSZip();
+            for(let idx=0; idx<pendingLabelItems.length; idx++) {
+                const it = pendingLabelItems[idx];
+                const qrValue = (it.pid && it.pid !== 'NEW') ? it.pid : (it.bar || `${it.lotCode}-${idx}`);
+                try {
+                    const dataUrl = await new Promise((res,rej)=>QRCode.toDataURL(qrValue, {width:400, margin:2}, (e,u)=>e?rej(e):res(u)));
+                    const base64 = dataUrl.split(',')[1];
+                    const safeName = (it.name||'item').replace(/[^a-z0-9]+/gi,'_').substring(0,40);
+                    zip.file(`QR_${safeName}_${idx}.png`, base64, {base64:true});
+                } catch(e) { console.error('QR export failed for', it.name, e); }
+            }
+            const blob = await zip.generateAsync({type:'blob'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `QR_Labels_${lastLotCode||'export'}.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function loadPurchaseHistory() {
+            const start = document.getElementById('histStart').value;
+            const end = document.getElementById('histEnd').value;
+            const whFilter = document.getElementById('histWarehouse').value;
+            let q = supabaseClient.from('purchase_invoices').select('*, parties(party_name, trading_name)').order('invoice_date', {ascending:false}).limit(200);
+            if(start) q = q.gte('invoice_date', start);
+            if(end) q = q.lte('invoice_date', end);
+            if(whFilter) q = q.eq('warehouse_type', whFilter);
+            const { data, error } = await q;
+            const tbody = document.querySelector('#historyTable tbody');
+            if(error) { tbody.innerHTML = `<tr><td colspan="11" style="color:#b91c1c;">Error loading history: ${error.message}</td></tr>`; return; }
+            if(!data || !data.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#888;">No purchase invoices found for this filter.</td></tr>'; return; }
+            tbody.innerHTML = data.map(inv => {
+                const partyLabel = inv.parties ? (inv.parties.trading_name || inv.parties.party_name) : '(unknown vendor)';
+                const grand = inv.grand_total ?? inv.total_bill_amount ?? 0;
+                return `<tr>
+                    <td>${inv.invoice_date||''}</td>
+                    <td>${partyLabel}</td>
+                    <td>${inv.invoice_number||'(cash)'}</td>
+                    <td>${(inv.invoice_type||'').toUpperCase()}</td>
+                    <td>${inv.lot_code||''}</td>
+                    <td>${(inv.warehouse_type||'').toUpperCase()}</td>
+                    <td>₹${Number(inv.total_bill_amount||0).toFixed(2)}</td>
+                    <td>${Number(inv.landed_cost_pct||0).toFixed(2)}%</td>
+                    <td>₹${Number(grand).toFixed(2)}</td>
+                    <td>${inv.recorded_by||''}</td>
+                    <td><button class="btn btn-info" style="font-size:0.7rem;padding:4px 8px;" onclick="openReprintLabelsModal('${inv.id}')">🏷️ Reprint Labels</button></td>
+                </tr>`;
+            }).join('');
         }
 
         async function saveExpense() {
