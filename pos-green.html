@@ -1,3 +1,4 @@
+<!-- FILE: pos-green.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -303,6 +304,16 @@
         </div>
     </div>
 </div>
+
+<!-- Phase 17 / F2 (16 Sep 2026): lot picker — shown when a selected brand+volume has more than
+     one batch in stock, so staff can match the price on the physical unit in hand to the right
+     batch, per the approved catalog design. -->
+<div id="modalPosLotPicker" class="overlay-modal" style="z-index:400;"><div class="modal-card">
+  <h3 style="margin-top:0;color:var(--primary);" id="posLotPickerTitle">Pick a batch</h3>
+  <p style="font-size:0.78rem;color:#64748b;margin-top:-8px;">More than one batch of this item is in stock, at different prices. Pick the one matching the physical unit.</p>
+  <div id="posLotPickerBody" style="max-height:280px;overflow-y:auto;"></div>
+  <div style="display:flex;gap:10px;margin-top:14px;"><button class="btn-action" style="background:#e2e8f0;color:#1e293b;flex:1;" onclick="document.getElementById('modalPosLotPicker').style.display='none'">CANCEL</button></div>
+</div></div>
 
 <!-- ══ INVOICE PREVIEW MODAL ══ -->
 <!-- ── PHASE 9: POS RETURN MODAL ─────────────────────────────────────── -->
@@ -838,21 +849,36 @@
         }
     }
 
+    // Phase 17 / F2 (16 Sep 2026): rewritten to search the real parent -> variant -> lot
+    // structure (brand + volume aware) instead of the old flat product_master-only list, same
+    // rework already done for billing.html and purchase-manager.html. The B2 warehouse scoping
+    // (16 Sep 2026, still in effect) is unchanged in spirit — Green/Moped only ever see their own
+    // counter's stock plus 'universal'/unset items; Admin sees everything.
     async function prefetchCentralCatalog() {
-        // Phase 17 / B2 (16 Sep 2026): this fetched EVERY warehouse's products with no filter at
-        // all, so a Moped counter search returned Green's stock too (and vice versa) — same root
-        // cause and same fix as billing.html's prefetchCentralCatalog(). Scoped to the counter's
-        // own warehouse_type (case-insensitive) plus 'universal' items and legacy rows with no
-        // warehouse_type set (shown to everyone rather than hidden — see billing.html's fuller
-        // comment on this same fix for the reasoning). Admin is unaffected, still sees everything.
         const activeRole = (localStorage.getItem('ERP_ACTIVE_ROLE')||'').toLowerCase();
-        let masterQuery = supabaseClient.from('product_master').select('*');
-        if (activeRole === 'green' || activeRole === 'moped') {
-            masterQuery = masterQuery.or(`warehouse_type.ilike.${activeRole},warehouse_type.ilike.universal,warehouse_type.is.null`);
-        }
-        const { data: master, error: masterErr } = await masterQuery;
-        if (masterErr) console.error('prefetchCentralCatalog: product_master fetch failed —', masterErr.message);
-        globalCatalogCache = master || [];
+        const { data: variants, error: vErr } = await supabaseClient.from('product_variants')
+            .select('*, product_variant_lots(id,mrp,sell_price,mac,current_qty,source,received_date), product_master(item_name,category,scope,family_name,unit_metric,hsn_code,warehouse_type,gst_percent,track_stock,compatibility_tags)');
+        if (vErr) { console.error('prefetchCentralCatalog: product_variants fetch failed —', vErr.message); globalCatalogCache = []; return; }
+        globalCatalogCache = (variants || []).map(v => {
+            const p = v.product_master || {};
+            const lots = (v.product_variant_lots || []).slice().sort((a, b) => new Date(b.received_date || 0) - new Date(a.received_date || 0));
+            const latest = lots[0] || {};
+            const stock = lots.reduce((s, l) => s + (l.current_qty || 0), 0);
+            return {
+                variant_id: v.id, parent_id: v.parent_product_id,
+                item_name: p.item_name || '', brand: v.brand || '', volume_per_unit: v.volume_per_unit || null,
+                category: p.category || 'Spare', unit_metric: p.unit_metric || (v.volume_per_unit ? 'ML' : 'Pcs'),
+                warehouse_type: v.warehouse_type || p.warehouse_type || null, compatibility_tags: p.compatibility_tags || '',
+                mrp: latest.mrp || v.mrp || 0, default_price: latest.sell_price || v.default_price || 0,
+                current_stock: stock, mac: latest.mac || v.cost_price || 0, track_stock: p.track_stock !== false,
+                gst_percent: (p.gst_percent != null && !isNaN(parseFloat(p.gst_percent))) ? parseFloat(p.gst_percent) : 18,
+                barcode_id: v.barcode_id || null, lots
+            };
+        }).filter(p => {
+            if (activeRole !== 'green' && activeRole !== 'moped') return true; // admin sees everything
+            const wh = (p.warehouse_type || 'universal').toLowerCase();
+            return wh === activeRole || wh === 'universal' || wh === 'both';
+        });
     }
 
     /* ── CHANGE 4: Document-level keyboard handler for autocomplete navigation ── */
@@ -897,34 +923,52 @@
         }
         if (results.length === 0) { results = globalCatalogCache.filter(p => { const pType=(p.warehouse_type||'universal').toLowerCase(); if((role==='moped'||role==='green')&&!(pType===role||pType==='universal'||pType==='both'))return false; const txt=(p.item_name+' '+(p.brand||'')+' '+(p.compatibility_tags||'')).toLowerCase(); return tokens.every(t=>txt.includes(t.toLowerCase())); }); }
         results = results.slice(0, 10);
+        // Phase 17 / F2 (16 Sep 2026): results now show brand + volume, and the full matched
+        // variant object (with its lots) is passed into applySelectedCatalogItem() rather than a
+        // long positional argument list — same pattern used in billing.html/purchase-manager.html.
         results.forEach(p => {
             const stk = p.track_stock===false?`<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>`:`<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`;
             const mrpTag = p.mrp>0?`<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>`:'';
-            list.innerHTML += `<div class="autocomplete-item" onmousedown="applySelectedCatalogItem(${targetIdx},'${p.item_name.replace(/'/g,"\\'")}','${(p.brand||'').replace(/'/g,"\\'")}',${p.mrp||p.default_price||0},${p.default_price||0},'${p.id||''}',${p.mac||0},'${p.category||'Spare'}',${p.volume_per_unit||0},${p.gst_percent!=null?p.gst_percent:18})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;align-items:center;">${stk}${mrpTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`;
+            const volLabel = p.volume_per_unit ? ` — ${p.volume_per_unit}ml` : '';
+            const lotTag = (p.lots||[]).length > 1 ? `<span style="color:#b45309;font-size:0.68rem;" title="More than one batch in stock">${p.lots.length} lots</span>` : '';
+            list.innerHTML += `<div class="autocomplete-item" onmousedown='applySelectedCatalogItem(${targetIdx}, ${JSON.stringify(p).replace(/'/g,"&#39;")})'><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}${volLabel}</span></div><div style="display:flex;gap:6px;align-items:center;">${stk}${mrpTag}${lotTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`;
         });
         list.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onmousedown="flagNewItemForReview(${targetIdx},'${inputRef.value.trim().replace(/'/g,"\\'")}')">➕ Add as Unverified</div>`;
         list.style.display = 'block';
     }
 
     function hideAutocomplete(idx) { setTimeout(()=>{ const l=document.getElementById(`autolist-${idx}`); if(l)l.style.display='none'; },200); }
-    function flagNewItemForReview(idx,val) { const row=document.querySelector(`.inline-item-row[data-index="${idx}"]`); if(!row)return; row.querySelector('.i-name').value=val.toUpperCase(); row._pendingItemUnverified=true; document.getElementById(`autolist-${idx}`).style.display='none'; }
+    function flagNewItemForReview(idx,val) { const row=document.querySelector(`.inline-item-row[data-index="${idx}"]`); if(!row)return; row.querySelector('.i-name').value=val.toUpperCase(); row._pendingItemUnverified=true; row._vid=null; row._lid=null; document.getElementById(`autolist-${idx}`).style.display='none'; }
 
     function toggleVolumeDropdown(sel,idx) { const row=document.querySelector(`.inline-item-row[data-index="${idx}"]`); if(!row)return; const vs=row.querySelector('.i-vol'); const vo=row.querySelector('.i-vol-other'); if(sel.value==='Spare'){vs.style.display='none';vo.style.display='none';if(row.querySelector('.vol-tag'))row.querySelector('.vol-tag').remove();}else{if(!row._pendingVolume){vs.style.display='block';if(vs.value==='Other')vo.style.display='block';}}}
     function checkOtherVolume(sel,idx) { const row=document.querySelector(`.inline-item-row[data-index="${idx}"]`); if(!row)return; row.querySelector('.i-vol-other').style.display=sel.value==='Other'?'block':'none'; }
 
     /* ── CHANGE 5: Cursor focuses Brand field after autocomplete selection ── */
-    function applySelectedCatalogItem(targetIdx, nameStr, brandStr, mrpVal, defaultRate, pid, macVal, category, volPerUnit, gstPct) {
+    // Phase 17 / F2 (16 Sep 2026): now takes the whole matched variant object. A brand+volume
+    // with 2+ lots opens the small lot picker (per the approved mockup) so staff match the price
+    // to the physical unit in hand; a single-lot (or lot-less, e.g. a brand-new item) match fills
+    // in directly, same as before.
+    function applySelectedCatalogItem(targetIdx, p) {
+        if ((p.lots || []).length > 1) { openLotPicker(targetIdx, p); return; }
+        _fillRowFromVariantAndLot(targetIdx, p, (p.lots || [])[0] || null);
+    }
+
+    function _fillRowFromVariantAndLot(targetIdx, p, lot) {
         const rowNode = document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`); if(!rowNode)return;
-        rowNode.querySelector('.i-name').value = nameStr;
-        rowNode.querySelector('.i-brand').value = brandStr;
-        rowNode.querySelector('.i-rate').value = defaultRate;
+        const mrpVal = (lot && lot.mrp) || p.mrp || 0;
+        const rateVal = (lot && lot.sell_price) || p.default_price || mrpVal;
+        rowNode.querySelector('.i-name').value = p.item_name;
+        rowNode.querySelector('.i-brand').value = p.brand || '';
+        rowNode.querySelector('.i-rate').value = rateVal;
         rowNode.querySelector('.i-mrp').value = mrpVal;
-        const catSel = rowNode.querySelector('.i-cat'); if(catSel) catSel.value = category==='Lube'?'Lube':'Spare';
-        rowNode._pid=pid; rowNode._pmac=macVal; rowNode._pmrp=mrpVal; rowNode._pendingItemUnverified=false; rowNode._pendingVolume=volPerUnit;
+        const catSel = rowNode.querySelector('.i-cat'); if(catSel) catSel.value = (p.category==='Lube'||p.category==='Lubricant')?'Lube':'Spare';
+        rowNode._pid=p.parent_id; rowNode._vid=p.variant_id; rowNode._lid=lot?lot.id:null;
+        rowNode._pmac=(lot&&lot.mac)||p.mac||0; rowNode._pmrp=mrpVal; rowNode._pendingItemUnverified=false; rowNode._pendingVolume=p.volume_per_unit||0;
         // Used only if this sale turns out to be B2B (customer GSTIN entered) — a proper Tax
         // Invoice needs each line's own GST% to split its price into Base + CGST + SGST.
-        rowNode._pgst = (gstPct !== undefined && gstPct !== null) ? gstPct : 18;
+        rowNode._pgst = (p.gst_percent !== undefined && p.gst_percent !== null) ? p.gst_percent : 18;
         const qtyInput = rowNode.querySelector('.i-qty'); qtyInput.placeholder='Pcs'; qtyInput.min='1';
+        const volPerUnit = p.volume_per_unit || 0; const category = p.category;
         if(category==='Lube'&&volPerUnit>0){const vs=rowNode.querySelector('.i-vol');if(vs)vs.style.display='none';const vo=rowNode.querySelector('.i-vol-other');if(vo)vo.style.display='none';let tag=rowNode.querySelector('.vol-tag');if(!tag){tag=document.createElement('span');tag.className='vol-tag';tag.style.cssText='font-size:0.7rem;color:var(--info);font-weight:bold;position:absolute;right:10px;top:-15px;';qtyInput.parentElement.style.position='relative';qtyInput.parentElement.appendChild(tag);}tag.innerText=`🧴 Each: ${volPerUnit}ml`;}
         document.getElementById(`autolist-${targetIdx}`).style.display='none';
         autocompleteHighlight = -1;
@@ -932,6 +976,27 @@
         compileDynamicInvoicerSums();
         /* CHANGE 5: Focus Brand field so user can verify/change brand without clicking */
         setTimeout(() => rowNode.querySelector('.i-brand')?.focus(), 50);
+    }
+
+    let _pendingLotPick = null;
+    function openLotPicker(targetIdx, p) {
+        _pendingLotPick = { targetIdx, p };
+        const body = document.getElementById('posLotPickerBody');
+        body.innerHTML = (p.lots || []).map((l, i) => `
+          <div class="autocomplete-item" onclick="choosePickedPosLot(${i})" style="display:flex;justify-content:space-between;gap:10px;">
+            <span>Batch ${new Date(l.received_date || 0).toLocaleDateString('en-IN') || '—'}</span>
+            <span>MRP ₹${l.mrp||0} · Sell ₹${l.sell_price||0} · Stock ${l.current_qty||0}</span>
+          </div>`).join('') || '<div style="padding:10px;color:#94a3b8;">No batches found.</div>';
+        document.getElementById('posLotPickerTitle').innerText = `${p.item_name} — ${p.brand||''}${p.volume_per_unit?' — '+p.volume_per_unit+'ml':''}`;
+        document.getElementById('modalPosLotPicker').style.display = 'flex';
+    }
+    function choosePickedPosLot(i) {
+        if (!_pendingLotPick) return;
+        const { targetIdx, p } = _pendingLotPick;
+        const lot = (p.lots || [])[i];
+        document.getElementById('modalPosLotPicker').style.display = 'none';
+        _fillRowFromVariantAndLot(targetIdx, p, lot);
+        _pendingLotPick = null;
     }
 
     async function evaluateRuleDiscounts(targetIdx) { const row=document.querySelector(`.inline-item-row[data-index="${targetIdx}"]`); if(!row||!targetCustomerProfile)return; const brandCode=row.querySelector('.i-brand').value.trim().toUpperCase(); if(!brandCode)return; const custom=targetCustomerProfile.custom_brand_discounts_green||{}; if(custom[brandCode]!==undefined){row.querySelector('.i-disc').value=custom[brandCode];compileDynamicInvoicerSums();return;} const {data:bM}=await supabaseClient.from('brand_master').select('*').eq('brand_name',brandCode).single(); if(bM){const ct=targetCustomerProfile.category?`disc_${targetCustomerProfile.category.toLowerCase()}`:'disc_regular';row.querySelector('.i-disc').value=parseFloat(bM[ct])||0;compileDynamicInvoicerSums();} }
@@ -1143,10 +1208,38 @@
                 const lineGstAmt = net - lineTaxable;
                 const lineCgst = lineGstAmt/2, lineSgst = lineGstAmt/2;
                 gstTotals.taxable += lineTaxable; gstTotals.cgst += lineCgst; gstTotals.sgst += lineSgst;
-                /* Fix (7 Sep 2026, 11A.27 continued): warehouse_type lowercased to 'green' to match the exact-match filter used everywhere else (product-master-console.html, purchase-manager.html) — this file's own search already lowercases before comparing so it was unaffected, but Full Catalog wasn't. catalog_status now 'live' with pending_admin_approval:true instead of fully hidden 'unverified', matching the same live-with-approval-badge pattern as product-master-console.html's Add Product. */
-                if (row._pendingItemUnverified) { const ud={item_name:clean,brand,warehouse_type:'green',default_price:r,mrp,catalog_status:'live',pending_admin_approval:true,category:typeVal}; if(isLube&&volumeML>0)ud.volume_per_unit=volumeML; await supabaseClient.from('product_master').upsert(ud,{onConflict:'item_name,brand',ignoreDuplicates:false}); }
-                else { supabaseClient.from('product_master').upsert({item_name:clean,brand,warehouse_type:'green',default_price:r,category:typeVal,catalog_status:'live',pending_admin_approval:true},{onConflict:'item_name,brand'}).then(); }
-                promises.push(supabaseClient.from('counter_sale_items').insert({ sale_id:saleId, item_name:`${clean} (${brand})`, qty:q, unit_price:r, total_price:net, mrp_at_billing:mrp, mac_at_billing:row._pmac||0, product_master_id:row._pid||null, unit_metric:isLube?'ML':'Pcs', volume_ml:isLube?volumeML:null, gst_percent:gstPct, taxable_value:lineTaxable, cgst_amount:lineCgst, sgst_amount:lineSgst }));
+                // Phase 17 / F2 (16 Sep 2026): parent + variant are now always found-or-created the
+                // same way billing.html/purchase-manager.html/product-entry-modal.js already do —
+                // reusing an existing match by exact name/brand/volume, creating only what's
+                // genuinely new — instead of the old product_master.upsert() calls. This also fixes
+                // a real bug caught while rewriting this: both upsert branches hardcoded
+                // warehouse_type:'green' even though this same file also serves the Moped counter
+                // (activeRole correctly drives the SEARCH/read side already, just never the write
+                // side) — a Moped-counter sale of a genuinely new/unverified item was tagging its
+                // catalog entry as Green's stock. Now uses the real activeRole for both branches.
+                const activeRoleForWrite = (localStorage.getItem('ERP_ACTIVE_ROLE')||'green').toLowerCase();
+                let pid = null, vid = null;
+                const { data: existingParent } = await supabaseClient.from('product_master').select('id').ilike('item_name', clean).limit(1);
+                if (existingParent && existingParent.length) { pid = existingParent[0].id; }
+                else {
+                    const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: clean, category: typeVal, unit_metric: isLube?'ML':'Pcs', warehouse_type: activeRoleForWrite, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
+                    if (parentErr) { console.error('buildAndInsertItems: product create failed —', parentErr.message); continue; }
+                    pid = np.id;
+                }
+                let vq = supabaseClient.from('product_variants').select('id').eq('parent_product_id', pid).ilike('brand', brand);
+                vq = (isLube && volumeML) ? vq.eq('volume_per_unit', volumeML) : vq.is('volume_per_unit', null);
+                const { data: existingVariant } = await vq.limit(1);
+                if (existingVariant && existingVariant.length) { vid = existingVariant[0].id; }
+                else {
+                    const { data: nv, error: variantErr } = await supabaseClient.from('product_variants').insert({ parent_product_id: pid, variant_label: brand + (isLube&&volumeML?` — ${volumeML}ml`:''), brand, volume_per_unit: (isLube&&volumeML)?volumeML:null, warehouse_type: activeRoleForWrite, catalog_status: 'live', mrp, default_price: r, cost_price: 0, current_stock: 0, pending_admin_approval: true }).select('id').single();
+                    if (variantErr) { console.error('buildAndInsertItems: variant create failed —', variantErr.message); continue; }
+                    vid = nv.id;
+                }
+                // The lot picked earlier (row._lid) is only trustworthy if it still belongs to the
+                // variant just resolved above — if the brand/volume was changed after picking, the
+                // earlier lot pick no longer applies.
+                const lotIdToUse = (vid && vid === row._vid) ? (row._lid || null) : null;
+                promises.push(supabaseClient.from('counter_sale_items').insert({ sale_id:saleId, item_name:`${clean} (${brand})`, qty:q, unit_price:r, total_price:net, mrp_at_billing:mrp, mac_at_billing:row._pmac||0, product_master_id:pid, variant_id:vid, lot_id:lotIdToUse, unit_metric:isLube?'ML':'Pcs', volume_ml:isLube?volumeML:null, gst_percent:gstPct, taxable_value:lineTaxable, cgst_amount:lineCgst, sgst_amount:lineSgst }));
             }
         }
         const results = await Promise.allSettled(promises);
