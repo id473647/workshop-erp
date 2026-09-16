@@ -18,7 +18,13 @@
      in a follow-up delivery (F1 "other half" / F2), so every page uses one identical
      product-creation flow instead of drifting copies of the same logic.
      See product-entry-modal.js for what it does. -->
-<script src="product-entry-modal.js"></script>
+<!-- Fix (Phase 17 / B7, 16 Sep 2026): a version query string is added here so the browser is
+     forced to fetch a fresh copy of product-entry-modal.js whenever it changes, instead of
+     silently keeping an old cached copy after an update (root cause of the "still showing manual
+     entries, not the volume dropdown" report -- the live deployed file WAS correct, the browser
+     was just still running an old cached version from before this fix existed). Bump this number
+     any time product-entry-modal.js is updated again. -->
+<script src="product-entry-modal.js?v=20260916d"></script>
 <style>
 :root{--primary:#2c3e50;--success:#27ae60;--info:#2980b9;--light:#f8fafc;--border:#e2e8f0;--text:#1e293b;--danger:#e74c3c;--purple:#8e44ad;--gold:#f59e0b;}
 *{box-sizing:border-box;}
@@ -184,7 +190,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <div class="block-title">🗂️ Product Families</div>
       <div class="inputs-grid">
         <div class="field-group"><label>Family Name</label>
-          <input type="text" id="famName" placeholder="e.g. ENGINE OIL" oninput="this.value=this.value.toUpperCase()">
+          <input type="text" id="famName" placeholder="e.g. ENGINE OIL" oninput="_ucKeepCursor(this)">
         </div>
         <div class="field-group"><label>Has Fiber Variants?</label>
           <select id="famFiber"><option value="false">No</option><option value="true">Yes</option></select>
@@ -209,7 +215,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <p style="font-size:.85rem;color:#64748b;margin-top:0;">Group a base product with compatible vehicle models for smart autocomplete in billing.</p>
       <div class="inputs-grid">
         <div class="field-group" style="grid-column:span 2;"><label>Group Name</label>
-          <input type="text" id="grpName" placeholder="e.g. VISOR SHINE PLATFORM" oninput="this.value=this.value.toUpperCase()">
+          <input type="text" id="grpName" placeholder="e.g. VISOR SHINE PLATFORM" oninput="_ucKeepCursor(this)">
         </div>
         <div class="field-group" style="grid-column:span 2;"><label>Base Product — Search by Name</label>
           <div style="position:relative;">
@@ -232,7 +238,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <div class="block-title">💰 Brand Discount Tier Rules</div>
       <div class="inputs-grid" style="background:#fefce8;border:1px solid #fef08a;">
         <div class="field-group"><label>Brand Name</label>
-          <input type="text" id="brandName" placeholder="e.g. MOTUL" oninput="this.value=this.value.toUpperCase()">
+          <input type="text" id="brandName" placeholder="e.g. MOTUL" oninput="_ucKeepCursor(this)">
         </div>
         <div class="field-group"><label>Regular Discount %</label><input type="number" id="brandReg" value="0"></div>
         <div class="field-group"><label>Silver Discount %</label><input type="number" id="brandSilv" value="5"></div>
@@ -313,9 +319,9 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       <input type="hidden" id="pvEditId">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
         <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">BRAND</label>
-          <input type="text" id="pvEditBrand" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+          <input type="text" id="pvEditBrand" oninput="_ucKeepCursor(this)" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
         <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">MODEL NAME</label>
-          <input type="text" id="pvEditModel" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
+          <input type="text" id="pvEditModel" oninput="_ucKeepCursor(this)" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;"></div>
         <div><label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">CATEGORY</label>
           <select id="pvEditCat" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;">
             <option>100cc Motorcycle &amp; Below</option><option>125cc Motorcycle</option>
@@ -369,7 +375,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <div style="margin-bottom:12px;">
       <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">PRODUCT NAME * (ALL CAPS)</label>
       <div style="position:relative;">
-        <input type="text" id="apName" oninput="this.value=this.value.toUpperCase();searchExistingProducts(this.value)"
+        <input type="text" id="apName" oninput="_ucKeepCursor(this);searchExistingProducts(this.value)"
           placeholder="e.g. CHAIN KIT SPL Y2K — type to search existing"
           style="width:100%;padding:10px;border:2px solid #7c3aed;border-radius:6px;box-sizing:border-box;font-weight:700;">
         <div id="apNameDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:100;max-height:180px;overflow-y:auto;"></div>
@@ -386,7 +392,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <div>
         <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">BRAND *</label>
-        <input type="text" id="apBrand" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. ROLON"
+        <input type="text" id="apBrand" oninput="_ucKeepCursor(this)" placeholder="e.g. ROLON"
           style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
       </div>
       <div>
@@ -423,7 +429,7 @@ td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
       </div>
       <div>
         <label style="font-size:.72rem;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">FAMILY NAME</label>
-        <input type="text" id="apFamily" oninput="this.value=this.value.toUpperCase()" placeholder="e.g. CHAIN KIT"
+        <input type="text" id="apFamily" oninput="_ucKeepCursor(this)" placeholder="e.g. CHAIN KIT"
           style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
       </div>
       <div>
@@ -607,6 +613,21 @@ document.getElementById('roleDisplay').innerText=sessionRole.toUpperCase();
 function doLogout(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
 
 let catalogCache = []; // used by Add Product name autocomplete
+
+// Phase 17 / B6 (16 Sep 2026): shared cursor-safe uppercase helper. Plain
+// `this.value=this.value.toUpperCase()` always snaps the caret to the end of the field the
+// instant .value is reassigned (standard browser behavior) -- so correcting text in the MIDDLE of
+// a field (e.g. "DINESH JI" -> "DINESH KUMAR JI") was impossible in one flow; every keystroke
+// mid-string jumped back to the end. This restores the caret/selection after the uppercase
+// transform, same idea billing.html's own product-search box already used correctly in one place.
+// Tracked page-by-page in the Phase 17 tracker (B6) as each page gets this applied.
+function _ucKeepCursor(el) {
+  const upper = el.value.toUpperCase();
+  if (el.value === upper) return;
+  const s = el.selectionStart, e = el.selectionEnd;
+  el.value = upper;
+  try { el.setSelectionRange(s, e); } catch (err) {}
+}
 
 // Phase 11F Stage 2 (12 Sep 2026): the shared Add Product popup replaces the old
 // single-brand-locked Add Product flow (openAddProductModal) for NEW entries —
@@ -927,10 +948,10 @@ async function loadUnverified(){
       </div>
       <div class="unv-grid">
         <div class="field-group" style="grid-column:span 2;"><label>Item Name</label>
-          <input type="text" id="u-name-${p.id}" value="${p.item_name||''}" oninput="this.value=this.value.toUpperCase()">
+          <input type="text" id="u-name-${p.id}" value="${p.item_name||''}" oninput="_ucKeepCursor(this)">
         </div>
         <div class="field-group"><label>Brand</label>
-          <input type="text" id="u-brand-${p.id}" value="${p.brand||''}" oninput="this.value=this.value.toUpperCase()">
+          <input type="text" id="u-brand-${p.id}" value="${p.brand||''}" oninput="_ucKeepCursor(this)">
         </div>
         <div class="field-group"><label>Scope</label>
           <select id="u-scope-${p.id}">
@@ -990,9 +1011,26 @@ async function approveProduct(id){
   else loadUnverified();
 }
 
+// Fix (Phase 17 / B4, 16 Sep 2026): this used to just call product_master.delete() and never
+// checked the result. Since the 11F variant-architecture schema, every product_master row that
+// actually has a price/stock to show also has at least one product_variants row pointing back at
+// it (parent_product_id, no cascade delete) — so the delete was silently REJECTED by that foreign
+// key every time, and the code just reloaded the same (unchanged) list, making DELETE look like it
+// does nothing. Now deletes the full chain (lots -> variants -> parent) in order, and actually
+// surfaces an error if any step fails instead of pretending it worked.
 async function deleteProduct(id,isCatalog){
   if(!confirm('Delete this product permanently?')) return;
-  await sb.from('product_master').delete().eq('id',id);
+  const { data: variants, error: vFetchErr } = await sb.from('product_variants').select('id').eq('parent_product_id', id);
+  if (vFetchErr) { alert('Delete failed (could not check variants): ' + vFetchErr.message); return; }
+  const variantIds = (variants || []).map(v => v.id);
+  if (variantIds.length) {
+    const { error: lotErr } = await sb.from('product_variant_lots').delete().in('variant_id', variantIds);
+    if (lotErr) { alert('Delete failed (could not remove existing batches/lots first): ' + lotErr.message); return; }
+    const { error: vErr } = await sb.from('product_variants').delete().in('id', variantIds);
+    if (vErr) { alert('Delete failed (could not remove brand/variant rows first): ' + vErr.message); return; }
+  }
+  const { error } = await sb.from('product_master').delete().eq('id', id);
+  if (error) { alert('Delete failed: ' + error.message); return; }
   isCatalog?loadCatalog():loadUnverified();
 }
 
@@ -1848,7 +1886,7 @@ async function loadGroups(){
       </div>
       <div id="vehForm_${g.id}" style="display:none;margin-top:8px;display:none;">
         <div style="display:flex;gap:8px;">
-          <input type="text" id="vehInp_${g.id}" placeholder="e.g. ACTIVA 6G" oninput="this.value=this.value.toUpperCase()" style="flex:1;">
+          <input type="text" id="vehInp_${g.id}" placeholder="e.g. ACTIVA 6G" oninput="_ucKeepCursor(this)" style="flex:1;">
           <button class="btn-action" style="padding:6px 12px;font-size:.8rem;" onclick="addVehicleToGroup('${g.id}')">LINK</button>
         </div>
         ${(g.product_group_vehicles||[]).map(v=>`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.8rem;border-bottom:1px solid #f1f5f9;">
