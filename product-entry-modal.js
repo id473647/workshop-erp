@@ -1,4 +1,5 @@
-/* ── SHARED PRODUCT ENTRY PANEL ──────────────────────────────────────────────
+/* FILE: product-entry-modal.js
+ * ── SHARED PRODUCT ENTRY PANEL ──────────────────────────────────────────────
  * Phase 17 / F1 (16 Sep 2026) — FULL REWRITE.
  *
  * WHY THIS FILE CHANGED: the original (11F Stage 2) version of this file was a
@@ -131,9 +132,8 @@
     <div class="pem-panel" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin:6px 0;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <div style="font-weight:700;color:#7c3aed;font-size:.9rem;">${isNew ? '➕ NEW PRODUCT' : '✏️ PRODUCT DETAILS'}</div>
-        <button onclick="ProductEntryModal.collapse(document.getElementById('${id}-host'))" style="border:none;background:none;font-size:1.1rem;cursor:pointer;color:#64748b;" title="Collapse">▲ Collapse</button>
+        <button onclick="ProductEntryModal.collapse(this.closest('[data-pem-instance]'))" style="border:none;background:none;font-size:1.1rem;cursor:pointer;color:#64748b;" title="Collapse">▲ Collapse</button>
       </div>
-      <div id="${id}-host" data-pem-instance="${id}" style="display:contents;"></div>
  
       <div style="margin-bottom:8px;">
         <label style="font-size:.7rem;font-weight:700;color:#64748b;display:block;margin-bottom:3px;">PRODUCT NAME * (ALL CAPS)</label>
@@ -281,16 +281,23 @@
   function _brandRowHtml(id, v, isLube) {
     const lotCount = (v._lots || []).length;
     const multiLot = lotCount > 1;
-    const top = lotCount ? v._lots[0] : { mrp: v.mrp, sell_price: v.default_price, mac: v.cost_price, current_qty: v.current_stock, source: 'opening_stock' };
-    const locked = top.source === 'purchase';
+    const top = lotCount ? v._lots[0] : null;
+    const locked = top && top.source === 'purchase';
+    // Single-lot brands are edited directly on this row (no extra expand needed, per the
+    // approved mockup) — same rule as the multi-lot sub-rows: editable unless purchase-sourced.
+    const mrpCell = !top ? '—' : (locked ? money(top.mrp) : `<input type="number" value="${top.mrp || ''}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','mrp',this.value)" style="width:65px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
+    const sellCell = !top ? '—' : (locked ? money(top.sell_price) : `<input type="number" value="${top.sell_price || ''}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','sell_price',this.value)" style="width:65px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
+    const macCell = !top ? '—' : (locked ? money(top.mac) : `<input type="number" value="${top.mac || ''}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','mac',this.value)" style="width:65px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
+    const qtyCell = !top ? '—' : (locked ? (top.current_qty ?? top.opening_qty ?? 0) : `<input type="number" value="${top.current_qty ?? top.opening_qty ?? 0}" onchange="ProductEntryModal._saveLotField('${id}','${top.id}','current_qty',this.value)" style="width:55px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`);
+    const delBtn = (top && !locked) ? `<button onclick="ProductEntryModal._deleteLot('${id}','${top.id}')" title="Delete this lot" style="padding:4px 7px;border:none;border-radius:5px;background:#fef2f2;color:#dc2626;font-size:.72rem;cursor:pointer;">✕</button>` : '';
     let html = `<tr style="border-top:1px solid #f1f5f9;">
       <td style="padding:5px;font-weight:700;">${multiLot ? `<a href="#" onclick="ProductEntryModal._toggleBrandExpand('${id}','${v.id}');return false;" style="text-decoration:none;">${v._expanded ? '▼' : '▶'} </a>` : ''}${esc(v.brand)}${multiLot ? ` <span style="color:#94a3b8;font-weight:400;">(${lotCount} lots)</span>` : ''}</td>
       ${isLube ? `<td style="padding:5px;">${v.volume_per_unit || '—'}</td>` : ''}
-      <td style="padding:5px;">${multiLot ? '—' : money(top.mrp)}</td>
-      <td style="padding:5px;">${multiLot ? '—' : money(top.sell_price)}</td>
-      <td style="padding:5px;">${multiLot ? '—' : money(top.mac)}</td>
-      <td style="padding:5px;">${multiLot ? (v.current_stock ?? '—') : (top.current_qty ?? top.opening_qty ?? 0)}</td>
-      <td style="padding:5px;"><button onclick="ProductEntryModal._addLot('${id}','${v.id}')" style="padding:4px 8px;border:1px dashed #7c3aed;border-radius:5px;background:white;color:#7c3aed;font-size:.72rem;cursor:pointer;">+ ADD LOT</button></td>
+      <td style="padding:5px;">${multiLot ? '—' : mrpCell}</td>
+      <td style="padding:5px;">${multiLot ? '—' : sellCell}</td>
+      <td style="padding:5px;">${multiLot ? '—' : macCell}</td>
+      <td style="padding:5px;">${multiLot ? (v.current_stock ?? '—') : qtyCell}</td>
+      <td style="padding:5px;white-space:nowrap;"><button onclick="ProductEntryModal._addLot('${id}','${v.id}')" style="padding:4px 8px;border:1px dashed #7c3aed;border-radius:5px;background:white;color:#7c3aed;font-size:.72rem;cursor:pointer;">+ ADD LOT</button> ${multiLot ? '' : delBtn}</td>
     </tr>`;
     if (locked && !multiLot) {
       html += `<tr><td colspan="${isLube ? 7 : 6}" style="padding:2px 5px 6px 20px;font-size:.72rem;color:#b45309;">🔒 This lot came from a purchase invoice — only the brand name can be corrected here. To fix pricing/quantity, correct the purchase voucher instead.</td></tr>`;
@@ -310,8 +317,19 @@
       <td style="padding:4px 5px;">${locked ? money(l.sell_price) : `<input type="number" value="${l.sell_price || ''}" onchange="ProductEntryModal._saveLotField('${id}','${l.id}','sell_price',this.value)" style="width:70px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`}</td>
       <td style="padding:4px 5px;">${locked ? money(l.mac) : `<input type="number" value="${l.mac || ''}" onchange="ProductEntryModal._saveLotField('${id}','${l.id}','mac',this.value)" style="width:70px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`}</td>
       <td style="padding:4px 5px;">${locked ? (l.current_qty ?? l.opening_qty ?? 0) : `<input type="number" value="${l.current_qty ?? l.opening_qty ?? 0}" onchange="ProductEntryModal._saveLotField('${id}','${l.id}','current_qty',this.value)" style="width:60px;padding:3px;border:1px solid #e2e8f0;border-radius:4px;">`}</td>
-      <td></td>
+      <td>${locked ? '' : `<button onclick="ProductEntryModal._deleteLot('${id}','${l.id}')" title="Delete this lot" style="padding:3px 6px;border:none;border-radius:5px;background:#fef2f2;color:#dc2626;font-size:.7rem;cursor:pointer;">✕</button>`}</td>
     </tr>`;
+  }
+ 
+  // Deletes one lot permanently (mirrors the DEL affordance the old grouped-catalog table
+  // already had). Purchase-sourced lots are never offered a delete button in the HTML above —
+  // correcting those means correcting the purchase voucher, not deleting the record of it.
+  async function _deleteLot(id, lotId) {
+    if (!confirm('Delete this batch/lot permanently? This cannot be undone.')) return;
+    const { error } = await _client.from('product_variant_lots').delete().eq('id', lotId);
+    if (error) { alert('Delete failed: ' + error.message); return; }
+    await _reloadBrands(id);
+    _onSaved({ parentId: _instances[id].parentId });
   }
  
   function _toggleBrandExpand(id, variantId) {
@@ -486,9 +504,8 @@
  
   global.ProductEntryModal = {
     init, expandExisting, expandNew, collapse,
-    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField,
+    _saveParent, _toggleVolCols, _toggleBrandExpand, _saveLotField, _deleteLot,
     _addBrandRow, _draftField, _removeDraftRow, _saveBrandRow,
     _addLot, _saveLotDraft
   };
 })(window);
- 
