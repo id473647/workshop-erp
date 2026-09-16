@@ -1,3 +1,4 @@
+<!-- FILE: billing.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -718,6 +719,16 @@
 <div id="modalPhotoFull" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);z-index:500;align-items:center;justify-content:center;" onclick="this.style.display='none'">
   <img id="photoFullImg" style="max-width:96%;max-height:96vh;border-radius:8px;">
 </div>
+
+<!-- Phase 17 / F2 (16 Sep 2026): lot picker — shown when a selected brand+volume has more than
+     one batch in stock, so staff can match the price on the physical unit in hand to the right
+     batch, per the approved catalog design. -->
+<div id="modalLotPicker" class="overlay-modal" style="z-index:400;"><div class="modal-card">
+  <h3 style="margin-top:0;color:var(--primary);" id="lotPickerTitle">Pick a batch</h3>
+  <p style="font-size:0.78rem;color:#64748b;margin-top:-8px;">More than one batch of this item is in stock, at different prices. Pick the one matching the physical unit.</p>
+  <div id="lotPickerBody" style="max-height:280px;overflow-y:auto;"></div>
+  <div style="display:flex;gap:10px;margin-top:14px;"><button class="btn-action" style="background:#e2e8f0;color:#1e293b;flex:1;" onclick="document.getElementById('modalLotPicker').style.display='none'">CANCEL</button></div>
+</div></div>
 
 <div id="modalPayNow" class="overlay-modal"><div class="modal-card"><h3 style="margin-top:0; color:var(--primary);">Settle Payment</h3><p style="font-size:0.85rem; color:#64748b;">Total Payable: ₹<span id="payTotalDisplay">0</span></p><div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;"><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">Cash Received (₹)</label><input type="number" id="payCashInput" value="0" min="0" oninput="calcPaySplit()" style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box;"></div><div><label style="font-size:0.75rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px; display:block;">UPI / Card Received (₹)</label><input type="number" id="payUpiInput" value="0" min="0" readonly style="padding:12px; border:1px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%; box-sizing:border-box; background:#f1f5f9;"></div></div><p style="font-size:0.7rem; color:#94a3b8; margin-top:8px; margin-bottom:0;">Leave Cash as the full amount for a pure cash payment. Adjust either field and UPI auto-fills the remainder — the system saves it as Cash, UPI, or Split automatically based on what you enter.</p><div style="display:flex; gap:10px; margin-top:16px;"><button id="btnConfirmPayNow" class="btn-action btn-success" style="flex:1;" onclick="confirmPayNow()">CONFIRM PAYMENT</button><button class="btn-action" style="background:#e2e8f0; color:#1e293b;" onclick="document.getElementById('modalPayNow').style.display='none'">CANCEL</button></div></div></div>
 
@@ -2885,43 +2896,113 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { const lc = document.getElementById('autolist-n'); if (lc) lc.style.display = 'none'; } });
     function hideAutoSuggestions() { setTimeout(() => { const auto = document.getElementById('autolist-n'); if (auto) auto.style.display = 'none'; }, 200); }
 
+    // Phase 17 / F2 (16 Sep 2026): results now show brand + volume (not just the product name),
+    // and pass the FULL cached variant object into applySelectedCatalogItem() instead of a long
+    // positional argument list — same pattern already used in purchase-manager.html's rewrite.
     async function queryCatalogAutocomplete(inputRef) { const upperVal = inputRef.value.toUpperCase(); if (inputRef.value !== upperVal) { const cursorPos = inputRef.selectionStart; inputRef.value = upperVal; inputRef.setSelectionRange(cursorPos, cursorPos); } const q = upperVal.trim(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; listContainer.style.display = 'none'; currentFocus = -1; if (q.length < 2) return;
       /* PHASE 11A: Barcode-first lookup — if typed/scanned value matches a barcode_id exactly, auto-fill immediately */
       const exactBarcode = globalCatalogCache.find(p => p.source === 'product' && p.barcode_id && p.barcode_id.toUpperCase().trim() === q.trim());
-      if (exactBarcode) { inputRef.value = ''; applySelectedCatalogItem(exactBarcode.item_name, exactBarcode.brand||'', exactBarcode.mrp||exactBarcode.default_price||0, exactBarcode.default_price||0, exactBarcode.unit_metric||'Pcs', exactBarcode.category||'Spare', exactBarcode.id, exactBarcode.mac||0); return; }
-      const tokens = q.split(' ').filter(t=>t.length>0); let results = []; if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { let pResults = globalCatalogCache.filter(p => p.source === 'product'); pResults = pResults.filter(p => { const txt = (p.item_name + ' ' + (p.brand || '')).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...pResults); } if(sessionRole === 'service' || sessionRole === 'admin') { let sResults = globalCatalogCache.filter(p => p.source === 'service'); sResults = sResults.filter(s => { const txt = (s.item_name).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...sResults); } results = results.slice(0,10); results.forEach(p => { if(p.source === 'product') { const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`; const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : ''; const macTag = (sessionRole==='admin'||window._settings?.mac_visible_all) && (p.mac||0)>0 ? `<span style="color:#94a3b8;font-size:0.68rem;border:1px solid #e2e8f0;padding:1px 4px;border-radius:3px;" title="Purchase cost (MAC)">₹${p.mac} cost</span>` : ''; listContainer.innerHTML += `<div class="autocomplete-item" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '${(p.brand||'').replace(/'/g,"\\'")}', ${p.mrp||p.default_price||0}, ${p.default_price||0}, '${p.unit_metric||'Pcs'}', '${p.category||'Spare'}', '${p.id}', ${p.mac||0})"><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}</span></div><div style="display:flex;gap:6px;">${stk}${mrpTag}${macTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } else { listContainer.innerHTML += `<div class="autocomplete-item" style="background:#fef3c7;" onclick="applySelectedCatalogItem('${p.item_name.replace(/'/g,"\\'")}', '', 0, ${p.default_price||0}, 'Pkg', '⚙️ Fixed Protocol', null, 0)"><div><strong style="color:#b45309;">🏷️ ${p.item_name}</strong></div><div style="display:flex;gap:6px;"><span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } }); listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onclick="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`; listContainer.style.display = 'block'; }
+      if (exactBarcode) { inputRef.value = ''; applySelectedCatalogItem(exactBarcode); return; }
+      const tokens = q.split(' ').filter(t=>t.length>0); let results = []; if(sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') { let pResults = globalCatalogCache.filter(p => p.source === 'product'); pResults = pResults.filter(p => { const txt = (p.item_name + ' ' + (p.brand || '')).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...pResults); } if(sessionRole === 'service' || sessionRole === 'admin') { let sResults = globalCatalogCache.filter(p => p.source === 'service'); sResults = sResults.filter(s => { const txt = (s.item_name).toLowerCase(); return tokens.every(t => txt.includes(t.toLowerCase())); }); results.push(...sResults); } results = results.slice(0,10); results.forEach((p,ri) => { if(p.source === 'product') { const stk = p.track_stock===false ? `<span style="color:#94a3b8;font-size:0.7rem;">Bin</span>` : `<span style="color:${(p.current_stock||0)>0?'#15803d':'#dc2626'};font-size:0.7rem;">Stk:${p.current_stock||0}</span>`; const mrpTag = p.mrp>0 ? `<span style="color:#7c3aed;font-size:0.7rem;">MRP:₹${p.mrp}</span>` : ''; const macTag = (sessionRole==='admin'||window._settings?.mac_visible_all) && (p.mac||0)>0 ? `<span style="color:#94a3b8;font-size:0.68rem;border:1px solid #e2e8f0;padding:1px 4px;border-radius:3px;" title="Purchase cost (MAC)">₹${p.mac} cost</span>` : ''; const volLabel = p.volume_per_unit ? ` — ${p.volume_per_unit}ml` : ''; const lotTag = (p.lots||[]).length > 1 ? `<span style="color:#b45309;font-size:0.68rem;" title="More than one batch in stock">${p.lots.length} lots</span>` : ''; listContainer.innerHTML += `<div class="autocomplete-item" onclick='applySelectedCatalogItem(${JSON.stringify(p).replace(/'/g,"&#39;")})'><div><strong>${p.item_name}</strong> <span style="color:#64748b;font-size:0.75rem;margin-left:6px;">${p.brand||'STD'}${volLabel}</span></div><div style="display:flex;gap:6px;">${stk}${mrpTag}${macTag}${lotTag} <span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } else { listContainer.innerHTML += `<div class="autocomplete-item" style="background:#fef3c7;" onclick='applySelectedCatalogItem(${JSON.stringify(p).replace(/'/g,"&#39;")})'><div><strong style="color:#b45309;">🏷️ ${p.item_name}</strong></div><div style="display:flex;gap:6px;"><span style="font-weight:700;">₹${p.default_price||0}</span></div></div>`; } }); listContainer.innerHTML += `<div class="autocomplete-item" style="color:var(--success);font-style:italic;" onclick="flagNewItemForReview()">➕ "${inputRef.value.trim()}" — Add Manually</div>`; listContainer.style.display = 'block'; }
 
-    function flagNewItemForReview() { const inp = document.getElementById('nPart'); const raw = inp.value.trim().toUpperCase(); inp.value = raw; document.getElementById('autolist-n').style.display='none'; window._pendingItemUnverified = true; }
-    function applySelectedCatalogItem(name, brand, mrpVal, defRate, metric, cat, pid, mac) { document.getElementById('nPart').value = name; document.getElementById('nBrand').value = brand; document.getElementById('nRate').value = defRate || mrpVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal; const typeSelect = document.getElementById('nType'); if (cat === 'Lube' || cat === 'Lubricant') typeSelect.value = 'Lube'; else if (cat === '⚙️ Fixed Protocol') typeSelect.value = '⚙️ Fixed Protocol'; else typeSelect.value = 'Spare'; toggleLubeUI(); document.getElementById('autolist-n').style.display = 'none'; window._pid = pid; window._pmac = mac; window._pmrp = mrpVal; window._pendingItemUnverified = false; if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none'; if(cat === '⚙️ Fixed Protocol') pushItemToJobCard(); else document.getElementById('nQty').focus(); }
+    function flagNewItemForReview() { const inp = document.getElementById('nPart'); const raw = inp.value.trim().toUpperCase(); inp.value = raw; document.getElementById('autolist-n').style.display='none'; window._pendingItemUnverified = true; window._pid = null; window._vid = null; window._lid = null; }
+
+    // Phase 17 / F2 (16 Sep 2026): now takes the whole matched catalog object. Service items
+    // (source:'service') behave exactly as before. Product items with 2+ lots open the small lot
+    // picker (per the approved mockup) so staff match the price to the physical unit in hand —
+    // a single-lot (or no-lot, e.g. a brand-new/unverified item) product fills in directly, same
+    // as before.
+    function applySelectedCatalogItem(p) {
+      if (p.source === 'service') {
+        document.getElementById('nPart').value = p.item_name; document.getElementById('nBrand').value = '';
+        document.getElementById('nRate').value = p.default_price || 0; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = 0;
+        document.getElementById('nType').value = '⚙️ Fixed Protocol'; toggleLubeUI();
+        document.getElementById('autolist-n').style.display = 'none';
+        window._pid = null; window._vid = null; window._lid = null; window._pmac = 0; window._pmrp = 0; window._pendingItemUnverified = false;
+        pushItemToJobCard();
+        return;
+      }
+      if ((p.lots || []).length > 1) { openLotPicker(p); return; }
+      _fillFromVariantAndLot(p, (p.lots || [])[0] || null);
+    }
+
+    function _fillFromVariantAndLot(p, lot) {
+      document.getElementById('nPart').value = p.item_name; document.getElementById('nBrand').value = p.brand || '';
+      const mrpVal = (lot && lot.mrp) || p.mrp || 0; const rateVal = (lot && lot.sell_price) || p.default_price || mrpVal;
+      document.getElementById('nRate').value = rateVal; if (document.getElementById('nMrp')) document.getElementById('nMrp').value = mrpVal;
+      const typeSelect = document.getElementById('nType');
+      typeSelect.value = (p.category === 'Lube' || p.category === 'Lubricant') ? 'Lube' : 'Spare';
+      toggleLubeUI();
+      // A catalog-known volume is auto-applied to the pack-size dropdown (matching pos-green.html's
+      // existing, better behavior) instead of always making staff pick it manually.
+      if (p.volume_per_unit && document.getElementById('nPackSize')) {
+        const packSel = document.getElementById('nPackSize');
+        const hasOption = Array.from(packSel.options).some(o => o.value === String(p.volume_per_unit));
+        if (hasOption) { packSel.value = String(p.volume_per_unit); } else { packSel.value = 'Custom'; document.getElementById('nCustomML').value = p.volume_per_unit; }
+        toggleCustomML();
+      }
+      document.getElementById('autolist-n').style.display = 'none';
+      window._pid = p.parent_id; window._vid = p.variant_id; window._lid = lot ? lot.id : null;
+      window._pmac = (lot && lot.mac) || p.mac || 0; window._pmrp = mrpVal; window._pendingItemUnverified = false;
+      if (document.getElementById('mrpWarn')) document.getElementById('mrpWarn').style.display='none';
+      document.getElementById('nQty').focus();
+    }
+
+    let _pendingLotPickVariant = null;
+    function openLotPicker(p) {
+      _pendingLotPickVariant = p;
+      const body = document.getElementById('lotPickerBody');
+      body.innerHTML = (p.lots || []).map((l, i) => `
+        <div class="autocomplete-item" onclick="choosePickedLot(${i})" style="display:flex;justify-content:space-between;gap:10px;">
+          <span>Batch ${new Date(l.received_date || 0).toLocaleDateString('en-IN') || '—'}</span>
+          <span>MRP ₹${l.mrp||0} · Sell ₹${l.sell_price||0} · Stock ${l.current_qty||0}</span>
+        </div>`).join('') || '<div style="padding:10px;color:#94a3b8;">No batches found.</div>';
+      document.getElementById('lotPickerTitle').innerText = `${p.item_name} — ${p.brand||''}${p.volume_per_unit?' — '+p.volume_per_unit+'ml':''}`;
+      document.getElementById('modalLotPicker').style.display = 'flex';
+    }
+    function choosePickedLot(i) {
+      const p = _pendingLotPickVariant; if (!p) return;
+      const lot = (p.lots || [])[i];
+      document.getElementById('modalLotPicker').style.display = 'none';
+      _fillFromVariantAndLot(p, lot);
+      _pendingLotPickVariant = null;
+    }
+    // Phase 17 / F2 (16 Sep 2026): rewritten to search the real parent -> variant -> lot
+    // structure instead of the old flat product_master-only list, so results now show which
+    // BRAND and VOLUME each match is (e.g. "Ride Pro+ — 900ml" vs "Ride Pro+ — 1000ml" show up
+    // as two separate, clearly-labelled results) and, when a brand+volume has more than one
+    // batch in stock at different prices, selecting it opens a small picker so staff match the
+    // price to the physical unit in their hand — same approved design already built into
+    // purchase-manager.html and product-entry-modal.js. The service_packages branch (labour /
+    // fixed-protocol items) is untouched — those were never part of the variant/lot rework.
     async function prefetchCentralCatalog() {
-        // NOTE: previously this asked Supabase for one specific list of column names.
-        // If even ONE of those names doesn't match the live database exactly, Supabase
-        // rejects the whole request and returns nothing — silently, with no on-screen
-        // error — which empties the entire product search, not just one product. Other
-        // pages (e.g. the Counter Sale screen) ask for "all columns" instead, which is
-        // why they were unaffected. Switched to the same safer "all columns" pattern
-        // here, and errors are now logged to the browser console instead of vanishing,
-        // so a future problem shows up as a traceable message instead of "nothing found."
         globalCatalogCache = [];
         if (sessionRole === 'green' || sessionRole === 'moped' || sessionRole === 'admin') {
-            // Phase 17 / B2 (16 Sep 2026): this used to fetch EVERY warehouse's products for
-            // Green/Moped logins with no filter at all — a Moped login's search genuinely returned
-            // Green's stock, and selecting one carried that GREEN product's real database id into
-            // the job card line (a real cross-warehouse sale, not just a display issue). Fixed by
-            // scoping the fetch to the login's own warehouse_type (case-insensitive, matching the
-            // .ilike() tolerance already used elsewhere per 11A.27) plus anything tagged
-            // 'universal' (meant to be sold from any counter) or left unset (legacy rows with no
-            // warehouse_type recorded yet — shown to everyone rather than silently hidden, since
-            // hiding real stock would be worse than an occasional cross-listed legacy item; a data
-            // clean-up pass to tag these properly is a separate, future task, not done here).
-            // Admin is completely unaffected — still sees every warehouse's products, unchanged.
-            let masterQuery = supabaseClient.from('product_master').select('*');
-            if (sessionRole === 'green' || sessionRole === 'moped') {
-                masterQuery = masterQuery.or(`warehouse_type.ilike.${sessionRole},warehouse_type.ilike.universal,warehouse_type.is.null`);
-            }
-            const { data: master, error: masterErr } = await masterQuery;
-            if (masterErr) console.error('prefetchCentralCatalog: product_master fetch failed —', masterErr.message);
-            master?.forEach(m => globalCatalogCache.push({...m, source: 'product'}));
+            // Phase 17 / B2 (16 Sep 2026, still in effect): scoped to the login's own
+            // warehouse_type (case-insensitive) plus anything tagged 'universal' or left unset —
+            // see the B2 note in the Phase 17 tracker for the full history of this filter.
+            let variantQuery = supabaseClient.from('product_variants')
+                .select('*, product_variant_lots(id,mrp,sell_price,mac,current_qty,source,received_date), product_master(item_name,category,scope,family_name,unit_metric,hsn_code,warehouse_type,gst_percent,track_stock)');
+            const { data: variants, error: vErr } = await variantQuery;
+            if (vErr) { console.error('prefetchCentralCatalog: product_variants fetch failed —', vErr.message); }
+            (variants || []).forEach(v => {
+                const p = v.product_master || {};
+                const wh = (v.warehouse_type || p.warehouse_type || '').toLowerCase();
+                if ((sessionRole === 'green' || sessionRole === 'moped') && wh && wh !== sessionRole && wh !== 'universal') return; // same B2 scoping, applied client-side since this is now a joined query
+                const lots = (v.product_variant_lots || []).slice().sort((a, b) => new Date(b.received_date || 0) - new Date(a.received_date || 0));
+                const latest = lots[0] || {};
+                const stock = lots.reduce((s, l) => s + (l.current_qty || 0), 0);
+                globalCatalogCache.push({
+                    source: 'product', variant_id: v.id, parent_id: v.parent_product_id,
+                    item_name: p.item_name || '', brand: v.brand || '', volume_per_unit: v.volume_per_unit || null,
+                    category: p.category || 'Spare', unit_metric: p.unit_metric || (v.volume_per_unit ? 'ML' : 'Pcs'),
+                    mrp: latest.mrp || v.mrp || 0, default_price: latest.sell_price || v.default_price || 0,
+                    current_stock: stock, mac: latest.mac || v.cost_price || 0, track_stock: p.track_stock !== false,
+                    gst_percent: (p.gst_percent != null && !isNaN(parseFloat(p.gst_percent))) ? parseFloat(p.gst_percent) : null,
+                    barcode_id: v.barcode_id || null,
+                    lots
+                });
+            });
         }
         if (sessionRole === 'service' || sessionRole === 'admin') {
             const { data: servs, error: servErr } = await supabaseClient.from('service_packages').select('id,package_name,base_rate,is_premium_service,premium_label');
@@ -2930,7 +3011,41 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         }
     }
 
-    async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; /* Fix (7 Sep 2026, 11A.27 continued): product_master.warehouse_type must be lowercase to match the exact-match filter used everywhere else (product-master-console.html, purchase-manager.html) — capitalized wareTarget stays exactly as-is below for job_card_items/UI routing (unrelated, untouched); this lowercase copy is used only for the two product_master writes just below. */ const wareTargetForCatalog = wareTarget.toLowerCase(); let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal; if (window._pendingItemUnverified || typeSelect === 'Lube' || isServiceGroup) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTargetForCatalog, unit_metric: metricTarget, default_price: rVal, mrp: mrpVal, category: typeSelect, catalog_status: 'live', pending_admin_approval: true }, { onConflict: 'item_name' }); } else if (!window._pid) { await supabaseClient.from('product_master').upsert({ item_name: finalItemName, brand: cleanBrand, warehouse_type: wareTargetForCatalog, unit_metric: metricTarget, default_price: rVal, category: typeSelect, catalog_status: 'live', pending_admin_approval: true }, { onConflict: 'item_name' }); } const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: window._pid || null }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus();
+    async function pushItemToJobCard() { const rawPartStr = document.getElementById('nPart').value.trim(); const typeSelect = document.getElementById('nType').value; let qVal = parseFloat(document.getElementById('nQty').value) || 0; const rVal = parseFloat(document.getElementById('nRate').value) || 0; const mrpVal = parseFloat(document.getElementById('nMrp').value) || rVal; const issuerId = document.getElementById('nIssuer').value || null; if(!rawPartStr) return alert("Valid Description is required."); const isServiceGroup = (typeSelect === '⚙️ Custom Labour' || typeSelect === '⚙️ Custom Lathe' || typeSelect === '⚙️ Fixed Protocol'); if(!isServiceGroup && qVal <= 0) return alert("Quantity > 0 is required for Spares/Lubes."); if (isServiceGroup) qVal = 1; let volumeMlVal = null; const cleanNameRaw = rawPartStr.toUpperCase(); let cleanBrand = document.getElementById('nBrand').value.trim().toUpperCase(); let finalItemName = cleanNameRaw; if(isServiceGroup) { cleanBrand = ''; if(typeSelect === '⚙️ Custom Lathe') { finalItemName = `[LATHE] ${cleanNameRaw}`; } } else { if (cleanBrand !== '' && cleanBrand !== 'STANDARD' && cleanBrand !== 'STD') { if (!cleanNameRaw.includes(cleanBrand)) { finalItemName = `${cleanBrand} - ${cleanNameRaw}`; } } } if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; /* Fix (7 Sep 2026, 11A.27 continued): product_master.warehouse_type must be lowercase to match the exact-match filter used everywhere else (product-master-console.html, purchase-manager.html) — capitalized wareTarget stays exactly as-is below for job_card_items/UI routing (unrelated, untouched); this lowercase copy is used only for the product_master/product_variants writes just below. */ const wareTargetForCatalog = wareTarget.toLowerCase(); let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal;
+      // Phase 17 / F2 (16 Sep 2026): parent + variant are now always found-or-created the same
+      // way purchase-manager.html and product-entry-modal.js already do — reusing an existing
+      // match by exact name/brand/volume, creating only what's genuinely new — instead of the old
+      // product_master.upsert({onConflict:'item_name'}) call, which ignored brand entirely and
+      // could collide two different brands of the same product name into one row. This also fixes
+      // a real side-effect bug in the old code: it re-upserted (and could silently overwrite
+      // price/brand on) EVERY Lube item on EVERY push, even ones correctly matched from the
+      // catalog, just because their type was Lube — that unconditional branch is gone; a
+      // correctly-matched item is now only ever read, never rewritten, whatever its type.
+      let pid = null, vid = null;
+      if (!isServiceGroup) {
+        const { data: existingParent } = await supabaseClient.from('product_master').select('id').ilike('item_name', finalItemName).limit(1);
+        if (existingParent && existingParent.length) { pid = existingParent[0].id; }
+        else {
+          const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: finalItemName, category: typeSelect, unit_metric: metricTarget, warehouse_type: wareTargetForCatalog, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
+          if (parentErr) return alert('Error creating product: ' + parentErr.message);
+          pid = np.id;
+        }
+        const brandForMatch = cleanBrand || 'STANDARD';
+        let vq = supabaseClient.from('product_variants').select('id').eq('parent_product_id', pid).ilike('brand', brandForMatch);
+        vq = volumeMlVal ? vq.eq('volume_per_unit', volumeMlVal) : vq.is('volume_per_unit', null);
+        const { data: existingVariant } = await vq.limit(1);
+        if (existingVariant && existingVariant.length) { vid = existingVariant[0].id; }
+        else {
+          const { data: nv, error: variantErr } = await supabaseClient.from('product_variants').insert({ parent_product_id: pid, variant_label: brandForMatch + (volumeMlVal ? ` — ${volumeMlVal}ml` : ''), brand: brandForMatch, volume_per_unit: volumeMlVal || null, warehouse_type: wareTargetForCatalog, catalog_status: 'live', mrp: mrpVal, default_price: rVal, cost_price: 0, current_stock: 0, pending_admin_approval: true }).select('id').single();
+          if (variantErr) return alert('Error creating brand/variant: ' + variantErr.message);
+          vid = nv.id;
+        }
+      }
+      // The lot picked earlier (window._lid) is only trustworthy if it still belongs to the
+      // variant just resolved above — if the brand/volume typed doesn't match what was picked
+      // from the dropdown any more, the earlier lot pick no longer applies.
+      const lotIdToUse = (vid && vid === window._vid) ? (window._lid || null) : null;
+      const payload = { job_card_id: targetJobId, warehouse_type: wareTarget, item_name: finalItemName, qty: qVal, unit_metric: metricTarget, unit_price: rVal, total_price: calcInitialCost, issued_by_id: issuerId, mrp_at_billing: mrpVal, mac_at_billing: window._pmac || 0, product_master_id: pid, variant_id: vid, lot_id: lotIdToUse }; if (volumeMlVal) payload.volume_ml = volumeMlVal; const { error } = await supabaseClient.from('job_card_items').insert(payload); if(!error) { window._pendingItemUnverified = false; window._pid = null; window._vid = null; window._lid = null; window._pmac = 0; window._pmrp = 0; document.getElementById('nPart').value = ''; document.getElementById('nBrand').value = ''; if(document.getElementById('nMrp')) document.getElementById('nMrp').value = ''; document.getElementById('nQty').value = ''; document.getElementById('nRate').value = ''; document.getElementById('nCustomML').value = ''; document.getElementById('autolist-n').style.display = 'none'; loadInventoryLedgers(); document.getElementById('nPart').focus(); prefetchCentralCatalog(); /* refresh in the background so a newly created product/brand is searchable immediately */
             /* Phase 11C: Auto-tag suggestion from product family */
             if (!isServiceGroup) suggestJobTagFromProduct(finalItemName);
             } else { alert("Database Error: " + error.message); } }
