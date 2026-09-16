@@ -153,7 +153,7 @@
             </div>
             <div class="field-group">
                 <label>Customer GSTIN (only for B2B trader sales — leave blank for normal retail)</label>
-                <input type="text" id="posCustGstin" placeholder="e.g. 23ABCDE1234F1Z5" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+                <input type="text" id="posCustGstin" placeholder="e.g. 23ABCDE1234F1Z5" style="text-transform:uppercase;" oninput="_ucKeepCursor(this)">
             </div>
         </div>
         <div id="creditAlertBox" class="credit-alert" onclick="window.open('utility-router.html?crm=' + evaluatedPhoneContext, '_blank')">
@@ -197,7 +197,7 @@
     <div id="profileSetupFlow" class="card-panel step-section" style="border-left:5px solid var(--warning);">
         <div class="block-title" style="color:var(--warning);">New Customer Profile Required</div>
         <div class="inputs-grid">
-            <div class="field-group"><label>Customer Name</label><input type="text" id="newAccName" placeholder="Full Name" oninput="this.value=(this.value||'').toUpperCase()"></div>
+            <div class="field-group"><label>Customer Name</label><input type="text" id="newAccName" placeholder="Full Name" oninput="_ucKeepCursor(this)"></div>
             <div class="field-group"><label>Opening Balance (₹)</label><input type="number" id="newAccOpeningBal" placeholder="Prior Debt" min="0" value="0"></div>
             <div class="field-group"><label>Address</label><input type="text" id="newAccAddress" placeholder="Area / Location"></div>
         </div>
@@ -241,7 +241,7 @@
                         <input type="text" placeholder="Product Name" class="i-name" oninput="queryCatalogAutocomplete(this,0)" onblur="hideAutocomplete(0)">
                         <div id="autolist-0" class="autocomplete-container"></div>
                     </div>
-                    <input type="text" placeholder="Brand" class="i-brand" value="" oninput="this.value=(this.value||'').toUpperCase()" onblur="evaluateRuleDiscounts(0)">
+                    <input type="text" placeholder="Brand" class="i-brand" value="" oninput="_ucKeepCursor(this)" onblur="evaluateRuleDiscounts(0)">
                     <input type="number" class="i-mrp" value="" min="0" placeholder="MRP" style="border-color:#7c3aed;color:#7c3aed;">
                     <select class="i-cat" onchange="toggleVolumeDropdown(this,0)">
                         <option value="Spare">Spare</option>
@@ -362,7 +362,7 @@
     <!-- Reason -->
     <div style="margin-bottom:16px;">
       <label style="display:block;font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Return Reason</label>
-      <textarea id="prReason" rows="2" placeholder="Why is the customer returning this?" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;box-sizing:border-box;resize:vertical;"></textarea>
+      <textarea id="prReason" rows="2" placeholder="Why is the customer returning this?" oninput="_ucKeepCursor(this)" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:6px;font-size:.85rem;box-sizing:border-box;resize:vertical;"></textarea>
     </div>
 
     <!-- Return value display -->
@@ -602,6 +602,20 @@
     const SB_URL = "https://jycoirrphpvxkrwrjcwf.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    // Phase 17 / B6 (16 Sep 2026): shared cursor-safe uppercase helper. Plain
+    // `this.value=this.value.toUpperCase()` always snaps the caret to the end of the field the
+    // instant .value is reassigned (standard browser behavior) -- so correcting text in the MIDDLE
+    // of a field (e.g. a customer name) was impossible in one flow; every keystroke mid-string
+    // jumped back to the end. This restores the caret/selection after the transform.
+    // Tracked page-by-page in the Phase 17 tracker (B6) as each page gets this applied.
+    function _ucKeepCursor(el) {
+      const upper = el.value.toUpperCase();
+      if (el.value === upper) return;
+      const s = el.selectionStart, e = el.selectionEnd;
+      el.value = upper;
+      try { el.setSelectionRange(s, e); } catch (err) {}
+    }
 
     let activeDraftRecordId = null;
     let evaluatedPhoneContext = null;
@@ -1004,7 +1018,7 @@
     function pushRuntimeStackRow() {
         const stack=document.getElementById('dynamicRowsContainer'); const node=document.createElement('div');
         node.className='inline-add-strip inline-item-row'; node.setAttribute('data-index',rowSequenceIndex);
-        node.innerHTML=`<div class="name-wrap"><input type="text" placeholder="Product Name" class="i-name" oninput="queryCatalogAutocomplete(this,${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})"><div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div></div><input type="text" placeholder="Brand" class="i-brand" oninput="this.value=(this.value||'').toUpperCase()" onblur="evaluateRuleDiscounts(${rowSequenceIndex})"><input type="number" class="i-mrp" value="" min="0" placeholder="MRP" style="border-color:#7c3aed;color:#7c3aed;"><select class="i-cat" onchange="toggleVolumeDropdown(this,${rowSequenceIndex})"><option value="Spare">Spare</option><option value="Lube">Lube</option></select><select class="i-vol" style="display:none;" onchange="checkOtherVolume(this,${rowSequenceIndex})"><option value="500">500ml</option><option value="650">650ml</option><option value="800">800ml</option><option value="900">900ml</option><option value="1000" selected>1000ml</option><option value="1200">1200ml</option><option value="Other">Other</option></select><input type="number" class="i-vol-other" style="display:none;" placeholder="ML"><div class="qty-wrap"><input type="number" class="i-qty" value="" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()"></div><input type="number" class="i-rate" value="" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()"><input type="number" class="i-disc" value="" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()"><button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none;border:none;color:var(--danger);font-size:1.2rem;cursor:pointer;font-weight:bold;">×</button>`;
+        node.innerHTML=`<div class="name-wrap"><input type="text" placeholder="Product Name" class="i-name" oninput="queryCatalogAutocomplete(this,${rowSequenceIndex})" onblur="hideAutocomplete(${rowSequenceIndex})"><div id="autolist-${rowSequenceIndex}" class="autocomplete-container"></div></div><input type="text" placeholder="Brand" class="i-brand" oninput="_ucKeepCursor(this)" onblur="evaluateRuleDiscounts(${rowSequenceIndex})"><input type="number" class="i-mrp" value="" min="0" placeholder="MRP" style="border-color:#7c3aed;color:#7c3aed;"><select class="i-cat" onchange="toggleVolumeDropdown(this,${rowSequenceIndex})"><option value="Spare">Spare</option><option value="Lube">Lube</option></select><select class="i-vol" style="display:none;" onchange="checkOtherVolume(this,${rowSequenceIndex})"><option value="500">500ml</option><option value="650">650ml</option><option value="800">800ml</option><option value="900">900ml</option><option value="1000" selected>1000ml</option><option value="1200">1200ml</option><option value="Other">Other</option></select><input type="number" class="i-vol-other" style="display:none;" placeholder="ML"><div class="qty-wrap"><input type="number" class="i-qty" value="" min="1" placeholder="Qty" oninput="compileDynamicInvoicerSums()"></div><input type="number" class="i-rate" value="" min="0" placeholder="Rate" oninput="compileDynamicInvoicerSums()"><input type="number" class="i-disc" value="" min="0" placeholder="Disc %" oninput="compileDynamicInvoicerSums()"><button class="btn-del-line" onclick="dropActiveInlineRow(this)" style="background:none;border:none;color:var(--danger);font-size:1.2rem;cursor:pointer;font-weight:bold;">×</button>`;
         stack.appendChild(node); rowSequenceIndex++;
     }
 
