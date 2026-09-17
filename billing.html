@@ -3055,25 +3055,50 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
       // price/brand on) EVERY Lube item on EVERY push, even ones correctly matched from the
       // catalog, just because their type was Lube — that unconditional branch is gone; a
       // correctly-matched item is now only ever read, never rewritten, whatever its type.
+      /* Fix (Phase 17 / B11, 17 Sep 2026): the block below used to ALWAYS create a new product_master
+         row (and/or a new product_variants row) the instant a typed name didn't match anything
+         already catalogued -- whether or not the staff member actually clicked "+ Add Manually" from
+         the dropdown. window._pendingItemUnverified (set true only by flagNewItemForReview(), the
+         Add Manually click) was tracked but never actually read here, so it had no real effect --
+         every unmatched item silently became a new, permanent, pending-admin-approval catalog entry.
+         Restored intended behaviour, per the user's explicit description of how this worked before:
+         a FULL match (existing parent AND existing brand/volume variant) is always reused, exactly as
+         before -- that path is completely unchanged. When there is NO full match: if Add Manually WAS
+         clicked (_pendingItemUnverified === true), a new parent and/or variant is created and flagged
+         pending_admin_approval for the Unverified Queue, same end result as before. If Add Manually was
+         NOT clicked, nothing is written to product_master or product_variants at all -- pid/vid simply
+         stay null, so this line item is saved on THIS job card only (item_name still prints/displays
+         normally) and never appears in any product search, the Unverified Queue, or any other job card. */
       let pid = null, vid = null;
       if (!isServiceGroup) {
         const { data: existingParent } = await supabaseClient.from('product_master').select('id').ilike('item_name', catalogItemName).limit(1);
-        if (existingParent && existingParent.length) { pid = existingParent[0].id; }
-        else {
-          const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: catalogItemName, category: (typeSelect === 'Lube' ? 'Lubricant' : 'Spare'), unit_metric: metricTarget, warehouse_type: wareTargetForCatalog, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
-          if (parentErr) return alert('Error creating product: ' + parentErr.message);
-          pid = np.id;
-        }
+        const matchedPid = (existingParent && existingParent.length) ? existingParent[0].id : null;
         const brandForMatch = cleanBrand || 'STANDARD';
-        let vq = supabaseClient.from('product_variants').select('id').eq('parent_product_id', pid).ilike('brand', brandForMatch);
-        vq = volumeMlVal ? vq.eq('volume_per_unit', volumeMlVal) : vq.is('volume_per_unit', null);
-        const { data: existingVariant } = await vq.limit(1);
-        if (existingVariant && existingVariant.length) { vid = existingVariant[0].id; }
-        else {
+        let matchedVid = null;
+        if (matchedPid) {
+          let vq = supabaseClient.from('product_variants').select('id').eq('parent_product_id', matchedPid).ilike('brand', brandForMatch);
+          vq = volumeMlVal ? vq.eq('volume_per_unit', volumeMlVal) : vq.is('volume_per_unit', null);
+          const { data: existingVariant } = await vq.limit(1);
+          matchedVid = (existingVariant && existingVariant.length) ? existingVariant[0].id : null;
+        }
+        if (matchedPid && matchedVid) {
+          // Full existing match -- reuse it, no catalog writes, unchanged from before.
+          pid = matchedPid; vid = matchedVid;
+        } else if (window._pendingItemUnverified) {
+          // Explicitly confirmed via "+ Add Manually" -- create whichever of parent/variant is
+          // genuinely missing, flagged pending_admin_approval, same as the pre-existing behaviour.
+          pid = matchedPid;
+          if (!pid) {
+            const { data: np, error: parentErr } = await supabaseClient.from('product_master').insert({ item_name: catalogItemName, category: (typeSelect === 'Lube' ? 'Lubricant' : 'Spare'), unit_metric: metricTarget, warehouse_type: wareTargetForCatalog, catalog_status: 'live', pending_admin_approval: true }).select('id').single();
+            if (parentErr) return alert('Error creating product: ' + parentErr.message);
+            pid = np.id;
+          }
           const { data: nv, error: variantErr } = await supabaseClient.from('product_variants').insert({ parent_product_id: pid, variant_label: brandForMatch + (volumeMlVal ? ` — ${volumeMlVal}ml` : ''), brand: brandForMatch, volume_per_unit: volumeMlVal || null, warehouse_type: wareTargetForCatalog, catalog_status: 'live', mrp: mrpVal, default_price: rVal, cost_price: 0, current_stock: 0, pending_admin_approval: true }).select('id').single();
           if (variantErr) return alert('Error creating brand/variant: ' + variantErr.message);
           vid = nv.id;
         }
+        // else: no full match AND Add Manually was not clicked -- pid/vid stay null on purpose; this
+        // line is added to the current job card only, with no catalog record created anywhere.
       }
       // The lot picked earlier (window._lid) is only trustworthy if it still belongs to the
       // variant just resolved above — if the brand/volume typed doesn't match what was picked
