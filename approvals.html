@@ -229,7 +229,14 @@ async function openCA(rec){
   _caComplaint=complaint;
 
   // Fetch reference JC for labour_charges and mechanic details
-  const {data:refJc}=await sb.from('job_cards').select('id,labour_charges,mech_id,co_mech_id').eq('id',complaint.reference_jc_id).single();
+  const {data:refJc}=await sb.from('job_cards').select('id,jc_number,labour_charges,mech_id,co_mech_id').eq('id',complaint.reference_jc_id).single();
+
+  // Phase 17 / F4: real jc_number for the complaint's resulting new JC, when one exists.
+  let newJcNumber=null;
+  if(complaint.new_jc_id){
+    const {data:newJcRow}=await sb.from('job_cards').select('jc_number').eq('id',complaint.new_jc_id).single();
+    newJcNumber=newJcRow?.jc_number||null;
+  }
 
   // Fetch mechanic names
   const mechIds=[refJc?.mech_id,refJc?.co_mech_id].filter(Boolean);
@@ -243,8 +250,8 @@ async function openCA(rec){
   const {data:items}=await sb.from('complaint_items').select('*').eq('complaint_id',complaint.id);
   _caItems=items||[];
 
-  const refShort='JC-'+(complaint.reference_jc_id||'').split('-')[0].toUpperCase();
-  const newShort=complaint.new_jc_id?'JC-'+complaint.new_jc_id.split('-')[0].toUpperCase():'—';
+  const refShort=refJc?.jc_number||('JC-'+(complaint.reference_jc_id||'').split('-')[0].toUpperCase());
+  const newShort=complaint.new_jc_id?(newJcNumber||'JC-'+complaint.new_jc_id.split('-')[0].toUpperCase()):'—';
   const ft=complaint.fault_type;
   const primaryName=mechMap[refJc?.mech_id]||'Unknown';
   const coName=refJc?.co_mech_id?mechMap[refJc.co_mech_id]:null;
@@ -401,6 +408,14 @@ async function loadApprovals(){
   const pending = pendRes.data||[];
   const history = histRes.data||[];
   const pendingRefunds = refRes.data||[];
+  // Phase 17 / F4: customer_refunds only stores the raw job_cards.id, so a small lookup map is
+  // built here to show the real jc_number in the refund preview below, instead of a raw-id fragment.
+  let jcNumberByIdForRefunds = {};
+  const refundJcIds = [...new Set(pendingRefunds.map(r=>r.job_card_id).filter(Boolean))];
+  if (refundJcIds.length) {
+    const { data: refJcRows } = await sb.from('job_cards').select('id,jc_number').in('id', refundJcIds);
+    (refJcRows||[]).forEach(j => { jcNumberByIdForRefunds[j.id] = j.jc_number; });
+  }
   const pendingVehicles = vehRes.data||[];
 
   // Filter history to last 30 days
@@ -419,7 +434,7 @@ async function loadApprovals(){
             <span style="font-weight:700;font-size:1rem;">💸 ${pendingRefunds.length} Customer Refund${pendingRefunds.length>1?'s':''} Pending Payment</span>
             <div style="font-size:.78rem;color:#64748b;margin-top:2px;">Total: ₹${Math.round(totalAmt)} needs to be handed to customers</div>
             <div style="font-size:.75rem;color:#94a3b8;margin-top:4px;">
-              ${pendingRefunds.slice(0,3).map(r=>`JC-${(r.job_card_id||'').split('-')[0].toUpperCase()} ₹${Math.round(r.refund_amount)}`).join(' &nbsp;·&nbsp; ')}
+              ${pendingRefunds.slice(0,3).map(r=>`${jcNumberByIdForRefunds[r.job_card_id] || ('JC-'+(r.job_card_id||'').split('-')[0].toUpperCase())} ₹${Math.round(r.refund_amount)}`).join(' &nbsp;·&nbsp; ')}
               ${pendingRefunds.length>3?` &nbsp;·&nbsp; +${pendingRefunds.length-3} more`:''}
             </div>
           </div>
