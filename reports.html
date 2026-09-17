@@ -127,8 +127,8 @@
                 <div class="field-group"><label>Start Date</label><input type="date" id="lsStart"></div>
                 <div class="field-group"><label>End Date</label><input type="date" id="lsEnd"></div>
                 <div class="field-group" id="blockSourceR4"><label>Source</label><select id="fltSourceR4"></select></div>
-                <div class="field-group"><label>Brand</label><input type="text" id="lsBrand" placeholder="All Brands" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Product Name</label><input type="text" id="lsProduct" placeholder="All Products" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Brand</label><input type="text" id="lsBrand" placeholder="All Brands" oninput="_ucKeepCursor(this)"></div>
+                <div class="field-group"><label>Product Name</label><input type="text" id="lsProduct" placeholder="All Products" oninput="_ucKeepCursor(this)"></div>
                 <div style="display:flex; gap:8px;">
                     <button class="btn-action" style="background:var(--primary); flex:1;" onclick="runLubeSales()">RUN</button>
                     <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbLubeSales', 'Lube_Sales_Report')">📊 EXCEL</button>
@@ -288,6 +288,10 @@
 
     const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
     document.getElementById('roleDisplay').innerText = activeRole.toUpperCase();
+
+    // Fix (Phase 17 / B6, 17 Sep 2026): standard cursor-preserving uppercase helper, applied here
+    // because this page is already being touched for F3 -- see the Phase 17 tracker's B6 record.
+    function _ucKeepCursor(el){const upper=el.value.toUpperCase();if(el.value===upper)return;const s=el.selectionStart,e=el.selectionEnd;el.value=upper;try{el.setSelectionRange(s,e);}catch(err){}}
 
     function executeSessionTermination() {
         localStorage.removeItem('ERP_ACTIVE_ROLE');
@@ -623,38 +627,51 @@
 
         document.getElementById('lsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;">Analyzing taxonomy & fetching data...</td></tr>';
 
-        // Fix: identify lubricant items by volume_ml > 0 (set at billing time) 
-        // instead of product_master category names which vary (Lube/Lubricant/Engine Oil etc.)
-        // Still use product_master for brand and volume_per_unit lookup when available
-        const { data: pMaster } = await supabaseClient.from('product_master')
-            .select('item_name, brand, category, volume_per_unit')
-            .gt('volume_per_unit', 0);
-
-        const lubeMap = {};
-        (pMaster || []).forEach(p => lubeMap[p.item_name.toUpperCase()] = p);
-
+        // Fix (Phase 17 / F3, 17 Sep 2026): brand/volume_per_unit used to be looked up by re-parsing
+        // item_name text and matching it against product_master -- since the product/variant rebuild
+        // (11F), brand and volume_per_unit live on product_variants, not product_master, so this
+        // lookup silently returned nothing for any lube sold since the migration (brand showed "-").
+        // Now uses the real variant_id/product_master_id recorded on each sale line (variant_id first
+        // -- the accurate, current path; product_master_id kept as a fallback ONLY for older rows
+        // billed before F2 added variant_id, so a past date range doesn't regress). Per the user's
+        // confirmed decision, rows are now grouped by the ACTUAL BRAND SOLD, not just the product
+        // name -- two brands of the same product now correctly show as two separate lines.
         let itemsData = [];
 
         // Aggregate Workshop Data
         if (['All', 'Moped WS', 'Green WS', 'Both', 'Moped', 'Green', 'Workshop'].includes(sourceFlt)) {
-            let jcQuery = supabaseClient.from('job_card_items').select('item_name, qty, unit_metric, volume_ml, total_price, job_cards!inner(status, closed_at)')
+            let jcQuery = supabaseClient.from('job_card_items').select('item_name, qty, unit_metric, volume_ml, total_price, variant_id, product_master_id, job_cards!inner(status, closed_at)')
                 .gte('job_cards.closed_at', start + 'T00:00:00')
                 .lte('job_cards.closed_at', end + 'T23:59:59')
                 .eq('job_cards.status', 'Closed');
-            
+
             const { data: jcData } = await jcQuery;
             if(jcData) itemsData = itemsData.concat(jcData);
         }
 
         // Aggregate POS Data
         if (['All', 'Moped POS', 'Green POS', 'POS'].includes(sourceFlt) && activeRole !== 'service') {
-            let posQuery = supabaseClient.from('counter_sale_items').select('item_name, qty, unit_metric, volume_ml, total_price, counter_sales!inner(status, closed_at)')
+            let posQuery = supabaseClient.from('counter_sale_items').select('item_name, qty, unit_metric, volume_ml, total_price, variant_id, product_master_id, counter_sales!inner(status, closed_at)')
                 .gte('counter_sales.closed_at', start + 'T00:00:00')
                 .lte('counter_sales.closed_at', end + 'T23:59:59')
                 .eq('counter_sales.status', 'Closed');
-            
+
             const { data: posData } = await posQuery;
             if(posData) itemsData = itemsData.concat(posData);
+        }
+
+        // Resolve brand/volume_per_unit for every distinct variant_id (accurate path) and, as a
+        // fallback for older rows with no variant_id yet, every distinct product_master_id.
+        const vIds = [...new Set(itemsData.filter(i=>i.variant_id).map(i=>i.variant_id))];
+        const pmIdsFallback = [...new Set(itemsData.filter(i=>!i.variant_id && i.product_master_id).map(i=>i.product_master_id))];
+        let infoMap = {};
+        if (vIds.length) {
+            const { data: vs } = await supabaseClient.from('product_variants').select('id, brand, volume_per_unit').in('id', vIds);
+            (vs||[]).forEach(v => infoMap['v:'+v.id] = { brand: v.brand, volume_per_unit: v.volume_per_unit });
+        }
+        if (pmIdsFallback.length) {
+            const { data: pm } = await supabaseClient.from('product_master').select('id, brand, volume_per_unit').in('id', pmIdsFallback);
+            (pm||[]).forEach(p => infoMap['p:'+p.id] = { brand: p.brand, volume_per_unit: p.volume_per_unit });
         }
 
         let aggregated = {};
@@ -662,31 +679,38 @@
 
         itemsData.forEach(i => {
             const rawName = (i.item_name || '').split('(')[0].trim().toUpperCase();
-            const pInfo = lubeMap[rawName];
+            const infoKey = i.variant_id ? ('v:'+i.variant_id) : (i.product_master_id ? ('p:'+i.product_master_id) : null);
+            const pInfo = infoKey ? infoMap[infoKey] : null;
 
-            // Item is lube if: in product_master with volume_per_unit > 0 OR has volume_ml > 0 at line item level
-            const isLube = pInfo || parseFloat(i.volume_ml) > 0;
+            // Item is lube if: its resolved variant/parent has volume_per_unit > 0, OR the line
+            // item itself recorded a volume_ml > 0 at billing time (the more reliable signal for
+            // anything billed since F2, which always stamps volume_ml on a real lube sale).
+            const isLube = (pInfo && parseFloat(pInfo.volume_per_unit) > 0) || parseFloat(i.volume_ml) > 0;
             if (!isLube) return;
 
-            if(brandFlt && !(pInfo?.brand||'').toUpperCase().includes(brandFlt)) return;
-            if(prodFlt && !rawName.includes(prodFlt)) return;
+            const brand = (pInfo?.brand || '-').toUpperCase();
+            if(brandFlt && !brand.includes(brandFlt.toUpperCase())) return;
+            if(prodFlt && !rawName.includes(prodFlt.toUpperCase())) return;
 
-            if (!aggregated[rawName]) aggregated[rawName] = { brand: pInfo?.brand || '-', units: 0, litres: 0, rev: 0 };
+            // Grouping key is name + brand (per the confirmed per-variant/brand decision) -- two
+            // brands of the same product name now show as two separate report lines.
+            const key = rawName + ' | ' + brand;
+            if (!aggregated[key]) aggregated[key] = { name: rawName, brand, units: 0, litres: 0, rev: 0 };
 
-            aggregated[rawName].units += parseFloat(i.qty) || 1;
-            aggregated[rawName].rev += parseFloat(i.total_price) || 0;
+            aggregated[key].units += parseFloat(i.qty) || 1;
+            aggregated[key].rev += parseFloat(i.total_price) || 0;
 
             let volMath = 0;
             if (pInfo?.volume_per_unit) volMath = (parseFloat(pInfo.volume_per_unit) * (parseFloat(i.qty) || 0)) / 1000;
             else if (parseFloat(i.volume_ml) > 0) volMath = (parseFloat(i.volume_ml) * (parseFloat(i.qty) || 0)) / 1000;
-            aggregated[rawName].litres += volMath;
+            aggregated[key].litres += volMath;
         });
 
         let html = '';
         Object.keys(aggregated).sort().forEach(k => {
             const v = aggregated[k];
             tUnits += v.units; tLiters += v.litres; tRev += v.rev;
-            html += `<tr><td>${k}</td><td>${v.brand}</td><td>${v.units}</td><td>${v.litres.toFixed(2)} L</td><td>₹${v.rev.toFixed(2)}</td></tr>`;
+            html += `<tr><td>${v.name}</td><td>${v.brand}</td><td>${v.units}</td><td>${v.litres.toFixed(2)} L</td><td>₹${v.rev.toFixed(2)}</td></tr>`;
         });
 
         if (!html) html = '<tr><td colspan="5" style="text-align:center;">No valid lubricant transactions found.</td></tr>';
