@@ -664,7 +664,7 @@
 
         /* History table — fetch closed JCs with closed_at for 31-day complaint window */
         const { data: jcAll } = await supabaseClient.from('job_cards')
-            .select('id, total_invoice_value, closed_at, payment_mode, vehicle_id, mech_id, is_complaint_jc')
+            .select('id, jc_number, total_invoice_value, closed_at, payment_mode, vehicle_id, mech_id, is_complaint_jc')
             .eq('customer_mobile', mobile).eq('status', 'Closed')
             .order('closed_at', { ascending: false }).limit(6);
 
@@ -675,7 +675,7 @@
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">No recent closed transactions found.</td></tr>';
         } else {
             jcAll.forEach(x => {
-                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold;text-decoration:none;">JC-${x.id.split('-')[0].toUpperCase()}</a>`;
+                const refLink = `<a href="billing.html?id=${x.id}" target="_blank" style="color:var(--info);font-weight:bold;text-decoration:none;">${x.jc_number || 'JC-'+x.id.split('-')[0].toUpperCase()}</a>`;
                 const closedStr = x.closed_at ? new Date(x.closed_at).toLocaleDateString('en-IN') : '—';
                 const daysSince = x.closed_at ? Math.floor((now - new Date(x.closed_at)) / 86400000) : 999;
                 const canComplain = daysSince <= 31 && !x.is_complaint_jc;
@@ -683,7 +683,7 @@
                 const actionCell = isComplaintJc
                     ? `<span style="font-size:.7rem;color:#94a3b8;">Complaint JC</span>`
                     : canComplain
-                        ? `<button onclick="openComplaintModal('${x.id}','${x.vehicle_id||''}','${x.mech_id||''}')" style="background:#f59e0b;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">⚠️ RAISE COMPLAINT</button>`
+                        ? `<button onclick="openComplaintModal('${x.id}','${x.vehicle_id||''}','${x.mech_id||''}','${x.jc_number||''}')" style="background:#f59e0b;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">⚠️ RAISE COMPLAINT</button>`
                         : `<span style="font-size:.7rem;color:#cbd5e1;">${daysSince}d ago</span>`;
                 tbody.innerHTML += `<tr style="${canComplain ? 'background:#fffbeb;' : ''}">
                     <td>${refLink}</td>
@@ -707,7 +707,7 @@
 
         const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const { data: recent } = await supabaseClient.from('job_cards')
-            .select('id, problem_mentioned, closed_at')
+            .select('id, jc_number, problem_mentioned, closed_at')
             .eq('customer_mobile', mobile).eq('vehicle_id', vehicleSel).eq('status', 'Closed')
             .gte('closed_at', thirtyDaysAgo.toISOString()).order('closed_at', { ascending: false }).limit(5);
         if (!recent || recent.length === 0) return;
@@ -716,7 +716,7 @@
         const match  = (recent || []).find(j => tokens.some(t => (j.problem_mentioned || '').toLowerCase().includes(t)));
         if (match) {
             flagBox.style.display = 'block';
-            document.getElementById('warrantFlagDetail').innerText = 'Last closed: JC-' + match.id.split('-')[0].toUpperCase() + ' on ' + new Date(match.closed_at).toLocaleDateString('en-IN') + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"';
+            document.getElementById('warrantFlagDetail').innerText = 'Last closed: ' + (match.jc_number || 'JC-' + match.id.split('-')[0].toUpperCase()) + ' on ' + new Date(match.closed_at).toLocaleDateString('en-IN') + ' — "' + (match.problem_mentioned || '').substring(0, 60) + '"';
         }
     }
 
@@ -836,12 +836,14 @@
 
     // ── PHASE 9: COMPLAINT MODAL ────────────────────────────────────────
     let _cRefJcId    = null;
+    let _cRefJcNumber = null;
     let _cVehicleId  = null;
     let _cMechId     = null;
     let _cItems      = [];
 
-    async function openComplaintModal(jcId, vehicleId, mechId) {
+    async function openComplaintModal(jcId, vehicleId, mechId, jcNumber) {
         _cRefJcId   = jcId;
+        _cRefJcNumber = jcNumber || null;
         _cVehicleId = vehicleId || null;
         _cMechId    = mechId   || null;
         _cItems     = [];
@@ -894,7 +896,7 @@
 
     function closeComplaintModal() {
         document.getElementById('modalComplaint').style.display = 'none';
-        _cRefJcId = null; _cVehicleId = null; _cMechId = null; _cItems = [];
+        _cRefJcId = null; _cRefJcNumber = null; _cVehicleId = null; _cMechId = null; _cItems = [];
     }
 
     async function createComplaintJC() {
@@ -939,7 +941,7 @@
         }
 
         // 3. Create new complaint JC pre-filled
-        const refShort  = 'JC-' + _cRefJcId.split('-')[0].toUpperCase();
+        const refShort  = _cRefJcNumber || ('JC-' + _cRefJcId.split('-')[0].toUpperCase());
         const probText  = `CUSTOMER COMPLAINT — Ref: ${refShort} | ${faultType.toUpperCase()} FAULT | ${note}`;
         const { data: newJc, error: jcErr } = await supabaseClient.from('job_cards').insert({
             customer_mobile   : mobile,
@@ -971,10 +973,10 @@
           // Wait for history to load then auto-open complaint modal
           setTimeout(async()=>{
             const{data:jc}=await supabaseClient.from('job_cards')
-              .select('vehicle_id,mech_id,closed_at').eq('id',_jcid).single();
+              .select('vehicle_id,mech_id,closed_at,jc_number').eq('id',_jcid).single();
             if(jc){
               const days=Math.floor((Date.now()-new Date(jc.closed_at))/86400000);
-              if(days<=31) openComplaintModal(_jcid,jc.vehicle_id||'',jc.mech_id||'');
+              if(days<=31) openComplaintModal(_jcid,jc.vehicle_id||'',jc.mech_id||'',jc.jc_number||'');
               else alert('This JC is beyond the 31-day complaint window.');
             }
           },1200);
