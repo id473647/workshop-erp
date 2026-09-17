@@ -1111,6 +1111,11 @@ async function loadCatalog(){
   const catWh0 = whSel0.value;
   const search0 = document.getElementById('catSearch').value.trim().toLowerCase();
   const scope0 = document.getElementById('catScope').value;
+  // Fix (Phase 17 / F3, 17 Sep 2026): the "🚫 Deactivated" option added to this dropdown for the
+  // B4-follow-up Delete/Deactivate work was wired into a dead, never-called copy of loadCatalog()
+  // left over from before the Stage 2 grouped-catalog rewrite -- it had no effect on the real page.
+  // Wired correctly here instead, into the actual live function.
+  const smartFilter0 = document.getElementById('catSmartFilter')?.value || '';
 
   // Pull every variant with its lots and its parent's shared fields in one go.
   // product_variants -> product_master is a single, unambiguous FK
@@ -1127,9 +1132,11 @@ async function loadCatalog(){
   // correctly land in one card regardless of which specific row a variant's
   // parent_product_id happens to point at.
   const groups = new Map();
+  const wantStatus = smartFilter0==='deactivated' ? 'inactive' : 'live';
   (data||[]).forEach(v=>{
     const parent = v.product_master || {};
-    if(parent.catalog_status && parent.catalog_status!=='live') return; // keep Unverified Queue's own items out of here
+    const effectiveStatus = parent.catalog_status || 'live';
+    if(effectiveStatus!==wantStatus) return;
     if(catWh0 && (v.warehouse_type||'').toLowerCase()!==catWh0) return;
     if(scope0 && parent.scope!==scope0) return;
     const nameKey=(parent.item_name||'').toLowerCase();
@@ -1142,9 +1149,11 @@ async function loadCatalog(){
   // Build name cache for the shared Add Product popup's autocomplete
   _catalogNameCache=[...new Set(_catGroupsCache.map(g=>g.parent.item_name).filter(Boolean))].sort();
   catalogCache=_catGroupsCache.map(g=>g.parent);
+  _catShowingDeactivated = (smartFilter0==='deactivated');
 
   renderCatalogGroups();
 }
+let _catShowingDeactivated = false;
 
 // Phase 17 / F1 (16 Sep 2026): renderCatalogGroups() no longer builds its own per-lot detail
 // rows with prompt()-based EDIT/DEL -- clicking a product row now expands it IN PLACE using
@@ -1177,7 +1186,11 @@ function renderCatalogGroups(){
       <td style="font-weight:400;">Stock: ${totalStock}</td>
       <td style="font-size:.78rem;">${p.hsn_code||'—'}</td>
       <td></td>
-      <td>${canEdit?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;background:#7c3aed;" onclick="toggleCatGroup(${gi})">✏️ EDIT / ADD LOT</button>`:''}</td>
+      <td style="white-space:nowrap;">
+        ${canEdit && !_catShowingDeactivated?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;background:#7c3aed;" onclick="toggleCatGroup(${gi})">✏️ EDIT / ADD LOT</button>`:''}
+        ${canEdit && !_catShowingDeactivated?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;margin-left:2px;background:#64748b;" onclick="deactivateProduct('${g.parentId}')" title="Hide this product everywhere without deleting it or touching any past invoice/job card">🚫 HIDE</button>`:''}
+        ${canEdit && _catShowingDeactivated?`<button class="btn-action" style="padding:3px 7px;font-size:.72rem;background:#16a34a;" onclick="reactivateProduct('${g.parentId}')">✅ REACTIVATE</button>`:''}
+      </td>
     </tr>`;
     // Per-lot rows are still always rendered (just as before this rewrite) so bulkPrintLabels()'s
     // "Print Selected" checkboxes keep working exactly as they did — this row's own EDIT/DEL
