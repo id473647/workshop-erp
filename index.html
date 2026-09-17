@@ -403,10 +403,28 @@ async function prefetchSystemMechanics() {
 }
 
 /* ── Stock valuation ── */
+// Fix (Phase 17 / F3, 17 Sep 2026): this used to read current_stock/mac/mrp straight off
+// product_master -- since the product/variant/lot rebuild (11F), those numbers no longer live
+// there for anything created or sold after the migration; the real, current numbers are on
+// product_variants and, for cost/MRP specifically, on each individual product_variant_lots batch
+// (different batches of the same variant can have different MAC/MRP). This widget had been
+// silently showing a frozen, increasingly-wrong snapshot from before the migration. Rewired to
+// sum every live, stock-tracked lot's own qty x mac / qty x mrp -- the same numbers Full Catalog
+// and Billing/POS already treat as authoritative.
 async function loadStockValuation() {
-    const { data: prods } = await supabaseClient.from('product_master').select('current_stock,mac,mrp').eq('track_stock', true).gt('current_stock', 0);
-    const cv = (prods||[]).reduce((s,p) => s + (p.current_stock*(p.mac||0)), 0);
-    const mv = (prods||[]).reduce((s,p) => s + (p.current_stock*(p.mrp||0)), 0);
+    const { data: variants } = await supabaseClient.from('product_variants')
+        .select('catalog_status, product_variant_lots(mac,mrp,current_qty), product_master(track_stock)')
+        .eq('catalog_status', 'live');
+    let cv = 0, mv = 0;
+    (variants||[]).forEach(v => {
+        if (v.product_master && v.product_master.track_stock === false) return;
+        (v.product_variant_lots||[]).forEach(l => {
+            const qty = l.current_qty || 0;
+            if (qty <= 0) return;
+            cv += qty * (l.mac || 0);
+            mv += qty * (l.mrp || 0);
+        });
+    });
     document.getElementById('stockValContent').innerText = fmt(cv);
     document.getElementById('stockValSub').innerText     = `MRP Value: ${fmt(mv)}`;
 }
