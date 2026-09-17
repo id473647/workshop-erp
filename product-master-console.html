@@ -710,9 +710,18 @@ async function loadPendingVehicles() {
     .select('id,brand,model_name,emission_standard,category_group').eq('status','active').order('brand');
   _activeVehicleMaster = active || [];
 
+  // Phase 17 / F4: one batch lookup covers every added_for_jc referenced in this pending list, so
+  // the real jc_number shows instead of a raw-id fragment.
+  const pendingJcIds = [...new Set(pending.map(v => v.added_for_jc).filter(Boolean))];
+  let jcNumberByIdForPending = {};
+  if (pendingJcIds.length) {
+    const { data: pendingJcRows } = await sb.from('job_cards').select('id,jc_number').in('id', pendingJcIds);
+    (pendingJcRows||[]).forEach(j => { jcNumberByIdForPending[j.id] = j.jc_number; });
+  }
+
   listEl.innerHTML = pending.map(v => {
     const added = new Date(v.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
-    const jcRef = v.added_for_jc ? 'JC-'+v.added_for_jc.split('-')[0].toUpperCase() : '—';
+    const jcRef = v.added_for_jc ? (jcNumberByIdForPending[v.added_for_jc] || 'JC-'+v.added_for_jc.split('-')[0].toUpperCase()) : '—';
     const emitCol = {BS6:'#15803d',BS4:'#b45309','Pre-BS4':'#64748b','Electric AIS156':'#2980b9'};
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:#f8fafc;">
       <div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:8px;">
@@ -862,7 +871,15 @@ async function loadDefectiveStock(){
   let cMap={};
   if(cIds.length>0){
     const{data:cs}=await sb.from('customer_complaints').select('id,new_jc_id').in('id',cIds);
-    (cs||[]).forEach(c=>cMap[c.id]=c.new_jc_id?'JC-'+c.new_jc_id.split('-')[0].toUpperCase():'—');
+    // Phase 17 / F4: one batch lookup covers every new_jc_id referenced by these complaints, so the
+    // real jc_number shows instead of a raw-id fragment.
+    const dsJcIds=[...new Set((cs||[]).map(c=>c.new_jc_id).filter(Boolean))];
+    let dsJcNumberById={};
+    if(dsJcIds.length){
+      const{data:dsJcRows}=await sb.from('job_cards').select('id,jc_number').in('id',dsJcIds);
+      (dsJcRows||[]).forEach(j=>{dsJcNumberById[j.id]=j.jc_number;});
+    }
+    (cs||[]).forEach(c=>cMap[c.id]=c.new_jc_id?(dsJcNumberById[c.new_jc_id]||'JC-'+c.new_jc_id.split('-')[0].toUpperCase()):'—');
   }
 
   const stColors={In_Store:'#854d0e',Vendor_Claimed:'#2980b9',Written_Off:'#64748b'};
