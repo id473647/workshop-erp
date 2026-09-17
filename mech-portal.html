@@ -934,7 +934,7 @@ function calcAutoStatus(nowDate,shift,exemption){
 
 // ── MECHANIC DATA (FIX1: labour_charges only — no pkgLabor doubling) ───────
 async function loadMechanicData(){
-  const{data:jobs}=await sb.from('job_cards').select('id,created_at,closed_at,status,labour_charges,mech_id,co_mech_id,is_reviewed,review_rating,review_mech_feedback,vehicles(reg_number)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at',{ascending:false});
+  const{data:jobs}=await sb.from('job_cards').select('id,jc_number,created_at,closed_at,status,labour_charges,mech_id,co_mech_id,is_reviewed,review_rating,review_mech_feedback,vehicles(reg_number)').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).order('created_at',{ascending:false});
   let totalNetShare=0;
   const jList=document.getElementById('jobsList'); jList.innerHTML='';
   const rList=document.getElementById('reviewsList'); rList.innerHTML='';
@@ -952,7 +952,7 @@ async function loadMechanicData(){
     const statClass=job.status==='Open'?'open':'closed';
     jList.innerHTML+=`<div class="list-item">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <strong>JC-${job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong>
+        <strong>${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()} | ${job.vehicles?.reg_number||'N/A'}</strong>
         <span class="pill ${statClass}">${job.status}</span>
       </div>
       <div style="font-size:.82rem;color:#64748b;margin-bottom:4px;">Date: ${new Date(job.created_at).toLocaleDateString('en-IN')}</div>
@@ -964,7 +964,7 @@ async function loadMechanicData(){
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${job.status==='Open'?`
             <button onclick="viewJcParts('${job.id}')" style="background:#f1f5f9;color:var(--primary);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">📦 Parts</button>
-            <button onclick="openMechPhotoModal('${job.id}')" style="background:var(--info);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">📸 Photos</button>
+            <button onclick="openMechPhotoModal('${job.id}','${job.jc_number||''}')" style="background:var(--info);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">📸 Photos</button>
             <button onclick="markJcReady('${job.id}')" style="background:var(--success);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:pointer;">✅ Mark Ready</button>
           `:''}
         </div>
@@ -972,7 +972,7 @@ async function loadMechanicData(){
     </div>`;
     if(job.is_reviewed&&job.mech_id===activeMech.id){
       const stars='★'.repeat(job.review_rating||0)+'☆'.repeat(5-(job.review_rating||0));
-      rList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>JC-${job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:.8rem;color:#475569;font-style:italic;">"${job.review_mech_feedback||'No feedback'}"</div></div>`;
+      rList.innerHTML+=`<div class="list-item"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</strong><span class="stars">${stars}</span></div><div style="font-size:.8rem;color:#475569;font-style:italic;">"${job.review_mech_feedback||'No feedback'}"</div></div>`;
       if(new Date(job.closed_at)>=startOfWeek){weekTotal+=job.review_rating||0;weekCount++;}
     }
   });
@@ -1085,7 +1085,7 @@ async function generateLedgerStatement(){
   const end=document.getElementById('ledgEnd').value;
   if(!start||!end){alert('Select a date range.');return;}
   const[{data:jobs},{data:payouts}]=await Promise.all([
-    sb.from('job_cards').select('id,closed_at,labour_charges,mech_id,co_mech_id').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).eq('status','Closed').gte('closed_at',start).lte('closed_at',end+'T23:59:59'),
+    sb.from('job_cards').select('id,jc_number,closed_at,labour_charges,mech_id,co_mech_id').or(`mech_id.eq.${activeMech.id},co_mech_id.eq.${activeMech.id}`).eq('status','Closed').gte('closed_at',start).lte('closed_at',end+'T23:59:59'),
     sb.from('workshop_expenses').select('*').eq('stakeholder_id',activeMech.id).gte('created_at',start).lte('created_at',end+'T23:59:59')
   ]);
   let totalCredit=0,totalDebit=0;
@@ -1099,7 +1099,7 @@ async function generateLedgerStatement(){
     const rate=parseFloat(activeMech.commission_rate)||0;
     const share=gross*(rate/100);
     totalCredit+=share;
-    tbody.innerHTML+=`<tr><td>${new Date(job.closed_at).toLocaleDateString('en-IN')}</td><td>JC-${job.id.split('-')[0].toUpperCase()}</td><td>Labour Commission${split}</td><td class="credit-text">+₹${share.toFixed(2)}</td><td>--</td></tr>`;
+    tbody.innerHTML+=`<tr><td>${new Date(job.closed_at).toLocaleDateString('en-IN')}</td><td>${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</td><td>Labour Commission${split}</td><td class="credit-text">+₹${share.toFixed(2)}</td><td>--</td></tr>`;
   });
   (payouts||[]).forEach(p=>{
     totalDebit+=parseFloat(p.amount)||0;
@@ -1152,13 +1152,13 @@ async function loadMyComplaints(){
 
   // Fetch reference JC info for display
   const refJcIds=[...new Set(complaints.map(c=>c.reference_jc_id).filter(Boolean))];
-  const{data:refJcs}=await sb.from('job_cards').select('id,closed_at,labour_charges').in('id',refJcIds);
+  const{data:refJcs}=await sb.from('job_cards').select('id,jc_number,closed_at,labour_charges').in('id',refJcIds);
   const refJcMap={};(refJcs||[]).forEach(j=>refJcMap[j.id]=j);
 
   const cards=complaints.map(c=>{
     const fine=fineMap[c.id];
     const refJc=refJcMap[c.reference_jc_id];
-    const refShort='JC-'+(c.reference_jc_id||'').split('-')[0].toUpperCase();
+    const refShort=refJc?.jc_number || ('JC-'+(c.reference_jc_id||'').split('-')[0].toUpperCase());
     const closedStr=refJc?.closed_at?new Date(refJc.closed_at).toLocaleDateString('en-IN'):'—';
     const ft=c.fault_type;
     const ftBadge=ft==='service'
@@ -1376,9 +1376,9 @@ window.onload=async()=>{
 
 let _mechPhotoJcId = null;
 
-async function openMechPhotoModal(jcId) {
+async function openMechPhotoModal(jcId, jcNumber) {
   _mechPhotoJcId = jcId;
-  const jcShort = 'JC-' + jcId.split('-')[0].toUpperCase();
+  const jcShort = jcNumber || ('JC-' + jcId.split('-')[0].toUpperCase());
   document.getElementById('mechPhotoJcRef').innerText = jcShort;
   document.getElementById('mechPhotoModal').style.display = 'block';
   document.getElementById('mechPhotoNote').value = '';
