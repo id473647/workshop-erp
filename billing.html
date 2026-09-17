@@ -3034,7 +3034,17 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
    approval on nearly every Lube push -- even ones picked straight from the autocomplete. Only the
    parent lookup/insert below now uses catalogItemName; finalItemName (with the ML suffix) is
    unchanged everywhere else -- it's still exactly what job_card_items.item_name displays/prints. */
-    const catalogItemName = finalItemName;
+    /* Fix (Phase 17 / B4-c, 17 Sep 2026): B5's fix above only stripped the Lube " (xxx ML)" suffix
+       before capturing catalogItemName -- it still captured it from finalItemName AFTER the
+       brand-prefix step just above ("BRAND - NAME"), for every branded Spare or Lube alike. Since
+       product_master.item_name is stored WITHOUT any brand prefix everywhere else (brand lives on
+       product_variants.brand -- see product-entry-modal.js/purchase-manager.html), that mismatch
+       meant the ilike lookup below almost never matched an already-catalogued branded product --
+       even one just picked straight from the autocomplete -- so a second, brand-prefixed junk
+       parent ("MILEX - PETROL ADDITIVE 5ML" alongside the real "PETROL ADDITIVE 5ML") got silently
+       created on nearly every branded push. Fixed: catalogItemName is now always the plain,
+       un-prefixed cleanNameRaw -- exactly what product_master.item_name actually stores. */
+    const catalogItemName = cleanNameRaw;
     if (typeSelect === 'Lube') { const packSelect = document.getElementById('nPackSize').value; volumeMlVal = packSelect === 'Custom' ? parseFloat(document.getElementById('nCustomML').value) : parseFloat(packSelect); if (!volumeMlVal || volumeMlVal <= 0) return alert("Please specify a valid ML volume for the lubricant."); finalItemName += ` (${volumeMlVal} ML)`; } let wareTarget = 'Green'; if(sessionRole === 'moped') wareTarget = 'Moped'; if(isServiceGroup) wareTarget = 'Service'; /* Fix (7 Sep 2026, 11A.27 continued): product_master.warehouse_type must be lowercase to match the exact-match filter used everywhere else (product-master-console.html, purchase-manager.html) — capitalized wareTarget stays exactly as-is below for job_card_items/UI routing (unrelated, untouched); this lowercase copy is used only for the product_master/product_variants writes just below. */ const wareTargetForCatalog = wareTarget.toLowerCase(); let metricTarget = isServiceGroup ? 'Pkg' : 'Pcs'; const calcInitialCost = qVal * rVal;
       // Phase 17 / F2 (16 Sep 2026): parent + variant are now always found-or-created the same
       // way purchase-manager.html and product-entry-modal.js already do — reusing an existing
