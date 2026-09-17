@@ -250,7 +250,7 @@ input,select,textarea{padding:8px;border:1px solid var(--border);border-radius:6
         <div class="field-group"><label>Amount (₹)</label><input type="number" id="expAmount"></div>
         <div class="field-group"><label>Cash / UPI</label><select id="expMode"><option>Cash</option><option>UPI</option></select></div>
         <div class="field-group" id="expEntityWrap" style="display:none;"><label>Entity</label><select id="expEntity"><option value="green">Green</option><option value="moped">Moped</option><option value="service">Service</option></select></div>
-        <div class="field-group" style="grid-column:1/-1;"><label>Description</label><input type="text" id="expNote" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="field-group" style="grid-column:1/-1;"><label>Description</label><input type="text" id="expNote" oninput="_ucKeepCursor(this)"></div>
         <button id="btnSaveExpense" class="btn-action" onclick="saveExpense()">💾 SAVE & PRINT TICKET</button>
         <button id="btnCancelExpenseEdit" class="btn-action" style="background:#e2e8f0;color:#1e293b;display:none;" onclick="cancelExpenseEdit()">CANCEL EDIT</button>
       </div>
@@ -272,6 +272,10 @@ const supabaseClient=supabase.createClient(SB_URL,SB_KEY);
 const activeRole=(localStorage.getItem('ERP_ACTIVE_ROLE')||'guest').toLowerCase();
 document.getElementById('roleDisplay').innerText=activeRole.toUpperCase();
 function executeSessionTermination(){localStorage.removeItem('ERP_ACTIVE_ROLE');window.location.href='login.html';}
+
+// Fix (Phase 17 / B6, 17 Sep 2026): standard cursor-preserving uppercase helper, applied here
+// because this page is already being touched for F3 -- see the Phase 17 tracker's B6 record.
+function _ucKeepCursor(el){const upper=el.value.toUpperCase();if(el.value===upper)return;const s=el.selectionStart,e=el.selectionEnd;el.value=upper;try{el.setSelectionRange(s,e);}catch(err){}}
 
 const urlParams=new URLSearchParams(window.location.search);
 const todayStr=new Date().toISOString().split('T')[0];
@@ -634,20 +638,33 @@ async function loadEodSummary(){
   window._systemCIH=cashInHand;
 
   // Fetch lube data for Workshop snapshot (parallel, non-blocking)
+  // Fix (Phase 17 / F3, 17 Sep 2026): brand used to be looked up via product_master_id, but since
+  // the product/variant rebuild (11F), brand lives on product_variants -- billing.html/pos-green.html
+  // have recorded variant_id on every job_card_items row since F2 shipped, so that's now used first
+  // (per the user's confirmed decision: group by the actual brand sold, not the parent product).
+  // product_master_id is kept as a fallback ONLY for older rows billed before F2 (no variant_id yet),
+  // so a past date's EOD snapshot doesn't regress to "Other" for everything -- new rows always have
+  // variant_id and use the accurate path.
   const lubeByBrand={};
   if(activeRole==='service'||activeRole==='admin'){
     const {data:lubeItems}=await supabaseClient.from('job_card_items')
-      .select('qty,volume_ml,product_master_id').gt('volume_ml',0)
+      .select('qty,volume_ml,variant_id,product_master_id').gt('volume_ml',0)
       .gte('created_at',activeDate+'T00:00:00').lte('created_at',activeDate+'T23:59:59');
     if(lubeItems&&lubeItems.length){
-      const pmIds=[...new Set(lubeItems.map(i=>i.product_master_id).filter(Boolean))];
+      const vIds=[...new Set(lubeItems.filter(i=>i.variant_id).map(i=>i.variant_id))];
+      const pmIds=[...new Set(lubeItems.filter(i=>!i.variant_id && i.product_master_id).map(i=>i.product_master_id))];
       let brandMap={};
+      if(vIds.length){
+        const {data:vs}=await supabaseClient.from('product_variants').select('id,brand').in('id',vIds);
+        (vs||[]).forEach(v=>brandMap['v:'+v.id]=v.brand||'Other');
+      }
       if(pmIds.length){
         const {data:pm}=await supabaseClient.from('product_master').select('id,brand').in('id',pmIds);
-        (pm||[]).forEach(p=>brandMap[p.id]=p.brand||'Other');
+        (pm||[]).forEach(p=>brandMap['p:'+p.id]=p.brand||'Other');
       }
       lubeItems.forEach(i=>{
-        const brand=brandMap[i.product_master_id]||'Other';
+        const key=i.variant_id?('v:'+i.variant_id):('p:'+i.product_master_id);
+        const brand=brandMap[key]||'Other';
         if(!lubeByBrand[brand]) lubeByBrand[brand]={qty:0,litres:0};
         lubeByBrand[brand].qty+=parseFloat(i.qty)||1;
         lubeByBrand[brand].litres+=(parseFloat(i.volume_ml)||0)*(parseFloat(i.qty)||1)/1000;
