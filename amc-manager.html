@@ -424,7 +424,7 @@
 
         const { data: jcs, error } = await supabaseClient
             .from('job_cards')
-            .select('id, created_at, closed_at, customer_mobile, mech_id, co_mech_id, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name), job_card_items(warehouse_type, item_name)')
+            .select('id, jc_number, created_at, closed_at, customer_mobile, mech_id, co_mech_id, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name), job_card_items(warehouse_type, item_name)')
             .eq('customer_mobile', mobile)
             .eq('vehicle_id', vehId)
             .eq('status', 'Closed');
@@ -459,7 +459,7 @@
             return;
         }
 
-        const jcRef = `JC-${matchingJc.id.split('-')[0].toUpperCase()}`;
+        const jcRef = matchingJc.jc_number || `JC-${matchingJc.id.split('-')[0].toUpperCase()}`;
         if (!confirm(`Engine Restoration found in ${jcRef}. Proceed with warranty registration?`)) return;
 
         const cDate = new Date(matchingJc.closed_at || matchingJc.created_at);
@@ -504,17 +504,17 @@
     async function printEngineWarranty(jcId) {
         const { data: jc, error } = await supabaseClient
             .from('job_cards')
-            .select('id, created_at, closed_at, customer_mobile, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name)')
+            .select('id, jc_number, created_at, closed_at, customer_mobile, total_invoice_value, vehicles(reg_number, make_model), mechanics!job_cards_mech_id_fkey(name), co_mechanics:mechanics!co_mech_id(name)')
             .eq('id', jcId)
             .single();
-            
+
         if (error || !jc) return alert("Error fetching JC details for print.");
 
         const { data: cust } = await supabaseClient.from('customers').select('name').eq('mobile_number', jc.customer_mobile).single();
         const { data: inv } = await supabaseClient.from('invoices').select('id').eq('job_card_id', jcId).single();
         const { data: vouchers } = await supabaseClient.from('engine_warranty_vouchers').select('service_number, scheduled_date').eq('job_card_id', jcId).order('service_number', {ascending: true});
 
-        const jcRef = `JC-${jcId.split('-')[0].toUpperCase()}`;
+        const jcRef = jc.jc_number || `JC-${jcId.split('-')[0].toUpperCase()}`;
         const invRef = inv ? `INV-${inv.id.split('-')[0].toUpperCase()}` : jcRef;
         const custName = cust ? cust.name : '--';
         const mechName = jc.mechanics?.name || '--';
@@ -600,11 +600,20 @@
         
         const tbody = document.getElementById('tbEngine');
         tbody.innerHTML = '';
-        
+
         if (!subs || subs.length === 0) {
             return tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#64748b;">No Engine Warranties currently active.</td></tr>';
         }
-        
+
+        // Phase 17 / F4: engine_warranty_vouchers only stores the raw job_cards.id, so one batch
+        // lookup covers every voucher's real jc_number at once, instead of the old raw-id fragment.
+        const voucherJcIds = [...new Set((vouchers||[]).map(v => v.job_card_id).filter(Boolean))];
+        let jcNumberByIdForVouchers = {};
+        if (voucherJcIds.length) {
+            const { data: voucherJcRows } = await supabaseClient.from('job_cards').select('id,jc_number').in('id', voucherJcIds);
+            (voucherJcRows||[]).forEach(j => { jcNumberByIdForVouchers[j.id] = j.jc_number; });
+        }
+
         const today = new Date();
         
         subs.forEach(sub => {
@@ -618,7 +627,7 @@
                 const v = subVouchers.find(x => x.service_number === i);
                 if (v) {
                     if (i === 1 && v.job_card_id) {
-                        jcRef = `JC-${v.job_card_id.split('-')[0].toUpperCase()}`;
+                        jcRef = jcNumberByIdForVouchers[v.job_card_id] || `JC-${v.job_card_id.split('-')[0].toUpperCase()}`;
                     }
                     
                     const sDate = new Date(v.scheduled_date);
