@@ -56,8 +56,8 @@
         <div class="card-panel">
             <div class="block-title">Master Vehicle Taxonomy</div>
             <div class="inputs-grid">
-                <div class="field-group"><label>Brand</label><input type="text" id="nBrand" placeholder="e.g. HONDA" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
-                <div class="field-group"><label>Model Name</label><input type="text" id="nModel" placeholder="e.g. SHINE 125" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></div>
+                <div class="field-group"><label>Brand</label><input type="text" id="nBrand" placeholder="e.g. HONDA" style="text-transform:uppercase;" oninput="_ucKeepCursor(this)"></div>
+                <div class="field-group"><label>Model Name</label><input type="text" id="nModel" placeholder="e.g. SHINE 125" style="text-transform:uppercase;" oninput="_ucKeepCursor(this)"></div>
                 <div class="field-group">
                     <label>Category Group</label>
                     <select id="nCat">
@@ -100,6 +100,17 @@
         const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5Y29pcnJwaHB2eGtyd3JqY3dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNTQxMTMsImV4cCI6MjA5MzkzMDExM30.mw7rEiJAX9mFRpLMCFifMNVgjXw6JJHA4RlQhR9gL3k";
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
         const sessionRole = localStorage.getItem('ERP_ACTIVE_ROLE') || 'guest';
+
+        // Fix (Phase 17 / B6, 17 Sep 2026): standard cursor-preserving uppercase helper, applied
+        // here because this page is already being touched for F3 -- see the Phase 17 tracker's B6
+        // page-by-page record.
+        function _ucKeepCursor(el) {
+            const upper = el.value.toUpperCase();
+            if (el.value === upper) return;
+            const s = el.selectionStart, e = el.selectionEnd;
+            el.value = upper;
+            try { el.setSelectionRange(s, e); } catch (err) {}
+        }
 
         function verifyManagementPrivileges() {
             document.getElementById('roleDisplay').innerText = sessionRole;
@@ -167,36 +178,61 @@
             });
         }
 
+        // Fix (Phase 17 / F3, 17 Sep 2026): all three lookups below used to read item_name/brand/
+        // current_stock/default_price straight off product_master -- since the product/variant/lot
+        // rebuild (11F), brand and the real live stock/price only exist on product_variants (and,
+        // for stock/price specifically, per individual product_variant_lots batch). A product with
+        // more than one brand would also only ever show once here instead of once per brand. Every
+        // lookup now goes through product_variants, and stock/price is summed/picked from that
+        // variant's real lots the same way the inventory-lookup.html fix above does.
+        function _variantToRow(v) {
+            const parent = v.product_master || {};
+            const lots = v.product_variant_lots || [];
+            const totalStock = lots.reduce((s,l)=>s+(l.current_qty||0), 0);
+            const bestLot = lots.slice().sort((a,b)=>(b.current_qty||0)-(a.current_qty||0))[0] || null;
+            return { item_name: parent.item_name||'', brand: v.brand||'', current_stock: totalStock, default_price: (bestLot && bestLot.sell_price) || 0 };
+        }
+
         async function loadCompatProducts() {
             const model = document.getElementById('compatVehicleSelect').value;
             if (!model) return;
             const container = document.getElementById('compatProductList');
             container.innerHTML = 'Loading dataset...';
-            
+
+            const VARIANT_SELECT = 'brand, product_variant_lots(current_qty,sell_price), product_master(item_name,scope,compatibility_tags)';
+
             // Group-linked products
             const {data:gLinks} = await supabaseClient.from('product_group_vehicles').select('group_id').eq('vehicle_model',model);
             let groupProds = [];
             if (gLinks?.length>0) {
                 const {data:grps} = await supabaseClient.from('product_groups').select('product_master_id,group_name').in('id',gLinks.map(g=>g.group_id));
                 if (grps?.length>0) {
-                    const {data:prods} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').in('id',grps.map(g=>g.product_master_id));
-                    groupProds = prods||[];
+                    const {data:variants} = await supabaseClient.from('product_variants').select(VARIANT_SELECT).in('parent_product_id',grps.map(g=>g.product_master_id));
+                    groupProds = (variants||[]).map(_variantToRow);
                 }
             }
-            
-            // Tag-linked products
-            const {data:tagProds} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').ilike('compatibility_tags','%'+model+'%');
-                
+
+            // Tag-linked products -- compatibility_tags lives on the parent, so the filter has to
+            // apply to the embedded product_master row (!inner makes that an actual join filter,
+            // not just a post-fetch embed).
+            const {data:tagVariants} = await supabaseClient.from('product_variants')
+                .select(VARIANT_SELECT.replace('product_master(', 'product_master!inner('))
+                .ilike('product_master.compatibility_tags', '%'+model+'%');
+            const tagProds = (tagVariants||[]).map(_variantToRow);
+
             // Universal products
-            const {data:uniProds} = await supabaseClient.from('product_master').select('item_name,brand,current_stock,default_price').eq('scope','universal').limit(10);
-                
-            const all = [...groupProds,...(tagProds||[]),...(uniProds||[])];
-            
+            const {data:uniVariants} = await supabaseClient.from('product_variants')
+                .select(VARIANT_SELECT.replace('product_master(', 'product_master!inner('))
+                .eq('product_master.scope', 'universal').limit(10);
+            const uniProds = (uniVariants||[]).map(_variantToRow);
+
+            const all = [...groupProds,...tagProds,...uniProds];
+
             if (all.length===0) {
                 container.innerHTML='No products linked yet. Add compatibility in Product Catalog Console.';
                 return;
             }
-            
+
             container.innerHTML = all.map(p=>`
                 <div style="display:flex;justify-content:space-between;padding:8px 0; border-bottom:1px solid var(--border);font-size:0.85rem;">
                     <span><strong style="color:var(--primary);">${p.item_name}</strong>
