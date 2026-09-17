@@ -134,7 +134,7 @@
             // rules silently dropping it -- same fix already applied to product-master-console.html.
             globalCatalog = (variants||[]).filter(v => (v.catalog_status||'live') !== 'inactive');
 
-            const { data: jcs } = await supabaseClient.from('job_cards').select('id, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
+            const { data: jcs } = await supabaseClient.from('job_cards').select('id, jc_number, customer_mobile, vehicles(reg_number, make_model)').eq('status', 'Open');
             openJobCards = jcs || [];
             
             document.getElementById('searchInput').addEventListener('input', () => {
@@ -249,8 +249,9 @@
             openJobCards.forEach(jc => {
                 const reg = jc.vehicles?.reg_number || 'UNKNOWN';
                 const mod = jc.vehicles?.make_model || '';
-                list.innerHTML += `<div class="jc-row" onclick="addToJobCard('${jc.id}', '${reg}')">
-                    <div><strong style="color:var(--info);">JC-${jc.id.split('-')[0].toUpperCase()}</strong> — ${reg} (${mod})</div>
+                const jcNum = jc.jc_number || ('JC-'+jc.id.split('-')[0].toUpperCase());
+                list.innerHTML += `<div class="jc-row" onclick="addToJobCard('${jc.id}', '${reg}', '${jcNum}')">
+                    <div><strong style="color:var(--info);">${jcNum}</strong> — ${reg} (${mod})</div>
                     <div style="color:#64748b; font-size:0.85rem; font-weight:bold;">${jc.customer_mobile||''}</div>
                 </div>`;
             });
@@ -259,7 +260,7 @@
 
         function closeJcModal() { document.getElementById('jcModal').style.display = 'none'; activeProductForJc = null; }
 
-        async function addToJobCard(jcId, regNumber) {
+        async function addToJobCard(jcId, regNumber, jcNumber) {
             if(!activeProductForJc) return;
             
             // BUG FIX: Fetch user-confirmed rate and qty from modal
@@ -294,7 +295,7 @@
             
             closeJcModal();
             // EXPLICIT CONFIRMATION 
-            alert(`✅ SUCCESS!\n\nAdded: ${finalQty}x ${activeProductForJc.name}\nTo: ${regNumber} (JC-${jcId.split('-')[0].toUpperCase()})\nRate: ₹${finalRate}`);
+            alert(`✅ SUCCESS!\n\nAdded: ${finalQty}x ${activeProductForJc.name}\nTo: ${regNumber} (${jcNumber || 'JC-'+jcId.split('-')[0].toUpperCase()})\nRate: ₹${finalRate}`);
         }
 
         function startPosSale(pid) {
