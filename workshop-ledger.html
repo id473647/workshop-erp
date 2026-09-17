@@ -337,7 +337,9 @@ async function loadTabData(tabId){
 // ─── SHARED HELPERS ──────────────────────────────────────────────────────────
 function fmt(n){n=parseFloat(n)||0; return '₹'+Math.round(n).toLocaleString('en-IN');}
 function dashOrFmt(n){n=parseFloat(n)||0; return n===0?'<span class="dash">—</span>':fmt(n);}
-function jcRef(id){return 'JC-'+id.split('-')[0].toUpperCase();}
+// Phase 17 / F4: jcRef() now prefers a real jc_number when the caller has one (pass it as the 2nd
+// arg); falls back to the old raw-id-fragment format only when a row's jc_number isn't in hand.
+function jcRef(id,num){return num || ('JC-'+id.split('-')[0].toUpperCase());}
 
 async function prefetchStaticData(){
   const {data:mechs}=await supabaseClient.from('mechanics').select('id,name,commission_rate,staff_role').eq('is_active',true);
@@ -417,7 +419,7 @@ async function loadJcDetails(){
 
     const tr=document.createElement('tr'); tr.className=rowClass;
     tr.innerHTML=`<td><span class="arrow" id="arr-${idx}">▶</span></td>
-      <td><b>${jcRef(j.id)}</b>${openBadge}<br><span style="font-size:.75rem;color:#64748b;">${j.vehicles?.reg_number||''} ${j.vehicles?.make_model||''}</span></td>
+      <td><b>${jcRef(j.id,j.jc_number)}</b>${openBadge}<br><span style="font-size:.75rem;color:#64748b;">${j.vehicles?.reg_number||''} ${j.vehicles?.make_model||''}</span></td>
       <td>${mechName(j.mech_id)}</td>
       <td>${dashOrFmt(grn)}</td><td>${dashOrFmt(mop)}</td><td>${dashOrFmt(lab)}</td><td>${dashOrFmt(lathe)}</td><td>${payStr}</td>`;
     tr.onclick=()=>toggleJcRow(idx,j);
@@ -502,7 +504,7 @@ function renderJcSummary(rows){
   const noteEl=document.getElementById('jcOpenNote');
   if(open.length>0){
     noteEl.style.display='block';
-    const openList=open.map(j=>`${jcRef(j.id)} (Advance: ${fmt(j.advance_service)}, Billing: ${fmt((parseFloat(j.green_total)||0)+(parseFloat(j.moped_total)||0)+(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0))})`).join(', ');
+    const openList=open.map(j=>`${jcRef(j.id,j.jc_number)} (Advance: ${fmt(j.advance_service)}, Billing: ${fmt((parseFloat(j.green_total)||0)+(parseFloat(j.moped_total)||0)+(parseFloat(j.labour_charges)||0)+(parseFloat(j.lathe_welding)||0))})`).join(', ');
     noteEl.innerHTML=`⚠️ <b>${open.length} OPEN JC(s)</b> shown because advance was collected on this date — not included in crosscheck. Formal closure pending: ${openList}`;
   } else {
     noteEl.style.display='none';
@@ -560,7 +562,7 @@ async function loadEodSummary(){
     // to be. Queried separately, keyed by the advance's own payment timestamp (not the job's
     // eventual closed_at), so each rupee is counted on the one date it was actually collected —
     // never double-counted on a later day once the job closes.
-    supabaseClient.from('job_cards').select('id,advance_service,advance_service_mode,advance_service_paid_at,green_total,moped_total,labour_charges,lathe_welding,status')
+    supabaseClient.from('job_cards').select('id,jc_number,advance_service,advance_service_mode,advance_service_paid_at,green_total,moped_total,labour_charges,lathe_welding,status')
       .neq('status','Closed').gt('advance_service',0)
       .gte('advance_service_paid_at',activeDate+'T00:00:00').lte('advance_service_paid_at',activeDate+'T23:59:59')
   ]);
@@ -572,6 +574,10 @@ async function loadEodSummary(){
   /* STEP 5: Check if any JC from this date was amended AFTER it was closed
      If the EOD was locked and a JC was subsequently amended, admin needs to know. */
   let eodAmendments=[];
+  // Phase 17 / F4: jobs already carries jc_number (fetched via select('*') above), so a lookup map
+  // is built here instead of re-querying it -- used below to show the real JC number on each
+  // amendment banner line instead of the old raw-id-fragment construction.
+  const jcNumberById={}; (jobs||[]).forEach(j=>{ jcNumberById[j.id]=j.jc_number; });
   const jcIds=(jobs).map(j=>j.id);
   if(jcIds.length>0){
     const{data:amends}=await supabaseClient.from('jc_amendments')
@@ -710,7 +716,7 @@ async function loadEodSummary(){
           ℹ️ <b>${fmt(openAdvTotal)}</b> advance collected today from ${openAdvJobs.length} still-OPEN job card${openAdvJobs.length>1?'s':''}
           (Cash: ${fmt(openAdvCash)}, UPI: ${fmt(openAdvUpi)}) — <b>included</b> in Workshop Cash IN / UPI IN above,
           but <b>not yet</b> in Total Billing (T) or the crosscheck (job not yet closed):
-          ${openAdvJobs.map(j=>`${jcRef(j.id)} (${fmt(parseFloat(j.advance_service)||0)} ${(j.advance_service_mode||'Cash')})`).join(', ')}
+          ${openAdvJobs.map(j=>`${jcRef(j.id,j.jc_number)} (${fmt(parseFloat(j.advance_service)||0)} ${(j.advance_service_mode||'Cash')})`).join(', ')}
         </div>`
       : '';
 
@@ -720,7 +726,7 @@ async function loadEodSummary(){
         <div style="font-weight:700;color:#854d0e;margin-bottom:6px;">⚠️ ${eodAmendments.length} JC Amendment${eodAmendments.length>1?'s':''} made after EOD date — figures below are CORRECTED</div>
         <div style="font-size:.78rem;color:#92400e;">Original EOD locked figures may differ. The corrected amounts are shown here. Check eod_cash_logs for the locked figures.</div>
         ${eodAmendments.map(a=>`<div style="font-size:.75rem;border-top:1px solid #fde68a;margin-top:6px;padding-top:4px;">
-          <strong>JC-${a.job_card_id.split('-')[0].toUpperCase()}</strong> — amended ${new Date(a.amended_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+          <strong>${jcNumberById[a.job_card_id] || 'JC-'+a.job_card_id.split('-')[0].toUpperCase()}</strong> — amended ${new Date(a.amended_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
           by ${a.amended_by?.toUpperCase()} &nbsp;|&nbsp; ${a.amendment_note}
           &nbsp;|&nbsp; Fields: ${(a.fields_changed||[]).join(', ')||'not recorded'}
         </div>`).join('')}
@@ -1189,7 +1195,7 @@ function exportMechEarningsExcel(){
 // ─── LUBE ISSUED TAB ─────────────────────────────────────────────────────────
 async function loadLubeIssued(){
   const tbody=document.getElementById('lubeTableBody'); tbody.innerHTML='<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
-  let q=supabaseClient.from('job_card_items').select('*,job_cards!inner(id,status,closed_at)').not('volume_ml','is',null).gt('volume_ml',0)
+  let q=supabaseClient.from('job_card_items').select('*,job_cards!inner(id,jc_number,status,closed_at)').not('volume_ml','is',null).gt('volume_ml',0)
     .gte('job_cards.closed_at',activeDate+'T00:00:00').lte('job_cards.closed_at',activeDate+'T23:59:59').eq('job_cards.status','Closed');
   if(activeRole==='green') q=q.eq('warehouse_type','Green');
   if(activeRole==='moped') q=q.eq('warehouse_type','Moped');
@@ -1197,7 +1203,7 @@ async function loadLubeIssued(){
   if(error){tbody.innerHTML=`<tr><td colspan="6" style="color:red;">${error.message}</td></tr>`;return;}
   if(!data||data.length===0){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No lube issued.</td></tr>';return;}
   data.forEach(l=>{const vol=(parseFloat(l.qty)||0)*(parseFloat(l.volume_ml)||0);
-    tbody.innerHTML+=`<tr><td>${jcRef(l.job_card_id)}</td><td>${l.warehouse_type}</td><td>${l.item_name}</td><td>${l.qty}</td><td>${(vol/1000).toFixed(2)}</td><td>${fmt(l.total_price)}</td></tr>`;});
+    tbody.innerHTML+=`<tr><td>${jcRef(l.job_card_id,l.job_cards?.jc_number)}</td><td>${l.warehouse_type}</td><td>${l.item_name}</td><td>${l.qty}</td><td>${(vol/1000).toFixed(2)}</td><td>${fmt(l.total_price)}</td></tr>`;});
 }
 
 // ─── POS TABS ─────────────────────────────────────────────────────────────────
@@ -1230,8 +1236,16 @@ async function loadCreditCollections(){
   let rows=data||[];
   if(activeRole==='green'||activeRole==='moped') rows=rows.filter(p=>p.paid_by_role===activeRole);
   if(rows.length===0){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No collections today.</td></tr>';return;}
+  // Phase 17 / F4: one batch lookup covers every job_card_id referenced in today's collections,
+  // so jcRef() below can show the real jc_number instead of a raw-id fragment.
+  const collJcIds=[...new Set(rows.map(p=>p.job_card_id).filter(Boolean))];
+  let jcNumberByIdForCollections={};
+  if(collJcIds.length){
+    const {data:collJcRows}=await supabaseClient.from('job_cards').select('id,jc_number').in('id',collJcIds);
+    (collJcRows||[]).forEach(j=>{jcNumberByIdForCollections[j.id]=j.jc_number;});
+  }
   rows.forEach(p=>{
-    const ref=p.sale_id?'POS-'+p.sale_id.split('-')[0].toUpperCase():(p.job_card_id?jcRef(p.job_card_id):'Opening Bal');
+    const ref=p.sale_id?'POS-'+p.sale_id.split('-')[0].toUpperCase():(p.job_card_id?jcRef(p.job_card_id,jcNumberByIdForCollections[p.job_card_id]):'Opening Bal');
     tbody.innerHTML+=`<tr><td>${ref}</td><td>${p.customer_mobile||''}</td><td>${fmt(p.amount_paid)}</td><td>${p.payment_mode||''}</td><td>${p.paid_by_role||''}</td></tr>`;
   });
 }
@@ -1515,7 +1529,7 @@ function printJcDetails(){
     const lab=parseFloat(j.labour_charges)||0;
     const lathe=parseFloat(j.lathe_welding)||0;
     const payCell=isOpen?`Adv ${fmt(j.advance_service)} — OPEN`:`Cash ${fmt(j.cash_amount)} UPI ${fmt(j.upi_amount)} Cr ${fmt(j.credit_amount)}`;
-    rows+=`<tr style="${isOpen?'background:#fffbeb;':''}"><td>${jcRef(j.id)}${isOpen?' [OPEN]':''}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>${fmt(lathe)}</td><td>${payCell}</td></tr>`;
+    rows+=`<tr style="${isOpen?'background:#fffbeb;':''}"><td>${jcRef(j.id,j.jc_number)}${isOpen?' [OPEN]':''}</td><td>${j.vehicles?.reg_number||''}</td><td>${mechName(j.mech_id)}</td><td>${fmt(grn)}</td><td>${fmt(mop)}</td><td>${fmt(lab)}</td><td>${fmt(lathe)}</td><td>${payCell}</td></tr>`;
   });
   openPrintWindow('JC Details '+activeDate,`<h2>MY CARE — JC DAILY REGISTER — ${activeDate}</h2>${summaryTable}${ccLine}${openNote}
     <table><thead><tr><th>JC No</th><th>Vehicle</th><th>Mechanic</th><th>Net Grn</th><th>Net Mop</th><th>Net Labour</th><th>Net Lathe</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>`,'A4 landscape');
