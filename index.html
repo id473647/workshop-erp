@@ -692,7 +692,12 @@ async function queryMasterJobRegisters() {
             if (!queryVal) return true;
             return (row.customer_mobile && row.customer_mobile.includes(queryVal))
                 || (row.vehicles?.reg_number && row.vehicles.reg_number.toLowerCase().includes(queryVal))
-                || (row.id && row.id.toLowerCase().includes(queryVal));
+                || (row.id && row.id.toLowerCase().includes(queryVal))
+                // Phase 17 / F4: also match the real jc_number (e.g. "JC-2026091701" or just
+                // "2026091701"), so a JC found by its NEW reference is searchable too -- the
+                // old raw-id-fragment match above is left in place so anything written down
+                // before this migration (the old-style "JC-550E8400" reference) still works.
+                || (row.jc_number && row.jc_number.toLowerCase().includes(queryVal));
         });
 
         if (!filtered.length) { tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">No records found.</td></tr>`; return; }
@@ -802,7 +807,7 @@ async function queryMasterJobRegisters() {
             tbody.innerHTML += `<tr ${rowBg}>
                 <td>
                     <a class="clickable-ref" href="billing.html?id=${job.id}">${model}${color}</a>
-                    <span style="font-size:0.67rem;color:#94a3b8;">JC-${job.id.split('-')[0].toUpperCase()}</span>
+                    <span style="font-size:0.67rem;color:#94a3b8;">${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</span>
                     ${probHtml}
                     ${timeHtml}
                 </td>
@@ -837,13 +842,22 @@ async function pollAdminOverrides() {
     const list  = document.getElementById('overrideQueueList');
     if (error||!data||!data.length) { block.style.display='none'; return; }
     block.style.display='block';
+    // Phase 17 / F4: approval_requests.payload only ever stored the raw job_cards.id, so a real
+    // jc_number was never available here without a lookup -- one small query covers every pending
+    // item in this queue at once (usually a handful), instead of the old raw-id-fragment display.
+    const jcIdsInQueue = [...new Set(data.map(req => req.payload?.jc_id).filter(Boolean))];
+    let jcNumberById = {};
+    if (jcIdsInQueue.length) {
+        const { data: jcRows } = await supabaseClient.from('job_cards').select('id,jc_number').in('id', jcIdsInQueue);
+        (jcRows||[]).forEach(j => { jcNumberById[j.id] = j.jc_number; });
+    }
     list.innerHTML = data.map(req => {
         const jcId   = req.payload?.jc_id||'UNKNOWN';
         const disc   = req.payload?.requested_discount||0;
         const total  = req.payload?.total_bill_value||0;
-        const short  = jcId.split('-')[0].toUpperCase();
+        const jcRef  = jcNumberById[jcId] || ('JC-'+jcId.split('-')[0].toUpperCase());
         return `<div class="override-queue-item">
-            <div><strong style="color:var(--danger);">JC-${short} — Override Needed</strong><br>
+            <div><strong style="color:var(--danger);">${jcRef} — Override Needed</strong><br>
             <span style="font-size:0.82rem;color:#64748b;">Requesting <b>₹${disc}</b> discount on ₹${total} bill.</span></div>
             <button class="btn-review" onclick="openOverrideModal('${req.id}','${jcId}',${disc},${total})">REVIEW</button>
         </div>`;
@@ -853,14 +867,14 @@ async function pollAdminOverrides() {
 async function openOverrideModal(reqId, jcId, discAmt, totalBill) {
     activeOverrideReqId    = reqId;
     requiredOverrideAmount = parseFloat(discAmt);
-    document.getElementById('orRefHash').innerText       = `JC-${jcId.split('-')[0].toUpperCase()}`;
     document.getElementById('orTotalBill').innerText     = totalBill;
     document.getElementById('orRequestedDisc').innerText = discAmt;
     document.getElementById('toggleProMode').checked     = false;
     toggleProMarginMode(false);
     ['allocGrn','allocMop','allocLab','allocLathe'].forEach(id => { document.getElementById(id).value=0; document.getElementById(id).style.borderColor='var(--border)'; });
 
-    const { data:jc    } = await supabaseClient.from('job_cards').select('labour_charges,lathe_welding').eq('id',jcId).single();
+    const { data:jc    } = await supabaseClient.from('job_cards').select('jc_number,labour_charges,lathe_welding').eq('id',jcId).single();
+    document.getElementById('orRefHash').innerText = jc?.jc_number || ('JC-'+jcId.split('-')[0].toUpperCase());
     const { data:items } = await supabaseClient.from('job_card_items').select('*').eq('job_card_id',jcId);
     let gGross=0, mGross=0, sGross=0;
     const tbody = document.getElementById('orTableBody'); tbody.innerHTML='';
