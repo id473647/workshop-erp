@@ -199,7 +199,7 @@
             const container = document.getElementById('tab-jobs'); container.innerHTML = '<p>Loading...</p>';
             const fourMonthsAgo = new Date(); fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
             
-            const { data: jobs } = await supabaseClient.from('job_cards').select('id, vehicle_id, created_at, status, total_invoice_value, labour_charges, mech_id, is_reviewed, vehicles(reg_number)').eq('customer_mobile', currentCustomer.mobile_number).gte('created_at', fourMonthsAgo.toISOString()).order('created_at', { ascending: false });
+            const { data: jobs } = await supabaseClient.from('job_cards').select('id, jc_number, vehicle_id, created_at, status, total_invoice_value, labour_charges, mech_id, is_reviewed, vehicles(reg_number)').eq('customer_mobile', currentCustomer.mobile_number).gte('created_at', fourMonthsAgo.toISOString()).order('created_at', { ascending: false });
             
             if(!jobs || jobs.length === 0) { container.innerHTML = '<p>कोई जॉब कार्ड नहीं मिला।</p>'; return; }
 
@@ -218,7 +218,7 @@
                 container.innerHTML += `
                     <div class="card">
                         <div class="card-header">
-                            <span>JC-${job.id.split('-')[0].toUpperCase()}</span>
+                            <span>${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</span>
                             <span class="${job.status === 'Open' ? 'status-open' : 'status-closed'}">${job.status}</span>
                         </div>
                         <p><strong>Vehicle:</strong> ${job.vehicles?.reg_number || 'Unknown'}</p>
