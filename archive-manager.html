@@ -301,14 +301,16 @@
         const jcFiltered = localMemoryArchiveCache.jc.filter(j => {
             if(!j) return false;
             const matchClient = (j.customer_mobile && j.customer_mobile.toLowerCase().includes(qClient)) || (j.customer_name && j.customer_name.toLowerCase().includes(qClient));
-            const matchHash = j.id && j.id.toLowerCase().includes(qHash);
+            // Phase 17 / F4: match either the old raw-id fragment or the real jc_number,
+            // if the archived record has one (older archives made before F4 won't).
+            const matchHash = (j.id && j.id.toLowerCase().includes(qHash)) || (j.jc_number && j.jc_number.toLowerCase().includes(qHash));
             return (!qClient || matchClient) && (!qHash || matchHash);
         }).slice(0, 50);
 
         if(jcFiltered.length > 0) {
             jcFiltered.forEach(j => {
                 const dStr = j.closed_at ? new Date(j.closed_at).toLocaleDateString() : 'N/A';
-                jBody.innerHTML += `<tr><td><strong>JC-${j.id.split('-')[0].toUpperCase()}</strong></td><td>${j.customer_mobile || 'Walk-in'}</td><td>${dStr}</td><td><strong>₹${j.total_invoice_value || 0}</strong></td></tr>`;
+                jBody.innerHTML += `<tr><td><strong>${j.jc_number || 'JC-'+j.id.split('-')[0].toUpperCase()}</strong></td><td>${j.customer_mobile || 'Walk-in'}</td><td>${dStr}</td><td><strong>₹${j.total_invoice_value || 0}</strong></td></tr>`;
             });
         } else jBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:#888;">No historical workshop elements map selection boundaries.</td></tr>';
 
