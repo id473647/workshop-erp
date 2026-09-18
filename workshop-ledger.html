@@ -1425,8 +1425,13 @@ function toggleHeadingMode(){
   document.getElementById('expVendorFieldWrap').style.display=stakeholderMode?'flex':'none';
   document.getElementById('expNewCategoryWrap').style.display='none';
   document.getElementById('expNewVendorWrap').style.display='none';
-  if(stakeholderMode) populateVendorDropdown(val);
-  else populateCategoryDropdown(val);
+  // Bugfix (18 Sep 2026, live report -- Green/Service saw no name box the first time a heading had
+  // zero vendors/heads visible to them): rebuilding the dropdown can silently leave it defaulted to
+  // "Add New..." (its only option) without firing a change event, since nothing here actually changes
+  // the selected value by hand. Explicitly re-sync the box to whatever the dropdown now holds, every
+  // time it's rebuilt -- not just on a user-driven onchange.
+  if(stakeholderMode){ populateVendorDropdown(val); toggleNewVendorBox(); }
+  else { populateCategoryDropdown(val); toggleNewCategoryBox(); }
 }
 // Admin-only in practice (the dropdown option itself only renders for Admin) -- no approval queue
 // needed here, since Admin IS the approver for everything else.
