@@ -1495,8 +1495,13 @@ async function addNewVendor(){
     return dupe.id;
   }
   const isAdmin=activeRole==='admin';
+  // Bugfix (18 Sep 2026, live report -- "null value in column vendor_category ... violates not-null
+  // constraint"): vendor_category is a real NOT-NULL column on the live expense_vendors table (legacy
+  // from the dead workshop_expenses.html page's hardcoded 5-category list), not an optional/unused
+  // one as first assumed. main_heading_id is now the real classification going forward, so this just
+  // satisfies the constraint with the heading's own name -- nothing downstream reads vendor_category.
   const {data,error}=await supabaseClient.from('expense_vendors').insert({
-    vendor_name:raw, main_heading_id:heading?.id, is_active:true, created_by:activeRole, pending_admin_approval:!isAdmin
+    vendor_name:raw, vendor_category:headingName, main_heading_id:heading?.id, is_active:true, created_by:activeRole, pending_admin_approval:!isAdmin
   }).select('*').single();
   if(error){ alert('Could not create new vendor/account: '+error.message); return null; }
   vendorCache.push(data);
