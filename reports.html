@@ -88,6 +88,8 @@
             <!-- Sub-Phase 11D.32: GST Purchase/Sales Registers -->
             <button class="tab-btn" onclick="switchTab('tabGstPurchase',this)" id="btnTabGstPurchase">🧾 GST Purchase Register</button>
             <button class="tab-btn" onclick="switchTab('tabGstSales',this)" id="btnTabGstSales">🧾 GST Sales Register</button>
+            <!-- Phase 17 / F6: printable/downloadable ledger for one custom expense head -->
+            <button class="tab-btn" onclick="switchTab('tabExpenseLedger',this)" id="btnTabExpenseLedger">💸 Expense Ledger</button>
         </div>
 
         <div id="tabAnalytics" class="view-panel active">
@@ -274,6 +276,30 @@
                     <thead><tr><th>Date</th><th>Bill No</th><th>Source</th><th>Entity</th><th>Customer</th><th>GSTIN</th><th>Type</th><th>Taxable Value (₹)</th><th>CGST (₹)</th><th>SGST (₹)</th><th>IGST (₹)</th><th>Total (₹)</th></tr></thead>
                     <tbody id="gsBody"><tr><td colspan="12" style="text-align:center;color:#64748b;padding:20px;">Select filters and click RUN</td></tr></tbody>
                     <tfoot id="gsFoot" style="background:#e2e8f0;font-weight:900;"></tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── Phase 17 / F6: EXPENSE LEDGER BY HEAD ─────────────────────── -->
+        <div id="tabExpenseLedger" class="view-panel">
+            <div class="inputs-grid" style="background:#f1f5f9;padding:12px;border-radius:8px;">
+                <div class="field-group"><label>Main Heading</label><select id="elHeading" onchange="toggleElHeadingMode()"><option value="">-- Select Main Heading --</option></select></div>
+                <div class="field-group" id="elHeadFieldWrap"><label>Expense Head</label><select id="elHead"><option value="">-- Select Head --</option></select></div>
+                <div class="field-group" id="elVendorFieldWrap" style="display:none;"><label>Vendor / Account</label><select id="elVendor"><option value="">-- Select Vendor/Account --</option></select></div>
+                <div class="field-group"><label>Start Date</label><input type="date" id="elStart"></div>
+                <div class="field-group"><label>End Date</label><input type="date" id="elEnd"></div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-action" style="background:var(--primary);flex:1;" onclick="runExpenseLedger()">RUN</button>
+                    <button class="btn-action" style="background:#15803d;" onclick="exportToExcel('tbExpenseLedger','Expense_Ledger')">📊 EXCEL</button>
+                    <button class="btn-action" style="background:var(--text);" onclick="window.print()">🖨️ PDF</button>
+                </div>
+            </div>
+            <div id="elScopeNote" style="font-size:0.8rem;color:#64748b;margin-bottom:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid var(--border);"></div>
+            <div class="table-wrapper">
+                <table class="data-table" id="tbExpenseLedger">
+                    <thead><tr><th>Date</th><th>Amount (₹)</th><th>Mode</th><th>Entity</th><th>Note</th><th>Recorded By</th></tr></thead>
+                    <tbody id="elBody"><tr><td colspan="6" style="text-align:center;color:#64748b;padding:20px;">Select a head and date range, then click RUN</td></tr></tbody>
+                    <tfoot id="elFoot" style="background:#e2e8f0;font-weight:900;"></tfoot>
                 </table>
             </div>
         </div>
@@ -506,6 +532,98 @@
         }
         document.getElementById('gpStart').value = today; document.getElementById('gpEnd').value = today;
         document.getElementById('gsStart').value = today; document.getElementById('gsEnd').value = today;
+
+        // Phase 17 / F6: Expense Ledger tab defaults + scope note
+        document.getElementById('elStart').value = today; document.getElementById('elEnd').value = today;
+        document.getElementById('elScopeNote').innerText = activeRole === 'admin'
+            ? 'Showing every login\'s entries for the selected head.'
+            : 'Showing only expenses YOU recorded under the selected head (per the Reports Universal Rule — each login sees reports for data it can add/edit). Ask Admin for the full ledger.';
+        populateElHeadings();
+    }
+
+    // ==========================================
+    // Phase 17 / F6 (main-heading round): EXPENSE LEDGER BY MAIN HEADING → HEAD or VENDOR/ACCOUNT
+    // ==========================================
+    let elHeadingCache = [], elCategoryCache = [], elVendorCache = [];
+    const EL_STAKEHOLDER_HEADINGS = ['Lathe/Welding Expenses', 'Bank Transfer'];
+    async function populateElHeadings() {
+        const [{ data: hData }, { data: cData }, { data: vData }] = await Promise.all([
+            supabaseClient.from('expense_main_headings').select('*').eq('is_active', true).order('sort_order'),
+            supabaseClient.from('expense_categories').select('*').eq('is_active', true).order('sort_order'),
+            supabaseClient.from('expense_vendors').select('*').eq('is_active', true).order('vendor_name')
+        ]);
+        elHeadingCache = hData || []; elCategoryCache = cData || []; elVendorCache = vData || [];
+        const sel = document.getElementById('elHeading');
+        sel.innerHTML = '<option value="">-- Select Main Heading --</option>' + elHeadingCache.map(h => `<option value="${h.name}">${h.name}</option>`).join('');
+        toggleElHeadingMode();
+    }
+    function toggleElHeadingMode() {
+        const headingName = document.getElementById('elHeading').value;
+        const stakeholderMode = EL_STAKEHOLDER_HEADINGS.includes(headingName);
+        document.getElementById('elHeadFieldWrap').style.display = stakeholderMode ? 'none' : 'flex';
+        document.getElementById('elVendorFieldWrap').style.display = stakeholderMode ? 'flex' : 'none';
+        const heading = elHeadingCache.find(h => h.name === headingName);
+        if (stakeholderMode) {
+            const visible = elVendorCache.filter(v => v.main_heading_id === heading?.id && (!v.pending_admin_approval || activeRole === 'admin' || v.created_by === activeRole));
+            document.getElementById('elVendor').innerHTML = '<option value="">-- Select Vendor/Account --</option>' + visible.map(v => `<option value="${v.id}">${v.vendor_name}${v.pending_admin_approval ? ' ⏳' : ''}</option>`).join('');
+        } else {
+            // Same visibility rule as workshop-ledger.html's own Category dropdown: a head shows here
+            // once it's approved, or if THIS login is the one who proposed it -- Admin always sees
+            // every head, approved or not. Scoped to whichever main heading is currently selected (or
+            // to every head, if no heading has been picked yet).
+            const visible = elCategoryCache.filter(c => (!headingName || c.main_heading_id === heading?.id) && (!c.pending_admin_approval || activeRole === 'admin' || c.created_by === activeRole));
+            document.getElementById('elHead').innerHTML = '<option value="">-- Select Head --</option>' + visible.map(c => `<option value="${c.name}">${c.name}${c.pending_admin_approval ? ' ⏳' : ''}</option>`).join('');
+        }
+    }
+
+    async function runExpenseLedger() {
+        const headingName = document.getElementById('elHeading').value;
+        const stakeholderMode = EL_STAKEHOLDER_HEADINGS.includes(headingName);
+        const head = document.getElementById('elHead').value;
+        const vendorId = document.getElementById('elVendor').value;
+        const start = document.getElementById('elStart').value;
+        const end = document.getElementById('elEnd').value;
+        const tbody = document.getElementById('elBody');
+        const tfoot = document.getElementById('elFoot');
+        if (!headingName) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">Select a main heading first.</td></tr>'; tfoot.innerHTML = ''; return; }
+        if (stakeholderMode && !vendorId) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">Select a vendor/account first.</td></tr>'; tfoot.innerHTML = ''; return; }
+        if (!stakeholderMode && !head) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">Select an expense head first.</td></tr>'; tfoot.innerHTML = ''; return; }
+        if (!start || !end) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">Select a start and end date.</td></tr>'; tfoot.innerHTML = ''; return; }
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Loading...</td></tr>'; tfoot.innerHTML = '';
+
+        let q = supabaseClient.from('workshop_expenses').select('*')
+            .gte('created_at', start + 'T00:00:00').lte('created_at', end + 'T23:59:59')
+            .order('created_at', { ascending: true });
+        // Stakeholder mode (Lathe/Welding, Bank Transfer): filter by heading NAME + the specific
+        // vendor/account's id, so this delivers a clean per-vendor ledger (point A of the user's
+        // request) — the same identifier already relied on by mech-portal.html / purchase-manager.html.
+        // Named-head mode: unchanged from the first F6 build, filtered by the head's own name.
+        if (stakeholderMode) q = q.eq('expense_category', headingName).eq('stakeholder_id', vendorId);
+        else q = q.eq('expense_category', head);
+        // Reports Universal Rule B: a non-admin login only sees the report for data it can itself
+        // add/edit -- workshop-ledger.html's own edit/delete rights are already scoped the same way
+        // (11B.48's canEditExpense: own entries only). Defence in depth, not just a UI-level filter.
+        if (activeRole !== 'admin') q = q.eq('recorded_by', activeRole);
+
+        const { data, error } = await q;
+        if (error) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);padding:20px;">${error.message}</td></tr>`; return; }
+        const rows = data || [];
+        tbody.innerHTML = '';
+        if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:20px;">No expenses found for this head and date range.</td></tr>'; return; }
+        let total = 0;
+        rows.forEach(e => {
+            const amt = parseFloat(e.amount) || 0;
+            total += amt;
+            tbody.innerHTML += `<tr>
+                <td>${e.created_at ? new Date(e.created_at).toLocaleDateString('en-IN') : '—'}</td>
+                <td>₹${Math.round(amt).toLocaleString('en-IN')}</td>
+                <td>${e.payment_mode || 'Cash'}</td>
+                <td>${e.warehouse_type || '—'}</td>
+                <td>${e.note || '—'}</td>
+                <td>${(e.recorded_by || '—').toUpperCase()}</td>
+            </tr>`;
+        });
+        tfoot.innerHTML = `<tr><td>TOTAL (${rows.length} entr${rows.length === 1 ? 'y' : 'ies'})</td><td>₹${Math.round(total).toLocaleString('en-IN')}</td><td colspan="4"></td></tr>`;
     }
 
     // Maps a stored gst_entity / source_role combination to its display label.
