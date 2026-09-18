@@ -2588,10 +2588,42 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const stBtn = document.getElementById('btnSaveTotal');
         if (stBtn) stBtn.disabled = true;
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = true; el.style.background = '#f1f5f9'; });
-        if(sessionRole === 'admin') document.getElementById('btnUnlockAdmin').style.display = 'inline-block';
+        /* Phase 17 / F5: Service can now also reopen a Closed JC (not just Admin), subject to
+           the EOD-finalized gate checked inside unlockForEdit() itself. Green/Moped never see
+           this button directly -- they get their own warehouse's edit rights automatically,
+           through the existing per-line dropAuth logic, once Service or Admin has reopened it. */
+        if (sessionRole === 'admin' || sessionRole === 'service') {
+            const btn = document.getElementById('btnUnlockAdmin');
+            btn.style.display = 'inline-block';
+            btn.innerText = sessionRole === 'admin' ? 'UNLOCK FOR BACKDATED EDIT' : 'REOPEN & EDIT (Reason Required)';
+        }
     }
 
-    function unlockForEdit() {
+    /* Phase 17 / F5: before allowing a non-admin reopen, check whether EOD has already been
+       finalized for the day this JC actually closed, for any warehouse this JC touches. If so,
+       a Service-level reopen is blocked -- that day's books are locked -- and only Admin can
+       still unlock (Admin is never blocked by this gate, matching the existing "Admin
+       unrestricted" pattern used everywhere else in the app, e.g. 11B.48). */
+    async function checkEodGateForReopen() {
+        if (sessionRole === 'admin') return { allowed: true };
+        const closedDate = (activeJobContext?.closed_at || '').split('T')[0];
+        if (!closedDate) return { allowed: true }; // safety: no closed_at, nothing to gate against
+        const touchedWarehouses = [...new Set((lineItemsLocalMemory || []).map(i => (i.warehouse_type || '').toLowerCase()).filter(Boolean))];
+        if (!touchedWarehouses.length) return { allowed: true };
+        const { data: eodRows } = await supabaseClient.from('eod_cash_logs')
+            .select('entity, is_finalised').eq('log_date', closedDate).in('entity', touchedWarehouses);
+        const finalisedEntities = (eodRows || []).filter(r => r.is_finalised).map(r => r.entity);
+        if (finalisedEntities.length) {
+            return { allowed: false, reason: `EOD has already been finalised for ${finalisedEntities.join(', ').toUpperCase()} on ${closedDate}. Ask Admin to unlock this job card instead.` };
+        }
+        return { allowed: true };
+    }
+
+    async function unlockForEdit() {
+        if (sessionRole !== 'admin') {
+            const gate = await checkEodGateForReopen();
+            if (!gate.allowed) { alert('🔒 ' + gate.reason); return; }
+        }
         document.getElementById('lockedBanner').style.display = 'none';
         document.getElementById('adminEditBlock').style.display = 'block';
         document.getElementById('uiPartEntryBlock').style.display = 'flex';
@@ -2718,6 +2750,32 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const btn = document.querySelector('#adminEditBlock button.btn-action');
         if (btn) { btn.disabled = true; btn.innerText = 'SAVING…'; }
 
+        /* F5: detect deleted line items BEFORE building `updates`, so a genuine financial
+           change (or an item removal) can bump invoice_revision in the SAME write.
+           dropActiveRow() now soft-deletes a Closed-JC line item (is_deleted flag) instead of
+           hard-deleting the row, so the old "vanished from lineItemsLocalMemory" ID-absence
+           check would always find zero deletions now. Detect via the is_deleted flag on the
+           CURRENT in-memory items instead, with a defensive fallback to the old ID-absence
+           check against the snapshot for any item that somehow still went away outright. */
+        const snapshotItemsForDelete = window._amendmentSnapshotItems || [];
+        const currentIdsForDelete    = new Set((lineItemsLocalMemory || []).map(i => i.id));
+        const softDeleted            = (lineItemsLocalMemory || []).filter(i => i.is_deleted
+            && i.warehouse_type !== 'Service'); // service protocol deletions don't create product returns
+        const hardVanished           = snapshotItemsForDelete.filter(i => !currentIdsForDelete.has(i.id)
+            && i.warehouse_type !== 'Service');
+        const deletedItems           = [...softDeleted, ...hardVanished];
+
+        /* F5: a genuine financial change or an item removal on a reopened, already-Closed JC
+           prints as a new invoice revision ("REV-2", "REV-3"...) rather than a silent unlabeled
+           reprint. The job card's own id/jc_number never change — only this printed label. */
+        const origTotalForRevCheck    = parseFloat(window._amendmentSnapshot?.total_invoice_value) || 0;
+        const financialChangeOccurred = Math.abs(origTotalForRevCheck - netVal) > 0.5;
+        const willBumpRevision = activeJobContext?.status === 'Closed'
+            && (financialChangeOccurred || deletedItems.length > 0);
+        const nextRevision = willBumpRevision
+            ? ((parseInt(activeJobContext?.invoice_revision) || 1) + 1)
+            : (parseInt(activeJobContext?.invoice_revision) || 1);
+
         /* Build update — NOTE: closed_at is intentionally NOT included */
         const updates = {
             total_invoice_value: netVal,
@@ -2736,7 +2794,8 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             points_used         : pUsed,
             last_modified_at    : new Date().toISOString(),
             last_modified_by    : sessionRole,
-            amendment_count     : (parseInt(activeJobContext?.amendment_count) || 0) + 1
+            amendment_count     : (parseInt(activeJobContext?.amendment_count) || 0) + 1,
+            invoice_revision    : nextRevision
         };
 
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
@@ -2785,15 +2844,10 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         const amendmentId = amendData?.id;
 
         /* ── Customer Refund Detection ─────────────────────────────────────────
-           Compare original total vs amended total.
-           Also detect physically deleted line items (product return scenario). */
-        const originalTotal = parseFloat(window._amendmentSnapshot?.total_invoice_value) || 0;
+           Compare original total vs amended total. deletedItems was already computed above
+           (before `updates`, so the invoice_revision bump could see it in the same write). */
+        const originalTotal = origTotalForRevCheck;
         const refundAmt     = Math.round(originalTotal - netVal);
-
-        const snapshotItems = window._amendmentSnapshotItems || [];
-        const currentIds    = new Set((lineItemsLocalMemory || []).map(i => i.id));
-        const deletedItems  = snapshotItems.filter(i => !currentIds.has(i.id)
-            && i.warehouse_type !== 'Service'); // service protocol deletions don't create product returns
 
         if (refundAmt > 0 || deletedItems.length > 0) {
             const refundType = deletedItems.length > 0 ? 'product_return' : 'money_refund';
@@ -2834,7 +2888,8 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             ? `\n💸 ₹${refundAmt} refund logged as PENDING — visible in Approvals.`
             : deletedItems.length > 0 ? `\n📦 Product return logged — visible in Approvals for stock restore.`
             : '';
-        alert(`✅ Amendment saved to audit log.\nOriginal close date preserved: ${origDate}\nFields changed: ${changedFields.join(', ') || 'none detected'}\nReason: ${note}${refundMsg}`);
+        const revMsg = willBumpRevision ? `\n🧾 Invoice updated to REV-${nextRevision} — reprint to get the new copy.` : '';
+        alert(`✅ Amendment saved to audit log.\nOriginal close date preserved: ${origDate}\nFields changed: ${changedFields.join(', ') || 'none detected'}\nReason: ${note}${refundMsg}${revMsg}`);
     }
 
     async function cancelJobCard() { const reason = prompt("Please provide a reason for cancelling this job card:"); if(!reason || reason.trim() === '') return alert("Cancellation requires a valid reason."); if(confirm("Are you absolutely sure you want to CANCEL this Job Card?")) { await supabaseClient.from('job_cards').update({ status: 'Cancelled', cancellation_reason: reason.trim() }).eq('id', targetJobId); alert("Job Card Cancelled."); window.location.href = 'index.html'; } }
@@ -2899,7 +2954,20 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     
     async function loadInventoryLedgers() { const { data: items } = await supabaseClient.from('job_card_items').select('*, mechanics(name)').eq('job_card_id', targetJobId).order('created_at', { ascending: true }); lineItemsLocalMemory = items || []; renderDynamicTable(); }
     
-    function renderDynamicTable() { const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none'; lineItemsLocalMemory.forEach((line, idx) => { let dropAuth = false; if (!isLocked) { if (sessionRole === 'admin') { dropAuth = true; } else if (sessionRole === 'service' && line.warehouse_type === 'Service') { dropAuth = true; } else if (sessionRole === 'green' && line.warehouse_type === 'Green') { dropAuth = true; } else if (sessionRole === 'moped' && line.warehouse_type === 'Moped') { dropAuth = true; } } let evaluatedLineTotal = parseFloat(line.total_price); if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); evaluatedLineTotal = evaluatedLineTotal || 0; const issuerName = line.mechanics?.name || '--'; let displayRole = line.warehouse_type; let cssClass = `ware-${line.warehouse_type.toLowerCase()}`; let displayItemName = line.item_name; if(line.warehouse_type === 'Service') { const isLathe = line.item_name.startsWith('[LATHE]'); const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); const icon = isLathe ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️'); displayRole = isLathe ? icon : `${icon} Service`; if(isLathe) { cssClass = 'ware-lathe'; displayItemName = line.item_name.replace('[LATHE]', '').trim(); } } const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; let qtyDisplay = `<input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}`; if(line.warehouse_type === 'Service') qtyDisplay = `1 Pkg`; tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${displayItemName}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; });
+    function renderDynamicTable() { const tbody = document.getElementById('lineItemsContainer'); tbody.innerHTML = ''; const isLocked = activeJobContext && (activeJobContext.status === 'Closed' || activeJobContext.status === 'Cancelled') && document.getElementById('adminEditBlock').style.display === 'none';
+        /* Phase 17 / F5: soft-removed items are shown first, struck through, so a reopened job
+           card's history is fully transparent instead of items silently disappearing. They never
+           get a drop button or an editable qty -- they're a permanent record of what was removed
+           and why, not an active line any more. */
+        const orderedItems = [...lineItemsLocalMemory].sort((a, b) => (b.is_deleted ? 1 : 0) - (a.is_deleted ? 1 : 0));
+        orderedItems.forEach((line) => { const idx = lineItemsLocalMemory.indexOf(line); /* Phase 17 / F5: idx must be the item's real index in lineItemsLocalMemory (what updateInlineScalar expects), not its position in this sorted display copy */ let dropAuth = false; if (!isLocked && !line.is_deleted) { if (sessionRole === 'admin') { dropAuth = true; } else if (sessionRole === 'service' && line.warehouse_type === 'Service') { dropAuth = true; } else if (sessionRole === 'green' && line.warehouse_type === 'Green') { dropAuth = true; } else if (sessionRole === 'moped' && line.warehouse_type === 'Moped') { dropAuth = true; } } let evaluatedLineTotal = parseFloat(line.total_price); if(isNaN(evaluatedLineTotal)) evaluatedLineTotal = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); evaluatedLineTotal = evaluatedLineTotal || 0; const issuerName = line.mechanics?.name || '--'; let displayRole = line.warehouse_type; let cssClass = `ware-${line.warehouse_type.toLowerCase()}`; let displayItemName = line.item_name; if(line.warehouse_type === 'Service') { const isLathe = line.item_name.startsWith('[LATHE]'); const isCustom = line.unit_metric === 'Pkg' && !line.item_name.toLowerCase().includes('service'); const icon = isLathe ? '⚙️ [Lathe]' : (isCustom ? '⚙️' : '🏷️'); displayRole = isLathe ? icon : `${icon} Service`; if(isLathe) { cssClass = 'ware-lathe'; displayItemName = line.item_name.replace('[LATHE]', '').trim(); } }
+            if (line.is_deleted) {
+                const delWho = (line.deleted_by || '').toUpperCase();
+                const delWhen = line.deleted_at ? new Date(line.deleted_at).toLocaleDateString('en-IN') : '';
+                tbody.innerHTML += `<tr style="background:#fef2f2; text-decoration:line-through; color:#94a3b8;"><td><span class="pill-warehouse ${cssClass}" style="opacity:.5;">${displayRole}</span></td><td><strong>${displayItemName}</strong><div style="font-size:.68rem; text-decoration:none; color:#b91c1c; font-weight:700;">🗑️ REMOVED by ${delWho} ${delWhen ? 'on ' + delWhen : ''} — ${line.deleted_reason || 'no reason recorded'}</div></td><td style="font-size:0.75rem;">${issuerName}</td><td>${line.qty || ''} ${line.unit_metric || ''}</td><td>₹${evaluatedLineTotal}</td><td></td></tr>`;
+                return;
+            }
+            const dropBtn = dropAuth ? `<button class="row-destroyer" onclick="dropActiveRow('${line.id}')">×</button>` : ''; const inputState = isLocked ? 'disabled style="background:#f1f5f9;"' : ''; let qtyDisplay = `<input type="number" class="inline-input" value="${line.qty}" onchange="updateInlineScalar(${idx}, 'qty', this.value)" ${inputState}> ${line.unit_metric||''}`; if(line.warehouse_type === 'Service') qtyDisplay = `1 Pkg`; tbody.innerHTML += `<tr><td><span class="pill-warehouse ${cssClass}">${displayRole}</span></td><td><strong>${displayItemName}</strong></td><td style="font-size:0.75rem; color:var(--info); font-weight:bold;">${issuerName}</td><td>${qtyDisplay}</td><td>₹${evaluatedLineTotal}</td><td style="display:${document.getElementById('columnDestroyer').style.display}; text-align:center;">${dropBtn}</td></tr>`; });
     /* PHASE 9: Complaint credit lines — defective items credited back (read-only) */
     if(complaintCreditLines.length>0){complaintCreditLines.forEach(cl=>{tbody.innerHTML+=`<tr style="background:#fef2f2;"><td><span class="pill-warehouse" style="background:#991b1b;color:white;">CREDIT</span></td><td><strong style="color:#991b1b;">${cl.item_name}</strong></td><td style="font-size:.75rem;color:#94a3b8;">Defective return</td><td>—</td><td style="color:#991b1b;font-weight:700;">−₹${cl.original_price}</td><td></td></tr>`;});}
     compileDynamicSums(); }
@@ -3109,9 +3177,26 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             if (!isServiceGroup) suggestJobTagFromProduct(finalItemName);
             } else { alert("Database Error: " + error.message); } }
     async function updateInlineScalar(indexTarget, fieldTarget, stringValNumeric) { const itemContext = lineItemsLocalMemory[indexTarget]; itemContext[fieldTarget] = parseFloat(stringValNumeric) || 0; itemContext.total_price = itemContext.unit_metric === 'ML' ? itemContext.unit_price : (itemContext.qty * itemContext.unit_price); await supabaseClient.from('job_card_items').update({ qty: itemContext.qty, unit_price: itemContext.unit_price, total_price: itemContext.total_price }).eq('id', itemContext.id); renderDynamicTable(); }
-    async function dropActiveRow(nodeIdHash) { if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); } }
+    async function dropActiveRow(nodeIdHash) {
+        /* Phase 17 / F5: while reopening/editing a JC that was already Closed, a "drop" must
+           never actually delete the row -- it soft-deletes it (is_deleted + a mandatory reason)
+           so the item stays visible on the job card, struck through, at the top of the table,
+           instead of silently vanishing. A normal still-Open JC keeps its original, unchanged
+           hard-delete behaviour -- nothing about that everyday flow changes. */
+        if (activeJobContext?.status === 'Closed') {
+            const reason = prompt("Reason for removing this item (mandatory -- will be shown on the job card and saved to the audit log):");
+            if (!reason || !reason.trim()) return alert("A reason is required to remove an item from a reopened job card.");
+            const { error } = await supabaseClient.from('job_card_items').update({
+                is_deleted: true, deleted_reason: reason.trim().toUpperCase(), deleted_by: sessionRole, deleted_at: new Date().toISOString()
+            }).eq('id', nodeIdHash);
+            if (error) return alert('Error removing item: ' + error.message);
+            loadInventoryLedgers();
+            return;
+        }
+        if(confirm("Drop item?")) { await supabaseClient.from('job_card_items').delete().eq('id', nodeIdHash); loadInventoryLedgers(); }
+    }
 
-    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; const totalDisplayEl = document.getElementById('totalValuationDisplay'); if (totalDisplayEl) totalDisplayEl.innerText = Math.round(grossTotalBeforeDiscount) || 0;
+    function compileDynamicSums() { try { partsGrossTotal = 0; servicePkgGrossTotal = 0; internalLatheNet = 0; let greenNet = 0; let mopedNet = 0; let lubeNet = 0; lineItemsLocalMemory.forEach(line => { if (line.is_deleted) return; /* Phase 17 / F5: a soft-removed item never counts toward any total -- it's shown struck through for the audit trail only */ let rowNet = parseFloat(line.total_price); if(isNaN(rowNet)) rowNet = line.unit_metric === 'ML' ? parseFloat(line.unit_price) : ((parseFloat(line.qty)||0) * (parseFloat(line.unit_price)||0)); rowNet = rowNet || 0; if (line.warehouse_type === 'Green') greenNet += rowNet; else if (line.warehouse_type === 'Moped') mopedNet += rowNet; else if (line.warehouse_type === 'Service') { if(line.item_name.startsWith('[LATHE]')) { internalLatheNet += rowNet; } else { servicePkgGrossTotal += rowNet; } } if(line.warehouse_type !== 'Service') partsGrossTotal += rowNet; if (line.unit_metric === 'ML' || line.unit_metric === 'L' || line.unit_metric === 'Ltr' || line.volume_ml) { lubeNet += rowNet; } }); let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = partsGrossTotal * (activeGlobalDiscountPercent / 100); } let d = 0; const grossTotalBeforeDiscount = (partsGrossTotal - autoPartsDiscountValue) + servicePkgGrossTotal + internalLatheNet; const totalDisplayEl = document.getElementById('totalValuationDisplay'); if (totalDisplayEl) totalDisplayEl.innerText = Math.round(grossTotalBeforeDiscount) || 0;
         /* PHASE 3: Referral 5% on gross total — applied first, before admin concession is subtracted from net */
         referralDiscountAmount = referralDiscountActive ? Math.round(grossTotalBeforeDiscount * 0.05) : 0;
         const couponAmtEl = document.getElementById('couponDiscountAmt'); if (couponAmtEl) couponAmtEl.innerText = referralDiscountAmount;
@@ -3364,7 +3449,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         if(!error) { if(statusTarget === 'Closed') { populateReceiptDocument(modeTarget, netVal, updates); if(modeTarget === 'Credit') document.getElementById('thermalShopName').innerHTML = "My Care Service Center<br><span style='color:red; font-size:1.4rem; font-weight:900;'>CREDIT BILL</span>"; else document.getElementById('thermalShopName').innerHTML = "My Care Service Center"; } else { alert("Operational draft saved safely."); window.location.href = 'index.html'; } } else { alert("Database Error: " + error.message); }
     }
 
-    function populateReceiptDocument(paymentMode, finalNet, scopeVals, amendments, refunds) { amendments = amendments || []; refunds = refunds || []; const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); document.getElementById('thBillNo').innerText = activeJobContext.jc_number || `JC-${targetJobId.split('-')[0].toUpperCase()}`; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); const svcQty = parseFloat(line.qty) || 1; const svcRateRaw = svcQty > 0 ? (parseFloat(line.total_price) / svcQty) : (parseFloat(line.unit_price) || 0); const svcRate = Number.isInteger(svcRateRaw) ? svcRateRaw : parseFloat(svcRateRaw.toFixed(2)); const svcGstPct = parseFloat(line.gst_percent) || 18; const svcMrpSnap = parseFloat(line.mrp_at_billing) || 0; const svcMrpLine = (svcMrpSnap > 0 && svcRate < svcMrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP: ₹${svcMrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${svcQty} ${line.unit_metric||'Pkg'}&nbsp;&nbsp;Rate: ₹${svcRate}&nbsp;&nbsp;${svcGstPct}% GST</span></div>${svcMrpLine}</div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (parseFloat(line.total_price) / parseFloat(line.qty)) : (parseFloat(line.unit_price) || 0); const displayRateRounded = Number.isInteger(displayRate) ? displayRate : parseFloat(displayRate.toFixed(2)); const gstPct = parseFloat(line.gst_percent) || 18; const mrpLine = (mrpSnap > 0 && displayRateRounded < mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP: ₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||'Pcs'}&nbsp;&nbsp;Rate: ₹${displayRateRounded}&nbsp;&nbsp;${gstPct}% GST</span></div>${mrpLine}</div>`; } }); const pUsed = parseFloat(scopeVals.points_used) || 0; const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const savingsEl = document.getElementById('receiptSavingsSummary'); if (totalMrpValue > 0 && totalSavings > 0) { savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div>`; } else { savingsEl.style.display = 'none'; } const grossSpares = Math.round(lineItemsLocalMemory.filter(function(ln){ return ln.warehouse_type !== 'Service'; }).reduce(function(s,ln){ return s + (parseFloat(ln.total_price)||0); }, 0)); document.getElementById('thPartsSum').innerText = `₹${grossSpares}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = grossSpares * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `-₹${vDisc}`; } else { dDisc.style.display = 'none'; }
+    function populateReceiptDocument(paymentMode, finalNet, scopeVals, amendments, refunds) { amendments = amendments || []; refunds = refunds || []; const mopedAmt = parseFloat(scopeVals.moped_total) || 0; const greenAmt = parseFloat(scopeVals.green_total) || 0; const labourAmt = parseFloat(scopeVals.labour_charges) || 0; if (mopedAmt > 0) { renderMultiEntityReceipt(paymentMode, finalNet, scopeVals, mopedAmt, greenAmt, labourAmt); return; } const dateSource = activeJobContext.closed_at || new Date(); document.getElementById('thDate').innerText = new Date(dateSource).toLocaleDateString('en-IN'); document.getElementById('thTime').innerText = new Date(dateSource).toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'}); const billNoBase = activeJobContext.jc_number || `JC-${targetJobId.split('-')[0].toUpperCase()}`; const invRev = parseInt(activeJobContext.invoice_revision) || 1; document.getElementById('thBillNo').innerText = invRev > 1 ? `${billNoBase}  (REV-${invRev})` : billNoBase; document.getElementById('thClientInfo').innerText = `${activeJobContext.customer_mobile || ''} | ${activeCustomerName}`; const vehMakeModel = activeJobContext.vehicles?.make_model || 'Unknown'; const vehReg = activeJobContext.vehicles?.reg_number || 'UNMAPPED'; document.getElementById('thAssetInfo').innerText = `${vehReg} (${vehMakeModel})`; document.getElementById('thProblem').innerText = activeJobContext.problem_mentioned || 'Routine Maintenance'; const container = document.getElementById('thStackedItemsContainer'); container.innerHTML = ''; let totalMrpValue = 0; let totalActualValue = 0; lineItemsLocalMemory.forEach(line => { const mrpSnap = parseFloat(line.mrp_at_billing)||0; const tp = parseFloat(line.total_price)||0; if (mrpSnap > 0) totalMrpValue += mrpSnap*(parseFloat(line.qty)||1); totalActualValue += tp; if(line.warehouse_type === 'Service') { const preStr = line.item_name.startsWith('[LATHE]') ? '[Lathe]' : '[Service]'; const cleanName = line.item_name.replace('[LATHE]', '').trim(); const svcQty = parseFloat(line.qty) || 1; const svcRateRaw = svcQty > 0 ? (parseFloat(line.total_price) / svcQty) : (parseFloat(line.unit_price) || 0); const svcRate = Number.isInteger(svcRateRaw) ? svcRateRaw : parseFloat(svcRateRaw.toFixed(2)); const svcGstPct = parseFloat(line.gst_percent) || 18; const svcMrpSnap = parseFloat(line.mrp_at_billing) || 0; const svcMrpLine = (svcMrpSnap > 0 && svcRate < svcMrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP: ₹${svcMrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${preStr} ${cleanName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${svcQty} ${line.unit_metric||'Pkg'}&nbsp;&nbsp;Rate: ₹${svcRate}&nbsp;&nbsp;${svcGstPct}% GST</span></div>${svcMrpLine}</div>`; } else { const truncName = line.item_name; let displayRate = (line.qty && line.qty > 0) ? (parseFloat(line.total_price) / parseFloat(line.qty)) : (parseFloat(line.unit_price) || 0); const displayRateRounded = Number.isInteger(displayRate) ? displayRate : parseFloat(displayRate.toFixed(2)); const gstPct = parseFloat(line.gst_percent) || 18; const mrpLine = (mrpSnap > 0 && displayRateRounded < mrpSnap) ? `<div style="font-size:0.65rem;color:#7c3aed;">MRP: ₹${mrpSnap}</div>` : ''; container.innerHTML += `<div style="border-bottom:1px dotted #ccc; padding-bottom:2px; margin-bottom:2px;"><div class="receipt-item-row"><span class="receipt-item-desc"><strong>${truncName}</strong></span><span class="receipt-item-val">₹${line.total_price}</span></div><div class="receipt-item-sub"><span>Qty: ${line.qty} ${line.unit_metric||'Pcs'}&nbsp;&nbsp;Rate: ₹${displayRateRounded}&nbsp;&nbsp;${gstPct}% GST</span></div>${mrpLine}</div>`; } }); const pUsed = parseFloat(scopeVals.points_used) || 0; const advSrv = parseFloat(scopeVals.advance_service) || 0; const prepGrn = parseFloat(scopeVals.prepaid_green) || 0; const prepMop = parseFloat(scopeVals.prepaid_moped) || 0; const totalSavings = totalMrpValue > 0 ? Math.round(totalMrpValue - (parseFloat(finalNet) + advSrv + prepGrn + prepMop)) : 0; const savingsEl = document.getElementById('receiptSavingsSummary'); if (totalMrpValue > 0 && totalSavings > 0) { savingsEl.style.display = 'block'; savingsEl.innerHTML = `<div style="display:flex;justify-content:space-between;font-weight:700;font-size:0.82rem;"><span>Total MRP Value:</span><span>₹${Math.round(totalMrpValue)}</span></div><div style="display:flex;justify-content:space-between;font-size:0.95rem;font-weight:900;color:#15803d;"><span>YOU SAVED TODAY:</span><span>₹${totalSavings}</span></div>`; } else { savingsEl.style.display = 'none'; } const grossSpares = Math.round(lineItemsLocalMemory.filter(function(ln){ return ln.warehouse_type !== 'Service'; }).reduce(function(s,ln){ return s + (parseFloat(ln.total_price)||0); }, 0)); document.getElementById('thPartsSum').innerText = `₹${grossSpares}`; let autoPartsDiscountValue = 0; if(activeGlobalDiscountPercent > 0) { autoPartsDiscountValue = grossSpares * (activeGlobalDiscountPercent / 100); document.getElementById('thPartsDiscRow').style.display = 'flex'; document.getElementById('thPartsDiscSum').innerText = `-₹${Math.round(autoPartsDiscountValue)}`; } else { document.getElementById('thPartsDiscRow').style.display = 'none'; } document.getElementById('thLaborSum').innerText = `₹${parseFloat(scopeVals.labour_charges)||0}`; const dLathe = document.getElementById('rowLatheSum'); if (scopeVals.lathe_welding > 0) { dLathe.style.display = 'flex'; document.getElementById('thLatheSum').innerText = `₹${scopeVals.lathe_welding}`; } else { dLathe.style.display = 'none'; } const dDisc = document.getElementById('rowDiscSum'); const vDisc = (sessionRole === 'service' || sessionRole === 'admin') ? parseFloat(document.getElementById('vTotalServiceDisc').value) || 0 : parseFloat(document.getElementById('vFlatDisc').value) || 0; if (vDisc > 0) { dDisc.style.display = 'flex'; document.getElementById('thDiscSum').innerText = `-₹${vDisc}`; } else { dDisc.style.display = 'none'; }
         /* PHASE 3: Referral discount row — show only when first-visit coupon is active */
         const dRef = document.getElementById('rowReferralDisc');
         if (referralDiscountActive && referralDiscountAmount > 0 && dRef) { dRef.style.display = 'flex'; document.getElementById('thReferralCode').innerText = activeJobContext.referral_code || '--'; document.getElementById('thReferralAmt').innerText = `-₹${referralDiscountAmount}`; } else if (dRef) { dRef.style.display = 'none'; }
