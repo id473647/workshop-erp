@@ -215,7 +215,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
         <div class="block-title">Master Workflow Registers</div>
 
         <div class="search-strip">
-            <input type="text" id="sQuery" placeholder="Search by contact, registration, or JC hash..." oninput="queryMasterJobRegisters()">
+            <input type="text" id="sQuery" placeholder="Search by JC number, contact, or registration..." oninput="queryMasterJobRegisters()">
             <select id="sMode" onchange="queryMasterJobRegisters()">
                 <option value="ALL">All Modes</option>
                 <option value="Cash">Cash</option>
@@ -240,7 +240,7 @@ td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
             <table>
                 <thead>
                     <tr>
-                        <th>Model / Problem</th>
+                        <th>JC No. / Model</th>
                         <th>Registration / Contact</th>
                         <th>Advances / Invoice</th>
                         <th>Status / Days</th>
@@ -806,8 +806,14 @@ async function queryMasterJobRegisters() {
 
             tbody.innerHTML += `<tr ${rowBg}>
                 <td>
-                    <a class="clickable-ref" href="billing.html?id=${job.id}">${model}${color}</a>
-                    <span style="font-size:0.67rem;color:#94a3b8;">${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</span>
+                    <!-- Phase 17 / F14 (19 Sep 2026): JC number now leads (the bold clickable link),
+                         with the vehicle model/color as the secondary line beneath it -- now that JC
+                         numbers are human-readable (JC-YYYYMMDD##, per F4), searching/scanning by JC
+                         number is the primary path; the vehicle model is still shown, just no longer
+                         the lead line. Disclosed per Rule 6: this swaps which of the two is bold/first
+                         in this one column -- no data, link target, or other column changed. -->
+                    <a class="clickable-ref" href="billing.html?id=${job.id}">${job.jc_number || 'JC-'+job.id.split('-')[0].toUpperCase()}</a>
+                    <span style="font-size:0.67rem;color:#94a3b8;">${model}${color}</span>
                     ${probHtml}
                     ${timeHtml}
                 </td>
