@@ -142,7 +142,30 @@
                 </div>
                 <div class="field-group">
                     <label>Color</label>
-                    <input type="text" id="nvColor" placeholder="e.g. BLACK" oninput="this.value=(this.value||'').toUpperCase()">
+                    <!-- Phase 17 / F13: prefilled color dropdown + Custom fallback, replacing the old free-type
+                         box -- same UX pattern already used for the volume Custom/Loose picker (F1). #nvColor
+                         itself is kept as the real hidden value the rest of the page/save logic already reads;
+                         nothing downstream needs to change. -->
+                    <select id="nvColorSelect" onchange="toggleCustomColor()">
+                        <option value="">-- Select Color --</option>
+                        <option value="BLACK">Black</option>
+                        <option value="RED">Red</option>
+                        <option value="WINE RED">Wine Red</option>
+                        <option value="SILVER">Silver</option>
+                        <option value="GREY">Grey</option>
+                        <option value="BLUE">Blue</option>
+                        <option value="METALLIC BLUE">Metallic Blue</option>
+                        <option value="PURPLE">Purple</option>
+                        <option value="WHITE">White</option>
+                        <option value="CREAM">Cream</option>
+                        <option value="BROWN">Brown</option>
+                        <option value="YELLOW">Yellow</option>
+                        <option value="GREEN">Green</option>
+                        <option value="ORANGE">Orange</option>
+                        <option value="__CUSTOM__">Custom / Other...</option>
+                    </select>
+                    <input type="text" id="nvColorCustom" placeholder="Type color" style="display:none;margin-top:6px;" oninput="this.value=(this.value||'').toUpperCase(); syncCustomColor();">
+                    <input type="hidden" id="nvColor">
                 </div>
             </div>
         </div>
@@ -471,6 +494,25 @@
             .order('brand').order('model_name').order('emission_standard');
         globalVehicleMaster = vMaster || [];
         loadJobTypesCache(); // Phase 11B: preload job types for tag autocomplete
+    }
+
+    /* ── Phase 17 / F13: vehicle color dropdown + Custom fallback ──────────────
+       #nvColorSelect drives the visible choice; #nvColor (hidden) stays the single
+       source of truth everything downstream (saveNewVehicle's insert) already reads,
+       so no other code needed to change. */
+    function toggleCustomColor() {
+        const sel = document.getElementById('nvColorSelect').value;
+        const isCustom = sel === '__CUSTOM__';
+        document.getElementById('nvColorCustom').style.display = isCustom ? 'block' : 'none';
+        if (isCustom) {
+            document.getElementById('nvColor').value = document.getElementById('nvColorCustom').value || '';
+        } else {
+            document.getElementById('nvColorCustom').value = '';
+            document.getElementById('nvColor').value = sel || '';
+        }
+    }
+    function syncCustomColor() {
+        document.getElementById('nvColor').value = (document.getElementById('nvColorCustom').value || '').toUpperCase();
     }
 
     /* ── PHASE 11A: Smart combined vehicle search ──────────────────────────── */
