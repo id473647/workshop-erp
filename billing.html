@@ -2719,6 +2719,35 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         }
     }
 
+    /* ── B13 fix, 19 Sep 2026 — cleanupStaleLedgerEntries ───────────────────────
+       Root cause: upsertLedgerEntry() above only ever inserts/updates a row for
+       whichever mechanic(s) are CURRENTLY selected on the job. If a Closed JC is
+       reopened (F5) and the primary mechanic is changed, or a co-mechanic is
+       removed, the OLD mechanic's staff_ledger row from the original closure is
+       never touched — it stays in the ledger forever, so that job's labour gets
+       credited to BOTH the old and new mechanic. This is what created the
+       phantom/doubled commission amounts reported for 15/17/19 Sept.
+       Fix: after upserting the currently-assigned mechanic(s), delete any other
+       'Labour Credit' row still on file for this same job card whose mechanic
+       is no longer the current primary or co-mechanic. Called from both
+       commitInvoiceSettlement (first close) and adminAmendJC (reopen/reclose)
+       so a reassignment is always cleaned up the moment it's saved. */
+    async function cleanupStaleLedgerEntries(jobId, keepMechIds) {
+        const keep = (keepMechIds || []).filter(Boolean);
+        const { data: existingRows, error: fetchErr } = await supabaseClient.from('staff_ledger')
+            .select('id, mechanic_id')
+            .eq('job_card_id', jobId)
+            .eq('entry_type', 'Labour Credit');
+        if (fetchErr || !existingRows) return;
+        const staleIds = existingRows
+            .filter(r => !keep.includes(r.mechanic_id))
+            .map(r => r.id);
+        if (staleIds.length) {
+            const { error: delErr } = await supabaseClient.from('staff_ledger').delete().in('id', staleIds);
+            if (delErr) alert('⚠️ Could not remove a stale commission entry: ' + delErr.message + '\nInform Admin.');
+        }
+    }
+
     /* ── ADMIN AMENDMENT FUNCTION ────────────────────────────────────────────────
        Replaces the old UPDATE AS CASH / UPI / CREDIT buttons.
        KEY DIFFERENCE from commitInvoiceSettlement:
@@ -2820,6 +2849,9 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, origDate);
         if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
             `${jcRef} (50% split - co-mechanic)`, origDate);
+        // B13 fix: remove any leftover commission row for a mechanic who was on
+        // this job before but has since been reassigned off it.
+        await cleanupStaleLedgerEntries(targetJobId, [primaryMechId, hasCo ? coMechId : null]);
 
         /* Write full audit record — permanent, never deleted */
         const valuesAfter = {
@@ -3342,6 +3374,10 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
                 `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, todayDate);
             if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
                 `${jcRef} (50% split - co-mechanic)`, todayDate);
+            // B13 fix: remove any leftover commission row for a mechanic who was on
+            // this job before but has since been reassigned off it (covers a JC
+            // closed, reopened via an older path, then closed again).
+            await cleanupStaleLedgerEntries(targetJobId, [primaryMechId, hasCo ? coMechId : null]);
             if (activeCustomerProfile && activeCustomerProfile.mobile_number) {
                 /*
                  * LOYALTY EARN — 1% on My Care portion only (Green + Labour + Lathe).
