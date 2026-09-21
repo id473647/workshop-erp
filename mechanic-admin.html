@@ -576,11 +576,16 @@ async function renderCalendar(){
   const monthEnd=`${y}-${pad2(m+1)}-${pad2(daysInMonth)}`;
   const mechIds=Object.keys(mechCache);
   const[{data:ledger},{data:paid},{data:holidays}]=await Promise.all([
-    mechIds.length?sb.from('staff_ledger').select('mechanic_id,log_date,commission_amount').eq('entry_type','Labour Credit').in('mechanic_id',mechIds).gte('log_date',monthStart).lte('log_date',monthEnd):Promise.resolve({data:[]}),
+    /* B14 (21 Sep 2026): fetch release_status too — 'Pending Collection' rows (Credit
+       job cards not yet fully paid by the customer) must NOT be payable here. Filtered
+       in JS, not via .neq() in the query, so a legacy row with a null release_status
+       (shouldn't happen — column defaults to 'Released' — but just in case) is still
+       correctly treated as Released rather than silently dropped by SQL NULL semantics. */
+    mechIds.length?sb.from('staff_ledger').select('mechanic_id,log_date,commission_amount,release_status').eq('entry_type','Labour Credit').in('mechanic_id',mechIds).gte('log_date',monthStart).lte('log_date',monthEnd):Promise.resolve({data:[]}),
     sb.from('mechanic_payouts').select('amount,earning_date').gte('earning_date',monthStart).lte('earning_date',monthEnd),
     sb.from('workshop_holidays').select('holiday_date,holiday_name').gte('holiday_date',monthStart).lte('holiday_date',monthEnd)
   ]);
-  const earnByDate={};(ledger||[]).forEach(r=>{earnByDate[r.log_date]=(earnByDate[r.log_date]||0)+parseFloat(r.commission_amount||0);});
+  const earnByDate={};(ledger||[]).forEach(r=>{if((r.release_status||'Released')==='Pending Collection')return;earnByDate[r.log_date]=(earnByDate[r.log_date]||0)+parseFloat(r.commission_amount||0);});
   const paidByDate={};(paid||[]).forEach(r=>{paidByDate[r.earning_date]=(paidByDate[r.earning_date]||0)+parseFloat(r.amount||0);});
   const holidayByDate={};(holidays||[]).forEach(r=>{holidayByDate[r.holiday_date]=r.holiday_name;});
 
@@ -630,15 +635,20 @@ async function loadPayoutEarnings(date){
   const content=document.getElementById('payoutsContent');content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:12px;">Loading...</p>';
   // Phase 8: read pre-computed commission from staff_ledger instead of calculating from job_cards
   const[{data:ledger},{data:paid}]=await Promise.all([
-    sb.from('staff_ledger').select('mechanic_id,commission_amount').eq('log_date',date).eq('entry_type','Labour Credit'),
+    sb.from('staff_ledger').select('mechanic_id,commission_amount,release_status').eq('log_date',date).eq('entry_type','Labour Credit'),
     sb.from('mechanic_payouts').select('mechanic_id,amount').eq('earning_date',date)
   ]);
-  const earnings={};Object.values(mechCache).forEach(m=>{earnings[m.id]={mechanic:m,earned:0};});
+  const earnings={};Object.values(mechCache).forEach(m=>{earnings[m.id]={mechanic:m,earned:0,pending:0};});
   (ledger||[]).forEach(row=>{
-    if(earnings[row.mechanic_id]) earnings[row.mechanic_id].earned+=parseFloat(row.commission_amount||0);
+    if(!earnings[row.mechanic_id])return;
+    /* B14 (21 Sep 2026): a Pending Collection row (Credit job card not yet fully paid)
+       is tracked separately and never added to `earned` — so it can never be paid out
+       from this screen. Admin still sees it's there via the note below the table. */
+    if((row.release_status||'Released')==='Pending Collection'){ earnings[row.mechanic_id].pending+=parseFloat(row.commission_amount||0); return; }
+    earnings[row.mechanic_id].earned+=parseFloat(row.commission_amount||0);
   });
   const paidMap={};(paid||[]).forEach(p=>{paidMap[p.mechanic_id]=(paidMap[p.mechanic_id]||0)+parseFloat(p.amount);});
-  const rows=Object.values(earnings).filter(e=>e.earned>0).sort((a,b)=>a.mechanic.name.localeCompare(b.mechanic.name));
+  const rows=Object.values(earnings).filter(e=>e.earned>0||e.pending>0.01).sort((a,b)=>a.mechanic.name.localeCompare(b.mechanic.name));
   if(!rows.length){content.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px;">No commission entries in staff ledger for this date.</p>';document.getElementById('paySourcePanel').style.display='none';return;}
   let tHtml=`<div class="table-wrapper"><table><thead><tr><th>☑</th><th>Mechanic</th><th>Rate</th><th>Earned</th><th>Paid</th><th>Outstanding</th><th>Pay Now (₹)</th><th>Status</th></tr></thead><tbody>`;
   rows.forEach(e=>{
@@ -648,10 +658,11 @@ async function loadPayoutEarnings(date){
     const earnedRounded=Math.round(e.earned);
     const paidRounded=Math.round(alreadyPaid);
     const outstanding=Math.max(0,earnedRounded-paidRounded);
-    const status=outstanding<=0?`<span style="color:#166534;font-weight:700;font-size:.78rem;">✅ PAID</span>`:paidRounded>0?`<span style="color:#854d0e;font-weight:700;font-size:.78rem;">🟡 PARTIAL</span>`:`<span style="color:#991b1b;font-weight:700;font-size:.78rem;">⏳ UNPAID</span>`;
+    const status=e.earned<=0.01?`<span style="color:#9a3412;font-weight:700;font-size:.78rem;">⏳ PENDING COLLECTION</span>`:outstanding<=0?`<span style="color:#166534;font-weight:700;font-size:.78rem;">✅ PAID</span>`:paidRounded>0?`<span style="color:#854d0e;font-weight:700;font-size:.78rem;">🟡 PARTIAL</span>`:`<span style="color:#991b1b;font-weight:700;font-size:.78rem;">⏳ UNPAID</span>`;
     const payInp=outstanding>0?`<input type="number" class="pay-inp" data-mech="${e.mechanic.id}" value="${outstanding}" min="0" oninput="updatePayTotal()">`:'<span style="color:#94a3b8;font-size:.8rem;">—</span>';
     const chk=outstanding>0?`<input type="checkbox" class="pay-chk" data-mech="${e.mechanic.id}" checked style="width:auto;" onchange="togglePayRow(this)">`:'';
-    tHtml+=`<tr id="payRow_${e.mechanic.id}"><td>${chk}</td><td><strong>${e.mechanic.name}</strong></td><td>${e.mechanic.commission_rate||0}%</td><td style="font-weight:700;">₹${earnedRounded}</td><td style="color:var(--success);">₹${paidRounded}</td><td style="color:var(--danger);font-weight:700;">₹${outstanding}</td><td>${payInp}</td><td>${status}</td></tr>`;
+    const pendingNote=e.pending>0.01?`<div style="font-size:.68rem;color:#9a3412;margin-top:2px;">+₹${Math.round(e.pending)} pending collection on this date — not payable yet</div>`:'';
+    tHtml+=`<tr id="payRow_${e.mechanic.id}"><td>${chk}</td><td><strong>${e.mechanic.name}</strong>${pendingNote}</td><td>${e.mechanic.commission_rate||0}%</td><td style="font-weight:700;">₹${earnedRounded}</td><td style="color:var(--success);">₹${paidRounded}</td><td style="color:var(--danger);font-weight:700;">₹${outstanding}</td><td>${payInp}</td><td>${status}</td></tr>`;
   });
   tHtml+='</tbody></table></div>';
   content.innerHTML=tHtml;
