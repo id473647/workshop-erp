@@ -1501,7 +1501,16 @@
         document.getElementById('clCustName').innerText = name||'Walk-in';
         document.getElementById('clCustMobile').innerText = mobile;
         /* CHANGE 1: filter by credit_amount > 0, not payment_mode = Credit */
-        const { data: sales } = await supabaseClient.from('counter_sales').select('*').eq('customer_mobile',mobile).gt('credit_amount',0).eq('status','Closed').order('closed_at',{ascending:true});
+        /* B14 (20 Sep 2026): also pull Workshop (job card) credit invoices into the
+           same ledger, so one screen settles Green/Moped POS credit AND Workshop
+           (Green/Moped/Labour/Lathe) job-card credit together — this is what makes
+           "100% collected before release" actually enforceable: settling here is
+           the one place that flips a job card's credit_settled flag. */
+        const [salesRes, jcRes] = await Promise.all([
+            supabaseClient.from('counter_sales').select('*').eq('customer_mobile',mobile).gt('credit_amount',0).eq('status','Closed').order('closed_at',{ascending:true}),
+            supabaseClient.from('job_cards').select('id,jc_number,closed_at,total_invoice_value,credit_amount').eq('customer_mobile',mobile).gt('credit_amount',0).eq('status','Closed').order('closed_at',{ascending:true})
+        ]);
+        const sales = salesRes.data, jcs = jcRes.data;
         const { data: payments } = await supabaseClient.from('credit_payments').select('*').eq('customer_mobile',mobile);
         const tbody = document.getElementById('clTableBody'); tbody.innerHTML='';
         let totalOut=0; activeUnsettledInvoices=[];
@@ -1511,9 +1520,19 @@
             const paid = (payments||[]).filter(p=>p.sale_id===inv.id).reduce((s,p)=>s+(parseFloat(p.amount_paid)||0),0);
             const outstanding = creditAmt - paid;
             if(outstanding>0){
-                activeUnsettledInvoices.push({id:inv.id,outstanding});
+                activeUnsettledInvoices.push({id:inv.id,outstanding,type:'pos'});
                 totalOut+=outstanding;
                 tbody.innerHTML+=`<tr><td>POS-${inv.id.split('-')[0].toUpperCase()}</td><td>${new Date(inv.closed_at).toLocaleDateString('en-IN')}</td><td>₹${inv.total_amount}</td><td style="color:var(--warning);">₹${creditAmt}</td><td style="color:var(--success);">₹${paid.toFixed(2)}</td><td style="color:var(--danger);font-weight:bold;">₹${outstanding.toFixed(2)}</td></tr>`;
+            }
+        });
+        (jcs||[]).forEach(inv => {
+            const creditAmt = parseFloat(inv.credit_amount)||0;
+            const paid = (payments||[]).filter(p=>p.job_card_id===inv.id).reduce((s,p)=>s+(parseFloat(p.amount_paid)||0),0);
+            const outstanding = creditAmt - paid;
+            if(outstanding>0){
+                activeUnsettledInvoices.push({id:inv.id,outstanding,type:'jc'});
+                totalOut+=outstanding;
+                tbody.innerHTML+=`<tr><td>${inv.jc_number||('JC-'+inv.id.split('-')[0].toUpperCase())} <span style="font-size:0.65rem;color:#64748b;">(Workshop)</span></td><td>${new Date(inv.closed_at).toLocaleDateString('en-IN')}</td><td>₹${inv.total_invoice_value}</td><td style="color:var(--warning);">₹${creditAmt}</td><td style="color:var(--success);">₹${paid.toFixed(2)}</td><td style="color:var(--danger);font-weight:bold;">₹${outstanding.toFixed(2)}</td></tr>`;
             }
         });
         document.getElementById('clTotalOut').innerText=totalOut.toFixed(2);
@@ -1529,14 +1548,28 @@
         const note = document.getElementById('clNote').value.trim();
         const activeRole = localStorage.getItem('ERP_ACTIVE_ROLE')||'unknown';
         if(amountVal<=0)return alert("Enter a valid amount.");
-        let remaining=amountVal; const promises=[];
+        let remaining=amountVal; const promises=[]; const jcInvoicesTouched=[];
         for(const inv of activeUnsettledInvoices){
             if(remaining<=0)break;
             const apply=Math.min(inv.outstanding,remaining);
-            promises.push(supabaseClient.from('credit_payments').insert({customer_mobile:currentCreditLedgerMobile,sale_id:inv.id,amount_paid:apply,payment_mode:mode,note:note,paid_by_role:activeRole}));
+            const row = {customer_mobile:currentCreditLedgerMobile,amount_paid:apply,payment_mode:mode,note:note,paid_by_role:activeRole};
+            if (inv.type === 'jc') { row.job_card_id = inv.id; jcInvoicesTouched.push({id:inv.id, appliedNow:apply, outstandingBefore:inv.outstanding}); }
+            else { row.sale_id = inv.id; }
+            promises.push(supabaseClient.from('credit_payments').insert(row));
             remaining-=apply;
         }
         await Promise.all(promises);
+        /* B14 (20 Sep 2026): a job card whose credit is now fully covered gets its
+           release gate flipped — credit_settled = true on job_cards, and any
+           'Pending Collection' Labour Credit ledger row for it becomes 'Released'.
+           Only flips when the FULL credit_amount is covered (outstanding <= what
+           was just applied), never for a partial payment. */
+        for (const t of jcInvoicesTouched) {
+            if (t.appliedNow + 0.5 < t.outstandingBefore) continue; // still a partial payment
+            await supabaseClient.from('job_cards').update({ credit_settled: true }).eq('id', t.id);
+            await supabaseClient.from('staff_ledger').update({ release_status: 'Released' })
+                .eq('job_card_id', t.id).eq('entry_type', 'Labour Credit').eq('release_status', 'Pending Collection');
+        }
         /* Update outstanding_credit on customer record */
         if (currentCreditLedgerMobile) {
             const { data: cust } = await supabaseClient.from('customers').select('outstanding_credit').eq('mobile_number', currentCreditLedgerMobile).single();
