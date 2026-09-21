@@ -2684,8 +2684,13 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
        SKIP  if entry exists with same commission (double-click protection).
        UPDATE if entry exists with different commission (admin changed labour amount).
        INSERT if no entry exists (first closure). */
-    async function upsertLedgerEntry(mechId, share, rate, desc, logDate) {
+    /* B14 (20 Sep 2026): releaseStatus mirrors the job card's credit_settled flag —
+       'Released' for a Cash/UPI job (or a Credit job already fully collected),
+       'Pending Collection' for a Credit job still owed. Defaults to 'Released'
+       when the caller doesn't pass one, so nothing changes for existing callers. */
+    async function upsertLedgerEntry(mechId, share, rate, desc, logDate, releaseStatus) {
         if (!mechId || share < 0) return;
+        const relStatus = releaseStatus || 'Released';
         const newCommission = share * (rate / 100);
         const { data: existing } = await supabaseClient.from('staff_ledger')
             .select('id, commission_amount')
@@ -2695,13 +2700,19 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             .maybeSingle();
         if (existing) {
             const diff = Math.abs((existing.commission_amount || 0) - newCommission);
-            if (diff < 0.5) return; // Same amount within rounding — skip completely
+            if (diff < 0.5) {
+                // Same amount within rounding, but the settlement state may still have
+                // changed (e.g. credit just got paid off) — keep release_status current.
+                await supabaseClient.from('staff_ledger').update({ release_status: relStatus }).eq('id', existing.id);
+                return;
+            }
             // Labour amount genuinely changed — update the existing entry
             await supabaseClient.from('staff_ledger').update({
                 amount              : share,
                 commission_rate_snap: rate,
                 commission_amount   : newCommission,
-                log_date            : logDate
+                log_date            : logDate,
+                release_status      : relStatus
             }).eq('id', existing.id);
         } else {
             // No prior entry — normal first closure
@@ -2713,7 +2724,8 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
                 log_date            : logDate,
                 job_card_id         : targetJobId,
                 commission_rate_snap: rate,
-                commission_amount   : newCommission
+                commission_amount   : newCommission,
+                release_status      : relStatus
             }]);
             if (slErr) alert('⚠️ Commission ledger write failed: ' + slErr.message + '\nInform Admin.');
         }
@@ -2827,6 +2839,19 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             invoice_revision    : nextRevision
         };
 
+        /* B14 (20 Sep 2026): recompute credit_settled from what's actually been
+           collected so far (credit_payments), not just from whether this amendment
+           has a credit component — an amendment must never silently un-release a
+           job that a customer has already fully paid off. */
+        let b14CreditSettled = creditAmt <= 0;
+        if (!b14CreditSettled) {
+            const { data: b14Pays } = await supabaseClient.from('credit_payments')
+                .select('amount_paid').eq('job_card_id', targetJobId).gt('amount_paid', 0);
+            const b14Collected = (b14Pays || []).reduce((s, p) => s + (parseFloat(p.amount_paid) || 0), 0);
+            b14CreditSettled = b14Collected >= creditAmt - 0.5;
+        }
+        updates.credit_settled = b14CreditSettled;
+
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
         if (error) {
             if (btn) { btn.disabled = false; btn.innerText = '💾 SAVE AMENDMENT'; }
@@ -2845,10 +2870,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         /* CRITICAL: use original closed_at date — not today */
         const origDate       = (activeJobContext?.closed_at || new Date().toISOString()).split('T')[0];
         const jcRef          = activeJobContext?.jc_number || `JC-${targetJobId.split('-')[0].toUpperCase()}`;
+        const b14ReleaseStatus = b14CreditSettled ? 'Released' : 'Pending Collection';
         await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate,
-            `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, origDate);
+            `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, origDate, b14ReleaseStatus);
         if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
-            `${jcRef} (50% split - co-mechanic)`, origDate);
+            `${jcRef} (50% split - co-mechanic)`, origDate, b14ReleaseStatus);
         // B13 fix: remove any leftover commission row for a mechanic who was on
         // this job before but has since been reassigned off it.
         await cleanupStaleLedgerEntries(targetJobId, [primaryMechId, hasCo ? coMechId : null]);
@@ -3348,6 +3374,13 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             credit_amount      : creditAmtVal
         };
 
+        /* B14 (20 Sep 2026): a job with no credit component is settled the moment
+           it closes, exactly like today. A job with a credit component (creditAmtVal
+           > 0) starts life as NOT settled — nothing has been collected against it
+           yet — until a payment is recorded via the Credit Settlement screen. */
+        const b14CreditSettled = creditAmtVal <= 0;
+        updates.credit_settled = b14CreditSettled;
+
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
 
@@ -3370,10 +3403,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             /* ── FIX C: Use standalone upsertLedgerEntry (defined below adminAmendJC)
                Checks if entry exists for this JC+mechanic before inserting.
                Same amount → skip. Different amount → UPDATE. No entry → INSERT. */
+            const b14ReleaseStatus = b14CreditSettled ? 'Released' : 'Pending Collection';
             await upsertLedgerEntry(primaryMechId, primaryShare, primaryRate,
-                `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, todayDate);
+                `${jcRef}${hasCo ? ' (50% split - primary)' : ''}`, todayDate, b14ReleaseStatus);
             if (hasCo && coMechId) await upsertLedgerEntry(coMechId, coShare, coRate,
-                `${jcRef} (50% split - co-mechanic)`, todayDate);
+                `${jcRef} (50% split - co-mechanic)`, todayDate, b14ReleaseStatus);
             // B13 fix: remove any leftover commission row for a mechanic who was on
             // this job before but has since been reassigned off it (covers a JC
             // closed, reopened via an older path, then closed again).
