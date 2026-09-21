@@ -1069,7 +1069,7 @@ async function loadMechEarnings(){
   // Reading commission_amount from staff_ledger — pre-computed, rate-snapped, single source of truth.
   const[ledgerRes,payRes]=await Promise.all([
     supabaseClient.from('staff_ledger')
-      .select('mechanic_id,log_date,commission_amount,amount')
+      .select('mechanic_id,log_date,commission_amount,amount,release_status')
       .eq('entry_type','Labour Credit')
       .gte('log_date',from40)
       .lte('log_date',today),
@@ -1082,10 +1082,22 @@ async function loadMechEarnings(){
 
   // Build earnMap: date → { mechId: commission_amount } from staff_ledger
   // Build labourMap: date → { mechId: raw labour amount } — display-only, not used in payout totals
+  // B14 (20 Sep 2026): a row still awaiting full credit collection on its job card
+  // (release_status='Pending Collection') is NOT counted as earned/payable yet —
+  // it's tracked separately in pendingMap so it can be shown, not paid, until the
+  // job card's credit is settled (mirrors mechanic-admin.html's own payout screen).
   const earnMap={};
   const labourMap={};
+  const pendingMap={}; // date → { mechId: pending commission amount } — awaiting credit collection
+  let mechEarningsPendingTotal=0;
   (ledgerRes.data||[]).forEach(row=>{
     if(!row.log_date||!row.mechanic_id) return;
+    if((row.release_status||'Released')==='Pending Collection'){
+      if(!pendingMap[row.log_date]) pendingMap[row.log_date]={};
+      pendingMap[row.log_date][row.mechanic_id]=(pendingMap[row.log_date][row.mechanic_id]||0)+parseFloat(row.commission_amount||0);
+      mechEarningsPendingTotal+=parseFloat(row.commission_amount||0);
+      return;
+    }
     if(!earnMap[row.log_date]) earnMap[row.log_date]={};
     earnMap[row.log_date][row.mechanic_id]=(earnMap[row.log_date][row.mechanic_id]||0)+parseFloat(row.commission_amount||0);
     if(!labourMap[row.log_date]) labourMap[row.log_date]={};
@@ -1205,7 +1217,10 @@ async function loadMechEarnings(){
       <td style="text-align:right;padding:8px;font-weight:700;color:${totalBal>0?'var(--danger)':'#166534'};">₹${Math.round(totalBal).toLocaleString('en-IN')}</td>
       <td>—</td><td>—</td>
     </tr></tfoot>
-  </table>`;
+  </table>
+  ${mechEarningsPendingTotal>0.5?`<div style="margin-top:10px;padding:10px 14px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;font-size:.78rem;color:#9a3412;">
+    ⏳ <strong>₹${Math.round(mechEarningsPendingTotal).toLocaleString('en-IN')} Pending Collection</strong> — commission earned on Credit job cards not yet fully paid by the customer. Not shown above and not payable until that job card's credit is settled (Credit Settlement page). Not lost — it will move into the table above automatically once collected.
+  </div>`:''}`;
 
   // Summary line
   const sumEl=document.getElementById('mechUnpaidSummary');
