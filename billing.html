@@ -2289,7 +2289,14 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
              * Tags [G] for Green, [M] for Moped so the mechanic knows who issued each.
              * Blank rows fill remaining space to a total of TOTAL_ROWS (targets A5 bottom).
              */
-            const TOTAL_ROWS = 17; // Calculated for A5 portrait at 5mm margins
+            // URGENT fix, 21 Sep 2026: user's screen recording showed the ticket spilling onto a
+            // 2nd A5 page ("2 sheets of paper" in Chrome's own print preview) once the page margin
+            // was widened 5mm->7mm (and 4mm left/right padding added) for the right-edge-cutting
+            // fix delivered just before this. TOTAL_ROWS=17 was originally sized for the OLD 5mm
+            // margins, which no longer fits inside the new, slightly smaller printable area.
+            // Per the user's explicit instruction ("you can delete 2-3 rows but keep it in one
+            // page"), reduced by 3, 17 -> 14, to reclaim that room and fit back on a single A5 page.
+            const TOTAL_ROWS = 14; // Recalculated for A5 portrait at 7mm margins (was 17 @ 5mm)
             const tbody = document.getElementById('tkPartsBody');
             const partItems = lineItemsLocalMemory.filter(l => l.warehouse_type !== 'Service');
             let html = ''; let sno = 1;
