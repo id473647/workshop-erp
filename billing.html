@@ -146,7 +146,6 @@
         .me-summary { background: #f8fafc; border: 2px solid #2c3e50; padding: 10px; font-family: 'Courier New', monospace; font-size: 0.78rem; }
         .me-sum-row { display: flex; justify-content: space-between; margin: 2px 0; }
         
-        .ping-box { background:#eff6ff; border:1px solid #bae6fd; padding:12px; border-radius:8px; margin-top:10px;}
         #adminOverrideBlock { display:none; background:#fef2f2; padding:16px; border-radius:8px; border:1px solid #fecaca; text-align:center; margin-bottom:16px; }
 
         @media print { 
@@ -653,15 +652,11 @@
                 <button class="btn-action btn-credit" onclick="commitInvoiceSettlement('Credit', 'Closed')">CREDIT BILL</button>
             </div>
         </div>
-
-        <div class="ping-box" id="pingRequestBlock" style="display:none;">
-            <label style="font-size:0.75rem; font-weight:bold; color:var(--primary);">🛎️ Request Payment at Counter</label>
-            <div style="display:flex; gap:8px; margin-top:6px;">
-                <select id="pingTargetDept" style="flex:1; padding:6px; font-size:0.8rem;"><option value="green">Green Counter</option><option value="moped">Moped Counter</option></select>
-                <button onclick="dispatchPaymentPing()" style="background:#0284c7; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">PING DESK</button>
-            </div>
-            <div id="pingStatusText" style="font-size:0.7rem; color:#64748b; margin-top:6px;"></div>
-        </div>
+        <!-- Ping/"Request Payment at Counter" feature removed 22 Sep 2026, per the user's
+             explicit instruction — scrapped. It was already known to have no working consumer
+             anywhere else in the app (flagged under 13.19's audit: the approval_requests rows it
+             created were never read by any page), so removing it deletes dead UI, not a live
+             workflow. See the matching removal of dispatchPaymentPing() and its CSS below. -->
     </div>
 
     <!--
@@ -1919,7 +1914,6 @@
          */
         if (sessionRole === 'service' || sessionRole === 'admin') {
             document.getElementById('settlementActionBlock').style.display = 'grid';
-            document.getElementById('pingRequestBlock').style.display = 'block';
         }
 
         /* Discount block visibility */
@@ -2674,9 +2668,27 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         /* CHANGE 1: restore LOG COLLECTION button on unlock */
         const lcBtn = document.getElementById('btnLogCollection');
         if (lcBtn) lcBtn.style.display = 'block';
-        /* CHANGE 6: re-enable Save Total during admin backdated edit */
-        const stBtn = document.getElementById('btnSaveTotal');
-        if (stBtn) stBtn.disabled = false;
+        /* URGENT fix, 22 Sep 2026 — real live incident: a manager reported a Closed,
+           invoiced, EOD-finalized job card (JC-2026092124) showing back up as "Open"
+           the next day, with its payment_mode/cash/UPI/credit amounts wiped to zero,
+           even though closed_at and the mechanic's commission entry were both still
+           correctly in place from the original close. Root-caused by reading this
+           exact function: unlockForEdit() ALWAYS runs on a JC that was Closed or
+           Cancelled (it's only ever reachable from the button lockUserInterface()
+           shows for those two statuses) — F5 (18 Sep 2026) correctly added its own
+           dedicated "SAVE AMENDMENT" button (adminAmendJC(), inside #adminEditBlock)
+           for re-saving a reopened Closed JC, but this pre-existing line below it
+           ALSO re-enabled the OLD "SAVE TOTAL" button, whose handler is
+           commitInvoiceSettlement('Pending','Open') — a plain still-open-draft save.
+           Clicking that old button on a reopened Closed JC silently reverted it back
+           to Open/Pending, wiping payment_mode and the cash/UPI/credit columns
+           (commitInvoiceSettlement only sets closed_at and writes the commission
+           ledger when statusTarget==='Closed', so neither of those got touched —
+           exactly matching what was found in the live data). Fixed: btnSaveTotal is
+           no longer re-enabled here at all — lockUserInterface() already leaves it
+           disabled, and a reopened Closed JC should only ever be re-saved through
+           "SAVE AMENDMENT". A still-Open JC's own normal Save Total flow is
+           completely unaffected, since unlockForEdit() is never called for one. */
         document.querySelectorAll('.input-lockable').forEach(el => { el.disabled = false; el.style.background = 'white'; });
 
         /* STEP 4: Snapshot current values for amendment audit trail — captured at unlock time */
@@ -3284,7 +3296,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
         /* PHASE 3: Referral 5% on gross total — applied first, before admin concession is subtracted from net */
         referralDiscountAmount = referralDiscountActive ? Math.round(grossTotalBeforeDiscount * 0.05) : 0;
         const couponAmtEl = document.getElementById('couponDiscountAmt'); if (couponAmtEl) couponAmtEl.innerText = referralDiscountAmount;
-        if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); const pingBlock = document.getElementById('pingRequestBlock'); if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(pingBlock) pingBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; if(pingBlock) pingBlock.style.display = 'block'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; }
+        if (sessionRole === 'service' || sessionRole === 'admin') { const totalServiceDisc = parseFloat(document.getElementById('vTotalServiceDisc').value) || 0; const discGreen = parseFloat(document.getElementById('vDiscGreen').value) || 0; const discMoped = parseFloat(document.getElementById('vDiscMoped').value) || 0; const discLabour = parseFloat(document.getElementById('vDiscLabour').value) || 0; const discLathe = parseFloat(document.getElementById('vDiscLathe').value) || 0; const remaining = totalServiceDisc - (discGreen + discMoped + discLabour + discLathe); const balNode = document.getElementById('serviceDiscBalance'); if(balNode) { balNode.innerText = `Remaining to Allocate: ₹${remaining}`; if (remaining < 0) balNode.style.color = 'red'; else if (remaining > 0) balNode.style.color = '#d97706'; else balNode.style.color = 'var(--success)'; } greenNet = Math.max(0, greenNet - discGreen); mopedNet = Math.max(0, mopedNet - discMoped); servicePkgGrossTotal = Math.max(0, servicePkgGrossTotal - discLabour); internalLatheNet = Math.max(0, internalLatheNet - discLathe); d = totalServiceDisc; partsGrossTotal = greenNet + mopedNet; } else { const flatNode = document.getElementById('vFlatDisc'); d = flatNode ? (parseFloat(flatNode.value) || 0) : 0; if (sessionRole === 'green') greenNet = Math.max(0, greenNet - d); else if (sessionRole === 'moped') mopedNet = Math.max(0, mopedNet - d); } const requiresOverride = (d > grossTotalBeforeDiscount * 0.10) && (sessionRole !== 'admin'); const adminBlock = document.getElementById('adminOverrideBlock'); const settleBlock = document.getElementById('settlementActionBlock'); /* pingBlock reference removed 22 Sep 2026 along with the scrapped Ping/Request-Payment-at-Counter feature */ if (requiresOverride && !overrideApproved) { if(settleBlock) settleBlock.style.display = 'none'; if(adminBlock) adminBlock.style.display = 'block'; } else { if(adminBlock) adminBlock.style.display = 'none'; if (activeJobContext && activeJobContext.status !== 'Closed' && activeJobContext.status !== 'Cancelled') { if(sessionRole !== 'green' && sessionRole !== 'moped') { if(settleBlock) settleBlock.style.display = 'grid'; } } } internalGreenNet = greenNet || 0; internalMopedNet = mopedNet || 0; internalLubeNet = lubeNet || 0; const a_srv = parseFloat(document.getElementById('vAdvanceService').value) || 0; const p_grn = parseFloat(document.getElementById('vPrepaidGreen').value) || 0; const p_mop = parseFloat(document.getElementById('vPrepaidMoped').value) || 0; const totalLabor = servicePkgGrossTotal || 0; const coMechNode = document.getElementById('coMech'); const coMechVal = coMechNode ? coMechNode.value : null; const splitIndicator = document.getElementById('splitIndicator'); if (coMechVal && splitIndicator) { splitIndicator.style.display = 'block'; splitIndicator.innerText = `Labour Split Active: ₹${(totalLabor / 2).toFixed(2)} each`; } else if (splitIndicator) { splitIndicator.style.display = 'none'; } let netBeforeAdv = 0; if (sessionRole === 'service' || sessionRole === 'admin') { netBeforeAdv = partsGrossTotal + totalLabor + internalLatheNet; } else { netBeforeAdv = (partsGrossTotal - autoPartsDiscountValue) + totalLabor + internalLatheNet - d; } const pointsNode = document.getElementById('vPointsUsed'); let pUsed = pointsNode ? (parseFloat(pointsNode.value) || 0) : 0; const actualMaxPoints = Math.min(customerWalletBalance, netBeforeAdv * 0.20); if(pUsed > actualMaxPoints) { pUsed = Math.floor(actualMaxPoints); if(pointsNode) pointsNode.value = pUsed; }
         /* PHASE 3: referralDiscountAmount deducted from net after admin concession — per confirmed sequencing */
         /* PHASE 9: complaintCreditTotal further reduces net for replaced defective items */
         document.getElementById('netValuationDisplay').innerText = Math.round(netBeforeAdv - referralDiscountAmount - a_srv - p_grn - p_mop - pUsed - complaintCreditTotal) || 0; clearTimeout(saveDraftTimeout); saveDraftTimeout = setTimeout(() => { saveJobState(); }, 1000); } catch (e) { console.error("Compilation Error: ", e); } }
@@ -4549,7 +4561,11 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     function triggerPrintSelection() { document.getElementById('modalPrintChoice').style.display = 'flex'; }
     function executePrint(mode) { document.body.className = ''; const isMulti = document.getElementById('multiEntityReceiptTarget').style.display !== 'none'; if (isMulti) { document.body.classList.add('print-multi'); if (mode === 'landscape') document.body.classList.add('print-landscape'); } else { document.body.classList.add('print-receipt'); const container = document.getElementById('renderThermalReceiptTarget'); if (mode === 'a5') container.classList.add('a5-mode'); else container.classList.remove('a5-mode'); } document.getElementById('modalPrintChoice').style.display = 'none'; setTimeout(() => { window.onafterprint = function() { document.body.className = ''; window.onafterprint = null; }; window.print(); }, 400); }
 
-    async function dispatchPaymentPing() { const reqAmt = parseFloat(document.getElementById('netValuationDisplay').innerText) || 0; if (reqAmt <= 0) return alert("No outstanding balance to request."); const target = document.getElementById('pingTargetDept').value; const statusText = document.getElementById('pingStatusText'); if(!confirm(`Send payment request for ₹${reqAmt} to the ${target.toUpperCase()} counter?`)) return; statusText.innerText = "Dispatching request..."; const payload = { customer_mobile: activeJobContext.customer_mobile, requested_by_role: sessionRole, request_type: 'Cash Collection', payload: { jc_id: targetJobId, amount: reqAmt }, status: 'Pending', target_dept: target }; const { error } = await supabaseClient.from('approval_requests').insert(payload); if (error) statusText.innerText = "Error: " + error.message; else { statusText.innerText = `✅ Request sent to ${target.toUpperCase()} counter. Waiting for approval...`; document.getElementById('settlementActionBlock').style.display = 'none'; } }
+    // dispatchPaymentPing() removed 22 Sep 2026 — the "Request Payment at Counter" / PING DESK
+    // feature has been scrapped per the user's explicit instruction. It only ever wrote a
+    // 'Cash Collection' row into approval_requests, and no page in the app ever read that
+    // request_type back out (confirmed via the earlier Phase 13.19 audit and a fresh grep across
+    // every file, still true today) — so nothing downstream depended on this function.
 
     // ── PHASE 9: COMPLAINT JC FUNCTIONS ─────────────────────────────────────
 
