@@ -498,7 +498,7 @@
         <div id="inlineAddStrip" class="inline-add-strip" style="display:none;">
             <div style="position:relative;">
                 <div style="display:flex;gap:4px;">
-                    <input type="text" id="nPart" placeholder="Search Parts, Lubes, or Services..." style="flex:1; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this)" onblur="hideAutoSuggestions()" autocomplete="off">
+                    <input type="text" id="nPart" placeholder="Search Parts, Lubes, or Services..." style="flex:1; padding:8px; border-radius:4px; border:1px solid var(--border);" onkeyup="queryCatalogAutocomplete(this,event)" onblur="hideAutoSuggestions()" autocomplete="off">
                     <button id="btnScanBarcode" onclick="openBarcodeCamera()" title="Scan Barcode or QR Code — works with hardware scanner and camera" class="input-lockable" style="padding:8px 10px;border:1px solid var(--border);border-radius:4px;background:#f0f9ff;color:var(--info);cursor:pointer;font-size:1rem;line-height:1;flex-shrink:0;white-space:nowrap;">📷</button>
                 </div>
                 <div id="autolist-n" class="autocomplete-container"></div>
@@ -3078,7 +3078,7 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
     // Phase 17 / F2 (16 Sep 2026): results now show brand + volume (not just the product name),
     // and pass the FULL cached variant object into applySelectedCatalogItem() instead of a long
     // positional argument list — same pattern already used in purchase-manager.html's rewrite.
-    async function queryCatalogAutocomplete(inputRef) { const upperVal = inputRef.value.toUpperCase(); if (inputRef.value !== upperVal) { const cursorPos = inputRef.selectionStart; inputRef.value = upperVal; inputRef.setSelectionRange(cursorPos, cursorPos); } const q = upperVal.trim(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; listContainer.style.display = 'none'; currentFocus = -1; if (q.length < 2) return;
+    async function queryCatalogAutocomplete(inputRef, ev) { /* B9 FIX (22 Sep 2026): this keyup handler used to run on EVERY keystroke, including ArrowUp/ArrowDown/Enter/Tab/Escape — it reset currentFocus=-1 and rebuilt the whole dropdown from scratch on every single keypress, which erased the highlight the separate keydown listener (below) had just set a moment earlier, making arrow-key navigation look completely broken. Fix: skip this function entirely for the same navigation/selection keys the keydown listener already owns — typing itself is completely unaffected. */ if (ev && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter' || ev.key === 'Tab' || ev.key === 'Escape')) return; const upperVal = inputRef.value.toUpperCase(); if (inputRef.value !== upperVal) { const cursorPos = inputRef.selectionStart; inputRef.value = upperVal; inputRef.setSelectionRange(cursorPos, cursorPos); } const q = upperVal.trim(); const listContainer = document.getElementById('autolist-n'); listContainer.innerHTML = ''; listContainer.style.display = 'none'; currentFocus = -1; if (q.length < 2) return;
       /* PHASE 11A: Barcode-first lookup — if typed/scanned value matches a barcode_id exactly, auto-fill immediately */
       const exactBarcode = globalCatalogCache.find(p => p.source === 'product' && p.barcode_id && p.barcode_id.toUpperCase().trim() === q.trim());
       if (exactBarcode) { inputRef.value = ''; applySelectedCatalogItem(exactBarcode); return; }
