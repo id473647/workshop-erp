@@ -3398,11 +3398,29 @@ supabaseClient.from('jc_photos').select('id',{count:'exact',head:true}).eq('job_
             /* CHANGE 4: Direct column writes — eliminates regex dependency */
             cash_amount        : cashAmtVal,
             upi_amount         : upiAmtVal,
-            credit_amount      : creditAmtVal
+            credit_amount      : creditAmtVal,
+            /* B16 fix (24 Sep 2026): this was the ONLY write path in the whole app that
+               touched job_cards without ever recording who/when — adminAmendJC() (the F5
+               reopen-and-edit path) already writes last_modified_at/last_modified_by on
+               every save; this plain SAVE TOTAL draft-save path never did. Investigating a
+               second SAVE TOTAL revert incident (JC-2026092232, following JC-2026092124/B15)
+               confirmed there was genuinely no record anywhere of who saved or when — added
+               here so any future save on this path is traceable the same way an amendment
+               already is. */
+            last_modified_at   : new Date().toISOString(),
+            last_modified_by   : sessionRole
         };
 
         if(statusTarget === 'Closed') { updates.closed_at = new Date().toISOString(); }
         const { error } = await supabaseClient.from('job_cards').update(updates).eq('id', targetJobId);
+        /* B16 fix (24 Sep 2026): this error was captured but never shown to staff on this
+           path — a blocked write (e.g. the new database-level trigger that now refuses to
+           let a Closed/Cancelled job's status silently revert to Open) would previously have
+           failed completely silently, leaving staff thinking nothing happened. Surface it. */
+        if (error) {
+            alert('⚠️ Could not save: ' + error.message + '\n\nNothing was changed. If this job card should already be locked, please refresh the page and inform Admin.');
+            return;
+        }
 
         /* ── FIX B: Lock UI immediately after successful DB closure ────────────
            Updating activeJobContext.status here means Fix A guard activates
