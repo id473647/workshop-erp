@@ -1122,7 +1122,24 @@
         </div>
 
         <!-- Customer & Vehicle -->
-        <div style="border:1px solid #000; margin-bottom:4px; padding:4px 6px;">
+        <!-- B19 fix (28 Sep 2026): the 3 rows below use justify-content:space-between, which
+             deliberately pushes Mob/Color/Odo flush against this box's own right inner edge --
+             the tightest possible spot relative to the printer's physical unprintable margin.
+             User confirmed real prints still clip the last ~2 characters of these right-hand
+             values even at a 95% print-dialog scale (e.g. "Black" -> "Bla", last 2 mobile
+             digits dropped). Per the user's own diagnosis (plenty of spare space at the bottom,
+             just needs a little more room on the right for these specific fields), added 8mm of
+             dedicated extra right padding to ONLY this box -- matching the same 8mm safety
+             margin already proven necessary for the A6 invoice on this identical printer
+             (11B.46c-fix16/fix "right-edge-cutting" history above). This pulls Mob/Color/Odo
+             inward from the box's true right edge by ~8mm (roughly 3-4 characters at this font
+             size) without touching the page's outer @page margin, the ticket's own container
+             padding, or the parts table -- so no other row/section is narrowed and the table's
+             row count (already tuned to fit one A5 page) is unaffected. Disclosed per Rule 6:
+             this leaves a small, intentional blank margin on the right of these 3 rows only,
+             visible on screen too (not just in print) since it's a real padding change, not a
+             print-only override -- the values themselves and their order are unchanged. -->
+        <div style="border:1px solid #000; margin-bottom:4px; padding:4px 8mm 4px 6px;">
             <div style="font-size:10px; font-weight:bold; text-transform:uppercase; border-bottom:1px solid #000; margin-bottom:3px; padding-bottom:2px;">Customer & Vehicle</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:1px; font-size:10px;"><span><strong>Name:</strong> <span id="tkFrontCustName">--</span></span><span><strong>Mob:</strong> <span id="tkFrontCustMobile">--</span></span></div>
             <div style="display:flex; justify-content:space-between; margin-bottom:1px; font-size:10px;"><span><strong>Vehicle:</strong> <span id="tkFrontVehModel">--</span></span><span><strong>Color:</strong> <span id="tkFrontVehColor">--</span></span></div>
